@@ -4,11 +4,20 @@ extends SceneTree
 # specific files I edited in this turn still parse.
 
 const FILES := [
-	"res://scripts/battle/vision/vision_service.gd",
-	"res://scripts/battle/units/unit.gd",
-	"res://scripts/battle/match_director.gd",
+	"res://scripts/module_catalog.gd",
+	"res://scripts/lab_document.gd",
+	"res://scripts/auto_weapon.gd",
+	"res://scripts/visual_builder.gd",
 	"res://scripts/battle/ai/commander.gd",
-	"res://scripts/battle/movement/flow_field_service.gd",
+	"res://scripts/weapon_alpha.gd",
+	"res://scripts/power_budget.gd",
+	"res://scripts/damage_resolver.gd",
+	"res://scripts/drivetrain.gd",
+	"res://scripts/module_placer.gd",
+	"res://scripts/armor_paint.gd",
+	"res://scripts/armor_station_panel.gd",
+	"res://scripts/hull_facets.gd",
+	"res://scripts/part_materials.gd",
 ]
 
 func _init():

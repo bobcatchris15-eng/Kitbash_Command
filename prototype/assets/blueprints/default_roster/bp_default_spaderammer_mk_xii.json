@@ -1,4 +1,4 @@
-{
+﻿{
 	"armor_material": "hardened_steel",
 	"armor_thickness": 1.2,
 	"faction": "industrialists",
@@ -307,7 +307,7 @@
 				"z": 0.0218120738863945
 			},
 			"mount_style": "pintle",
-			"name": "Sentry Deployer",
+			"name": "Mine Layer",
 			"position": {
 				"x": -1.0,
 				"y": 0.455346822738647,
@@ -333,7 +333,7 @@
 				"weight": 140.0
 			},
 			"tweaks": {},
-			"type_id": "sentry_deployer",
+			"type_id": "mine_layer",
 			"yaw_offset": 0.0
 		},
 		{
@@ -345,7 +345,7 @@
 				"z": 0.0218120776116848
 			},
 			"mount_style": "pintle",
-			"name": "Sentry Deployer",
+			"name": "Mine Layer",
 			"position": {
 				"x": 1.0,
 				"y": 0.455346345901489,
@@ -371,7 +371,7 @@
 				"weight": 140.0
 			},
 			"tweaks": {},
-			"type_id": "sentry_deployer",
+			"type_id": "mine_layer",
 			"yaw_offset": 0.0
 		},
 		{

@@ -76,7 +76,7 @@ const REGIME_BRUTE := "brute"
 const KINETIC_TYPES := [
 	"basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "ciws",
 	"coil_gun", "autocannon", "ballista", "anti_materiel_rifle",
-	"hypervelocity_missile", "aa_autocannon", "aps_interceptor",
+	"hypervelocity_missile", "aa_autocannon",
 ]
 const EXPLOSIVE_TYPES := [
 	"artillery", "mortar_array", "guided_missile", "missile_pod",
@@ -86,9 +86,8 @@ const EXPLOSIVE_TYPES := [
 	"anti_radiation_missile", "bunker_buster", "cruise_missile",
 ]
 const ENERGY_TYPES := [
-	"tesla_coil", "arc_projector", "ion_cannon", "heavy_laser", "plasma_lobber",
-	"pd_laser", "microwave_emitter", "particle_lance", "laser_dazzler",
-	"jammer_mast",
+	"arc_projector", "ion_cannon", "heavy_laser", "plasma_lobber",
+	"pd_laser", "microwave_emitter", "particle_lance",
 ]
 
 # Short display names for the armour columns. The full names the Lab's material

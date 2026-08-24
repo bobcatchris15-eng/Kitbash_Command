@@ -706,7 +706,6 @@ var default_locomotion_settings = {
 	"legs": {"leg_length": 1.0, "leg_width": 1.0, "count": 4, "leg_type": "stryker"},
 	"hover_engine": {},
 	"helicopter_rotors": {"size": 1.0, "count": 4},
-	"fixed_wing_engine": {"size": 1.0, "count": 2},
 	"ornithopter_wing": {"size": 1.0, "count": 2},
 	"buoyant_envelope": {"prop_count": 2, "blade_count": 3, "blade_pitch": 1.0},
 	"screw_drive": {"drum_diameter": 1.0, "helix_depth": 1.0}
@@ -881,6 +880,9 @@ func update_locomotion(type_id: String, settings: Dictionary) -> void:
 	var existing_gear := hull.get_node_or_null("RunningGear")
 	if existing_gear:
 		existing_gear.queue_free()
+	var existing_agp := hull.get_node_or_null("AGPRunningGear")
+	if existing_agp:
+		existing_agp.queue_free()
 	var spawned = LocomotionMountScript.rebuild(self, type_id, settings)
 	if had_loco_selection and spawned is Array and not spawned.is_empty():
 		_select_module(spawned[0])
@@ -1143,9 +1145,9 @@ func _place_weapon(type_id: String, pos: Vector3, normal: Vector3, is_mirror: bo
 			_refit_module_collider(new_weapon)
 
 	# Auto-scale armor to fit facet.
-	# The 4 PAINT_TYPE_IDS rows (armor_plating, slat_armor, spaced_composite,
-	# ablative_foam) live in the catalog as paint reference patches only - they
-	# are not placeable. The only real "category: armor" module is the energy
+	# The PAINT_TYPE_IDS entries (armor_plating, slat_armor, spaced_composite,
+	# ablative_foam) are cosmetic armor-station paints, not placeable modules.
+	# The only real "category: armor" module is the energy
 	# barrier projector, which is filtered through this branch.
 	if category == "armor" and not ArmorPaintScript.PAINT_TYPE_IDS.has(type_id):
 		if hull:

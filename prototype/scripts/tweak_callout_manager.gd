@@ -8,6 +8,7 @@ const RadialDialScript = preload("res://scripts/ui/radial_dial.gd")
 const RadialAmmoSelectorScript = preload("res://scripts/ui/radial_ammo_selector.gd")
 const TweakStations = preload("res://scripts/ui/tweak_stations.gd")
 const VisualBuilderScript = preload("res://scripts/visual_builder.gd")
+const LocomotionLayoutScript = preload("res://scripts/locomotion_layout.gd")
 
 var lab: Node
 var _action_ring: ModuleActionRing = null
@@ -208,142 +209,90 @@ func _generate_locomotion_radial_tweaks(module: Node3D, data: ModuleDataResource
 
 	lab.is_updating_sliders = true
 
-	# 1. Primary Size Dial
+	# Generated straight off the declared spec table, so a tweak cannot exist
+	# in the table without a station. The hand-written per-type branches this
+	# replaced had drifted behind the table: Stabiliser Ring, Afterburner
+	# Ring, Exposed Sprocket, Foot Pad Size, Wing Sweep, Front Axle Size,
+	# Rocker Arm Length, Plenum Pressure, Rotor Units and Envelope Volume were
+	# all declared but had no live control anywhere.
+	var specs: Array = ModuleCatalog.LOCOMOTION_TWEAK_SPECS.get(type_id, [])
 	var size_key: String = LabDocument.LOCOMOTION_SIZE_KEY.get(type_id, "size")
-	var size_val: float = settings.get(size_key, settings.get("size", 1.0))
-	size_slider.value = size_val
-	var size_dial = RadialDialScript.new(size_key, "Size", 0.5, 2.5, 0.05, 1.0)
-	size_dial.value = size_val
-	size_dial.drag_started.connect(lab._push_undo)
-	size_dial.value_changed.connect(func(v: float):
-		size_slider.value = v
-		_on_size_value_changed(v)
-	)
-	var size_angle: float = TweakStations.angle_for(size_key)
-	if size_angle < 0.0:
-		size_angle = TweakStations.CLOCK_1
-	_action_ring.add_tweak_station(size_key, "Size", size_dial, size_angle)
+	var count_key: String = str(LocomotionLayoutScript.LAYOUTS.get(type_id, {}).get("count_key", ""))
 
-	# 2. Count Dial (if applicable)
-	if type_id != "tracked_treads" and type_id != "screw_drive" and type_id != "ornithopter_wing":
-		var count_key := "count"
-		var count_min := 2.0
-		var count_max := 8.0
-		var count_step := 2.0
-		var count_val := 4.0
-		
-		if type_id == "wheels":
-			count_key = "num_axles"
-			count_min = 4.0
-			count_max = 8.0
-			count_val = float(settings.get("num_axles", 4))
-		elif type_id == "hover_engine":
-			count_key = "pad_count"
-			count_min = 4.0
-			count_max = 8.0
-			count_step = 1.0
-			count_val = float(settings.get("pad_count", 4))
-		elif type_id == "fixed_wing_engine":
-			count_key = "engine_count"
-			count_min = 2.0
-			count_max = 6.0
-			count_step = 1.0
-			count_val = float(settings.get("engine_count", 2))
-		elif type_id == "buoyant_envelope":
-			count_key = "prop_count"
-			count_min = 1.0
-			count_max = 6.0
-			count_step = 1.0
-			count_val = float(settings.get("prop_count", 2))
-		elif type_id == "half_track":
-			count_key = "bogie_count"
-			count_min = 2.0
-			count_max = 5.0
-			count_step = 1.0
-			count_val = float(settings.get("bogie_count", 3))
-		elif type_id == "rocker_bogie":
-			count_key = "bogie_pairs"
-			count_min = 2.0
-			count_max = 5.0
-			count_step = 1.0
-			count_val = float(settings.get("bogie_pairs", 3))
-		elif type_id == "air_cushion_skirt":
-			count_key = "lift_fan_count"
-			count_min = 2.0
-			count_max = 6.0
-			count_step = 1.0
-			count_val = float(settings.get("lift_fan_count", 3))
-		elif type_id == "anti_grav_plate":
-			count_key = "plate_count"
-			count_min = 3.0
-			count_max = 8.0
-			count_step = 1.0
-			count_val = float(settings.get("plate_count", 4))
-		elif type_id == "heavy_quad_tracks":
-			count_key = "track_count"
-			count_min = 4.0
-			count_max = 6.0
-			count_step = 2.0
-			count_val = float(settings.get("track_count", 4))
+	for spec in specs:
+		var s_name: String = str(spec.get("name", ""))
+		if s_name == "":
+			continue
+		var s_label: String = str(spec.get("label", s_name))
+		var angle: float = TweakStations.angle_for(s_name)
+		if angle < 0.0:
+			angle = TweakStations.CLOCK_1
+
+		if spec.get("type", "") == "bool":
+			var cur_b := bool(settings.get(s_name, spec.get("default", false)))
+			var check := CheckBox.new()
+			check.text = s_label
+			check.button_pressed = cur_b
+			check.toggled.connect(func(pressed: bool):
+				lab._push_undo()
+				if s_name == "duct":
+					# The shared rail checkbox's own handler applies this one
+					# (lab.bool_tweak_key routing) - just mirror into it.
+					lab.duct_checkbox.button_pressed = pressed
+				else:
+					root.update_locomotion_geometry_tweak(type_id, s_name, pressed)
+			)
+			_action_ring.add_tweak_station(s_name, s_label, check, angle)
+			_sync_persistent_widget(type_id, s_name, cur_b)
+			continue
+
+		var min_v := float(spec.get("min", 0.5))
+		var max_v := float(spec.get("max", 2.0))
+		var step_v := float(spec.get("step", 0.1))
+		var def_v := float(spec.get("default", 1.0))
+		var cur_v := float(settings.get(s_name, def_v))
+		if s_name == count_key:
+			cur_v = float(settings.get(s_name, settings.get("count", def_v)))
+			# The layout table owns how many stations can physically exist -
+			# intersect its bounds so a dial cannot ask for gear the layout
+			# refuses to place.
+			var lay: Dictionary = LocomotionLayoutScript.LAYOUTS.get(type_id, {})
+			min_v = maxf(min_v, float(lay.get("count_min", min_v)))
+			if lay.has("count_max"):
+				max_v = minf(max_v, float(lay.get("count_max")))
+			if bool(lay.get("count_even", false)):
+				step_v = maxf(step_v, 2.0)
+				cur_v = maxf(min_v, 2.0 * ceilf(cur_v * 0.5))
+
+		_sync_persistent_widget(type_id, s_name, cur_v)
+
+		var dial = RadialDialScript.new(s_name, s_label, min_v, max_v, step_v, def_v)
+		dial.value = cur_v
+		if s_name == count_key:
+			# Counts move stations, so they take the full respawn path,
+			# applied on drag end via the same handlers as the rail slider.
+			dial.drag_started.connect(_on_loco_drag_started)
+			dial.value_changed.connect(func(v: float):
+				_sync_persistent_widget(type_id, s_name, v)
+				_on_count_value_changed(v)
+			)
+			dial.drag_ended.connect(_on_loco_drag_ended)
+		elif s_name == size_key:
+			dial.drag_started.connect(lab._push_undo)
+			dial.value_changed.connect(func(v: float):
+				_sync_persistent_widget(type_id, s_name, v)
+				_on_size_value_changed(v)
+			)
 		else:
-			count_val = float(settings.get("count", 4))
+			dial.drag_started.connect(lab._push_undo)
+			dial.value_changed.connect(func(v: float):
+				_sync_persistent_widget(type_id, s_name, v)
+				root.update_locomotion_geometry_tweak(type_id, s_name, v)
+			)
+		_action_ring.add_tweak_station(s_name, s_label, dial, angle)
 
-		count_slider.value = count_val
-		var count_dial = RadialDialScript.new(count_key, "Count", count_min, count_max, count_step, count_val)
-		count_dial.value = count_val
-		count_dial.drag_started.connect(_on_loco_drag_started)
-		count_dial.value_changed.connect(func(v: float):
-			count_slider.value = v
-			_on_count_value_changed(v)
-		)
-		count_dial.drag_ended.connect(_on_loco_drag_ended)
-		var count_angle: float = TweakStations.angle_for(count_key)
-		if count_angle < 0.0:
-			count_angle = TweakStations.CLOCK_11
-		_action_ring.add_tweak_station(count_key, "Count", count_dial, count_angle)
-
-	# 3. Secondary dials
-	if type_id == "wheels":
-		var dually_dial = RadialDialScript.new("wheels_per_axle", "Tires/Axle", 1.0, 2.0, 1.0, float(settings.get("wheels_per_axle", 1)))
-		dually_dial.drag_started.connect(lab._push_undo)
-		dually_dial.value_changed.connect(func(v: float):
-			lab.wheels_per_axle_slider.value = v
-			_on_wheels_per_axle_changed(v)
-		)
-		_action_ring.add_tweak_station("wheels_per_axle", "Tires/Axle", dually_dial, TweakStations.CLOCK_8)
-	elif type_id == "helicopter_rotors":
-		var blade_dial = RadialDialScript.new("blade_count", "Blades", 2.0, 6.0, 1.0, float(settings.get("blade_count", 4)))
-		blade_dial.drag_started.connect(lab._push_undo)
-		blade_dial.value_changed.connect(func(v: float):
-			lab.blade_count_slider.value = v
-			_on_blade_count_changed(v)
-		)
-		_action_ring.add_tweak_station("blade_count", "Blades", blade_dial, TweakStations.CLOCK_5)
-	elif type_id == "buoyant_envelope":
-		var pitch_dial = RadialDialScript.new("blade_pitch", "Pitch", 0.5, 2.0, 0.1, float(settings.get("blade_pitch", 1.0)))
-		pitch_dial.drag_started.connect(lab._push_undo)
-		pitch_dial.value_changed.connect(func(v: float):
-			lab.blade_pitch_slider.value = v
-			_on_blade_pitch_changed(v)
-		)
-		_action_ring.add_tweak_station("blade_pitch", "Pitch", pitch_dial, TweakStations.CLOCK_8)
-	elif type_id == "screw_drive":
-		var depth_dial = RadialDialScript.new("helix_depth", "Helix", 0.5, 2.0, 0.1, float(settings.get("helix_depth", 1.0)))
-		depth_dial.drag_started.connect(lab._push_undo)
-		depth_dial.value_changed.connect(func(v: float):
-			lab.helix_depth_slider.value = v
-			_on_helix_depth_changed(v)
-		)
-		_action_ring.add_tweak_station("helix_depth", "Helix", depth_dial, TweakStations.CLOCK_5)
-	elif type_id == "legs":
-		var width_dial = RadialDialScript.new("leg_width", "Width", 0.5, 2.0, 0.1, float(settings.get("leg_width", 1.0)))
-		width_dial.drag_started.connect(lab._push_undo)
-		width_dial.value_changed.connect(func(v: float):
-			lab.leg_width_slider.value = v
-			_on_leg_width_changed(v)
-		)
-		_action_ring.add_tweak_station("leg_width", "Width", width_dial, TweakStations.CLOCK_2)
-
+	# Leg profile selector - a preset picker, not a numeric/bool spec entry.
+	if type_id == "legs":
 		var leg_options: Array = ModuleCatalog.get_leg_options()
 		var current_leg: String = ModuleCatalog.get_leg_type(settings)
 		var leg_selector = RadialAmmoSelectorScript.new()
@@ -353,18 +302,37 @@ func _generate_locomotion_radial_tweaks(module: Node3D, data: ModuleDataResource
 		)
 		_action_ring.add_tweak_station(ModuleCatalog.LEG_TWEAK_KEY, "Leg Profile", leg_selector, TweakStations.CLOCK_12)
 
-	if type_id == "helicopter_rotors":
-		var duct_check = CheckBox.new()
-		var duct_label := "Duct"
-		duct_check.text = duct_label
-		duct_check.button_pressed = bool(settings.get("duct", false))
-		duct_check.toggled.connect(func(pressed: bool):
-			lab.duct_checkbox.button_pressed = pressed
-			_on_duct_toggled(pressed)
-		)
-		_action_ring.add_tweak_station("duct", duct_label, duct_check, TweakStations.CLOCK_7)
-
 	lab.is_updating_sliders = false
+
+
+## Keeps the hidden rail widgets that _apply_tweaks() reads in step with the
+## hull's real settings. A count change respawns through _apply_tweaks(),
+## which rebuilds its settings dict FROM THOSE WIDGETS - a stale one would
+## silently revert every other tweak to whatever the rail last showed.
+## duct_checkbox mirrors too, since the helicopter branch of _apply_tweaks
+## reads it directly. Called under is_updating_sliders during generation and
+## from dial lambdas afterwards; setting a widget fires its own handler, which
+## is guarded either way.
+func _sync_persistent_widget(type_id: String, key: String, value) -> void:
+	if key == "duct":
+		lab.duct_checkbox.button_pressed = bool(value)
+		return
+	match key:
+		"wheels_per_axle":
+			lab.wheels_per_axle_slider.value = float(value)
+		"blade_count":
+			lab.blade_count_slider.value = float(value)
+		"helix_depth":
+			lab.helix_depth_slider.value = float(value)
+		"leg_width":
+			lab.leg_width_slider.value = float(value)
+		_:
+			if key != "" and key == LabDocument.LOCOMOTION_SECONDARY_SIZE_KEY.get(type_id, ""):
+				lab.blade_pitch_slider.value = float(value)
+			elif key == LabDocument.LOCOMOTION_SIZE_KEY.get(type_id, "size"):
+				size_slider.value = float(value)
+			elif key != "" and key == str(LocomotionLayoutScript.LAYOUTS.get(type_id, {}).get("count_key", "")):
+				count_slider.value = float(value)
 
 
 func _refresh_locomotion_labels():
@@ -531,19 +499,16 @@ func _apply_tweaks():
 		settings["tread_width"] = size_slider.value
 	elif type_id == "helicopter_rotors":
 		settings["size"] = size_slider.value
-		settings["count"] = int(count_slider.value)
+		settings["rotor_units"] = int(count_slider.value)
 		settings["blade_count"] = int(lab.blade_count_slider.value)
 		settings["duct"] = lab.duct_checkbox.button_pressed
 	elif type_id == "legs":
 		settings["leg_length"] = size_slider.value
-		settings["count"] = int(count_slider.value)
+		settings["leg_count"] = int(count_slider.value)
 		settings["leg_width"] = lab.leg_width_slider.value
 	elif type_id == "hover_engine":
 		settings["emv_level"] = size_slider.value
 		settings["pad_count"] = int(count_slider.value)
-	elif type_id == "fixed_wing_engine":
-		settings["turbine_compression"] = size_slider.value
-		settings["engine_count"] = int(count_slider.value)
 	elif type_id == "buoyant_envelope":
 		settings["prop_count"] = int(count_slider.value)
 		settings["blade_count"] = int(lab.blade_count_slider.value)

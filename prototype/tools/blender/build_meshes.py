@@ -1,4 +1,4 @@
-"""
+﻿"""
 Kitbash Command mesh generator (Milestone: Visual Refinement pass 2)
 Run headlessly with UPBGE's bundled Blender:
   UPBGE-0.30-windows-x86_64\\blender.exe --background --python tools\\blender\\build_meshes.py
@@ -144,7 +144,7 @@ def mark_armor_faces(bm, predicate):
 	"""Sets material_index=1 (hard armor slot, see finalize_dual()) on
 	every CURRENT bm.face satisfying predicate(face), leaving everything
 	else at the default 0 (structural). Call this AFTER the hull's primary
-	silhouette bevel but BEFORE greebles are fused on, so small appliquÃ©
+	silhouette bevel but BEFORE greebles are fused on, so small appliquÃƒÂ©
 	fixtures (hatches/vents/antennae) default to reading as structural
 	details bolted onto the hull, not armor plate, unless a specific
 	greeble helper explicitly marks its own faces afterward. Returns the
@@ -372,7 +372,7 @@ def write_hull_sidecar(out_dir, filename, size, color, domain, name=None,
 	# base_power is a foundation-only stat. Omit for vehicle hulls so the
 	# JSON shape stays close to the bake_custom_hull.py output (which also
 	# never wrote base_power for vehicles). foundations: see
-	# HULL_REFRESH_PLAN §5.7 - the existing 3 (pillbox/tower/wall)
+	# HULL_REFRESH_PLAN Â§5.7 - the existing 3 (pillbox/tower/wall)
 	# have it baked in by the legacy hand-pipeline.
 	if base_power is not None:
 		data["base_power"] = base_power
@@ -1709,22 +1709,6 @@ def build_exhaust_cone(name, radius=0.25, length=0.3, color=(0.15, 0.15, 0.16)):
 	return obj
 
 
-def build_jet_thruster_nozzle(name, radius=0.4, length=0.8, color=(0.8, 0.3, 0.1)):
-	bm = bmesh.new()
-	# Main engine body (tapered)
-	add_cyl_axis(bm, (0, 0, 0), radius, length * 0.6, 'x', segments=20, radius2=radius * 0.7)
-	# Rear nozzle flare
-	add_cyl_axis(bm, (0, 0, length * 0.4), radius * 0.85, length * 0.2, 'x', segments=20, radius2=radius * 0.7)
-	# Inner dark exhaust area
-	add_cyl_axis(bm, (0, 0, length * 0.45), radius * 0.75, length * 0.1, 'x', segments=16, radius2=radius * 0.6)
-	
-	obj = make_object_from_bmesh(bm, name)
-	# Use multiple material indices if possible? Just one material is fine, Godot colors it.
-	finalize(obj, name, color=color, metallic=0.8, roughness=0.2)
-	return obj
-
-
-
 def build_wing_shoulder(name, size=(0.3, 0.2, 0.7), color=(0.3, 0.3, 0.33)):
 	# Lengthened fore-aft (Z, was 0.25) so one gearbox block can plausibly
 	# span BOTH the fore and hind wing roots (offset +-0.22 on Z, see
@@ -2229,7 +2213,7 @@ OSTERHOLM_HEX_SCALES = {
 	"skiff":   (0.45, 1.55),  # very long and narrow (naval)
 }
 
-# --- U-keel body builder (Meridian only — the mecha hulls use this) ---
+# --- U-keel body builder (Meridian only â€” the mecha hulls use this) ---
 #
 # 5-slice cross-section hull. Each slice has 6 verts (bottom-left,
 # bottom-right, right-chine, right-roof, left-roof, left-chine).
@@ -2314,13 +2298,13 @@ def _u_keel_body(bm, length, width, height, family, tonnage):
 		bm.verts.new(GV(-sw, y_chine, z))
 
 
-# --- Hex-prism body builder (Osterholm only — faceted modular pod) ---
+# --- Hex-prism body builder (Osterholm only â€” faceted modular pod) ---
 #
 # 5-slice cross-section hull, each cross-section is a hexagon
 # (6 verts). No sponsons, no chine, just a flat-sided hex prism
 # that tapers along the length (pointed front, wide mid, blunt
 # rear). The cross-section is a regular hex (or stretched per
-# family) — reads as a faceted modular pod, the opposite of the
+# family) â€” reads as a faceted modular pod, the opposite of the
 # mecha u-keel.
 
 OSTERHOLM_HEX_BODY_PARAMS = {
@@ -2344,7 +2328,7 @@ def _hex_body(bm, length, width, height, family, tonnage):
 	different manufacturers used entirely different design
 	philosophies." The hex prism is fundamentally different from
 	the Meridian u-keel: faceted, no sponsons, no chine, the body's
-	plan-view outline IS the hex. No "bow" or "stern" — the hex
+	plan-view outline IS the hex. No "bow" or "stern" â€” the hex
 	prism is symmetric front/back; the signature adds the dorsal
 	asymmetry (central spine / antenna / rails) that distinguishes
 	the front from the back.
@@ -2355,7 +2339,7 @@ def _hex_body(bm, length, width, height, family, tonnage):
 	bottom hex face + 6 side quads (12 verts total). The hex's
 	plan-view outline is in the bmesh X-Z plane, with X radius =
 	half_w and Z radius = half_l. The per-family stretch in
-	OSTERHOLM_HEX_SCALES is NOT applied here — the SIZES table
+	OSTERHOLM_HEX_SCALES is NOT applied here â€” the SIZES table
 	already encodes the family role (wedge is long-narrow, plate
 	is wide-short, etc.), so multiplying by scale_x/scale_z on top
 	would double-stretch.
@@ -2393,7 +2377,7 @@ def _hex_body(bm, length, width, height, family, tonnage):
 # 5-slice cross-section hull, each cross-section is a circle
 # (12 verts for smoothness). No sponsons, just a smooth tube
 # that tapers along the length (pointed bow, wide mid, tapered
-# stern). Reads as a submarine/boat pressure hull — fundamentally
+# stern). Reads as a submarine/boat pressure hull â€” fundamentally
 # different from the mecha u-keel and the Osterholm hex prism.
 
 TIDEMARK_CYL_BODY_PARAMS = {
@@ -2980,7 +2964,7 @@ def _build_hull(name, family, tonnage, manufacturer, color):
 	bevel_sharp_edges(bm, list(bm.verts), R, tier=1, pct=0.12, segments=2)
 	bevel_sharp_edges(bm, list(bm.verts), R, tier=2, pct=0.06, segments=1)
 
-	# 5. Per-hull orientation fix. The glTF export applies a 180°
+	# 5. Per-hull orientation fix. The glTF export applies a 180Â°
 	#    rotation about the (1, 0, 1) axis (empirically verified),
 	#    so the bmesh needs to be pre-rotated by an equal-and-opposite
 	#    rotation for the hull to land in Godot convention (X=width,
@@ -3688,7 +3672,7 @@ def build_battery_hull(name, size_x, size_y, size_z, mounts=2, color=(0.4, 0.4, 
 	# The deck is a mount platform - real battery decks take incidental
 	# damage, not direct assault. The base slopes face the enemy.
 	# Frontal predicate with a wider threshold (0.3) so all four side slopes
-	# get tagged, matching the perimeter-battery concept from HULL_REFRESH_PLAN §5.7.
+	# get tagged, matching the perimeter-battery concept from HULL_REFRESH_PLAN Â§5.7.
 	armor_frac = mark_armor_faces(bm, outward_face_predicate(threshold=armor_threshold))
 	print("  [armor split] %s: %.1f%% of surface area tagged hard-armor" % (name, armor_frac * 100.0))
 
@@ -4310,16 +4294,12 @@ def generate_parts():
 	# motor can is a drum, a booster tube is a barrel.
 	export_and_cleanup(build_dome("turbo_housing", radius=0.18, squash=0.75, color=(0.35, 0.36, 0.4)), PARTS_DIR, "turbo_housing")
 	export_and_cleanup(build_cylinder_part("turbo_intake", radius=0.09, height=0.32, bolts=False, color=(0.3, 0.31, 0.34)), PARTS_DIR, "turbo_intake")
-	export_and_cleanup(build_cylinder_part("gearbox_bell", radius=0.2, height=0.34, color=(0.32, 0.3, 0.28)), PARTS_DIR, "gearbox_bell")
 	export_and_cleanup(build_cylinder_part("hub_motor_can", radius=0.16, height=0.14, bolts=False, color=(0.25, 0.4, 0.55)), PARTS_DIR, "hub_motor_can")
 	export_and_cleanup(build_box_part("hub_stator_segment", size=(0.05, 0.1, 0.03), bolts=False, color=(0.2, 0.35, 0.5)), PARTS_DIR, "hub_stator_segment")
 	export_and_cleanup(build_cylinder_part("nitrous_bottle", radius=0.11, height=0.55, bolts=False, color=(0.65, 0.85, 0.95)), PARTS_DIR, "nitrous_bottle")
 	export_and_cleanup(build_barrel("nitrous_feed_line", length=0.4, radius=0.025, muzzle_radius=0.025, segments=8, fins=0), PARTS_DIR, "nitrous_feed_line")
 	export_and_cleanup(build_barrel("booster_tube", length=0.7, radius=0.09, muzzle_radius=0.09, segments=12, fins=0), PARTS_DIR, "booster_tube")
 	export_and_cleanup(build_box_part("booster_rack_frame", size=(0.85, 0.12, 0.5), bolts=True, color=(0.4, 0.15, 0.12)), PARTS_DIR, "booster_rack_frame")
-
-	export_and_cleanup(build_dome("grav_lifter_dome", radius=0.35, squash=0.5, color=(0.3, 0.7, 0.9)), PARTS_DIR, "grav_lifter_dome")
-	export_and_cleanup(build_jet_thruster_nozzle("jet_thruster_nozzle", radius=0.4, length=0.8, color=(0.8, 0.3, 0.1)), PARTS_DIR, "jet_thruster_nozzle")
 
 	print("--- Parts library done ---")
 
@@ -4413,7 +4393,7 @@ def _assault_hull_greebles(bm, hx, hy, hz):
 # minimal signature, main gets the standard, heavy gets the full
 # signature with extra details.
 #
-# Conventions, all from the HULL_REFRESH_PLAN Â§4 manufacturer profiles:
+# Conventions, all from the HULL_REFRESH_PLAN Ã‚Â§4 manufacturer profiles:
 #   - Meridian   : conservative engineering, lots of bolts, plate
 #                  seams, exposed rivets, the "Marine Crocodile"
 #                  overhang. A slight upper-superstructure overhang.
@@ -4473,11 +4453,11 @@ def _osterholm_signature(bm, hx, hy, hz, tonnage):
 	):
 		add_cyl_y(bm, pos, 0.05, 0.05, segments=10)  # roundel housing
 	# Thin panel line: a single shallow horizontal groove at 1/3 height
-	# (per HULL_REFRESH_PLAN Â§4 "datum-line etchings on the side").
+	# (per HULL_REFRESH_PLAN Ã‚Â§4 "datum-line etchings on the side").
 	for x_sign in (-1, 1):
 		add_box(bm, (x_sign * hx * 0.99, hy * 0.33, 0), (0.04, 0.01, hz * 0.95))
 	# Integrated pintle pad (no turret ring - a clean integrated platform
-	# per HULL_REFRESH_PLAN Â§4 Osterholm cue).
+	# per HULL_REFRESH_PLAN Ã‚Â§4 Osterholm cue).
 	if tonnage == "heavy":
 		add_cyl_y(bm, (0, hy * 1.05, 0), 0.55, 0.12, segments=14)
 	else:
@@ -4804,7 +4784,7 @@ def generate_mk2_hulls():
 
 
 def generate_foundations():
-	"""Foundation catalogue (HULL_REFRESH_PLAN §5.7) - 13 hulls across
+	"""Foundation catalogue (HULL_REFRESH_PLAN Â§5.7) - 13 hulls across
 	4 families.
 
 	Family:      Manufacturer variants:        Total:
@@ -5007,7 +4987,7 @@ def generate_foundations():
 
 
 def generate_buildings():
-	"""Building catalogue (HULL_REFRESH_PLAN §7).
+	"""Building catalogue (HULL_REFRESH_PLAN Â§7).
 
 	1 base mesh + 9 greeble sets. The base is shared across all 9
 	C&C pre-fab buildings (hq, refinery, light/medium/heavy

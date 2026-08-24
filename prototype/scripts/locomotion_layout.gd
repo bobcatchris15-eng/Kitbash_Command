@@ -187,7 +187,8 @@ const LAYOUTS := {
 		"geo_keys": {"blade_count": 4.0, "blade_length": 1.0, "duct": false},
 		"geo_aliases": {"blade_length": ["size"]},
 		"normal": Vector3.UP, "reach_keys": ReachKeys.SIDE_XY,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 	"ornithopter_wing": {
 		"pattern": Pattern.SIDE_PAIRS, "per_side": 1,
@@ -212,15 +213,8 @@ const LAYOUTS := {
 		"geo_keys": {"emv_level": 1.0},
 		"geo_aliases": {"emv_level": ["size"]},
 		"normal": Vector3.DOWN, "reach_keys": ReachKeys.XYZ,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
-	},
-	"fixed_wing_engine": {
-		"pattern": Pattern.RING_XY,
-		"count_key": "engine_count", "count_fallback": "count", "count_default": 2,
-		"count_min": 2, "count_max": 6,
-		"geo_keys": {"turbine_compression": 1.0, "afterburner": false},
-		"normal": Vector3.RIGHT, "reach_keys": ReachKeys.XYZ,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 	"buoyant_envelope": {
 		# SIDE_PODS, not STERN_ROW. An airship's cruise engines hang off
@@ -230,8 +224,9 @@ const LAYOUTS := {
 		"count_key": "prop_count", "count_fallback": "count", "count_default": 2,
 		"count_min": 1, "count_max": 6,
 		"geo_keys": {"blade_count": 3.0, "blade_pitch": 1.0},
-		"normal_is_side": true, "mirror": true,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"normal_is_side": true, "mirror": false,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 	# --- Expansion types (LOCOMOTION_EXPANSION_PLAN.md 4) ---
 	# Every one of these is a data declaration and nothing else - no new branch
@@ -266,14 +261,16 @@ const LAYOUTS := {
 		"count_key": "lift_fan_count", "count_default": 3, "count_min": 2, "count_max": 6,
 		"geo_keys": {"skirt_diameter": 1.0, "plenum_pressure": 1.0},
 		"normal": Vector3.DOWN, "reach_keys": ReachKeys.XYZ,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 	"anti_grav_plate": {
 		"pattern": Pattern.RING_XZ,
 		"count_key": "plate_count", "count_default": 4, "count_min": 3, "count_max": 8,
 		"geo_keys": {"field_strength": 1.0, "stabilizer_ring": true},
 		"normal": Vector3.DOWN, "reach_keys": ReachKeys.XYZ,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 	"screw_drive": {
 		"pattern": Pattern.CORNER_SPAN,
@@ -319,7 +316,6 @@ const GEOMETRY := {
 	"ornithopter_wing":  {"x_pad": 0.0, "y": "topside", "y_pad": 0.0, "z_frac": 0.0},
 	# RING_*: ellipse radii and the fixed offset on the third axis.
 	"hover_engine":      {"pad_from_catalog": true, "y": "underside"},
-	"fixed_wing_engine": {"x_pad": 0.4, "y_pad": 0.4, "z_frac": 0.15},
 	# SIDE_PODS: how far outboard the pylon reaches, how far the row spreads
 	# fore/aft, and how far below the hull the belly pod hangs.
 	# Standoff doubled (Chris): 0.55 -> 1.10 outboard, and the belly pod drops
@@ -382,7 +378,6 @@ const MOUNT_KITS := {
 	# seeing under the bottom run. One structure per assembly, not two.
 	"tracked_treads":    {"kit": Kit.NONE, "drop": 0.0, "stations": 0},
 	"helicopter_rotors": {"kit": Kit.PYLON, "drop": 0.0, "stations": 1},
-	"fixed_wing_engine": {"kit": Kit.PYLON, "drop": 0.0, "stations": 1},
 	"buoyant_envelope":  {"kit": Kit.PYLON, "drop": 0.0, "stations": 1},
 	"hover_engine":      {"kit": Kit.HARDPOINT_PAD, "drop": 0.16, "stations": 4},
 	"air_cushion_skirt": {"kit": Kit.HARDPOINT_PAD, "drop": 0.14, "stations": 4},
@@ -437,20 +432,17 @@ const MAX_WIDTH_FACTOR := {
 	# shrinking the enlarged emitter heads straight back down - anti_grav_plate
 	# measured 0.018 bulk after the size-up, LOWER than the 0.107 it had
 	# before it.
-	"hover_engine": 2.3, "air_cushion_skirt": 1.6, "anti_grav_plate": 2.4,
-	# Air: span is the point. Rotors and engine clusters overhang by design;
-	# the ornithopter was still absurd at 4.25x.
-	"helicopter_rotors": 2.4, "fixed_wing_engine": 1.8,
-	# An airship's cruise engines hang off outriggers well clear of the
-	# envelope, so this one legitimately stands wide. At 1.4 the clamp was
-	# shrinking the whole pod to the 0.35 floor - which is what made the
-	# re-authored engine render as a speck.
+	"hover_engine": 0.0, "air_cushion_skirt": 0.0, "anti_grav_plate": 0.0,
+	# Air: span is the point. Rotors and engine clusters overhang by design.
+	# Setting to 0.0 disables width clamping so pylons and mounting struts
+	# maintain true physical reach to the hull on small hulls without shrinking.
+	"helicopter_rotors": 0.0, "buoyant_envelope": 0.0,
 	# The ornithopter is SUPPOSED to be absurd (Chris: "they're kind of an
 	# absurd choice and they need to feel like it. Impractically long"). This
 	# is the one type where a span several times the vehicle's width is the
 	# design, so the clamp is set to stop authoring accidents rather than to
 	# enforce proportion.
-	"ornithopter_wing": 5.5, "buoyant_envelope": 2.6,
+	"ornithopter_wing": 5.5,
 }
 
 static func max_width_factor(type_id: String) -> float:
@@ -764,21 +756,28 @@ static func stations(type_id: String, settings: Dictionary, ctx: Dictionary) -> 
 
 		Pattern.RING_XZ:
 			var n := _resolve_count(spec, settings)
-			var pad_radius := 0.0
-			if bool(geom.get("pad_from_catalog", false)):
-				pad_radius = cat_size.x * 0.5
-			var x_radius := hull_size.x / 2.0 + pad_radius
-			var z_radius := hull_size.z / 2.0 + pad_radius
+			var pad_radius: float = cat_size.x * 0.5 * (2.3 if type_id == "anti_grav_plate" else 2.1)
+			var hx: float = hull_size.x / 2.0
+			var hz: float = hull_size.z / 2.0
 			var y := -hull_size.y / 2.0 + bias
 			for i in range(n):
 				var angle := i * TAU / float(n)
-				var p := Vector3(cos(angle) * x_radius, y, sin(angle) * z_radius)
+				var cos_a := cos(angle)
+				var sin_a := sin(angle)
+				# Ray from origin to box perimeter along radial angle to find exact hull contact point
+				var t_box: float = minf(hx / maxf(absf(cos_a), 0.001), hz / maxf(absf(sin_a), 0.001))
+				var contact_pt := Vector3(cos_a * t_box, y, sin_a * t_box)
+				var p := contact_pt + Vector3(cos_a * pad_radius, 0.0, sin_a * pad_radius)
 				var geo := geo_base.duplicate()
 				geo["kit_reach"] = maxf(0.0, (-hull_size.y * 0.5) - p.y)
-				geo["kit_anchor_x"] = p.x * -0.55
-				geo["kit_anchor_y"] = anchor_y - p.y
-				geo["kit_anchor_z"] = p.z * -0.55
-				_apply_reach(geo, spec, -p, 0.0)
+				# Anchor vector points directly from pad center back to hull contact point
+				var anchor_vec := contact_pt - p
+				geo["kit_anchor_x"] = anchor_vec.x
+				geo["kit_anchor_y"] = anchor_vec.y
+				geo["kit_anchor_z"] = anchor_vec.z
+				geo["mount_reach_x"] = anchor_vec.x
+				geo["mount_reach_y"] = anchor_vec.y
+				geo["mount_reach_z"] = anchor_vec.z
 				var st := _station(p, spec.get("normal", Vector3.DOWN), geo, 0.0, false)
 				st["index"] = i
 				out.append(st)
@@ -828,6 +827,7 @@ static func stations(type_id: String, settings: Dictionary, ctx: Dictionary) -> 
 				for i in range(per_flank):
 					var zf: float = 0.0 if per_flank <= 1 						else -1.0 + 2.0 * (float(i) / float(per_flank - 1))
 					var geo := geo_base.duplicate()
+					geo["mount_side"] = side
 					# Internal geometry channel: the builder knows its catalog
 					# size (1.0) but not the hull's, and an engine pod sized off
 					# the catalog came out as a speck against a real airship.
@@ -844,6 +844,7 @@ static func stations(type_id: String, settings: Dictionary, ctx: Dictionary) -> 
 					out.append(st)
 			if has_belly:
 				var bgeo := geo_base.duplicate()
+				bgeo["mount_side"] = 0.0
 				# The belly pod hangs DOWN rather than out, so it is told to
 				# point its pylon at the hull's underside instead of its side.
 				bgeo["pod_belly"] = true

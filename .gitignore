@@ -2,6 +2,7 @@
 # Globbed rather than listed version-by-version: the 4.3 -> 4.7.1 upgrade
 # otherwise leaves the new pair untracked-but-not-ignored, and they are ~179MB
 # each, so a stray `git add -A` commits them.
+Godot_v*-stable_win64*.exe
 prototype/Godot_v*-stable_win64.exe
 prototype/Godot_v*-stable_win64_console.exe
 prototype/godot.exe

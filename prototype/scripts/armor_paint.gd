@@ -28,29 +28,16 @@
 # really does stop both frontal and plunging fire.
 
 const HullFacets = preload("res://scripts/hull_facets.gd")
-const ModuleCatalog = preload("res://scripts/module_catalog.gd")
-const FactionCatalog = preload("res://scripts/faction_catalog.gd")
 const LiveryScript = preload("res://scripts/livery.gd")
 
-# The four paintable armor types. These are still ModuleCatalog rows - their
-# hp/weight/metal/crystal are now read as the value of ONE REFERENCE PATCH
-# rather than of one placed object. `energy_barrier_projector` is deliberately
-# absent: it is category "armor" but is a projector, and stays a real module.
+# The four paintable armor types. PURELY COSMETIC: each is a skin likeness
+# the armor station paints onto facet triangles (HullFacets.SURFACE_PATTERNS
+# drives the cut/relief pattern; see armor_paint_visual.gd). They used to be
+# ModuleCatalog rows whose hp/weight/metal/crystal priced every painted patch
+# and fed a per-type damage-class bias - that stat layer was retired with the
+# rows; MATERIAL and THICKNESS are the only mechanical axes left. This list is
+# the visual palette, nothing more.
 const PAINT_TYPE_IDS := ["armor_plating", "slat_armor", "spaced_composite", "ablative_foam"]
-
-# The area one catalog row's stats buy, in square metres.
-#
-# 4.0 is armor_plating's authored 2.0 x 2.0 footprint, chosen so a 4 m^2 patch
-# costs exactly what one plate used to cost - the conversion is a no-op for a
-# design that armored one facet-sized area per side. It is a BALANCE CLIFF for
-# anything larger: painting a whole transport flank is many times the mass of
-# the single plate that used to sit on it, which is intended (that is the point
-# of area-scaled cost) but is the number to retune first if armor feels heavy.
-const ARMOR_REFERENCE_AREA := 4.0
-
-# Every armored facet adds this fraction of its type's reference HP to the
-# threshold, matching what damage_resolver did with a plate's module HP.
-const HP_TO_THRESHOLD := 0.1
 
 const SIDES := ["front", "back", "left", "right", "top", "bottom"]
 
@@ -245,30 +232,9 @@ static func analyze(hull_node: Node3D = null) -> Dictionary:
 	if plan.is_empty() or bool(plan.get("empty", true)):
 		return out
 
-	var faction := str(plan.get("faction", LiveryScript.NO_LIVERY))
-	var wt_mult := float(FactionCatalog.get_passive(faction, "armor_weight_mult", 1.0))
-
-	var weight := 0.0
-	var metal := 0.0
-	var crystal := 0.0
-	var facets: Dictionary = plan.get("facets", {})
-	for fid in facets.keys():
-		var a: Dictionary = facets[fid]
-		var data: Dictionary = ModuleCatalog.get_module_data(str(a.get("type_id", "")))
-		if data.is_empty():
-			continue
-		# One "unit" is one reference patch at thickness 1.
-		var units: float = (float(a.get("area", 0.0)) / ARMOR_REFERENCE_AREA) * float(a.get("thickness", 1.0))
-		weight += float(data.get("weight", 0.0)) * units
-		metal += float(data.get("metal", 0.0)) * units
-		crystal += float(data.get("crystal", 0.0)) * units
-
-	# The faction passive finally has a reader. It was declared in
-	# faction_catalog (Industrialists -20% armor weight) and consumed by nothing
-	# - drivetrain hardcoded 1.0, and ModuleCatalog.compute_hull_weight's
-	# armor_weight_mult parameter is underscore-prefixed and unused. It applies
-	# to PAINT weight, which is the only armor weight that exists now.
-	weight *= wt_mult
+	# Armor paint carries NO weight or cost - the types are cosmetic likenesses
+	# (see PAINT_TYPE_IDS). The keys stay because the stat rail reads them
+	# unconditionally; they are always zero now.
 
 	var sides: Dictionary = plan.get("sides", {})
 	var weakest := ""
@@ -280,15 +246,13 @@ static func analyze(hull_node: Node3D = null) -> Dictionary:
 			weakest_cov = cov
 			weakest = s
 
-	out["weight"] = weight
-	# Rounded ONCE over the sum rather than per facet, or a hull painted across
-	# twenty small facets would collect twenty half-credit roundings.
-	out["cost_metal"] = int(round(metal))
-	out["cost_crystal"] = int(round(crystal))
+	out["weight"] = 0.0
+	out["cost_metal"] = 0
+	out["cost_crystal"] = 0
 	out["coverage"] = float(plan.get("coverage", 0.0))
-	out["facet_count"] = facets.size()
+	out["facet_count"] = (plan.get("facets", {}) as Dictionary).size()
 	out["weakest_side"] = weakest
-	out["has_armor"] = not facets.is_empty()
+	out["has_armor"] = not (plan.get("facets", {}) as Dictionary).is_empty()
 	return out
 
 

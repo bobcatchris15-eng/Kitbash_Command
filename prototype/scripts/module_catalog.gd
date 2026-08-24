@@ -1,4 +1,4 @@
-class_name ModuleCatalog
+﻿class_name ModuleCatalog
 
 const HullLoader = preload("res://scripts/hull_loader.gd")
 const GlobalConfigScript = preload("res://scripts/global_config.gd")
@@ -53,7 +53,7 @@ static var _cached_hull_dict: Dictionary = {}
 # "hull") are no longer hardcoded here - see hull_loader.gd, which lazily
 # scans same-stem .glb+.json pairs from res://assets/models/hulls (built-in)
 # and user://mods/hulls (player-added mods) once and caches the result
-# (HULL_MODDING_PLAN.md §3).
+# (HULL_MODDING_PLAN.md Â§3).
 static func get_catalog() -> Dictionary:
 	var hulls = HullLoader.get_hulls()
 	if not _catalog_cache.is_empty() and is_same(hulls, _cached_hull_dict):
@@ -72,7 +72,7 @@ static func get_catalog() -> Dictionary:
 static func module_exists(type_id: String) -> bool:
 	return get_catalog().has(type_id)
 
-# --- Drone carrier profiles (DEPLOYABLE_MODULES_OVERHAUL.md §1) ---
+# --- Drone carrier profiles (DEPLOYABLE_MODULES_OVERHAUL.md Â§1) ---
 # drone_type is the 12 o'clock tweak on the drone_carrier in the Design Lab.
 # Each profile overrides speed, damage, and the state machine behaviour in drone_unit.gd.
 const DRONE_PROFILES = {
@@ -136,9 +136,8 @@ const WEAPON_FIRE_PROFILES = {
 	"cluster_dispenser":  {"fire_rate": 3.0,  "fire_range": 34.0, "laser_color": Color.CHOCOLATE},
 	"flamethrower":       {"fire_rate": 0.06, "fire_range": 11.0,  "laser_color": Color.CRIMSON},
 	"heavy_laser":        {"fire_rate": 0.05, "fire_range": 34.0, "laser_color": Color.DARK_RED},
-	"plasma_lobber":      {"fire_rate": 2.2,  "fire_range": 32.0, "laser_color": Color.MEDIUM_SPRING_GREEN},
-	"tesla_coil":         {"fire_rate": 1.4,  "fire_range": 18.0, "laser_color": Color.LIGHT_SKY_BLUE},
-	"arc_projector":      {"fire_rate": 0.9,  "fire_range": 12.0, "laser_color": Color.CYAN},
+	"plasma_lobber":      {"fire_rate": 2.2, "fire_range": 32.0, "laser_color": Color.MEDIUM_SPRING_GREEN},
+	"arc_projector":      {"fire_rate": 0.9, "fire_range": 12.0, "laser_color": Color.CYAN},
 	"ion_cannon":         {"fire_rate": 3.2,  "fire_range": 50.0, "laser_color": Color.SKY_BLUE},
 	# Cone denial. Short interval and low per-shot on purpose: it is not
 	# supposed to kill things, it is supposed to make their electronics stop
@@ -156,15 +155,9 @@ const WEAPON_FIRE_PROFILES = {
 	"loitering_munition": {"fire_rate": 4.0,  "fire_range": 120.0, "laser_color": Color(0.70, 0.78, 0.66)},
 	"anti_radiation_missile": {"fire_rate": 3.4, "fire_range": 60.0, "laser_color": Color(0.75, 0.80, 0.78)},
 	"bunker_buster":      {"fire_rate": 4.2,  "fire_range": 36.0, "laser_color": Color(0.70, 0.72, 0.75)},
-	"cruise_missile":     {"fire_rate": 5.0,  "fire_range": 170.0, "laser_color": Color(0.78, 0.80, 0.72)},
-	"chaff_dispenser":    {"fire_rate": 3.5,  "fire_range": 12.0,  "laser_color": Color(0.85, 0.86, 0.80)},
-	"laser_dazzler":      {"fire_rate": 0.7,  "fire_range": 28.0, "laser_color": Color(0.40, 0.95, 0.55)},
-	"aps_interceptor":    {"fire_rate": 0.9,  "fire_range": 9.0,  "laser_color": Color(1.0, 0.75, 0.35)},
+	"cruise_missile":     {"fire_rate": 5.0, "fire_range": 170.0, "laser_color": Color(0.78, 0.80, 0.72)},
 	"aa_autocannon":      {"fire_rate": 0.20, "fire_range": 38.0, "laser_color": Color(1.0, 0.85, 0.45)},
-	"jammer_mast":        {"fire_rate": 2.0,  "fire_range": 30.0, "laser_color": Color(0.55, 0.85, 0.90)},
-	"sentry_deployer":    {"fire_rate": 8.0,  "fire_range": 16.0, "laser_color": Color(0.70, 0.75, 0.60)},
 	"sensor_beacon_launcher": {"fire_rate": 6.0, "fire_range": 46.0, "laser_color": Color(0.65, 0.90, 0.75)},
-	"decoy_projector":    {"fire_rate": 10.0, "fire_range": 14.0, "laser_color": Color(0.80, 0.80, 0.65)},
 	"ciws":               {"fire_rate": 0.06, "fire_range": 22.0, "laser_color": Color.WHITE_SMOKE},
 	"pd_laser":           {"fire_rate": 0.1,  "fire_range": 24.0, "laser_color": Color.LIGHT_CORAL},
 	"flak_cannon":        {"fire_rate": 1.2,  "fire_range": 40.0, "laser_color": Color.DARK_GOLDENROD},
@@ -511,27 +504,8 @@ static func _build_catalog_literal() -> Dictionary:
 		# --- ENERGY WEAPONS ---
 		# "energy" damage_class weapons (ENERGY_AND_BALANCE_SPEC.md #4) - the
 		# only weapons that cost the firing unit's own current_energy per
-		# shot and, for tesla_coil/ion_cannon, also drain the TARGET's
-		# energy pool alongside HP damage.
-		"tesla_coil": {
-			"name": "Tesla Coil",
-			"category": "weapon",
-			"hp": 70.0,
-			"weight": 70.0,
-			"base_traverse": 0.876,
-			"metal": 40,
-			"crystal": 45,
-			"dps": 72.0,
-			# Tall and top-heavy (size.y=1.6 vs a 0.6x0.6 footprint) - a real
-			# structure this slender wants a level base to not look/feel like
-			# it's about to topple, so it's less tolerant of a steep slope
-			# than the compact autoguns.
-			"pintle_min_up_alignment": 0.4,
-			# Tall, top-heavy precision emitter - deliberate, controlled
-			# traverse rather than a fast snap-track.
-			"size": Vector3(1.0, 3.0, 1.0),
-			"color": Color.LIGHT_SKY_BLUE
-		},
+		# shot and, for ion_cannon, also drain the TARGET's energy pool
+		# alongside HP damage.
 		"ion_cannon": {
 			"name": "Ion Cannon",
 			"category": "weapon",
@@ -718,52 +692,6 @@ static func _build_catalog_literal() -> Dictionary:
 		},
 
 		# --- POINT DEFENSE EXPANSION ---------------------------------------
-		# Consumable lock-break. Unlike smoke it does not obscure vision - it
-		# breaks a seeker's lock directly and then it is gone.
-		"chaff_dispenser": {
-			"name": "Chaff Dispenser",
-			"category": "weapon",
-			"hp": 45.0,
-			"weight": 35.0,
-			"base_traverse": 1.603,
-			"metal": 16,
-			"crystal": 4,
-			"dps": 0.0,
-			"size": Vector3(0.8, 0.6, 0.8),
-			"color": Color(0.42, 0.44, 0.38)
-		},
-
-		# Directional seeker blinding. Has to be pointed, so it competes for
-		# arc with a real weapon - which is its cost.
-		"laser_dazzler": {
-			"name": "Laser Dazzler",
-			"category": "weapon",
-			"hp": 50.0,
-			"weight": 55.0,
-			"base_traverse": 2.001,
-			"metal": 18,
-			"crystal": 22,
-			"dps": 4.0,
-			"size": Vector3(0.8, 0.8, 1.2),
-			"color": Color(0.36, 0.42, 0.46)
-		},
-
-		# Hard kill. Covers the whole arc at once rather than traversing,
-		# which is what an active protection system does - and why it has
-		# almost no range.
-		"aps_interceptor": {
-			"name": "APS Interceptor",
-			"category": "weapon",
-			"hp": 60.0,
-			"weight": 75.0,
-			"base_traverse": 2.109,
-			"metal": 28,
-			"crystal": 14,
-			"dps": 26.0,
-			"size": Vector3(0.8, 0.6, 0.8),
-			"color": Color(0.34, 0.36, 0.38)
-		},
-
 		# Dedicated flak. Engages AIRCRAFT, not just incoming munitions,
 		# which is the gap between the CIWS and having no answer to air.
 		"aa_autocannon": {
@@ -779,37 +707,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color(0.28, 0.31, 0.27)
 		},
 
-		# Passive aura. No barrel, no traverse, no shot - it degrades guided
-		# weapons within its radius simply by existing, and advertises the
-		# vehicle's position while doing it.
-		"jammer_mast": {
-			"name": "Jammer Mast",
-			"category": "weapon",
-			"hp": 55.0,
-			"weight": 70.0,
-			"base_traverse": 0.876,
-			"metal": 22,
-			"crystal": 30,
-			"dps": 0.0,
-			"size": Vector3(0.8, 3.5, 0.8),
-			"color": Color(0.33, 0.37, 0.35)
-		},
-
 		# --- DEPLOYABLE EXPANSION ------------------------------------------
-		# Drops an autonomous turret that fights on after the carrier leaves.
-		"sentry_deployer": {
-			"name": "Sentry Deployer",
-			"category": "weapon",
-			"hp": 75.0,
-			"weight": 140.0,
-			"base_traverse": 0.524,
-			"metal": 46,
-			"crystal": 12,
-			"dps": 45.0,
-			"size": Vector3(1.2, 1.0, 1.5),
-			"color": Color(0.31, 0.34, 0.27)
-		},
-
 		# Lobs a beacon that reveals fog where it lands. Reuses the reveal
 		# beacons built for illumination ammo - vision as a weapon.
 		"sensor_beacon_launcher": {
@@ -828,65 +726,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"vision_bonus": 5.5,
 			"size": Vector3(0.8, 0.6, 1.2),
 			"color": Color(0.34, 0.40, 0.36)
-		},
-
-		# Deploys a false contact that draws fire. Zero damage; its entire
-		# output is other people's wasted shots.
-		"decoy_projector": {
-			"name": "Decoy Projector",
-			"category": "weapon",
-			"hp": 50.0,
-			"weight": 50.0,
-			"base_traverse": 1.318,
-			"metal": 20,
-			"crystal": 10,
-			"dps": 0.0,
-			"size": Vector3(0.8, 0.6, 0.8),
-			"color": Color(0.38, 0.39, 0.32)
-		},
-
-		# --- PAINT REFERENCE PATCHES (non-placeable) -------------------------
-		# Stats source for ArmorPaint.PAINT_TYPE_IDS: a row per paintable armor
-		# material, kept here so designers can tune hp/weight/metal/crystal in
-		# one place. NOT placeable as modules - module_placer.gd:1061 skips
-		# everything in PAINT_TYPE_IDS, leaving only energy_barrier_projector as
-		# a real "category: armor" module. Three of the four damage-class biases
-		# (FABLE_REVIEW.md 1.2) live in ARMOR_MODULE_BIAS, not on these rows -
-		# the rows carry the patch cost, the resolver reads the bias.
-		"slat_armor": {
-			"name": "Slat Armor",
-			"category": "armor",
-			"hp": 260.0,
-			"weight": 45.0,
-			"metal": 22,
-			"crystal": 0,
-			"dps": 0.0,
-			"size": Vector3(2.0, 0.25, 2.0),
-			"color": Color(0.40, 0.42, 0.36)
-		},
-		"spaced_composite": {
-			"name": "Spaced Composite",
-			"category": "armor",
-			"required_building": "tech_lab",
-			"hp": 620.0,
-			"weight": 155.0,
-			"metal": 68,
-			"crystal": 10,
-			"dps": 0.0,
-			"size": Vector3(2.0, 0.3, 2.0),
-			"color": Color(0.44, 0.45, 0.46)
-		},
-		"ablative_foam": {
-			"name": "Ablative Foam",
-			"category": "armor",
-			"required_building": "tech_lab",
-			"hp": 340.0,
-			"weight": 70.0,
-			"metal": 26,
-			"crystal": 14,
-			"dps": 0.0,
-			"size": Vector3(2.0, 0.28, 2.0),
-			"color": Color(0.60, 0.58, 0.50)
 		},
 
 		"arc_projector": {
@@ -1398,18 +1237,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.DODGER_BLUE
 		},
 
-		"armor_plating": {
-			"name": "Armor Plating",
-			"category": "armor",
-			"hp": 500.0,
-			"weight": 100.0,
-			"metal": 50,
-			"crystal": 0,
-			"dps": 0.0,
-			"size": Vector3(2.0, 0.2, 2.0),
-			"color": Color.SLATE_GRAY
-		},
-
 		# --- GENERATORS (Energy resource, ENERGY_AND_BALANCE_SPEC.md #1) ---
 		# "generator" is its own module category, not a weapon/utility
 		# variant - it contributes to a unit's power budget exactly like armor
@@ -1553,24 +1380,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"size": Vector3(0.6, 0.5, 0.6),
 			"color": Color(0.5, 0.5, 0.55)
 		},
-		"overdrive_gearbox": {
-			"name": "Overdrive Gearbox",
-			"category": "module",
-			"description": "Taller final drive gearing. Raises the chassis's own speed ceiling; trades away some of its load capacity to do it.",
-			"hp": 50.0,
-			"weight": 45.0,
-			"metal": 35,
-			"crystal": 10,
-			"dps": 0.0,
-			# The pure trade: +18% chassis ceiling for -15% capacity. Unlike
-			# turbocharger, this raises the ceiling itself, so it helps a
-			# design that is ALREADY capacity_limited - which is exactly the
-			# case a bigger engine cannot fix.
-			"top_speed_mult": 1.18,
-			"capacity_mult": 0.85,
-			"size": Vector3(0.55, 0.55, 0.7),
-			"color": Color(0.45, 0.42, 0.4)
-		},
 		"hub_motor_array": {
 			"name": "Electric Hub Motors",
 			"category": "module",
@@ -1617,37 +1426,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"boost": {"speed_mult": 2.2, "duration": 2.5, "cooldown": 0.0, "energy_per_sec": 0.0, "charges": 3},
 			"size": Vector3(0.9, 0.5, 1.1),
 			"color": Color(0.75, 0.25, 0.2)
-		},
-
-		"grav_lifter_assist": {
-			"name": "Grav-Lifter Assist",
-			"category": "module",
-			"required_building": "exotics_lab",
-			"description": "Provides a clean 25% boost to load capacity with no speed penalty.",
-			"hp": 55.0,
-			"weight": 35.0,
-			"metal": 40,
-			"crystal": 85,
-			"dps": 0.0,
-			"capacity_mult": 1.25,
-			"size": Vector3(0.7, 0.3, 0.7),
-			"color": Color(0.3, 0.7, 0.9)
-		},
-		"jet_thrusters": {
-			"name": "Jet Thrusters",
-			"category": "module",
-			"required_building": "tech_lab",
-			"description": "Extreme speed upgrade. High thrust and raises the chassis speed ceiling, at the cost of high energy drain.",
-			"hp": 60.0,
-			"weight": 75.0,
-			"metal": 60,
-			"crystal": 40,
-			"dps": 0.0,
-			"thrust_bonus": 150.0,
-			"top_speed_mult": 1.25,
-			"capacity_mult": 0.90,
-			"size": Vector3(0.8, 0.6, 1.2),
-			"color": Color(0.8, 0.3, 0.1)
 		},
 
 		# --- LOCOMOTION ARCHETYPES ---
@@ -1803,25 +1581,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.DARK_RED,
 			"traits": ["ground_contact"]
 		},
-		"fixed_wing_engine": {
-			"name": "AGP Strike Drive",
-			"category": "locomotion",
-			"required_building": "tech_lab",
-			"description": "Atmospheric Gravity Planing (AGP) Strike Drive - High-speed gravity planing drive for fast offensive strike vectoring.",
-			"hp": 70.0,
-			"weight": 60.0,
-			"metal": 60,
-			"crystal": 20,
-			"dps": 0.0,
-			"base_weight_capacity": 432.0,
-			# 22.0, not the original 18.0 (2026-08-08 speed pass): still the
-			# roster's outright top speed, widened along with everything else
-			# to keep the gap over wheels/hover meaningful.
-			"base_top_speed": 22.0,
-			"size": Vector3(1.0, 0.5, 1.5),
-			"color": Color.SLATE_BLUE,
-			"traits": ["airborne", "fixed_wing", "high_speed"]
-		},
 		"ornithopter_wing": {
 			"name": "Ornithopter Wing",
 			"category": "locomotion",
@@ -1840,10 +1599,10 @@ static func _build_catalog_literal() -> Dictionary:
 			"traits": ["airborne", "flapping_wing"]
 		},
 		"buoyant_envelope": {
-			"name": "AGP Loiter Drive",
+			"name": "Blimp",
 			"category": "locomotion",
 			"required_building": "tech_lab",
-			"description": "Atmospheric Gravity Planing (AGP) Loiter Drive - Sustained low-draw gravity planing drive optimized for long-endurance loitering and heavy payload transport.",
+			"description": "Blimp - Buoyant lighter-than-air envelope with outrigger propulsion nacelles for heavy payload transport.",
 			"hp": 40.0,
 			"weight": 35.0,
 			"metal": 25,
@@ -2104,7 +1863,6 @@ const MODULE_FLAVOR = {
 	"cluster_dispenser": "Wide dispersal pattern. Confirm no friendly units are downrange, or thereabouts.",
 	# Energy / exotic
 	"flamethrower": "Short range by design. Crews are advised to be certain about wind direction.",
-	"tesla_coil": "Arcs to the nearest conductive mass, which is not always the intended target.",
 	"ion_cannon": "Draws heavily from base power. Scheduling with the generator crew is recommended.",
 	"heavy_laser": "Continuous beam. Performance degrades in dust, smoke, rain, and general atmosphere.",
 	"arc_projector": "Empties capacitors at range. Does almost no damage and is almost never forgiven.",
@@ -2118,17 +1876,8 @@ const MODULE_FLAVOR = {
 	"anti_radiation_missile": "Homes on anyone using a radar. Encourages the enemy to switch theirs off, which is also a win.",
 	"bunker_buster": "Arrives from directly above. Structures were not consulted about this.",
 	"cruise_missile": "Long ranged, generously proportioned, and entirely visible on approach.",
-	"chaff_dispenser": "Fills the air with tinsel. Seekers find this more persuasive than seems reasonable.",
-	"laser_dazzler": "Blinds seekers and optics. Harmless to anything that navigates by hope.",
-	"aps_interceptor": "Shoots down what was shot at you. Bystanders are advised to stand considerably by.",
 	"aa_autocannon": "For aircraft. Will engage ground targets only under protest and with poor grace.",
-	"jammer_mast": "Degrades guided weapons nearby. Also announces exactly where you are.",
-	"sentry_deployer": "Leaves a turret behind. The turret does not ask when you are coming back.",
 	"sensor_beacon_launcher": "Throws an eye over the hill. Retrieval was not part of the design brief.",
-	"decoy_projector": "Inflates something vaguely vehicle-shaped. Works far more often than anyone admits.",
-	"slat_armor": "A cage held off the hull. Defeats shaped charges and almost nothing else.",
-	"spaced_composite": "Two plates and an argument between them. Heavy in every sense.",
-	"ablative_foam": "Sacrificial quilting. Burns away instead of you, once.",
 	"plasma_lobber": "Containment is temporary by design. Everything downrange is briefly reclassified.",
 	# Point defense
 	"ciws": "Engages incoming ordnance automatically. Do not walk in front of it while powered.",
@@ -2152,7 +1901,6 @@ const MODULE_FLAVOR = {
 	"topographic_radar": "Interferometric contour surveyor. Maps terrain elevations and horizons; ignores tactical contacts.",
 	"seismic_sensor": "Subsurface acoustic geophone. Detects moving ground hulls through solid rock; oblivious to air and idle units.",
 	"thermal_imager": "Cryogenically cooled infrared optics. Sees heat straight through smoke screens and obscurants.",
-	"armor_plating": "Additional plate. Adds mass. Physics has been consulted and remains unsympathetic.",
 	# Power
 	"fusion_generator": "Supplies heavy base power. Rated safe. Rating issued by the manufacturer.",
 	"diesel_generator": "Internal combustion turbine. Rugged, thirsty, and loud enough to mask minor engineering errors.",
@@ -2166,7 +1914,6 @@ const MODULE_FLAVOR = {
 	"helicopter_rotors": "Vertical lift. Loud enough to announce arrival well ahead of arrival.",
 	"hover_engine": "Ignores ground conditions entirely. Also ignores most attempts at braking.",
 	"legs": "Walks over what others drive around. Complexity per kilometre is considerable.",
-	"fixed_wing_engine": "Requires forward speed to stay airborne. Hovering is not among the options.",
 	"ornithopter_wing": "Flaps. Reviewed twice by engineering. Approved twice. Nobody is entirely sure why.",
 	"buoyant_envelope": "Lighter than air, slower than everything, and a generously sized target.",
 	"screw_drive": "Amphibious augers. Crosses land and water equally badly, which counts as versatility.",
@@ -2481,33 +2228,6 @@ static func needs_combat_script(type_id: String) -> bool:
 # accident. Anything else with zero weapons and none of these categories
 # is a motionless, harmless brick the player almost certainly forgot to
 # finish, not a deliberate build.
-# --- Bolt-on armor bias -----------------------------------------------------
-# Each plate multiplies the armor THRESHOLD against one damage class and is
-# punished against another, so the three of them form a rock-paper-scissors
-# among themselves. Deliberately applied on top of the hull's own armor
-# MATERIAL rather than replacing it: the material dropdown is a separate,
-# already-balanced 4-vs-4 (FABLE_REVIEW.md 1.2), and adding a fifth row there
-# would break a system that took real work to get right. A plate biases; it
-# does not redefine.
-#
-# Anything absent from a plate's row is 1.0 - unaffected.
-const ARMOR_MODULE_BIAS = {
-	# A cage held off the hull. Pre-detonates shaped charges beautifully and
-	# does essentially nothing against solid shot, which is honest: you can
-	# see straight through it.
-	"slat_armor": {"explosive": 1.95, "kinetic": 0.55, "thermal": 0.85},
-	# Two plates and an air gap. The kinetic answer, and heavy enough that
-	# committing to it is a real payload decision.
-	"spaced_composite": {"kinetic": 1.85, "explosive": 1.15, "energy": 0.70},
-	# Sacrificial quilting. Burns away instead of the hull, once.
-	"ablative_foam": {"thermal": 2.10, "energy": 1.25, "kinetic": 0.60},
-}
-
-static func get_armor_module_bias(type_id: String, damage_type: String) -> float:
-	if not ARMOR_MODULE_BIAS.has(type_id):
-		return 1.0
-	return float(ARMOR_MODULE_BIAS[type_id].get(damage_type, 1.0))
-
 const SUPPORT_CATEGORIES = ["generator"]
 const SUPPORT_TYPE_IDS = [
 	"repair_array", "drone_carrier", "resource_harvester", "sensor_suite",
@@ -2527,11 +2247,8 @@ const SUPPORT_TYPE_IDS = [
 #
 # Everything here is a device that is doing work continuously, and the numbers
 # are ordered by how loud that work is rather than by how big the part is:
-# jammer_mast is the hungriest because flooding a band is genuinely the most
-# power-intensive thing on this list, and its own catalog blurb ("also
-# announces exactly where you are") already sold it as the loud option - now it
-# is loud in the budget too. fire_control_radar costs more than sensor_suite
-# because it is actively tracking rather than passively listening.
+# fire_control_radar costs more than sensor_suite because it is actively
+# tracking rather than passively listening.
 #
 # ENERGY WEAPONS ARE DELIBERATELY ABSENT. They spend per shot through
 # spend_energy(), which is a burst cost, and putting them here as well would
@@ -2549,13 +2266,10 @@ const POWER_DRAW := {
 	"seismic_sensor": 1.5,
 	"thermal_imager": 2.0,
 	"fire_control_radar": 4.0,
-	"jammer_mast": 6.0,
 	"laser_designator": 2.0,
-	"decoy_projector": 1.5,
 	"energy_barrier_projector": 5.0,
 	"repair_array": 3.5,
 	"drone_carrier": 4.0,
-	"aps_interceptor": 2.0,
 }
 
 static func get_power_draw(type_id: String) -> float:
@@ -2601,18 +2315,8 @@ const MODULE_ROLES = {
 	"anti_radiation_missile": "Missiles",
 	"bunker_buster": "Missiles",
 	"cruise_missile": "Missiles",
-	"chaff_dispenser": "Point Defense",
-	"laser_dazzler": "Point Defense",
-	"aps_interceptor": "Point Defense",
 	"aa_autocannon": "Point Defense",
-	"jammer_mast": "Point Defense",
-	"sentry_deployer": "Deployables",
 	"sensor_beacon_launcher": "Deployables",
-	"decoy_projector": "Deployables",
-	"slat_armor": "Armor",
-	"spaced_composite": "Armor",
-	"ablative_foam": "Armor",
-	"tesla_coil": "Energy & Electromagnetic",
 	"coil_gun": "Energy & Electromagnetic",
 	"ion_cannon": "Energy & Electromagnetic",
 	"gauss_railgun": "Energy & Electromagnetic",
@@ -2639,7 +2343,6 @@ const MODULE_ROLES = {
 	"mine_layer": "Deployables",
 	"drone_carrier": "Deployables",
 
-	"armor_plating": "Armor",
 	"capacitor_bank": "Power",
 	"fusion_generator": "Power",
 	"diesel_generator": "Power",
@@ -2659,11 +2362,9 @@ const MODULE_ROLES = {
 	# rather than with the generators - see the TIERS/DRIVE_ROLES comment in
 	# parts_menu.gd for why that split doesn't need a new top-level toolbox.
 	"turbocharger": "Propulsion",
-	"overdrive_gearbox": "Propulsion",
 	"hub_motor_array": "Propulsion",
 	"nitrous_injector": "Propulsion",
 	"booster_rack": "Propulsion",
-	"jet_thrusters": "Propulsion",
 }
 
 # Display order for the module tab's drawers. Roughly "things that shoot" ->
@@ -2964,17 +2665,14 @@ static func get_base_traverse(type_id: String) -> float:
 #                 point-defense interception (weapon_missile.gd), not dodging
 const PROJECTILE_CLASS = {
 	"gauss_railgun": "hitscan", "heavy_laser": "hitscan", "pd_laser": "hitscan",
-	"tesla_coil": "hitscan", "ion_cannon": "hitscan",
+	"ion_cannon": "hitscan",
 	"arc_projector": "hitscan", "microwave_emitter": "hitscan", "particle_lance": "hitscan",
 	"resource_harvester": "hitscan", "repair_array": "hitscan",
 	"basic_cannon": "ballistic", "heavy_machine_gun": "ballistic", "rotary_cannon": "ballistic",
 	"ciws": "ballistic", "flak_cannon": "ballistic", "flamethrower": "ballistic",
 	"artillery": "arc", "mortar_array": "arc", "smoke_discharger": "arc",
 	"spigot_mortar": "arc", "rocket_artillery": "arc",
-	"chaff_dispenser": "arc", "sensor_beacon_launcher": "arc", "sentry_deployer": "arc",
-	"decoy_projector": "arc",
-	"laser_dazzler": "hitscan", "jammer_mast": "hitscan",
-	"aps_interceptor": "ballistic", "aa_autocannon": "ballistic",
+	"sensor_beacon_launcher": "arc",
 	# Every one of these is interceptable by point defence (they register in
 	# the "missiles" group via weapon_missile.gd), which is the property that
 	# makes them a different proposition from a gun of the same per-shot number.
@@ -3040,7 +2738,7 @@ static func get_missile_mesh(type_id: String) -> String:
 # Chris's framing: "something firing a shell or payload can also do smoke or
 # incendiary or HE". Ammo is a DESIGN-TIME choice per weapon module, stored
 # as a plain string in the module's own `tweaks` dict - exactly the pattern
-# armor_plating's "material" already uses (see stat_calculator.gd's
+# armor assignments' "material" already uses (see stat_calculator.gd's
 # ARMOR_MATERIALS block: "stored in the same tweaks dict so it rides the
 # existing save/load path for free"). That choice is load-bearing:
 #   - module_data.gd's get_weight()/get_cost()/get_dps() loops all gate on
@@ -3136,7 +2834,7 @@ const AMMO_TYPES = {
 		"desc": "Sub-calibre dart canister. Devastating to light frames, irrelevant to armour.",
 	},
 	# Energy shell: drains the target's capacitor alongside light HP damage,
-	# reusing the same drain_energy() contract tesla_coil/arc_projector use.
+	# reusing the same drain_energy() contract arc_projector uses.
 	# Gives ballistic weapons a door into the energy tier.
 	"emp": {
 		"label": "EMP Shell",
@@ -3785,11 +3483,6 @@ const LOCOMOTION_TWEAK_SPECS = {
 		{"name": "pad_count", "label": "Pad Count", "min": 4.0, "max": 8.0, "step": 1.0, "default": 4.0},
 		{"name": "emv_level", "label": "Electron Megavoltage", "min": 0.5, "max": 2.5, "step": 0.1, "default": 1.0}
 	],
-	"fixed_wing_engine": [
-		{"name": "engine_count", "label": "Engine Count", "min": 2.0, "max": 6.0, "step": 1.0, "default": 2.0},
-		{"name": "turbine_compression", "label": "Turbine Compression", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "afterburner", "label": "Afterburner Ring", "type": "bool", "default": false}
-	],
 	"ornithopter_wing": [
 		{"name": "wingspan", "label": "Wingspan", "min": 0.5, "max": 2.5, "step": 0.1, "default": 1.0},
 		{"name": "wing_sweep", "label": "Wing Sweep Angle", "min": 0.5, "max": 1.5, "step": 0.1, "default": 1.0}
@@ -3878,7 +3571,6 @@ const COUNT_TWEAK_DEFAULTS := {
 	"flak_cannon":              {"barrel_count": 2.0},
 	"mortar_array":             {"tube_count": 2.0},
 	"cluster_dispenser":        {"tube_count": 2.0},
-	"chaff_dispenser":          {"tube_count": 4.0},
 	"rocket_artillery":         {"tube_count": 4.0},
 	"hypervelocity_missile":    {"tube_count": 2.0},
 	"sam_launcher":             {"tube_count": 2.0},
@@ -3887,7 +3579,6 @@ const COUNT_TWEAK_DEFAULTS := {
 	"mine_layer":               {"tube_count": 1.0},
 	"smoke_discharger":         {"tube_count": 4.0},
 	"missile_pod":              {"grid_size": 4.0},
-	"sentry_deployer":          {"hangar_size": 2.0},
 	"drone_carrier":            {"hangar_size": 2.0},
 	"repair_array":             {"welder_count": 2.0},
 	"energy_barrier_projector": {"coil_count": 4.0},
@@ -4015,14 +3706,6 @@ static func get_locomotion_contribs(type_id: String, settings: Dictionary) -> Di
 			# are set so a default build lands near its base_weight_capacity
 			# and the extremes stay inside the band the ground types occupy.
 			capacity = units * (blades / 4.0) * length * 60.0
-		"fixed_wing_engine":
-			var count = settings.get("engine_count", settings.get("count", 2.0))
-			var compression = settings.get("turbine_compression", 1.0)
-			var afterburner = settings.get("afterburner", false)
-			thrust = (count / 2.0) * compression * (1.3 if afterburner else 1.0)
-			# Airspeed-assisted lift: more engine means more payload, but an
-			# afterburner is thrust only - it buys nothing you can carry.
-			capacity = (count / 2.0) * compression * 80.0
 		"ornithopter_wing":
 			var wingspan = settings.get("wingspan", settings.get("size", 1.0))
 			var sweep = settings.get("wing_sweep", 1.0)
@@ -4250,7 +3933,6 @@ const ELEVATION_LIMITS := {
 	# things directly overhead, and a PD gun that cannot look up is furniture.
 	"pd_laser":            {"up": 90.0, "down": 20.0},
 	"ciws":                {"up": 90.0, "down": 20.0},
-	"aps_interceptor":     {"up": 90.0, "down": 25.0},
 	# Machine gun and gatling, also named. A pintle MG on a high ring mount
 	# genuinely does point vertically, and it is the classic light-AA answer.
 	"heavy_machine_gun":   {"up": 90.0, "down": 15.0},
@@ -4272,10 +3954,6 @@ const ELEVATION_LIMITS := {
 	"missile_pod":         {"up": 75.0, "down": 6.0},
 	"hypervelocity_missile": {"up": 72.0, "down": 6.0},
 	"guided_missile":      {"up": 70.0, "down": 6.0},
-	"laser_dazzler":       {"up": 80.0, "down": 20.0},
-	"jammer_mast":         {"up": 85.0, "down": 20.0},
-	"chaff_dispenser":     {"up": 85.0, "down": 10.0},
-	"decoy_projector":     {"up": 80.0, "down": 15.0},
 	"sensor_beacon_launcher": {"up": 70.0, "down": 5.0},
 	# --- Directed energy (50-65) ----------------------------------------
 	# A beam has no recoil path to fight, but the emitter housing and its
@@ -4283,7 +3961,6 @@ const ELEVATION_LIMITS := {
 	"heavy_laser":         {"up": 60.0, "down": 15.0},
 	"ion_cannon":          {"up": 55.0, "down": 12.0},
 	"particle_lance":      {"up": 50.0, "down": 10.0},
-	"tesla_coil":          {"up": 65.0, "down": 15.0},
 	"arc_projector":       {"up": 60.0, "down": 20.0},
 	"microwave_emitter":   {"up": 65.0, "down": 18.0},
 	# --- Direct-fire guns (~45) -----------------------------------------
@@ -4301,7 +3978,6 @@ const ELEVATION_LIMITS := {
 	"cluster_dispenser":   {"up": 45.0, "down": 8.0},
 	"bunker_buster":       {"up": 40.0, "down": 10.0},
 	"smoke_discharger":    {"up": 60.0, "down": 5.0},
-	"sentry_deployer":     {"up": 30.0, "down": 5.0},
 	"mine_layer":          {"up": 15.0, "down": 10.0},
 	"resource_harvester":  {"up": 30.0, "down": 30.0},
 	"repair_array":        {"up": 60.0, "down": 30.0},

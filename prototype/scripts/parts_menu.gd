@@ -79,13 +79,6 @@ const HULL_GROUP_ORDER = [
 	"Static Foundations"
 ]
 
-# Locomotion: derived from the traits array each entry already declares, so a
-# modded drive sorts itself. Order is checked top-down and first match wins,
-# which is what makes the overlapping traits resolve - buoyant_envelope is both
-# "airborne" and "buoyant" and belongs under Air, screw_drive is both
-# "ground_contact" and "amphibious" and belongs under Ground.
-const LOCO_GROUP_ORDER = ["Ground", "Hover", "Naval", "Air"]
-
 # The four TOP-LEVEL TOOLBOXES, in left-to-right order along the bottom.
 # The "weapons"/"support"/"locomotion" tier ids are the same ones the
 # previous build used, so data logic and the tests that read it do not
@@ -162,7 +155,7 @@ func _ready() -> void:
 	var catalog = ModuleCatalog.get_catalog()
 	var hull_groups: Dictionary = {}
 	var module_groups: Dictionary = {}
-	var loco_groups: Dictionary = {}
+	var loco_entries: Array = []
 
 	for type_id in catalog.keys():
 		var data = catalog[type_id]
@@ -181,7 +174,7 @@ func _ready() -> void:
 		if category == "hull":
 			_bucket(hull_groups, _hull_group(data), type_id, data)
 		elif category == "locomotion":
-			_bucket(loco_groups, _loco_group(data), type_id, data)
+			loco_entries.append({"id": type_id, "data": data, "weight": float(data.get("weight", 0.0))})
 		else:
 			_bucket(module_groups, ModuleCatalog.get_module_role(type_id, category), type_id, data)
 
@@ -190,7 +183,7 @@ func _ready() -> void:
 	var combined_order = ModuleCatalog.MODULE_ROLE_ORDER.filter(func(r): return r in WEAPON_ROLES)
 	combined_order.append_array(SUPPORT_ROLE_ORDER)
 	_populate(module_groups, combined_order, "modules")
-	_populate(loco_groups, LOCO_GROUP_ORDER, "locomotion")
+	_populate_flat(loco_entries, "locomotion")
 
 	if _family_tabs.has("hulls"):
 		_family_tabs["hulls"].button_pressed = true
@@ -518,18 +511,59 @@ func _hull_group(data: Dictionary) -> String:
 	return "Heavy & Assault Chassis"
 
 
-func _loco_group(data: Dictionary) -> String:
-	var traits: Array = data.get("traits", [])
-	# First match wins - see LOCO_GROUP_ORDER's comment on the overlaps.
-	if "airborne" in traits:
-		return "Air"
-	if "naval" in traits or ("buoyant" in traits and "ground_contact" not in traits):
-		return "Naval"
-	if "ground_contact" in traits:
-		return "Ground"
-	if "hovering" in traits:
-		return "Hover"
-	return "Ground"
+func _populate_flat(entries: Array, family: String) -> void:
+	# LIGHT TO HEAVY. Ties broken by name for stable ordering.
+	entries.sort_custom(func(a, b):
+		if is_equal_approx(a.weight, b.weight):
+			return String(a.data.get("name", a.id)) < String(b.data.get("name", b.id))
+		return a.weight < b.weight)
+
+	var grid = GridContainer.new()
+	grid.name = "DrivesGrid"
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", Tokens.SPACE_XS)
+	grid.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
+
+	for entry in entries:
+		grid.add_child(_build_part_card(entry.id, entry.data))
+	grid.visible = true
+
+	var drawer_body = PanelContainer.new()
+	drawer_body.name = "DrivesBody"
+	drawer_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	drawer_body.visible = true
+
+	var recess_style = StyleBoxFlat.new()
+	recess_style.bg_color = Tokens.BASE_900
+	recess_style.corner_radius_top_left = 4
+	recess_style.corner_radius_top_right = 4
+	recess_style.corner_radius_bottom_left = 4
+	recess_style.corner_radius_bottom_right = 4
+	recess_style.border_width_top = 2
+	recess_style.border_color = Color(0.0, 0.0, 0.0, 0.55)
+	recess_style.content_margin_left = Tokens.SPACE_XS
+	recess_style.content_margin_right = Tokens.SPACE_XS
+	recess_style.content_margin_top = Tokens.SPACE_XS
+	recess_style.content_margin_bottom = Tokens.SPACE_SM
+	drawer_body.add_theme_stylebox_override("panel", recess_style)
+	drawer_body.add_child(grid)
+
+	var section = VBoxContainer.new()
+	section.name = "Drives_All"
+	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	section.add_child(drawer_body)
+
+	section.set_meta("drawer_category", "Drives")
+	section.set_meta("drawer_tab", family)
+	section.set_meta("drawer_open", true)
+	section.set_meta("content_container", grid)
+	section.set_meta("family", family)
+	section.set_meta("tier", family)
+	section.set_meta("is_flat", true)
+
+	_family_tier_body(family).add_child(section)
+	_all_drawers.append(section)
 
 
 # --- Construction -----------------------------------------------------------
@@ -888,11 +922,14 @@ func _open_category(section: Control) -> void:
 			continue
 		if str(other.get_meta("tier", "")) != tier_id:
 			continue
+		if other.has_meta("is_flat") and other.get_meta("is_flat"):
+			continue
 		var is_target: bool = other == section
 		var grid: Control = other.get_meta("content_container")
-		var header: Button = other.get_meta("header_btn")
+		if other.has_meta("header_btn"):
+			var header: Button = other.get_meta("header_btn")
+			header.set_pressed_no_signal(is_target)
 		grid.visible = is_target
-		header.set_pressed_no_signal(is_target)
 		other.set_meta("drawer_open", is_target)
 
 
@@ -936,7 +973,8 @@ func _apply_filters() -> void:
 			# would defeat the search.
 			if _filter != "":
 				grid.visible = true
-				section.get_meta("header_btn").set_pressed_no_signal(true)
+				if section.has_meta("header_btn"):
+					section.get_meta("header_btn").set_pressed_no_signal(true)
 				section.set_meta("drawer_open", true)
 				# The family tier above it has to open too, or the match is
 				# revealed inside a closed family and stays invisible. The
@@ -1025,9 +1063,10 @@ func reveal_part(type_id: String) -> Button:
 			_force_open_family(str(section.get_meta("tier", "")))
 			# Through the header's toggle rather than _open_category() directly,
 			# so the drawer's own accordion and its pressed state stay in step.
-			var header: Button = section.get_meta("header_btn")
-			if not header.button_pressed:
-				header.button_pressed = true
+			if section.has_meta("header_btn"):
+				var header: Button = section.get_meta("header_btn")
+				if not header.button_pressed:
+					header.button_pressed = true
 			return card
 	return null
 
@@ -1037,7 +1076,10 @@ func reveal_part(type_id: String) -> Button:
 func collapse_all_drawers() -> void:
 	for section in _all_drawers:
 		if is_instance_valid(section):
-			section.get_meta("header_btn").button_pressed = false
+			if section.has_meta("is_flat") and section.get_meta("is_flat"):
+				continue
+			if section.has_meta("header_btn"):
+				section.get_meta("header_btn").button_pressed = false
 			section.get_meta("content_container").visible = false
 			section.set_meta("drawer_open", false)
 	open_drawer_hulls = ""

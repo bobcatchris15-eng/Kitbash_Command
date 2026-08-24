@@ -12,8 +12,6 @@ const ModuleCatalogScript = preload("res://scripts/module_catalog.gd")
 # SLOPE_TRACE_MASK below cannot drift from its definition. battle_layers.gd has
 # no preloads of its own, so this closes no cycle.
 const BattleLayersScript = preload("res://scripts/battle/battle_layers.gd")
-const ArmorPaintScript = preload("res://scripts/armor_paint.gd")
-
 # Elevation combat advantage (multi-map pass): shooting down at a target on
 # meaningfully lower ground pierces more easily - real armor doesn't
 # protect top-down as well as face-on, and it gives holding a hill a real
@@ -31,7 +29,7 @@ const ELEVATION_COMBAT_PIERCE_MULTIPLIER: float = 0.85
 #
 # "energy" row added this pass (ENERGY_AND_BALANCE_SPEC.md #4 follow-up):
 # previously there was no "energy" key at all, so any weapon dealing
-# damage_class=="energy" (tesla_coil/arc_projector/ion_cannon) silently fell
+# damage_class=="energy" (arc_projector/ion_cannon) silently fell
 # through get_material_threshold()'s row.get(damage_type, row["explosive"])
 # fallback and actually resolved as EXPLOSIVE damage - a real bug, not just
 # a missing feature, found while scoping the energy-weapon-reclassification
@@ -222,16 +220,12 @@ static func _apply_assignment(baseline: Vector2, a: Dictionary, damage_type: Str
 	var material := str(a.get("material", ""))
 	if material == "":
 		return baseline
+	# The armor TYPE (plating/slat/composite/foam) is purely cosmetic - the
+	# painted likeness on the skin. Threshold and reduction come from the
+	# MATERIAL and its THICKNESS alone; the old per-type catalog-HP bonus and
+	# rock-paper-scissors bias multipliers were retired with the type rows.
 	var plate := get_material_threshold(material, damage_type, float(a.get("thickness", 1.0)))
-	var threshold := plate.x
-	var type_id := str(a.get("type_id", ""))
-	var data: Dictionary = ModuleCatalogScript.get_module_data(type_id)
-	# HP scales with how much surface this facet actually is, on the same
-	# reference-patch basis as its weight and cost.
-	var units: float = float(a.get("area", 0.0)) / ArmorPaintScript.ARMOR_REFERENCE_AREA
-	threshold += float(data.get("hp", 0.0)) * units * ArmorPaintScript.HP_TO_THRESHOLD
-	threshold *= ModuleCatalogScript.get_armor_module_bias(type_id, damage_type)
-	return Vector2(threshold, plate.y)
+	return plate
 
 
 # Partial coverage, blended linearly on both channels.
@@ -252,7 +246,6 @@ static func _blend_side(baseline: Vector2, summary: Dictionary, damage_type: Str
 		"material": material,
 		"type_id": str(summary.get("type_id", "")),
 		"thickness": 1.0,
-		"area": ArmorPaintScript.ARMOR_REFERENCE_AREA,
 	}, damage_type)
 	return Vector2(
 		lerpf(baseline.x, plated.x, coverage),

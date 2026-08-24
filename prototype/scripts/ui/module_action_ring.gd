@@ -2,7 +2,7 @@ class_name ModuleActionRing
 extends Control
 
 # Module action ring & radial tweak console for Design Lab parts manipulation.
-# Sized dynamically to clear the module's projected silhouette.
+# Sized ONCE, at open, to clear the module's projected silhouette - then fixed.
 # Combines inner verb wedges with outer clock-face tweak stations and a docked 6:00 spec plate.
 
 const RingDraw = preload("res://scripts/ui/ring_draw.gd")
@@ -20,7 +20,12 @@ const BAND_WIDTH := 44.0
 const CLEARANCE_MARGIN := 16.0
 const HUB_RADIUS := 28.0
 const STATION_RADIAL_OFFSET := 56.0
-const ORBIT_MARGIN := 120.0
+# Radial gap between stacked stations that share a clock angle. A dial is 72 px
+# tall including its caption badge, so one step clears the tier below.
+const STATION_TIER_OFFSET := 76.0
+# Canvas slack beyond the ring: must fit the station orbit plus two overflow
+# tiers plus half a station control (56 + 2*76 + ~40).
+const ORBIT_MARGIN := 250.0
 
 var target_node: Node3D = null
 var subject_label: String = ""
@@ -87,12 +92,43 @@ func add_tweak_station(tweak_name: String, label: String, control: Control, angl
 		angle = TweakStations.angle_for(tweak_name)
 		if angle < 0.0:
 			angle = TweakStations.CLOCK_1
-	
+
+	# Station claim order: the tweak's canonical clock angle when free, then
+	# the nearest free FIRST-LAYER station (the eight outer-band clocks), then
+	# - only once all eight are taken - a new outward tier stacked over the
+	# canonical angle. Two of one module's tweaks can share an angle (the
+	# rotary cannon's Barrel Count and Motor Size both live at 11 o'clock);
+	# the ring used to build outward immediately, leaving half the first
+	# layer empty while a second dial orbited out past it.
+	var claimed := {}
+	for st in _tweak_stations:
+		var a := float(st.get("angle", -1.0))
+		claimed[a] = int(claimed.get(a, 0)) + 1
+
+	var tier := 0
+	if claimed.has(angle):
+		var best_dist := INF
+		var free_angle := -1.0
+		for cand: float in TweakStations.OUTER_STATIONS:
+			if claimed.has(cand):
+				continue
+			var dist := absf(cand - angle)
+			dist = minf(dist, 1.0 - dist)
+			if dist < best_dist:
+				best_dist = dist
+				free_angle = cand
+		if free_angle >= 0.0:
+			angle = free_angle
+		else:
+			# All eight first-layer stations taken: build outward.
+			tier = int(claimed.get(angle, 0))
+
 	_tweak_stations.append({
 		"name": tweak_name,
 		"label": label,
 		"control": control,
 		"angle": angle,
+		"tier": tier,
 	})
 	_station_container.add_child(control)
 	_update_station_positions()
@@ -151,7 +187,7 @@ func open_for_module(module: Node3D, label_text: String = "") -> void:
 	subject_label = label_text
 	_is_open = true
 	visible = true
-	_update_silhouette_radius(true)
+	_size_to_module()
 	_update_screen_position()
 	_update_station_positions()
 	UIAnim.ring_pop(self)
@@ -178,12 +214,15 @@ func _process(delta: float) -> void:
 		close()
 		return
 
-	_update_silhouette_radius(false, delta)
 	_update_screen_position()
 	_update_station_positions()
 
 
-func _update_silhouette_radius(immediate: bool = false, delta: float = 0.016) -> void:
+# Measured once when the ring opens: the hole clears the module it was opened
+# on, and the geometry stays put from then on. The ring used to re-project the
+# module's silhouette every frame and breathe with camera zoom, which shrank
+# and grew the station orbit under a player's cursor mid-drag.
+func _size_to_module() -> void:
 	if target_node == null or not is_instance_valid(target_node):
 		return
 	var camera := get_viewport().get_camera_3d()
@@ -193,13 +232,7 @@ func _update_silhouette_radius(immediate: bool = false, delta: float = 0.016) ->
 	var half_diag := _compute_projected_half_diagonal(camera, target_node)
 	var vp_size: Vector2 = get_viewport().get_visible_rect().size
 	var viewport_cap: float = minf(vp_size.x, vp_size.y) * 0.40
-	var max_inner: float = maxf(minf(MAX_INNER_RADIUS, viewport_cap), half_diag + CLEARANCE_MARGIN)
-	var target_inner: float = clampf(half_diag + CLEARANCE_MARGIN, MIN_INNER_RADIUS, max_inner)
-
-	if immediate:
-		inner_radius = target_inner
-	else:
-		inner_radius = lerpf(inner_radius, target_inner, clampf(delta * 10.0, 0.0, 1.0))
+	inner_radius = clampf(half_diag + CLEARANCE_MARGIN, MIN_INNER_RADIUS, minf(MAX_INNER_RADIUS, viewport_cap))
 
 	outer_radius = inner_radius + BAND_WIDTH
 	_update_canvas_size()
@@ -278,7 +311,6 @@ func _update_screen_position() -> void:
 
 func _update_station_positions() -> void:
 	var center := size * 0.5
-	var station_r := outer_radius + STATION_RADIAL_OFFSET
 
 	for st in _tweak_stations:
 		var ctrl: Control = st.get("control")
@@ -288,8 +320,8 @@ func _update_station_positions() -> void:
 		# 0.0 is 12 o'clock (-PI/2), clockwise
 		var rad := angle_frac * TAU - PI * 0.5
 		var dir := Vector2(cos(rad), sin(rad))
-		var pos := center + dir * station_r - ctrl.size * 0.5
-		ctrl.position = pos
+		var station_r: float = outer_radius + STATION_RADIAL_OFFSET + float(st.get("tier", 0)) * STATION_TIER_OFFSET
+		ctrl.position = center + dir * station_r - ctrl.size * 0.5
 
 	if is_instance_valid(_spec_card) and _spec_card.visible:
 		# Docked at 6:00 (bottom)
@@ -358,8 +390,9 @@ func _draw() -> void:
 		var angle_frac: float = st.get("angle", 0.0)
 		var rad := angle_frac * TAU - PI * 0.5
 		var dir := Vector2(cos(rad), sin(rad))
+		var station_r: float = outer_radius + STATION_RADIAL_OFFSET + float(st.get("tier", 0)) * STATION_TIER_OFFSET
 		var p_ring := center + dir * outer_radius
-		var p_station := center + dir * (outer_radius + STATION_RADIAL_OFFSET - 8.0)
+		var p_station := center + dir * (station_r - 8.0)
 		draw_line(p_ring, p_station, Color(Tokens.BASE_600, 0.7), 1.0, true)
 		# Spoke node dot on outer bezel
 		draw_circle(p_ring, 2.5, Tokens.SIGNAL_HAZARD)

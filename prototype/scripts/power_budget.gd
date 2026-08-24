@@ -215,7 +215,7 @@ static func _empty() -> Dictionary:
 ## Written out in both steps rather than pre-cancelled: the cancellation is only
 ## valid while auto_weapon derives the cost that way, and someone changing that
 ## formula needs to see this one is downstream of it.
-const ENERGY_WEAPON_TYPES := ["tesla_coil", "arc_projector", "ion_cannon", "microwave_emitter", "particle_lance", "heavy_laser", "pd_laser", "laser_dazzler", "gauss_railgun", "coil_gun", "plasma_lobber"]
+const ENERGY_WEAPON_TYPES := ["arc_projector", "ion_cannon", "microwave_emitter", "particle_lance", "heavy_laser", "pd_laser", "gauss_railgun", "coil_gun", "plasma_lobber"]
 const ENERGY_COST_FRACTION := 0.4
 
 static func _sustained_weapon_draw(data) -> float:

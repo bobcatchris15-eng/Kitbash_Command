@@ -345,7 +345,7 @@ const MONOLITHIC_ANIMATION_PIVOTS := {
 
 const LOCOMOTION_MODULAR_TYPES := {
 	"wheels": true, "helicopter_rotors": true, "tracked_treads": true, "heavy_quad_tracks": true, "legs": true,
-	"hover_engine": true, "fixed_wing_engine": true, "ornithopter_wing": true,
+	"hover_engine": true, "ornithopter_wing": true,
 	"buoyant_envelope": true, "screw_drive": true,
 	"half_track": true, "rocker_bogie": true, "air_cushion_skirt": true,
 	"anti_grav_plate": true,
@@ -413,7 +413,7 @@ const MISSILE_LAUNCHER_PARTS := {
 const MODULAR_ASSEMBLY_TYPES := {
 	"basic_cannon": true, "heavy_machine_gun": true, "rotary_cannon": true, "gauss_railgun": true,
 	"artillery": true, "mortar_array": true, "guided_missile": true, "missile_pod": true,
-	"cluster_dispenser": true, "flamethrower": true, "tesla_coil": true, "ion_cannon": true,
+	"cluster_dispenser": true, "flamethrower": true, "ion_cannon": true,
 	"heavy_laser": true, "plasma_lobber": true, "ciws": true, "pd_laser": true, "flak_cannon": true,
 	"smoke_discharger": true,
 	"mk19_grenade_launcher": true, "recoilless_rifle": true, "coil_gun": true,
@@ -423,11 +423,10 @@ const MODULAR_ASSEMBLY_TYPES := {
 	"spigot_mortar": true, "rocket_artillery": true,
 	"hypervelocity_missile": true, "sam_launcher": true, "loitering_munition": true,
 	"anti_radiation_missile": true, "bunker_buster": true, "cruise_missile": true,
-	"chaff_dispenser": true, "laser_dazzler": true, "aps_interceptor": true,
-	"aa_autocannon": true, "jammer_mast": true, "sentry_deployer": true,
-	"sensor_beacon_launcher": true, "decoy_projector": true,
+	"aa_autocannon": true,
+	"sensor_beacon_launcher": true,
 	"wheels": true, "helicopter_rotors": true, "tracked_treads": true, "heavy_quad_tracks": true, "legs": true,
-	"hover_engine": true, "fixed_wing_engine": true, "ornithopter_wing": true,
+	"hover_engine": true, "ornithopter_wing": true,
 	"buoyant_envelope": true, "screw_drive": true,
 	"half_track": true, "rocker_bogie": true, "air_cushion_skirt": true,
 	"anti_grav_plate": true,
@@ -453,7 +452,6 @@ const MODULAR_AUTHORED_SIZES := {
 	"missile_pod": Vector3(1.2, 0.8, 1.5),
 	"cluster_dispenser": Vector3(1.4, 0.8, 1.4),
 	"flamethrower": Vector3(0.5, 0.5, 1.6),
-	"tesla_coil": Vector3(0.5, 1.2, 0.5),
 	"ion_cannon": Vector3(0.8, 0.8, 2.8),
 	"heavy_laser": Vector3(0.7, 0.7, 2.4),
 	"plasma_lobber": Vector3(0.6, 0.6, 1.6),
@@ -480,21 +478,14 @@ const MODULAR_AUTHORED_SIZES := {
 	"anti_radiation_missile": Vector3(0.6, 0.6, 1.4),
 	"bunker_buster": Vector3(0.7, 0.7, 1.5),
 	"cruise_missile": Vector3(0.8, 0.7, 2.0),
-	"chaff_dispenser": Vector3(0.5, 0.4, 0.5),
-	"laser_dazzler": Vector3(0.5, 0.5, 0.7),
-	"aps_interceptor": Vector3(0.6, 0.5, 0.6),
 	"aa_autocannon": Vector3(0.7, 0.6, 1.5),
-	"jammer_mast": Vector3(0.6, 1.0, 0.6),
-	"sentry_deployer": Vector3(0.7, 0.6, 0.9),
 	"sensor_beacon_launcher": Vector3(0.6, 0.5, 0.8),
-	"decoy_projector": Vector3(0.6, 0.5, 0.6),
 	"wheels": Vector3(0.6, 0.6, 0.6),
 	"helicopter_rotors": Vector3(4.0, 0.2, 4.0),
 	"tracked_treads": Vector3(0.8, 0.6, 2.5),
 	"heavy_quad_tracks": Vector3(0.9, 0.7, 1.4),
 	"legs": Vector3(0.5, 1.5, 0.5),
 	"hover_engine": Vector3(1.2, 0.3, 1.2),
-	"fixed_wing_engine": Vector3(1.0, 0.5, 1.5),
 	"ornithopter_wing": Vector3(2.0, 0.2, 1.0),
 	"buoyant_envelope": Vector3(1.0, 0.5, 1.0),
 	"screw_drive": Vector3(0.8, 0.8, 3.0),
@@ -722,7 +713,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			"helicopter_rotors": _build_helicopter_rotors(parent_node, base_size, base_color, tweaks)
 			"hover_engine": _build_hover_engine(parent_node, base_size, base_color, tweaks)
 			"legs": _build_legs(parent_node, base_size, base_color, tweaks)
-			"fixed_wing_engine": _build_fixed_wing_engine(parent_node, base_size, base_color, tweaks)
 			"ornithopter_wing": _build_ornithopter_wing(parent_node, base_size, base_color, tweaks)
 			"buoyant_envelope": _build_buoyant_envelope(parent_node, base_size, base_color, tweaks)
 			"screw_drive": _build_screw_drive(parent_node, base_size, base_color, tweaks)
@@ -1595,72 +1585,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			nozzle.rotation = Vector3(PI / 2, 0, 0)
 		parent_node.add_child(nozzle)
 
-	elif type_id == "tesla_coil":
-		var caliber = tweaks.get("caliber", 1.0)
-		var arc_freq = tweaks.get("arc_frequency", 1.0)
-		var surge_cap = tweaks.get("surge_capacity", 1.0)
-
-		# 1. MOUNT (tesla_coil_mount.glb)
-		var mount_mesh = _part("tesla_coil_mount")
-		if not mount_mesh:
-			mount_mesh = _part("pintle_mount")
-		var mount: MeshInstance3D
-		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
-			mount.scale = Vector3(caliber, 1.0, caliber)
-			mount.position = Vector3(0, 0, 0)
-		else:
-			mount = MeshInstance3D.new()
-			var m_box = BoxMesh.new()
-			m_box.size = Vector3(0.48 * caliber, 0.16, 0.48 * caliber)
-			mount.mesh = m_box
-			var m_mat = StandardMaterial3D.new()
-			m_mat.albedo_color = base_color.darkened(0.2)
-			mount.material_override = m_mat
-			mount.position = Vector3(0, 0.08, 0)
-		parent_node.add_child(mount)
-
-		# 2. TRANSFORMER TOWER HOUSING (tesla_coil_housing.glb)
-		var trunnion_y = 0.12
-		var housing_mesh = _part("tesla_coil_housing")
-		var housing: MeshInstance3D
-		if housing_mesh:
-			housing = _mesh_inst(housing_mesh, Color(0.70, 0.45, 0.20))
-			housing.scale = Vector3(caliber, surge_cap, caliber)
-			housing.position = Vector3(0, trunnion_y, 0)
-		else:
-			housing = MeshInstance3D.new()
-			var h_cyl = CylinderMesh.new()
-			h_cyl.top_radius = 0.16 * caliber
-			h_cyl.bottom_radius = 0.16 * caliber
-			h_cyl.height = 0.80 * surge_cap
-			housing.mesh = h_cyl
-			var h_mat = StandardMaterial3D.new()
-			h_mat.albedo_color = Color(0.70, 0.45, 0.20)
-			housing.material_override = h_mat
-			housing.position = Vector3(0, trunnion_y + 0.40 * surge_cap, 0)
-		parent_node.add_child(housing)
-
-		# 3. DISCHARGE TOROID DOME (tesla_coil_toroid.glb)
-		var toroid_mesh = _part("tesla_coil_toroid")
-		var toroid: MeshInstance3D
-		var toroid_y = trunnion_y + 0.80 * surge_cap
-		if toroid_mesh:
-			toroid = _mesh_inst(toroid_mesh, Color(0.85, 0.90, 0.95))
-			toroid.scale = Vector3(caliber * arc_freq, arc_freq, caliber * arc_freq)
-			toroid.position = Vector3(0, toroid_y, 0)
-		else:
-			toroid = MeshInstance3D.new()
-			var t_sph = SphereMesh.new()
-			t_sph.radius = 0.24 * caliber * arc_freq
-			t_sph.height = 0.32 * arc_freq
-			toroid.mesh = t_sph
-			var t_mat = StandardMaterial3D.new()
-			t_mat.albedo_color = Color.LIGHT_SKY_BLUE
-			toroid.material_override = t_mat
-			toroid.position = Vector3(0, toroid_y, 0)
-		parent_node.add_child(toroid)
-
 	elif type_id == "ion_cannon":
 		var beam_width = tweaks.get("beam_width", 1.0)
 		var ion_density = tweaks.get("ion_density", 1.0)
@@ -2348,8 +2272,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 		# 3. CRYO FLIR OPTICAL POD
 		var pod_mesh = _part("amr_sensor_pod")
-		if not pod_mesh:
-			pod_mesh = _part("dazzler_head")
 		var pod: MeshInstance3D = _mesh_inst(pod_mesh, Color(0.85, 0.45, 0.25)) if pod_mesh else MeshInstance3D.new()
 		pod.name = "thermal_flir_pod"
 		pod.scale = Vector3(aperture, aperture, aperture)
@@ -2683,64 +2605,13 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			cells.position = Vector3.ZERO
 			parent_node.add_child(cells)
 
-	elif type_id == "tesla_coil":
-		# Chris explicitly invited some fun/silly weapons alongside the
-		# grounded ones (ENERGY_AND_BALANCE_SPEC.md #4) - a literal wound
-		# coil with a glowing discharge ball on top, distinct from the
-		# generic box fallback every other unhandled type gets.
-		var base = MeshInstance3D.new()
-		var base_cyl = CylinderMesh.new()
-		base_cyl.top_radius = base_size.x * 0.45
-		base_cyl.bottom_radius = base_size.x * 0.55
-		base_cyl.height = base_size.y * 0.15
-		base.mesh = base_cyl
-		var base_mat = StandardMaterial3D.new()
-		base_mat.albedo_color = Color(0.2, 0.2, 0.22)
-		base.material_override = base_mat
-		base.position = Vector3(0, base_cyl.height / 2.0, 0)
-		parent_node.add_child(base)
-
-		var coil_segments = 8
-		var coil_height = base_size.y * 0.75
-		var coil_radius = base_size.x * 0.32
-		for i in range(coil_segments):
-			var ring = MeshInstance3D.new()
-			var torus = TorusMesh.new()
-			torus.inner_radius = coil_radius - 0.03
-			torus.outer_radius = coil_radius
-			ring.mesh = torus
-			var ring_mat = StandardMaterial3D.new()
-			ring_mat.albedo_color = base_color
-			ring_mat.emission_enabled = true
-			ring_mat.emission = base_color
-			ring_mat.emission_energy_multiplier = 0.4
-			ring.material_override = ring_mat
-			ring.position = Vector3(0, base_size.y * 0.2 + (coil_height * i / float(coil_segments - 1)), 0)
-			parent_node.add_child(ring)
-
-		var orb = MeshInstance3D.new()
-		var sphere = SphereMesh.new()
-		sphere.radius = base_size.x * 0.4
-		sphere.height = sphere.radius * 2.0
-		orb.mesh = sphere
-		var orb_mat = StandardMaterial3D.new()
-		orb_mat.albedo_color = Color.WHITE
-		orb_mat.emission_enabled = true
-		orb_mat.emission = base_color
-		orb_mat.emission_energy_multiplier = 1.5
-		orb.material_override = orb_mat
-		orb.position = Vector3(0, base_size.y * 0.2 + coil_height + sphere.radius * 0.6, 0)
-		parent_node.add_child(orb)
-
 	elif type_id in ["mk19_grenade_launcher", "autocannon", "recoilless_rifle", "coil_gun",
 					 "ballista", "napalm_mortar", "mine_layer", "smoke_discharger",
 					 "anti_materiel_rifle", "arc_projector", "microwave_emitter",
 					 "particle_lance", "spigot_mortar", "rocket_artillery",
 					 "hypervelocity_missile", "sam_launcher", "loitering_munition",
 					 "anti_radiation_missile", "bunker_buster", "cruise_missile",
-					 "chaff_dispenser", "laser_dazzler", "aps_interceptor",
-					 "aa_autocannon", "jammer_mast", "sentry_deployer",
-					 "sensor_beacon_launcher", "decoy_projector"]:
+					 "aa_autocannon", "sensor_beacon_launcher"]:
 		# --- Roster expansion ------------------------------------------------
 		# Assembled from authored .glb sub-parts (tools/blender/
 		# build_roster_expansion.py) exactly like basic_cannon and the HMG
@@ -3218,54 +3089,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 							float(ml_spec["front_z"]) * caliber)
 						ml_pivot.add_child(rnd)
 
-			"chaff_dispenser":
-				# Never points at anything, so no trunnion and no elevation
-				# pivot - the tubes are fixed and splayed. Same family as the
-				# smoke discharger, deliberately.
-				var cd_tubes = clampi(int(tweaks.get("tube_count", 4.0)), 2, 8)
-				var cd_body_mesh = _part("chaff_body")
-				if cd_body_mesh:
-					var cdb = _mesh_inst(cd_body_mesh, base_color.darkened(0.1))
-					cdb.scale = Vector3.ONE * caliber
-					parent_node.add_child(cdb)
-				var cd_tube_mesh = _part("chaff_tube")
-				if cd_tube_mesh:
-					for i in range(cd_tubes):
-						var t = 0.0 if cd_tubes == 1 else (float(i) / float(cd_tubes - 1) - 0.5)
-						var tube = _mesh_inst(cd_tube_mesh, Color(0.30, 0.31, 0.27))
-						tube.scale = Vector3.ONE * caliber
-						tube.position = Vector3(t * 0.30 * caliber, 0.24 * caliber, -0.05 * caliber)
-						# Splayed OUTWARD and canted up. Sign checked against
-						# the smoke discharger's own splay bug: the leftmost
-						# tube must yaw left, not inward.
-						tube.rotation = Vector3(deg_to_rad(-55.0), lerp(0.30, -0.30, float(i) / maxf(1.0, float(cd_tubes - 1))), 0)
-						parent_node.add_child(tube)
-
-			"laser_dazzler":
-				var dz_trunnion_y = 0.196
-				var dz_mount_mesh = _part("dazzler_mount")
-				if dz_mount_mesh:
-					var dzm = _mesh_inst(dz_mount_mesh, base_color.darkened(0.25))
-					dzm.scale = Vector3(caliber, 1.0, caliber)
-					parent_node.add_child(dzm)
-				var dz_head_mesh = _part("dazzler_head")
-				if dz_head_mesh:
-					var dzh = _mesh_inst(dz_head_mesh, Color(0.22, 0.24, 0.26),
-						Color(0.35, 0.95, 0.5), 0.5)
-					dzh.scale = Vector3.ONE * caliber * float(tweaks.get("lens_aperture", 1.0))
-					dzh.position = Vector3(0, dz_trunnion_y, 0)
-					parent_node.add_child(dzh)
-
-			"aps_interceptor":
-				# Covers the whole arc at once, so it does not traverse and
-				# has no trunnion - the launcher ring IS the weapon.
-				var aps_mesh = _part("aps_body")
-				if aps_mesh:
-					var apsb = _mesh_inst(aps_mesh, base_color.darkened(0.1),
-						Color(1.0, 0.6, 0.25), 0.25)
-					apsb.scale = Vector3.ONE * caliber
-					parent_node.add_child(apsb)
-
 			"aa_autocannon":
 				var aa_trunnion_y = 0.268
 				var aa_len = tweaks.get("barrel_length", 1.0)
@@ -3293,32 +3116,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 						bar.position = Vector3(side * 0.055 * caliber, 0, AA_RECEIVER_FRONT_Z * caliber)
 						aa_pivot.add_child(bar)
 
-			"jammer_mast":
-				# No barrel, no traverse, no shot. Reads as equipment.
-				var jm_mesh = _part("jammer_body")
-				if jm_mesh:
-					var jmb = _mesh_inst(jm_mesh, base_color.darkened(0.1),
-						Color(0.4, 0.8, 0.95), 0.30)
-					jmb.scale = Vector3(caliber, float(tweaks.get("mast_height", 1.0)), caliber)
-					parent_node.add_child(jmb)
-
-			"sentry_deployer":
-				var sd_rack_mesh = _part("sentry_rack")
-				if sd_rack_mesh:
-					var sdr = _mesh_inst(sd_rack_mesh, base_color.darkened(0.1))
-					sdr.scale = Vector3.ONE * caliber
-					parent_node.add_child(sdr)
-				# Loaded sentries visible in the rack, using the SAME mesh the
-				# deployed turret uses - what you see loaded is what you get.
-				var sd_turret_mesh = _part("sentry_turret")
-				if sd_turret_mesh:
-					var loaded = clampi(int(tweaks.get("hangar_size", 2.0)), 1, 3)
-					for i in range(loaded):
-						var st = _mesh_inst(sd_turret_mesh, Color(0.27, 0.29, 0.24))
-						st.scale = Vector3.ONE * caliber * 0.72
-						st.position = Vector3(0, (0.10 + i * 0.115) * caliber, 0.02 * caliber)
-						parent_node.add_child(st)
-
 			"sensor_beacon_launcher":
 				var sb_body_mesh = _part("beacon_body")
 				if sb_body_mesh:
@@ -3332,13 +3129,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 					sbt.position = Vector3(0, 0.196 * caliber, -0.02 * caliber)
 					sbt.rotation = Vector3(deg_to_rad(58.0), 0, 0)
 					parent_node.add_child(sbt)
-
-			"decoy_projector":
-				var dp_mesh = _part("decoy_body")
-				if dp_mesh:
-					var dpb = _mesh_inst(dp_mesh, base_color.darkened(0.05))
-					dpb.scale = Vector3.ONE * caliber
-					parent_node.add_child(dpb)
 
 			"recoilless_rifle":
 				var trunnion_y = 0.27
@@ -3726,7 +3516,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 						tube.rotation = Vector3(deg_to_rad(-55.0), splay, 0)
 						parent_node.add_child(tube)
 
-	elif type_id in ["turbocharger", "overdrive_gearbox", "hub_motor_array", "nitrous_injector", "booster_rack", "grav_lifter_assist", "jet_thrusters"]:
+	elif type_id in ["turbocharger", "hub_motor_array", "nitrous_injector", "booster_rack"]:
 		# --- Propulsion modules (speed pass, 2026-08-08) -----------------
 		# Same sub-part-per-tweak convention as recoilless_rifle above: the
 		# detail being tweaked is the piece that scales, nothing else. Parts
@@ -4456,101 +4246,150 @@ static func _build_helicopter_rotors(parent_node: Node3D, base_size: Vector3, ba
 	var strut_mesh = _part("mount_strut_tapered")
 	var mount_mesh = _part("rg_mount_box")
 
-	# Structural mounting pylon down to the hull's physical center - NOT just
-	# to its near edge. module_placer.gd places this whole module at
-	# hull_size/2 + a fixed clearance (1.2 outboard, 0.3 above the hull top)
-	# and passes the FULL resulting distances through as mount_reach_x/y
-	# (mirrored by mount_side for whichever side this instance is on -
-	# rotors are never mirror-flipped like wheels/tracked_treads are, since
-	# the mast+blade ring alone is rotationally symmetric, so this is the
-	# first rotor geometry that needs to know its own side). The strut
-	# travels the FULL mount_reach_x/y, guaranteeing it plunges into the
-	# hull body regardless of hull size or shape.
-	var mount_side = tweaks.get("mount_side", 1.0)
-	var mount_reach_x = tweaks.get("mount_reach_x", 1.2)
-	var mount_reach_y = tweaks.get("mount_reach_y", 0.3)
-	var hull_center = Vector3(-mount_reach_x * mount_side, -mount_reach_y, 0)
-	var strut_len = hull_center.length()
-	var strut_dir = hull_center / strut_len
-	# SOLVED AGAINST THE MESH, replacing "aim at the box centre and overshoot".
-	#
-	# Chris, 2026-08-12: "help the helicopter rotors mounting hardware actually
-	# reach the hull". mount_reach_x/y are derived from the fitted collision BOX,
-	# so pointing at the box's centre and travelling the full distance was only
-	# guaranteed to plunge into a hull that fills its box. On a tapered or curved
-	# one - which is most of the roster since the SDF bake - the strut stopped in
-	# open air beside the body.
-	#
-	# Casting along the strut's own axis to the real skin and biting 0.05 past it
-	# is both correct and less violent than the old overshoot: it no longer buries
-	# most of the pylon inside the hull to be sure of touching it.
-	var strut_reach: float = MountReachScript.solve(parent_node,
-		MountReachScript.station_from(tweaks), Vector3.ZERO, strut_dir, -1.0,
-		MountReachScript.node_scale_from(tweaks))
-	if strut_reach > 0.0:
-		strut_len = strut_reach
-	# rg_mount_box/mount_strut_tapered are both authored spanning local
-	# Y=[0, authored_len] - rotating by strut_angle about Z maps that Y span
-	# to world direction (-sin(angle), cos(angle), 0), so solving
-	# strut_dir = that gives the angle needed to point the strut's long axis
-	# at the hull center.
-	var strut_angle = atan2(-strut_dir.x, strut_dir.y)
+	var mount_side = float(tweaks.get("mount_side", 1.0))
+	var station := MountReachScript.station_from(tweaks)
+	var surface := MountReachScript.surface_for(parent_node)
+
+	# Direct vector towards the hull flank in 3D:
+	# Inward in X, angled slightly down in Y, and slight inward pull in Z
+	var z_pull: float = -signf(station.z) * 0.12 if absf(station.z) > 0.1 else 0.0
+	var dir_to_hull := Vector3(-mount_side, -0.38, z_pull).normalized()
+
+	var span_vec := dir_to_hull * 1.5
+	var hull_normal := -dir_to_hull
+
+	if not surface.is_empty():
+		var hit: Dictionary = HullProjectionScript.raycast(surface, station, dir_to_hull)
+		if hit.get("hit", false):
+			span_vec = hit["position"] - station
+			hull_normal = hit["normal"]
+		else:
+			for pitch_deg in [-10.0, 10.0, -20.0, 20.0, -35.0, 35.0]:
+				var found_hit := false
+				for yaw_deg in [-15.0, 15.0]:
+					var test_dir := dir_to_hull.rotated(Vector3.UP, deg_to_rad(yaw_deg))
+					var test_axis := Vector3.UP.cross(test_dir).normalized()
+					test_dir = test_dir.rotated(test_axis, deg_to_rad(pitch_deg))
+					var hit2: Dictionary = HullProjectionScript.raycast(surface, station, test_dir)
+					if hit2.get("hit", false):
+						span_vec = hit2["position"] - station
+						hull_normal = hit2["normal"]
+						found_hit = true
+						break
+				if found_hit:
+					break
+
+	var span_len: float = span_vec.length()
+	var spar_reach: float = span_len + 0.08
+
+	# Main structural spar pointing directly at the hull contact point
+	var arm := Node3D.new()
+	arm.name = "RotorBoom"
+	parent_node.add_child(arm)
+
+	# Align arm's local +Y with span_vec
+	var y_axis := span_vec.normalized()
+	var z_axis := y_axis.cross(Vector3.UP)
+	if z_axis.length_squared() < 0.001:
+		z_axis = y_axis.cross(Vector3.FORWARD)
+	z_axis = z_axis.normalized()
+	var x_axis := y_axis.cross(z_axis).normalized()
+	arm.transform.basis = Basis(x_axis, y_axis, z_axis)
+
 	if strut_mesh:
-		# mount_strut_tapered (build_meshes.py) is authored as a genuine
-		# taper - thin (near_half=0.12) at local Y=0, 3x-per-edge thicker
-		# (far_half=0.36) at local Y=1.0 (Chris's ask: the pylon should read
-		# as load-bearing, thickening as it nears the hull, not a uniform
-		# rod) - one continuous mesh, no separate flared "anchor" block
-		# needed anymore.
-		# THIN. Chris: the struts should read "lightweight and strong for
-		# aircraft". At a 1.0 cross-section against a strut_len of ~1.5 this
-		# was a slab, not a spar - aircraft structure is deep in the plane it
-		# is loaded in and narrow across it, so the taper keeps its full depth
-		# along the load path and comes right in on the other axis.
 		var strut = _mesh_inst(strut_mesh, base_color.darkened(0.3))
-		strut.scale = Vector3(0.42, strut_len, 0.30)
+		strut.scale = Vector3(0.38, spar_reach, 0.28)
 		strut.position = Vector3.ZERO
-		strut.rotation = Vector3(0, 0, strut_angle)
-		parent_node.add_child(strut)
+		arm.add_child(strut)
 
-		# SECOND MEMBER, to a point lower down the hull, so the two struts and
-		# the hull's own side close a triangle in profile (Chris). Removing the
-		# kit's redundant pylon last pass took this bracing with it and left a
-		# single cantilever - which is exactly the thing a real outrigger does
-		# not do, because one strut can carry the load but cannot resist the
-		# rotor's torque about it. Thinner again than the main member: it is a
-		# brace, and a brace that matches the spar it braces reads as two spars.
-		var lower_target := Vector3(-mount_reach_x * mount_side * 0.62,
-			-mount_reach_y - base_size.y * 1.35, 0.0)
-		var lower_len := lower_target.length()
-		var lower_dir := lower_target / lower_len
-		# Same solve for the brace. It aims lower down the hull's side, so its own
-		# distance to the skin is genuinely different from the main spar's - using
-		# the spar's would reopen the gap on one of the two members.
-		var lower_reach: float = MountReachScript.solve(parent_node,
-			MountReachScript.station_from(tweaks), Vector3.ZERO, lower_dir, -1.0,
-			MountReachScript.node_scale_from(tweaks))
-		if lower_reach > 0.0:
-			lower_len = lower_reach
-		var brace = _mesh_inst(strut_mesh, base_color.darkened(0.3))
-		brace.scale = Vector3(0.30, lower_len, 0.22)
+		# Second bracing strut forming a rigid triangular outrigger
+		var brace_orig := Vector3(0, -0.22, 0)
+		var brace_target := span_vec + Vector3(0, -0.32, 0)
+		var brace_vec := brace_target - brace_orig
+		var brace_len := brace_vec.length() + 0.08
+		
+		var brace_arm := Node3D.new()
+		brace_arm.name = "RotorBrace"
+		brace_arm.position = brace_orig
+		var b_y := brace_vec.normalized()
+		var b_z := b_y.cross(Vector3.UP)
+		if b_z.length_squared() < 0.001:
+			b_z = b_y.cross(Vector3.FORWARD)
+		b_z = b_z.normalized()
+		var b_x := b_y.cross(b_z).normalized()
+		brace_arm.transform.basis = Basis(b_x, b_y, b_z)
+		
+		var brace = _mesh_inst(strut_mesh, base_color.darkened(0.35))
+		brace.scale = Vector3(0.24, brace_len, 0.18)
 		brace.position = Vector3.ZERO
-		brace.rotation = Vector3(0, 0, atan2(-lower_dir.x, lower_dir.y))
-		parent_node.add_child(brace)
-	elif mount_mesh:
-		# Fallback (mount_strut_tapered not yet reimported): the old
-		# two-piece uniform-strut + larger-block-at-the-end approximation.
-		var strut = _mesh_inst(mount_mesh, base_color.darkened(0.3))
-		strut.scale = Vector3(0.3, strut_len / 0.4, 0.3)
-		strut.position = Vector3.ZERO
-		strut.rotation = Vector3(0, 0, strut_angle)
-		parent_node.add_child(strut)
+		brace_arm.add_child(brace)
+		parent_node.add_child(brace_arm)
 
-		var anchor = _mesh_inst(mount_mesh, base_color.darkened(0.3))
-		anchor.scale = Vector3(0.85, 0.7, 0.85)
-		anchor.position = hull_center
-		anchor.rotation = Vector3(0, 0, strut_angle)
-		parent_node.add_child(anchor)
+		# Heavy hull mounting flange bracket at the contact point, flush against the hull skin
+		var bracket := BoxMesh.new()
+		bracket.size = Vector3(0.38, 0.58, 0.14)
+		var bracket_inst := _mesh_inst(bracket, base_color.darkened(0.45).lightened(0.1))
+		bracket_inst.position = span_vec + Vector3(0, -0.16, 0)
+		if absf(hull_normal.dot(Vector3.UP)) < 0.95:
+			var b_forward := -hull_normal.normalized()
+			var b_right := b_forward.cross(Vector3.UP).normalized()
+			var b_up := b_right.cross(b_forward).normalized()
+			bracket_inst.transform.basis = Basis(b_right, b_up, -b_forward)
+		parent_node.add_child(bracket_inst)
+	elif mount_mesh:
+		var strut = _mesh_inst(mount_mesh, base_color.darkened(0.3))
+		strut.scale = Vector3(0.3, spar_reach / 0.4, 0.3)
+		strut.position = Vector3(0, spar_reach * 0.5, 0)
+		arm.add_child(strut)
+
+	# --- VERTICAL TURBOSHAFT ENGINE NACELLE POD ---
+	# Bulky aerodynamic nacelle housing bridging the upper boom and lower brace
+	# into a unified mechanical power unit under the rotor mast.
+	var nacelle := Node3D.new()
+	nacelle.name = "EngineNacelle"
+	parent_node.add_child(nacelle)
+
+	# 1. Main Nacelle Body Block
+	var nac_body := BoxMesh.new()
+	nac_body.size = Vector3(0.30, 0.48, 0.38)
+	var nac_inst := _mesh_inst(nac_body, base_color.darkened(0.22))
+	nac_inst.position = Vector3(0, -0.14, 0)
+	nacelle.add_child(nac_inst)
+
+	# 2. Upper Gearbox Transmission Collar surrounding the mast root
+	var gb_collar := CylinderMesh.new()
+	gb_collar.top_radius = 0.14
+	gb_collar.bottom_radius = 0.17
+	gb_collar.height = 0.12
+	var collar_inst := _mesh_inst(gb_collar, Color(0.20, 0.22, 0.24))
+	collar_inst.position = Vector3(0, 0.10, 0)
+	nacelle.add_child(collar_inst)
+
+	# 3. Lower Sump Housing / Maintenance Cap
+	var sump := CylinderMesh.new()
+	sump.top_radius = 0.14
+	sump.bottom_radius = 0.10
+	sump.height = 0.10
+	var sump_inst := _mesh_inst(sump, Color(0.18, 0.19, 0.21))
+	sump_inst.position = Vector3(0, -0.38, 0)
+	nacelle.add_child(sump_inst)
+
+	# 4. Front Aerodynamic Intake Scoop
+	var intake := BoxMesh.new()
+	intake.size = Vector3(0.22, 0.26, 0.14)
+	var intake_inst := _mesh_inst(intake, Color(0.16, 0.17, 0.19))
+	intake_inst.position = Vector3(0, -0.12, -0.22)
+	nacelle.add_child(intake_inst)
+
+	# 5. Rear Turboshaft Exhaust Shroud
+	var exhaust := CylinderMesh.new()
+	exhaust.top_radius = 0.07
+	exhaust.bottom_radius = 0.09
+	exhaust.height = 0.12
+	var ex_inst := _mesh_inst(exhaust, Color(0.25, 0.26, 0.28))
+	ex_inst.rotation = Vector3(deg_to_rad(-45.0), 0, 0)
+	ex_inst.position = Vector3(0, -0.22, 0.22)
+	nacelle.add_child(ex_inst)
 
 	var shaft_h = base_size.y * 0.8
 	if mast_mesh:
@@ -4615,51 +4454,21 @@ static func _build_helicopter_rotors(parent_node: Node3D, base_size: Vector3, ba
 
 
 static func _build_hover_engine(parent_node: Node3D, base_size: Vector3, base_color: Color = Color.DEEP_SKY_BLUE, tweaks: Dictionary = {}):
-	build_mount_kit(parent_node, "hover_engine", Color(0.32, 0.34, 0.37).lerp(base_color, 0.12), 1.0, float(tweaks.get("emv_level", 1.0)), float(tweaks.get("kit_reach", 0.0)), Vector3(float(tweaks.get("kit_anchor_x", 0.0)), float(tweaks.get("kit_anchor_y", 0.0)), float(tweaks.get("kit_anchor_z", 0.0))), tweaks)
-	# Scifi hover pad, per Chris's redesign: three concentric rings instead
-	# of the old fan+skirt+single-ring combo. The outer ring stays fixed/
-	# horizontal; the middle ring spins continuously around local X and the
-	# inner ring around local Y (unit.gd/battlefield.gd/
-	# module_placer.gd all spin "HoverRingMid"/"HoverRingInner" by name,
-	# same by-name-pivot pattern as helicopter_rotors' "RotorBlades"). No
-	# pad_size/skirt tweaks anymore - footprint is fixed off the hull
-	# (module_placer.gd), and emv_level (Electron Megavoltage) instead
-	# fattens the rings' tube thickness without changing their diameter, so
-	# it reads as "denser hardware", not "bigger pad".
-	var emv = tweaks.get("emv_level", 1.0)
-	var ring_mesh = _part("hover_ring")
-	# The MOUNTING is steel, not team paint. hover_engine's catalog colour is
-	# DEEP_SKY_BLUE, and everything structural was being tinted with it - so
-	# the pylon and mount came out as bright cyan girders, which is most of why
-	# this module "looked terrible" (Chris). The field colour belongs to the
-	# field; the hardware holding it out there is metal with a hint of team
-	# tint, the same as every other locomotor's mount.
-	var struct_color := Color(0.32, 0.34, 0.37).lerp(base_color, 0.12)
+	var emv: float = float(tweaks.get("emv_level", 1.0))
+	var ring_mesh := _part("hover_ring")
+	var struct_color := Color(0.28, 0.30, 0.33).lerp(base_color, 0.08)
 
-	# hover_ring is authored with major_radius=0.5, i.e. diameter=1.0 (see
-	# build_hover_ring in build_meshes.py) - ring_scale converts that to the
-	# catalog's actual footprint (base_size.x), and ring_radii nests three
-	# rings inside it (outer/mid/inner) at decreasing diameter.
-	var authored_diameter = 1.0
-	# Same prominence pass as anti_grav_plate: the rings ARE the module, and
-	# at 1.0 they read as a detail on the end of a strut rather than the
-	# working end of one (Chris).
+	var authored_diameter := 1.0
 	const HEAD_SCALE := 2.1
-	var ring_scale = (base_size.x / authored_diameter) * HEAD_SCALE
-	var ring_radii = [1.0, 0.65, 0.35]
-	var ring_names = ["HoverRingOuter", "HoverRingMid", "HoverRingInner"]
-	var ring_y = base_size.y * 0.5
+	var ring_scale: float = (base_size.x / authored_diameter) * HEAD_SCALE
+	var ring_radii := [1.0, 0.65, 0.35]
+	var ring_names := ["HoverRingOuter", "HoverRingMid", "HoverRingInner"]
+	var ring_y: float = base_size.y * 0.5
 
+	# 1. Concentric Hover Rings
 	for idx in range(3):
 		var ring: MeshInstance3D
 		if ring_mesh:
-			# Only the INNERMOST ring glows - the other two are dark polished
-			# alloy, same as the anti-grav pad body. Chris: "the hover pad
-			# looks similar, still all sky blue." Emission is applied over any
-			# material, so glowing all three was what kept the whole assembly
-			# blue however exotic the substrate was. One lit hoop inside two
-			# dark ones reads as a machine with something running in it;
-			# three lit hoops read as a plastic toy.
 			if idx == 2:
 				ring = _mesh_inst(ring_mesh, Color(0.26, 0.30, 0.34),
 					Color(0.35, 0.72, 1.0), 0.55)
@@ -4674,53 +4483,97 @@ static func _build_hover_engine(parent_node: Node3D, base_size: Vector3, base_co
 			ring.mesh = torus
 			var mat = StandardMaterial3D.new()
 			mat.albedo_color = base_color
-			mat.emission_enabled = true
-			mat.emission = base_color
-			mat.emission_energy_multiplier = 1.0
+			mat.emission_enabled = (idx == 2)
+			mat.emission = Color(0.35, 0.72, 1.0)
 			ring.material_override = mat
 			ring.scale = Vector3(1.0, emv, 1.0)
 		ring.name = ring_names[idx]
 		ring.position = Vector3(0, ring_y, 0)
 		parent_node.add_child(ring)
 
-	# Structural mounting pylon back to the hull's physical center - same
-	# "extend all the way to the center, not just the near edge" fix
-	# helicopter_rotors' pylon got, but flattened (mount_strut_flat, ~3x as
-	# wide as it is thick, per Chris's ask) rather than square, and general
-	# 3D (module_placer.gd distributes pads radially around the hull, so
-	# the reach direction has both an X and a Z component, unlike the
-	# rotor pylon which only ever needed to reach inboard along X).
-	var mount_reach = Vector3(tweaks.get("mount_reach_x", 0.6), tweaks.get("mount_reach_y", 0.15), tweaks.get("mount_reach_z", 0.0))
-	if mount_reach.length() > 0.001:
-		var strut_mesh = _part("mount_strut_flat")
-		var strut_len = mount_reach.length()
-		var dir = mount_reach / strut_len
-		# Gram-Schmidt: build an orthonormal basis with local Y along `dir`
-		# (the strut's authored long axis) - `reference` just needs to be
-		# any vector not parallel to dir, picked per-instance since dir
-		# varies with each pad's own angle around the hull.
-		var reference = Vector3(0, 0, 1)
-		if abs(dir.dot(reference)) > 0.95:
-			reference = Vector3(1, 0, 0)
-		var right = dir.cross(reference).normalized()
-		var forward = right.cross(dir).normalized()
-		if strut_mesh:
-			var strut = _mesh_inst(strut_mesh, struct_color)
-			# Basis columns pre-scaled directly (right/forward stay unit-
-			# length - the flattened 3-to-1 cross-section is already baked
-			# into the authored mesh - dir scaled to strut_len) rather than
-			# setting .scale separately afterward, which risks desyncing
-			# from a directly-assigned .transform.basis.
-			strut.transform = Transform3D(Basis(right, dir * strut_len, forward), Vector3.ZERO)
-			parent_node.add_child(strut)
+	# 2. Central Gimbal Hub
+	var hub_mesh := _part("wheel_gearbox")
+	if hub_mesh:
+		var hub := _mesh_inst(hub_mesh, struct_color)
+		var hub_s: float = 0.32 * ring_scale
+		hub.scale = Vector3(hub_s, hub_s * 0.5, hub_s)
+		hub.position = Vector3(0, ring_y, 0)
+		parent_node.add_child(hub)
+
+	# 3. Radial Outrigger Pylon / Mounting Arm spanning from pad hub to hull contact point
+	var pad_radius: float = ring_scale * 0.5
+	var anchor := Vector3(
+		float(tweaks.get("kit_anchor_x", tweaks.get("mount_reach_x", 0.0))),
+		float(tweaks.get("kit_anchor_y", tweaks.get("mount_reach_y", 0.0))),
+		float(tweaks.get("kit_anchor_z", tweaks.get("mount_reach_z", 0.0)))
+	)
+	var station := MountReachScript.station_from(tweaks)
+	var surface := MountReachScript.surface_for(parent_node)
+	
+	var dir_to_hull := anchor.normalized() if anchor.length_squared() > 0.001 else (-station).normalized()
+	var span_vec := dir_to_hull * (anchor.length() if anchor.length() > 0.05 else pad_radius)
+	var hull_normal := -dir_to_hull
+
+	if not surface.is_empty():
+		var eff_station := station + Vector3(0, ring_y, 0)
+		var hit: Dictionary = HullProjectionScript.raycast(surface, eff_station, dir_to_hull)
+		if hit.get("hit", false):
+			span_vec = hit["position"] - eff_station
+			hull_normal = hit["normal"]
 		else:
-			# Fallback (mount_strut_flat not yet reimported): a plain
-			# flattened box, no taper.
-			var mount_mesh = _part("rg_mount_box")
-			if mount_mesh:
-				var strut = _mesh_inst(mount_mesh, struct_color)
-				strut.transform = Transform3D(Basis(right * 0.6, dir * strut_len, forward * 0.2), Vector3.ZERO)
-				parent_node.add_child(strut)
+			for pitch_deg in [-10.0, 10.0, -20.0, 20.0, -35.0, 35.0]:
+				var test_axis := Vector3.UP.cross(dir_to_hull)
+				if test_axis.length_squared() > 0.001:
+					test_axis = test_axis.normalized()
+					var test_dir := dir_to_hull.rotated(test_axis, deg_to_rad(pitch_deg))
+					var hit2: Dictionary = HullProjectionScript.raycast(surface, eff_station, test_dir)
+					if hit2.get("hit", false):
+						span_vec = hit2["position"] - eff_station
+						hull_normal = hit2["normal"]
+						break
+
+	var span_len: float = span_vec.length()
+	if span_len > 0.05:
+		var arm := Node3D.new()
+		arm.name = "MountArm"
+		parent_node.add_child(arm)
+		
+		# Look towards span vector
+		arm.look_at_from_position(Vector3(0, ring_y, 0), Vector3(0, ring_y, 0) + span_vec, Vector3.UP)
+
+		var beam_thick: float = 0.22
+		var beam_reach: float = span_len + 0.08
+		var beam := BoxMesh.new()
+		beam.size = Vector3(beam_thick * 1.4, beam_thick * 1.1, 1.0)
+		var beam_inst := _mesh_inst(beam, struct_color)
+		beam_inst.position = Vector3(0, 0, -beam_reach * 0.5)
+		beam_inst.scale = Vector3(1, 1, beam_reach)
+		arm.add_child(beam_inst)
+
+		# Diagonal upper reinforcement gusset
+		var diag_strut := BoxMesh.new()
+		diag_strut.size = Vector3(beam_thick * 1.0, beam_thick * 0.7, 1.0)
+		var diag_inst := _mesh_inst(diag_strut, struct_color.darkened(0.1))
+		diag_inst.position = Vector3(0, beam_thick * 0.45, -beam_reach * 0.5)
+		diag_inst.scale = Vector3(1, 1, beam_reach * 0.9)
+		diag_inst.rotation = Vector3(deg_to_rad(-8.0), 0, 0)
+		arm.add_child(diag_inst)
+
+		# Heavy structural hull mounting flange bracket placed directly on hull contact point
+		# and oriented FLUSH and ALIGNED with the hull face normal!
+		var bracket := BoxMesh.new()
+		bracket.size = Vector3(beam_thick * 2.4, beam_thick * 2.2, beam_thick * 0.8)
+		var bracket_inst := _mesh_inst(bracket, struct_color.darkened(0.25).lightened(0.2))
+		bracket_inst.position = Vector3(span_vec.x, ring_y + span_vec.y, span_vec.z)
+		
+		# Align bracket basis flush with hull normal
+		var b_norm := hull_normal.normalized()
+		if absf(b_norm.dot(Vector3.UP)) < 0.95:
+			var b_forward := -b_norm
+			var b_right := b_forward.cross(Vector3.UP).normalized()
+			var b_up := b_right.cross(b_forward).normalized()
+			bracket_inst.transform.basis = Basis(b_right, b_up, -b_forward)
+		parent_node.add_child(bracket_inst)
 
 
 static func _build_legs(parent_node: Node3D, base_size: Vector3, base_color: Color = Color.GRAY, tweaks: Dictionary = {}):
@@ -4984,142 +4837,6 @@ static func _pose_leg_bones(swing: Node3D, cycle: float, weight: float) -> void:
 
 
 
-## AGP (Atmospheric Gravity Planing) Under-Hull Field & Projectors:
-## Adds boxy wave projector greebles along the hull belly, accompanied by a
-## diffuse under-vehicle gravity glow and a full-hull gravitic warp lens.
-## Attached ONCE directly to the vehicle's root hull node (chassis_node).
-static func _build_agp_hull_projectors_and_field(parent_node: Node3D, base_size: Vector3, base_color: Color, tweaks: Dictionary = {}, is_strike: bool = true) -> void:
-	if not is_instance_valid(parent_node):
-		return
-
-	if not parent_node.is_inside_tree() or parent_node.get_parent() == null:
-		if not parent_node.is_connected("tree_entered", Callable(VisualBuilder, "_on_agp_parent_tree_entered")):
-			parent_node.tree_entered.connect(_on_agp_parent_tree_entered.bind(parent_node, base_size, base_color, tweaks, is_strike), CONNECT_ONE_SHOT)
-		return
-
-	_apply_agp_hull_projectors_and_field(parent_node, base_size, base_color, tweaks, is_strike)
-
-static func _on_agp_parent_tree_entered(parent_node: Node3D, base_size: Vector3, base_color: Color, tweaks: Dictionary, is_strike: bool) -> void:
-	_apply_agp_hull_projectors_and_field(parent_node, base_size, base_color, tweaks, is_strike)
-
-static func _apply_agp_hull_projectors_and_field(parent_node: Node3D, base_size: Vector3, base_color: Color, tweaks: Dictionary = {}, is_strike: bool = true) -> void:
-	if not is_instance_valid(parent_node) or not parent_node.is_inside_tree():
-		return
-
-	# parent_node is the per-engine mount node (placed on the side of the hull).
-	# parent_node.get_parent() is the chassis root node (centered at 0,0,0).
-	var chassis_node: Node3D = parent_node.get_parent() as Node3D if (parent_node.get_parent() != null and parent_node.get_parent() is Node3D) else parent_node
-
-	# Walk up to the root chassis / hull node (centered at 0,0,0)
-	while chassis_node != null and chassis_node.get_parent() != null and (chassis_node.get_parent() is Node3D) and not (chassis_node.get_parent() is SubViewport or chassis_node.get_parent() is Window):
-		if chassis_node.name.contains("Hull") or chassis_node.name.contains("Vehicle") or chassis_node.name == "VisualModel" or chassis_node.has_meta("hull_data"):
-			break
-		chassis_node = chassis_node.get_parent() as Node3D
-
-	if not is_instance_valid(chassis_node):
-		chassis_node = parent_node
-
-	# Guarantee applied ONLY ONCE per vehicle chassis
-	if chassis_node.has_node("AGPRunningGear"):
-		return
-
-	var agp_container := Node3D.new()
-	agp_container.name = "AGPRunningGear"
-	chassis_node.add_child(agp_container)
-
-	# Gather surface triangles specifically from the HULL's MeshInstance3D
-	# (excluding running gear, wheels, ground planes, or extra modules).
-	var surface_data := _gather_hull_only_surface(chassis_node)
-	var hull_aabb: AABB = surface_data.get("aabb", get_full_hull_aabb(chassis_node))
-	var hull_w := maxf(hull_aabb.size.x, base_size.x * 1.8)
-	var hull_l := maxf(hull_aabb.size.z, base_size.z * 2.5)
-	var belly_y := hull_aabb.position.y
-
-	# 1. Boxy AGP wave projector greeble blocks pinned directly onto the bottom facets
-	var box_mesh := _part("rg_mount_box")
-	var proj_color := Color(0.24, 0.26, 0.28).lerp(base_color, 0.15)
-	var count_z := 4 if is_strike else 6
-	var z_step := 0.65 / float(maxi(1, count_z - 1))
-	var z_start := 0.175
-
-	for i in range(count_z):
-		var z_norm := z_start + float(i) * z_step
-		for side in [-1, 1]:
-			var x_norm: float = 0.5 + float(side) * 0.28
-			# Raycast straight UP (Vector3.DOWN approach) at the bottom facets of the visible hull mesh
-			var proj_info := HullProjectionScript.project(surface_data, Vector3(x_norm, 0.0, z_norm), Vector3.DOWN)
-			var proj_pos := Vector3.ZERO
-			var proj_basis := Basis.IDENTITY
-			if proj_info.get("hit", false):
-				proj_pos = proj_info.get("position", Vector3.ZERO)
-				proj_basis = proj_info.get("basis", Basis.IDENTITY)
-			else:
-				var z_pos := -hull_l * 0.32 + float(i) * (hull_l * 0.65 / float(maxi(1, count_z - 1)))
-				proj_pos = Vector3(float(side) * (hull_w * 0.30), belly_y, z_pos)
-
-			if box_mesh:
-				var proj := _mesh_inst(box_mesh, proj_color)
-				if proj_info.get("hit", false):
-					proj.transform = Transform3D(proj_basis, proj_pos).scaled_local(Vector3(0.55, 0.25, 0.55))
-				else:
-					proj.scale = Vector3(0.55, 0.25, 0.55)
-					proj.position = proj_pos
-				agp_container.add_child(proj)
-			else:
-				var proj := MeshInstance3D.new()
-				var bm_box := BoxMesh.new()
-				bm_box.size = Vector3(0.35, 0.18, 0.35)
-				proj.mesh = bm_box
-				var mat := StandardMaterial3D.new()
-				mat.albedo_color = proj_color
-				mat.metallic = 0.6
-				mat.roughness = 0.3
-				proj.material_override = mat
-				if proj_info.get("hit", false):
-					proj.transform = Transform3D(proj_basis, proj_pos)
-				else:
-					proj.position = proj_pos
-				agp_container.add_child(proj)
-
-	# 2. Raycast center bottom facet for glow light and gravitic warp lens quad
-	var center_proj := HullProjectionScript.project(surface_data, Vector3(0.5, 0.0, 0.5), Vector3.DOWN)
-	var belly_center: Vector3 = center_proj.get("position", Vector3(0, belly_y, 0)) if center_proj.get("hit", false) else Vector3(0, belly_y, 0)
-	var belly_normal: Vector3 = center_proj.get("normal", Vector3.UP) if center_proj.get("hit", false) else Vector3.UP
-
-	# Diffuse under-hull AGP gravity glow
-	var glow := OmniLight3D.new()
-	glow.name = "AGPGlow"
-	glow.position = belly_center + belly_normal * 0.25
-	glow.light_color = Color(0.32, 0.70, 1.0) if is_strike else Color(0.25, 0.85, 0.95)
-	glow.light_energy = 2.2 if is_strike else 1.8
-	glow.omni_range = maxf(hull_w, hull_l) * 2.2
-	glow.omni_attenuation = 2.0
-	glow.shadow_enabled = false
-	agp_container.add_child(glow)
-
-	# Full-hull gravitic warp lens (gravitic_lens.gdshader)
-	var lens_shader: Shader = load("res://shaders/gravitic_lens.gdshader")
-	if lens_shader:
-		var lens := MeshInstance3D.new()
-		lens.name = "AGPLens"
-		var quad := QuadMesh.new()
-		quad.size = Vector2(hull_w * 2.4, hull_l * 1.8)
-		lens.mesh = quad
-		var mat := ShaderMaterial.new()
-		mat.shader = lens_shader
-		mat.set_shader_parameter("strength", 0.019 if is_strike else 0.014)
-		mat.set_shader_parameter("tint", Color(0.28, 0.65, 0.98) if is_strike else Color(0.22, 0.80, 0.92))
-		lens.material_override = mat
-		if center_proj.get("hit", false):
-			var lens_basis: Basis = center_proj.get("basis", Basis.IDENTITY)
-			lens.transform = Transform3D(lens_basis, belly_center + belly_normal * 0.10)
-		else:
-			lens.rotation = Vector3(PI / 2.0, 0, 0)
-			lens.position = Vector3(0, belly_y - 0.10, 0)
-		lens.extra_cull_margin = 8.0
-		agp_container.add_child(lens)
-
-
 static func _gather_hull_only_surface(chassis_node: Node3D) -> Dictionary:
 	var tris := PackedVector3Array()
 	var aabb := AABB()
@@ -5149,137 +4866,6 @@ static func _gather_hull_only_surface(chassis_node: Node3D) -> Dictionary:
 				aabb = aabb.expand(world_v)
 
 	return {"tris": tris, "aabb": aabb, "hull_mi": hull_mi}
-
-
-static func _build_fixed_wing_engine(parent_node: Node3D, base_size: Vector3, base_color: Color = Color.SLATE_GRAY, tweaks: Dictionary = {}):
-	var turbine_compression = float(tweaks.get("turbine_compression", 1.0))
-	var nacelle_size = turbine_compression
-	var afterburner = tweaks.get("afterburner", false)
-
-	var nacelle_mesh = _part("engine_nacelle")
-	var fan_mesh = _part("engine_fan")
-	var exhaust_mesh = _part("exhaust_cone")
-	var core_mesh = _part("engine_core")
-	var strut_mesh = _part("mount_strut_aerofoil")
-
-	var actual_size = Vector3(base_size.x * nacelle_size, base_size.y * nacelle_size, base_size.z * nacelle_size)
-	if nacelle_mesh:
-		var nac = _mesh_inst(nacelle_mesh, base_color)
-		nac.scale = Vector3(nacelle_size, nacelle_size, nacelle_size)
-		# engine_nacelle is authored along local Z (build_engine_nacelle,
-		# add_cyl_axis(..., 'z')) - matching this function's own placement
-		# convention (rotation=Vector3.ZERO at the module_placer call site) -
-		# so it needs NO runtime rotation. The stray 90deg-about-Y rotation
-		# this used to carry pointed the nacelle/core sideways along world X
-		# instead of forward along Z, which is why turbine_compression read
-		# as "wider" instead of "longer" and the core appeared to drift off
-		# to the side instead of extending straight out the back.
-		nac.position = Vector3(0, 0, 0)
-		parent_node.add_child(nac)
-	else:
-		var nac = MeshInstance3D.new()
-		var cyl = CylinderMesh.new()
-		cyl.top_radius = actual_size.y * 0.55
-		cyl.bottom_radius = actual_size.y * 0.4
-		cyl.height = actual_size.z
-		nac.mesh = cyl
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = base_color
-		mat.metallic = 0.6
-		mat.roughness = 0.3
-		nac.material_override = mat
-		nac.rotation = Vector3(PI / 2.0, 0, 0)
-		parent_node.add_child(nac)
-
-	if fan_mesh:
-		# The intake fan is the one moving part of a jet the eye can actually
-		# read, and it was static - a fixed-wing unit in flight had nothing at
-		# all in motion, unlike every other airborne type. Spun about local Z
-		# (the engine's own thrust axis, which is what this whole part family
-		# is authored along) via a named pivot, so the nacelle around it stays
-		# put.
-		var fan_pivot = Node3D.new()
-		fan_pivot.name = SPIN_PIVOT_TURBINE
-		fan_pivot.position = Vector3(0, 0, -actual_size.z * 0.48)
-		parent_node.add_child(fan_pivot)
-		var fan = _mesh_inst(fan_mesh, Color(0.2, 0.2, 0.22))
-		fan.scale = Vector3(nacelle_size, nacelle_size, nacelle_size)
-		fan_pivot.add_child(fan)
-
-	# Turbine core: a distinct segment behind the main nacelle whose own
-	# length is what turbine_compression physically stretches/compresses
-	# ("a central part of the engine housing longer or shorter... out the
-	# back", Chris's ask) - engine_core is authored along local Z like the
-	# rest of this engine's part family (build_engine_nacelle/_fan/
-	# _exhaust_cone), matching this function's own no-rotation convention
-	# (see the nacelle comment above - no runtime rotation needed).
-	# core_rear_z is fixed (independent of core_len), and the node's
-	# position is core_rear_z + half its own scaled length, so the FRONT
-	# face (position.z - core_len/2 == core_rear_z) never moves as
-	# turbine_compression changes - only the rear face (core_rear_z +
-	# core_len) extends further out, anchoring growth at the nacelle joint.
-	var core_len = actual_size.z * 0.7 * turbine_compression
-	var core_rear_z = actual_size.z * 0.48
-	if core_mesh:
-		var core = _mesh_inst(core_mesh, base_color.darkened(0.15))
-		core.scale = Vector3(nacelle_size, nacelle_size, core_len / 0.6)
-		core.position = Vector3(0, 0, core_rear_z + core_len * 0.5)
-		parent_node.add_child(core)
-	else:
-		var core = MeshInstance3D.new()
-		var cyl = CylinderMesh.new()
-		cyl.top_radius = actual_size.y * 0.42
-		cyl.bottom_radius = actual_size.y * 0.42
-		cyl.height = core_len
-		core.mesh = cyl
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = base_color.darkened(0.15)
-		mat.metallic = 0.7
-		mat.roughness = 0.3
-		core.material_override = mat
-		core.rotation = Vector3(PI / 2.0, 0, 0)
-		core.position = Vector3(0, 0, core_rear_z + core_len * 0.5)
-		parent_node.add_child(core)
-
-	if afterburner:
-		if exhaust_mesh:
-			var ex = _mesh_inst(exhaust_mesh, Color(1.0, 0.4, 0.1), Color(1.0, 0.5, 0.1), 1.5)
-			ex.scale = Vector3(nacelle_size, nacelle_size, nacelle_size)
-			# Pushed back past the turbine core (which the old fixed
-			# actual_size.z*0.48 position didn't account for) so the
-			# exhaust sits at the engine's TRUE rear now that the core can
-			# stretch it further back.
-			ex.position = Vector3(0, 0, core_rear_z + core_len)
-			parent_node.add_child(ex)
-
-	# Structural mounting pylon back to the hull's physical center - same
-	# reach-vector technique as helicopter_rotors'/hover_engine's pylons,
-	# generalized to full 3D (module_placer.gd distributes engines
-	# radially/elliptically, so the reach direction has both an X and a Z
-	# component, same as hover's). Aerofoil cross-section (mount_strut_
-	# aerofoil, "vaguely aerofoil shaped... pretend that gives enough
-	# lift", Chris's ask) and noticeably thicker than hover's flat pylon.
-	var mount_reach = Vector3(tweaks.get("mount_reach_x", 1.0), tweaks.get("mount_reach_y", 0.0), tweaks.get("mount_reach_z", 0.0))
-	if mount_reach.length() > 0.001:
-		var reach_len = mount_reach.length()
-		var dir = mount_reach / reach_len
-		var reference = Vector3(0, 1, 0)
-		if abs(dir.dot(reference)) > 0.95:
-			reference = Vector3(1, 0, 0)
-		var right = dir.cross(reference).normalized()
-		var forward = right.cross(dir).normalized()
-		if strut_mesh:
-			var strut = _mesh_inst(strut_mesh, base_color.darkened(0.2))
-			strut.transform = Transform3D(Basis(right * 1.8, dir * reach_len, forward * 1.8), Vector3.ZERO)
-			parent_node.add_child(strut)
-		else:
-			var mount_mesh = _part("rg_mount_box")
-			if mount_mesh:
-				var strut = _mesh_inst(mount_mesh, base_color.darkened(0.2))
-				strut.transform = Transform3D(Basis(right * 1.4, dir * reach_len, forward * 0.7), Vector3.ZERO)
-				parent_node.add_child(strut)
-
-	_build_agp_hull_projectors_and_field(parent_node, base_size, base_color, tweaks, true)
 
 
 static func _build_ornithopter_wing(parent_node: Node3D, base_size: Vector3, base_color: Color = Color.BROWN, tweaks: Dictionary = {}):
@@ -5343,39 +4929,23 @@ static func _build_ornithopter_wing(parent_node: Node3D, base_size: Vector3, bas
 ## module's LOCAL units. Inboard is -X on both sides (the layout mirrors the
 ## port instance), so the frame is built on -X and the wings on +X.
 static func _build_ornithopter_rig(parent_node: Node3D, base_size: Vector3, base_color: Color, roof_len: float, roof_reach: float) -> Vector3:
-	var rail_z: float = roof_len * 0.42        # 84% of the roof, fore to aft
+	var rail_z: float = roof_len * 0.44        # spans full working area of the roof
 	var inboard_x: float = -roof_reach * 0.85  # stops just short of the centreline
-	# Sized off the ROOF, not off base_size. The catalog size for this type is
-	# (2.0, 0.2, 1.0) - a wing panel's own proportions - so keying the frame's
-	# girth to base_size.y built 0.03-thick rails across a 2.5-long roof:
-	# threadlike, and loose enough that the assembly measured as six separate
-	# islands. The frame's job is to look like it could throw those wings, and
-	# the only thing it should be proportional to is the vehicle carrying it.
-	var rail_y: float = roof_reach * 0.20      # clear of the roof, so struts have a run
-	var beam := roof_reach * 0.13
+	var rail_y: float = roof_reach * 0.22      # clear of the roof, so struts have a run
+	var beam := roof_reach * 0.24             # Heavy structural box girders (Chris: bulkier rack)
 
 	var box_mesh := _part("rg_mount_box")
 	var gb_mesh := _part("wheel_gearbox")
 	var strut_mesh := _part("mount_strut_tapered")
 	var metal := base_color.darkened(0.25).lightened(0.2)
 
-	# rg_mount_box runs along its own local +Y, so a rail or a cross-beam is
-	# that same box turned onto the axis it should run along - built by basis
-	# rather than by rotation so the two cases read alike.
-	#
-	# MEASURED, not assumed. The box is not a unit cube: it is 0.4 long and
-	# 0.35 across. Treating the scale factor as a length in world units built
-	# rails 40% of the span they were asked for - the inboard rail stopped
-	# short of the aft cross-beam entirely and the frame measured as two
-	# separate islands - and cross-sections a third of the intended girth, so
-	# the whole frame read as wire. Same lesson as the screw drum and the
-	# rotor blade: fit to the AABB you can measure.
 	var box_len := 1.0
 	var box_wide := 1.0
 	if box_mesh:
 		var ba := box_mesh.get_aabb()
 		box_len = maxf(ba.size.y, 0.001)
 		box_wide = maxf(maxf(ba.size.x, ba.size.z), 0.001)
+
 	var _beamed := func(span: Vector3, at: Vector3, w: float) -> void:
 		if box_mesh == null:
 			return
@@ -5393,65 +4963,126 @@ static func _build_ornithopter_rig(parent_node: Node3D, base_size: Vector3, base
 			Basis(right * (w / box_wide), dir * (l / box_len), fwd * (w / box_wide)), at)
 		parent_node.add_child(b)
 
-	# Two longitudinal rails, outboard and inboard, plus three cross-beams.
+	# 1. Heavy longitudinal rails, outboard and inboard
 	for x in [0.0, inboard_x]:
 		_beamed.call(Vector3(0, 0, rail_z * 2.0), Vector3(x, rail_y, -rail_z), beam)
-	for z in [-rail_z, 0.0, rail_z]:
-		_beamed.call(Vector3(inboard_x, 0, 0), Vector3(0, rail_y, z), beam * 0.8)
 
-	# Gearboxes at the wing roots - the bulk Chris asked for. Sized off the
-	# hull's own height rather than the part's authored unit, because at the
-	# authored size these are pea-sized against a roof-spanning frame.
+	# 2. Heavy cross-girders connecting the rails
+	for z in [-rail_z, -rail_z * 0.45, 0.0, rail_z * 0.45, rail_z]:
+		_beamed.call(Vector3(inboard_x, 0, 0), Vector3(0, rail_y, z), beam * 0.90)
+
+	# 3. Bulky industrial gearboxes and drive transmission (Chris: bulkier gearboxes)
+	var gb: float = roof_reach * 0.88
+	var root_z_offset := roof_len * 0.30
+
 	if gb_mesh:
-		var gb: float = roof_reach * 0.62
-		for z in [roof_len * 0.30, -roof_len * 0.30]:
-			var gearbox := _mesh_inst(gb_mesh, base_color.darkened(0.1).lightened(0.3))
-			gearbox.scale = Vector3(gb, gb, gb * 1.15)
-			gearbox.position = Vector3(-gb * 0.25, rail_y, z)
+		for z in [root_z_offset, -root_z_offset]:
+			# Main wing-root gearbox housing
+			var gearbox := _mesh_inst(gb_mesh, base_color.darkened(0.15).lightened(0.25))
+			gearbox.scale = Vector3(gb * 1.15, gb * 1.20, gb * 1.40)
+			gearbox.position = Vector3(-gb * 0.20, rail_y, z)
 			parent_node.add_child(gearbox)
-		# A drive housing amidships between them, so the two roots read as
-		# driven by one mechanism rather than as two unrelated boxes. It has to
-		# SPAN the gap (roof_len * 0.60 = the full root-to-root distance), not
-		# merely sit in the middle of it, or the gearboxes measure as islands.
-		var drive := _mesh_inst(gb_mesh, base_color.darkened(0.2))
-		drive.scale = Vector3(gb * 0.62, gb * 0.7, roof_len * 0.60)
-		drive.position = Vector3(-gb * 0.25, rail_y, 0.0)
+
+			# Outboard Flapping Pivot Bearing Collar
+			var bearing := CylinderMesh.new()
+			bearing.top_radius = gb * 0.24
+			bearing.bottom_radius = gb * 0.28
+			bearing.height = gb * 0.32
+			var bearing_inst := _mesh_inst(bearing, Color(0.22, 0.24, 0.26))
+			bearing_inst.rotation = Vector3(0, 0, deg_to_rad(90.0))
+			bearing_inst.position = Vector3(gb * 0.35, rail_y, z)
+			parent_node.add_child(bearing_inst)
+
+			# Inboard Motor / Hydraulic Actuator Housing
+			var actuator := BoxMesh.new()
+			actuator.size = Vector3(gb * 0.40, gb * 0.80, gb * 0.80)
+			var act_inst := _mesh_inst(actuator, Color(0.18, 0.19, 0.21))
+			act_inst.position = Vector3(-gb * 0.70, rail_y, z)
+			parent_node.add_child(act_inst)
+
+		# Heavy central drive transmission unit spanning the gap between gearboxes
+		var drive := _mesh_inst(gb_mesh, base_color.darkened(0.25))
+		drive.scale = Vector3(gb * 0.85, gb * 0.95, roof_len * 0.65)
+		drive.position = Vector3(-gb * 0.20, rail_y, 0.0)
 		parent_node.add_child(drive)
 
-	# Struts down and inboard into the roof. mount_strut_tapered is authored
-	# along local +Y spanning 0..1, thin at the root and flaring at the far
-	# end, so it is placed here by building a basis around the span vector -
-	# the technique the rotor, hover and track mounts all share.
-	if strut_mesh:
-		# DEEP. Chris: "extend the struts further down so they actually
-		# intersect hull." At 0.35 the struts stopped short of the hull's
-		# visible mesh, which is inset from the collision box the station is
-		# derived from - so they cleared the box and still read as resting on
-		# nothing. Taken past the halfway point of the hull's own height, so
-		# the frame is visibly bolted THROUGH the roof rather than onto it.
-		var down: float = rail_y + roof_reach * 0.85
-		for i in range(4):
-			var t: float = (float(i) + 0.5) / 4.0
-			var z: float = -rail_z + rail_z * 2.0 * t
-			for x in [0.0, inboard_x]:
-				# Splayed: the outboard rail's struts lean in, the inboard
-				# rail's lean out, so the pair reads as a braced trestle
-				# rather than as two parallel posts.
-				var lean: float = (roof_reach * 0.18) * (-1.0 if x == 0.0 else 1.0)
-				var span := Vector3(lean, -down, 0.0)
-				var l: float = span.length()
-				var dir: Vector3 = span / l
-				var right: Vector3 = dir.cross(Vector3.FORWARD).normalized()
-				var fwd: Vector3 = right.cross(dir).normalized()
-				var strut := _mesh_inst(strut_mesh, base_color.darkened(0.3))
-				strut.transform = Transform3D(
-					Basis(right * beam * 0.85, dir * l, fwd * beam * 0.85),
-					Vector3(x, rail_y, z))
-				parent_node.add_child(strut)
+		# Mechanical cooling / stiffener ribs along top of central transmission
+		var rib := BoxMesh.new()
+		rib.size = Vector3(gb * 0.50, gb * 0.12, roof_len * 0.55)
+		var rib_inst := _mesh_inst(rib, Color(0.15, 0.16, 0.18))
+		rib_inst.position = Vector3(-gb * 0.20, rail_y + gb * 0.50, 0.0)
+		parent_node.add_child(rib_inst)
 
-	# Inside the gearbox, not adjacent to it: the wing root should visibly
-	# emerge from the housing that drives it.
-	return Vector3(roof_reach * 0.12, rail_y, 0.0)
+	# 4. Thick structural pylons solved against the hull surface mesh (Chris: thicker & extend to hull skin)
+	var station := MountReachScript.station_from({})
+	var surface := MountReachScript.surface_for(parent_node)
+
+	var pylon_w := beam * 1.55 # Thick, load-bearing legs
+
+	var pylon_z_stations := [-rail_z * 0.75, -rail_z * 0.25, rail_z * 0.25, rail_z * 0.75]
+	for z_pos in pylon_z_stations:
+		for x in [0.0, inboard_x]:
+			var p_local := Vector3(x, rail_y, z_pos)
+			# Station in hull space (accounting for node_scale of (2,1,2))
+			var p_hull := station + Vector3(p_local.x * 2.0, p_local.y, p_local.z * 2.0)
+
+			var drop_len: float = rail_y + roof_reach * 0.85
+			var hit_norm := Vector3.UP
+
+			if not surface.is_empty():
+				var hit: Dictionary = HullProjectionScript.raycast(surface, p_hull, Vector3.DOWN)
+				if hit.get("hit", false):
+					var hit_pos: Vector3 = hit["position"]
+					hit_norm = hit.get("normal", Vector3.UP)
+					drop_len = (p_hull.y - hit_pos.y) + 0.08
+				else:
+					# Fan search if vertical hit missed a chamfered shoulder
+					for ang in [-15.0, 15.0, -30.0, 30.0]:
+						var test_dir := Vector3.DOWN.rotated(Vector3.FORWARD, deg_to_rad(ang))
+						var hit2: Dictionary = HullProjectionScript.raycast(surface, p_hull, test_dir)
+						if hit2.get("hit", false):
+							var hit_pos2: Vector3 = hit2["position"]
+							hit_norm = hit2.get("normal", Vector3.UP)
+							drop_len = (p_hull.y - hit_pos2.y) + 0.08
+							break
+
+			# Splay slightly for triangular trestle stability
+			var lean: float = (roof_reach * 0.10) * (-1.0 if x == 0.0 else 1.0)
+			var span := Vector3(lean, -drop_len, 0.0)
+			var l: float = span.length()
+			var dir: Vector3 = span / l
+			var right: Vector3 = dir.cross(Vector3.FORWARD).normalized()
+			var fwd: Vector3 = right.cross(dir).normalized()
+
+			if strut_mesh:
+				var strut := _mesh_inst(strut_mesh, base_color.darkened(0.32))
+				strut.transform = Transform3D(
+					Basis(right * pylon_w, dir * l, fwd * pylon_w),
+					p_local)
+				parent_node.add_child(strut)
+			else:
+				var leg := BoxMesh.new()
+				leg.size = Vector3(pylon_w, l, pylon_w)
+				var leg_inst := _mesh_inst(leg, base_color.darkened(0.32))
+				leg_inst.transform = Transform3D(
+					Basis(right * pylon_w, dir * l, fwd * pylon_w),
+					p_local)
+				parent_node.add_child(leg_inst)
+
+			# Mounting flange baseplate flush against the hull roof skin
+			var baseplate := BoxMesh.new()
+			baseplate.size = Vector3(pylon_w * 1.6, 0.08, pylon_w * 1.6)
+			var baseplate_inst := _mesh_inst(baseplate, base_color.darkened(0.45).lightened(0.1))
+			baseplate_inst.position = p_local + span
+			if absf(hit_norm.dot(Vector3.UP)) < 0.95:
+				var b_forward := -hit_norm.normalized()
+				var b_right := b_forward.cross(Vector3.UP).normalized()
+				var b_up := b_right.cross(b_forward).normalized()
+				baseplate_inst.transform.basis = Basis(b_right, b_up, -b_forward)
+			parent_node.add_child(baseplate_inst)
+
+	# Wing root emerges directly from the outboard pivot bearing
+	return Vector3(gb * 0.35, rail_y, 0.0)
 
 
 # One wing (membrane + a single main spar) of an ornithopter_wing's fore/
@@ -5688,16 +5319,8 @@ static func _build_pylon_mounted_propeller(parent_node: Node3D, base_size: Vecto
 
 
 static func _build_buoyant_envelope(parent_node: Node3D, base_size: Vector3, base_color: Color = Color.TAN, tweaks: Dictionary = {}):
-	# AIRSHIP CRUISE ENGINE. Chris: "a mechanical boxy engine out to either
-	# side on a pylon. the pylon connecting to a nose cone, then a
-	# boxy-enginey-mechanical lookin bit, then a wide slow turning prop."
-	#
-	# Three parts in a row along the shaft rather than one smooth nacelle. An
-	# airship engine is slow, exposed and serviceable - bolted to an outrigger,
-	# closer to a traction engine than to a jet - so you should be able to read
-	# the machinery of it. No mount kit: this builds its own pylon, and the
-	# kit's fixed-length stub pylon was the same redundant second mounting that
-	# left a collar dangling under the rotors.
+	# AIRSHIP CRUISE / LOITER ENGINE
+	# Mechanical exposed turboprop/radial engine pod on structural outrigger pylons.
 	var blade_count := int(tweaks.get("blade_count", 3.0))
 	var blade_pitch := float(tweaks.get("blade_pitch", 1.0))
 	var is_belly: bool = bool(tweaks.get("pod_belly", false))
@@ -5705,95 +5328,361 @@ static func _build_buoyant_envelope(parent_node: Node3D, base_size: Vector3, bas
 	var nose_mesh := _part("be_nose_cone")
 	var block_mesh := _part("be_engine_block")
 	var blade_mesh := _part("rotor_blade")
-	var strut_mesh := _part("mount_strut_aerofoil")
+	var strut_mesh := _part("mount_strut_tapered")
+	if not strut_mesh:
+		strut_mesh = _part("mount_strut_aerofoil")
 
-	# Sized off the HULL, not the catalog. buoyant_envelope's catalog size is a
-	# 1.0 placeholder, so a pod built from it came out as a speck bolted to the
-	# side of a real airship. pod_scale is the hull's own height, from
-	# locomotion_layout.gd's SIDE_PODS pattern.
 	var pod_mult: float = float(tweaks.get("engine_size", tweaks.get("size", tweaks.get("scale", 1.0))))
-	var s: float = maxf(float(tweaks.get("pod_scale", base_size.x)), 0.5) * 0.92 * pod_mult
-	const POD_Z := -0.20
+	var s: float = maxf(float(tweaks.get("pod_scale", base_size.x)), 0.5) * 0.95 * pod_mult
 	var struct_color := base_color.darkened(0.25)
 
-	# PYLON, from the engine's mounting saddle back into the hull. TWO members,
-	# so they and the hull's own side close a triangle in profile - the same
-	# arrangement the rotor outriggers use, and for the same reason: one strut
-	# carries the load but cannot resist the engine's torque about it.
-	#
-	# The span is SOLVED from pod_reach (locomotion_layout.gd's standoff)
-	# rather than being a fixed length in pod units. The old fixed span stopped
-	# reaching the hull the moment the standoff doubled, which is exactly the
-	# failure the rotor kit's stub pylon had.
-	var reach := float(tweaks.get("pod_reach", 0.6))
-	var root := Vector3(0, 0.16 * s, POD_Z * s)
-	if strut_mesh:
-		# +0.35 overruns the hull's skin so the strut ends inside its volume
-		# rather than against it. A flank pod reaches inboard along X; the
-		# belly pod reaches straight up instead, which is all that differs.
-		var main_span := Vector3(0, reach + 0.35 * s, 0) if is_belly 			else Vector3(-(reach + 0.35 * s), 0.15 * s, 0)
-		# The brace lands further AFT on the hull, which is what opens the
-		# triangle out in profile.
-		var brace_span := main_span + (Vector3(0, 0, 0.85 * s) if is_belly 			else Vector3(0, -0.25 * s, 0.85 * s))
-		for entry in [[main_span, 0.30, 0.16], [brace_span, 0.20, 0.11]]:
-			var span: Vector3 = entry[0]
-			var span_len: float = span.length()
-			var dir: Vector3 = span / span_len
-			var ref := Vector3.FORWARD if absf(dir.dot(Vector3.UP)) > 0.95 else Vector3.UP
-			var right: Vector3 = dir.cross(ref).normalized()
-			var fwd: Vector3 = right.cross(dir).normalized()
-			var member := _mesh_inst(strut_mesh, struct_color)
-			member.transform = Transform3D(
-				Basis(right * float(entry[1]) * s, dir * span_len, fwd * float(entry[2]) * s),
-				root)
-			parent_node.add_child(member)
+	# 1. Structural Outrigger Poles: Continuous stretched poles spanning directly to the hull skin
+	var station := MountReachScript.station_from(tweaks)
+	if station.length_squared() < 0.001 and parent_node.position.length_squared() > 0.001:
+		station = parent_node.position
 
-	if nose_mesh:
-		var nose := _mesh_inst(nose_mesh, struct_color.lightened(0.06))
-		nose.scale = Vector3.ONE * s
-		nose.rotation = Vector3(0, PI, 0)
-		nose.position = Vector3(0, 0, POD_Z * s)
-		parent_node.add_child(nose)
+	var surface := MountReachScript.surface_for(parent_node)
+	if surface.is_empty() and parent_node.get_parent() != null and (parent_node.get_parent() is Node3D):
+		surface = HullProjectionScript.build_surface(parent_node.get_parent())
 
+	var mount_side := float(tweaks.get("mount_side", 1.0 if station.x >= 0.0 else -1.0))
+	var station_x: float = absf(station.x) if station.length_squared() > 0.001 else 2.5
+	var eff_station := Vector3(station_x, station.y, station.z)
+
+	var dist_to_skin: float = 0.0
+	var found_skin := false
+
+	if not surface.is_empty():
+		var hit: Dictionary = HullProjectionScript.raycast(surface, eff_station, Vector3(-1.0, 0, 0))
+		if hit.get("hit", false):
+			dist_to_skin = (hit["position"] - eff_station).length()
+			found_skin = true
+		else:
+			for ang in [-15.0, 15.0, -30.0, 30.0]:
+				var test_dir := Vector3(-1.0, 0, 0).rotated(Vector3.UP, deg_to_rad(ang))
+				var hit2: Dictionary = HullProjectionScript.raycast(surface, eff_station, test_dir)
+				if hit2.get("hit", false):
+					dist_to_skin = (hit2["position"] - eff_station).length()
+					found_skin = true
+					break
+
+	if not found_skin:
+		dist_to_skin = maxf(station_x * 0.75, 2.0)
+
+	# Extend deeply into the hull skin (at least 0.35m past skin or 75% of standoff distance)
+	var total_reach: float = maxf(dist_to_skin + 0.35, maxf(station_x * 0.75 + 0.3, 2.4))
+	var dir_x: float = -1.0 if mount_side >= 0.0 else 1.0
+
+	var pole_cyl := CylinderMesh.new()
+	pole_cyl.top_radius = 0.055 * s
+	pole_cyl.bottom_radius = 0.065 * s
+	pole_cyl.height = total_reach
+	pole_cyl.radial_segments = 12
+
+	if is_belly:
+		for z_off in [0.05 * s, 0.35 * s]:
+			var pole := _mesh_inst(pole_cyl, struct_color)
+			pole.position = Vector3(0, total_reach * 0.5, z_off)
+			parent_node.add_child(pole)
+	else:
+		# Forward mounting pole
+		var p1 := _mesh_inst(pole_cyl, struct_color)
+		p1.position = Vector3(dir_x * (total_reach * 0.5), 0.05 * s, 0.05 * s)
+		p1.rotation = Vector3(0, 0, deg_to_rad(90.0))
+		parent_node.add_child(p1)
+
+		# Aft mounting pole
+		var p2 := _mesh_inst(pole_cyl, struct_color)
+		p2.position = Vector3(dir_x * (total_reach * 0.5), 0.05 * s, 0.35 * s)
+		p2.rotation = Vector3(0, 0, deg_to_rad(90.0))
+		parent_node.add_child(p2)
+
+	# 2. Engine Block (Center)
 	if block_mesh:
 		var block := _mesh_inst(block_mesh, struct_color)
 		block.scale = Vector3.ONE * s
-		block.rotation = Vector3(0, PI, 0)
-		block.position = Vector3(0, 0, POD_Z * s)
+		block.rotation = Vector3(0, PI, 0) # Face forward (-Z)
+		block.position = Vector3.ZERO
 		parent_node.add_child(block)
+	else:
+		var block := BoxMesh.new()
+		block.size = Vector3(0.40 * s, 0.45 * s, 0.65 * s)
+		var b_inst := _mesh_inst(block, struct_color)
+		b_inst.position = Vector3.ZERO
+		parent_node.add_child(b_inst)
 
-	# THE PROP: wide and slow. unit.gd spins "PropBlades" about Z at the
-	# airship's own reduced rate.
+	# 3. Front Nose Cone / Fairing (Snug against front face of engine block)
+	if nose_mesh:
+		var nose := _mesh_inst(nose_mesh, struct_color.lightened(0.06))
+		nose.scale = Vector3.ONE * s
+		nose.rotation = Vector3(0, PI, 0) # Point forward (-Z)
+		nose.position = Vector3(0, 0, -0.03 * s) # Collar meets front of block
+		parent_node.add_child(nose)
+
+	# 4. Rear Propeller Hub & Blades (Snug against rear reduction gear at Z = +0.45 * s)
 	var pivot := Node3D.new()
 	pivot.name = "PropBlades"
-	# On the block's own output bearing (authored at Blender +0.50, so Godot
-	# +0.50 after the half turn, plus the pod offset).
-	pivot.position = Vector3(0, 0, (POD_Z + 0.52) * s)
+	pivot.position = Vector3(0, 0.04 * s, 0.45 * s)
 	parent_node.add_child(pivot)
 
-	# WIDE. An airship's cruise prop is disproportionately large and low-RPM,
-	# because it is providing gentle thrust rather than fighting gravity.
-	# A TARGET LENGTH, divided by the mesh's own measured span - not a raw
-	# multiplier. rotor_blade is 1.16 long on X, so treating 1.55 as a scale
-	# factor asked for a 3.7-unit blade.
-	const AUTHORED_BLADE_X := 1.16
-	var blade_span: float = (1.05 * s) / AUTHORED_BLADE_X
+	# Spinner bullet cone pointing aft (+Z)
+	var spinner := CylinderMesh.new()
+	spinner.top_radius = 0.02 * s
+	spinner.bottom_radius = 0.15 * s
+	spinner.height = 0.20 * s
+	var spinner_inst := _mesh_inst(spinner, Color(0.24, 0.26, 0.28))
+	spinner_inst.rotation = Vector3(deg_to_rad(90.0), 0, 0)
+	spinner_inst.position = Vector3(0, 0, 0.10 * s)
+	pivot.add_child(spinner_inst)
+
+	# Spinner backing plate collar
+	var backing := CylinderMesh.new()
+	backing.top_radius = 0.16 * s
+	backing.bottom_radius = 0.16 * s
+	backing.height = 0.04 * s
+	var back_inst := _mesh_inst(backing, Color(0.18, 0.20, 0.22))
+	back_inst.rotation = Vector3(deg_to_rad(90.0), 0, 0)
+	back_inst.position = Vector3(0, 0, 0.01 * s)
+	pivot.add_child(back_inst)
+
+	# Propeller Blades spanning radially in the XY plane (shrunk by 30%)
+	const AUTHORED_BLADE_LEN := 1.20
+	var blade_len: float = 0.95 * s
+	var blade_scale_z: float = blade_len / AUTHORED_BLADE_LEN
+
 	_ring_of(pivot, blade_count, 0.0, func(p, _pos, angle, _idx):
-		if blade_mesh == null:
-			return
-		# rotor_blade spans LOCAL X (measured 1.16 along X against 0.159 along
-		# Z). This hub turns about Z, and an X-spanning blade sweeps correctly
-		# under a Z rotation, so there is no reorientation to do - pitch it
-		# about its own spanwise axis, then fan it round the hub.
-		var pitch_rot := Basis(Vector3(1, 0, 0), 0.30 * blade_pitch)
-		var fan_rot := Basis(Vector3(0, 0, 1), angle)
-		var blade := _mesh_inst(blade_mesh, Color(0.22, 0.22, 0.24))
-		blade.quaternion = (fan_rot * pitch_rot).get_rotation_quaternion()
-		blade.scale = Vector3(blade_span, 0.9 * s, 0.9 * s)
-		p.add_child(blade)
+		var span_dir := Vector3(cos(angle), sin(angle), 0.0)
+		var chord_dir := span_dir.cross(Vector3(0, 0, 1.0)).normalized()
+		var thrust_dir := Vector3(0, 0, 1.0)
+
+		var pitch_rad: float = deg_to_rad(25.0 * blade_pitch)
+		var pitched_chord: Vector3 = chord_dir.rotated(span_dir, pitch_rad)
+		var pitched_thrust: Vector3 = thrust_dir.rotated(span_dir, pitch_rad)
+
+		if blade_mesh:
+			var blade := _mesh_inst(blade_mesh, Color(0.22, 0.22, 0.24))
+			blade.transform.basis = Basis(pitched_chord, pitched_thrust, span_dir)
+			blade.scale = Vector3(0.85 * s, 0.85 * s, blade_scale_z)
+			blade.position = span_dir * (0.12 * s)
+			p.add_child(blade)
+		else:
+			var blade_box := BoxMesh.new()
+			blade_box.size = Vector3(0.12 * s, 0.025 * s, blade_len)
+			var blade_inst := _mesh_inst(blade_box, Color(0.22, 0.22, 0.24))
+			blade_inst.transform.basis = Basis(pitched_chord, pitched_thrust, span_dir)
+			blade_inst.position = span_dir * (0.12 * s + blade_len * 0.5)
+			p.add_child(blade_inst)
 	)
 
-	_build_agp_hull_projectors_and_field(parent_node, base_size, base_color, tweaks, false)
+	# 5. Blimp Envelope attached to top of hull with rigging cables
+	_build_blimp_envelope(parent_node, base_size, base_color, tweaks)
+
+
+## Blimp Gasbag Envelope & Suspension Rigging Cables
+static func _build_blimp_envelope(parent_node: Node3D, base_size: Vector3, base_color: Color, tweaks: Dictionary = {}) -> void:
+	if not is_instance_valid(parent_node):
+		return
+	if not parent_node.is_inside_tree() or parent_node.get_parent() == null:
+		if not parent_node.is_connected("tree_entered", Callable(VisualBuilder, "_on_blimp_parent_tree_entered")):
+			parent_node.tree_entered.connect(_on_blimp_parent_tree_entered.bind(parent_node, base_size, base_color, tweaks), CONNECT_ONE_SHOT)
+		return
+	_apply_blimp_envelope(parent_node, base_size, base_color, tweaks)
+
+static func _on_blimp_parent_tree_entered(parent_node: Node3D, base_size: Vector3, base_color: Color, tweaks: Dictionary) -> void:
+	Callable(VisualBuilder, "_apply_blimp_envelope").call_deferred(parent_node, base_size, base_color, tweaks)
+
+static func _apply_blimp_envelope(parent_node: Node3D, base_size: Vector3, base_color: Color, tweaks: Dictionary = {}) -> void:
+	if not is_instance_valid(parent_node) or not parent_node.is_inside_tree():
+		return
+
+	var chassis_node: Node3D = parent_node.get_parent() as Node3D if (parent_node.get_parent() != null and parent_node.get_parent() is Node3D) else parent_node
+	while chassis_node != null and chassis_node.get_parent() != null and (chassis_node.get_parent() is Node3D) and not (chassis_node.get_parent() is SubViewport or chassis_node.get_parent() is Window):
+		if chassis_node.name.contains("Hull") or chassis_node.name.contains("Vehicle") or chassis_node.name == "VisualModel" or chassis_node.has_meta("hull_data"):
+			break
+		chassis_node = chassis_node.get_parent() as Node3D
+
+	if chassis_node.has_node("BlimpEnvelope"):
+		return
+
+	var blimp_container := Node3D.new()
+	blimp_container.name = "BlimpEnvelope"
+	chassis_node.add_child(blimp_container)
+
+	var surface_data := _gather_hull_only_surface(chassis_node)
+	var hull_aabb: AABB = surface_data.get("aabb", get_full_hull_aabb(chassis_node))
+
+	var hull_w: float = maxf(hull_aabb.size.x, 2.2)
+	var hull_h: float = maxf(hull_aabb.size.y, 1.2)
+	var hull_l: float = maxf(hull_aabb.size.z, 3.8)
+	var hull_roof_y: float = hull_aabb.position.y + hull_aabb.size.y
+	var hull_center_z: float = hull_aabb.position.z + hull_aabb.size.z * 0.5
+
+	# Gasbag Ellipsoid Dimensions
+	var env_radius_z: float = hull_l * 0.72
+	var env_radius_x: float = hull_w * 0.68
+	var env_radius_y: float = hull_w * 0.60
+	var cable_gap: float = maxf(hull_h * 0.40, 0.75)
+	var env_center_y: float = hull_roof_y + cable_gap + env_radius_y
+	var env_center := Vector3(0, env_center_y, hull_center_z)
+
+	var fabric_color: Color = base_color.lightened(0.18)
+	var struct_color: Color = base_color.darkened(0.35)
+
+	# 1. Main Ellipsoid Gasbag Mesh
+	var sphere := SphereMesh.new()
+	sphere.radius = 1.0
+	sphere.height = 2.0
+	sphere.radial_segments = 36
+	sphere.rings = 18
+	var gasbag := _mesh_inst(sphere, fabric_color)
+	gasbag.scale = Vector3(env_radius_x, env_radius_y, env_radius_z)
+	gasbag.position = env_center
+	blimp_container.add_child(gasbag)
+
+	# 2. Longitudinal Keel Spar along lower belly of gasbag
+	var keel := BoxMesh.new()
+	keel.size = Vector3(0.20, 0.16, env_radius_z * 1.65)
+	var keel_inst := _mesh_inst(keel, struct_color)
+	keel_inst.position = env_center + Vector3(0, -env_radius_y * 0.94, 0)
+	blimp_container.add_child(keel_inst)
+
+	# 3. Girth Reinforcement Rings (Forward, Mid, Aft)
+	for z_frac in [-0.45, 0.0, 0.45]:
+		var rz: float = z_frac * env_radius_z
+		var factor: float = sqrt(maxf(0.01, 1.0 - (z_frac * z_frac)))
+		var ring_rx: float = env_radius_x * factor + 0.02
+		var ring_ry: float = env_radius_y * factor + 0.02
+		var ring_torus := TorusMesh.new()
+		ring_torus.inner_radius = maxf(ring_rx - 0.03, 0.1)
+		ring_torus.outer_radius = ring_rx
+		ring_torus.rings = 24
+		ring_torus.ring_segments = 8
+		var ring_inst := _mesh_inst(ring_torus, struct_color)
+		ring_inst.rotation = Vector3(deg_to_rad(90.0), 0, 0)
+		ring_inst.scale = Vector3(1.0, 1.0, ring_ry / maxf(ring_rx, 0.1))
+		ring_inst.position = env_center + Vector3(0, 0, rz)
+		blimp_container.add_child(ring_inst)
+
+	# 4. Tail Empennage (Stabilizer Fins at Aft)
+	var fin_z: float = hull_center_z + env_radius_z * 0.72
+	var fin_len: float = env_radius_z * 0.38
+	var fin_span_x: float = env_radius_x * 0.55
+	var fin_span_y: float = env_radius_y * 0.55
+
+	# Dorsal (Top) Fin
+	var fin_d := BoxMesh.new()
+	fin_d.size = Vector3(0.08, fin_span_y, fin_len)
+	var fd_inst := _mesh_inst(fin_d, struct_color.lightened(0.05))
+	fd_inst.position = Vector3(0, env_center_y + env_radius_y * 0.85, fin_z)
+	blimp_container.add_child(fd_inst)
+
+	# Ventral (Bottom) Fin
+	var fin_v := BoxMesh.new()
+	fin_v.size = Vector3(0.08, fin_span_y * 0.7, fin_len)
+	var fv_inst := _mesh_inst(fin_v, struct_color.lightened(0.05))
+	fv_inst.position = Vector3(0, env_center_y - env_radius_y * 0.85, fin_z)
+	blimp_container.add_child(fv_inst)
+
+	# Port & Starboard Horizontal Fins
+	for sx in [-1.0, 1.0]:
+		var fin_h := BoxMesh.new()
+		fin_h.size = Vector3(fin_span_x, 0.08, fin_len)
+		var fh_inst := _mesh_inst(fin_h, struct_color.lightened(0.05))
+		fh_inst.position = Vector3(sx * (env_radius_x * 0.85), env_center_y, fin_z)
+		blimp_container.add_child(fh_inst)
+
+	# 5. Nose Mooring Spindle Cap (Front)
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.04
+	cone.bottom_radius = 0.28
+	cone.height = 0.40
+	var cone_inst := _mesh_inst(cone, struct_color)
+	cone_inst.rotation = Vector3(deg_to_rad(-90.0), 0, 0)
+	cone_inst.position = Vector3(0, env_center_y, hull_center_z - env_radius_z - 0.12)
+	blimp_container.add_child(cone_inst)
+
+	# 6. Suspension Rigging Cables (Attaching Hull Roof to Blimp Envelope dynamically)
+	var cable_color := Color(0.20, 0.21, 0.23)
+
+	# Ensure complete surface triangle cache for accurate raycasting against hull skin
+	if not surface_data.has("tris") or surface_data["tris"].is_empty():
+		surface_data = MountReachScript.surface_for(parent_node)
+	if not surface_data.has("tris") or surface_data["tris"].is_empty():
+		surface_data = HullProjectionScript.build_surface(chassis_node)
+
+	var anchor_specs: Array[Dictionary] = [
+		{"x": -hull_w * 0.35, "z": hull_center_z - hull_l * 0.28, "env_x": -env_radius_x * 0.48, "env_z": -env_radius_z * 0.35},
+		{"x":  hull_w * 0.35, "z": hull_center_z - hull_l * 0.28, "env_x":  env_radius_x * 0.48, "env_z": -env_radius_z * 0.35},
+		{"x": -hull_w * 0.40, "z": hull_center_z,                  "env_x": -env_radius_x * 0.55, "env_z": 0.0},
+		{"x":  hull_w * 0.40, "z": hull_center_z,                  "env_x":  env_radius_x * 0.55, "env_z": 0.0},
+		{"x": -hull_w * 0.35, "z": hull_center_z + hull_l * 0.28, "env_x": -env_radius_x * 0.48, "env_z":  env_radius_z * 0.35},
+		{"x":  hull_w * 0.35, "z": hull_center_z + hull_l * 0.28, "env_x":  env_radius_x * 0.48, "env_z":  env_radius_z * 0.35},
+	]
+
+	for spec in anchor_specs:
+		var env_attach := env_center + Vector3(spec["env_x"], -env_radius_y * 0.65, spec["env_z"])
+		var target_x: float = spec["x"]
+		var target_z: float = spec["z"]
+
+		# Raycast dynamically from high above down toward the hull surface
+		var ray_origin := Vector3(target_x, env_center_y, target_z)
+		var ray_hit: Dictionary = HullProjectionScript.raycast(surface_data, ray_origin, Vector3.DOWN)
+
+		var p_hull := Vector3.ZERO
+		var n_hull := Vector3.UP
+
+		if ray_hit.get("hit", false):
+			p_hull = ray_hit["position"]
+			n_hull = ray_hit.get("normal", Vector3.UP)
+		else:
+			var dir_to_target := (Vector3(target_x, hull_roof_y - 0.2, target_z) - env_attach).normalized()
+			var angled_hit: Dictionary = HullProjectionScript.raycast(surface_data, env_attach, dir_to_target)
+			if angled_hit.get("hit", false):
+				p_hull = angled_hit["position"]
+				n_hull = angled_hit.get("normal", Vector3.UP)
+			else:
+				p_hull = Vector3(target_x, hull_roof_y, target_z)
+				n_hull = Vector3.UP
+
+		# Cable extends dynamically deep into the hull skin (0.04m penetration to avoid gaps)
+		var p_hull_deep := p_hull - n_hull * 0.04
+		_build_blimp_cable(blimp_container, p_hull_deep, env_attach, 0.016, cable_color)
+
+		# Mounting bracket pad seated flush against the hull surface
+		var pad := BoxMesh.new()
+		pad.size = Vector3(0.18, 0.05, 0.18)
+		var p_inst := _mesh_inst(pad, struct_color)
+		p_inst.position = p_hull + n_hull * 0.02
+
+		var pad_y := n_hull.normalized()
+		var pad_z := pad_y.cross(Vector3.RIGHT)
+		if pad_z.length_squared() < 0.001:
+			pad_z = pad_y.cross(Vector3.FORWARD)
+		pad_z = pad_z.normalized()
+		var pad_x := pad_y.cross(pad_z).normalized()
+		p_inst.transform.basis = Basis(pad_x, pad_y, pad_z)
+		blimp_container.add_child(p_inst)
+
+static func _build_blimp_cable(root: Node3D, p_from: Vector3, p_to: Vector3, radius: float = 0.016, color: Color = Color(0.20, 0.21, 0.23)) -> void:
+	var diff := p_to - p_from
+	var length := diff.length()
+	if length < 0.01:
+		return
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = radius
+	cyl.bottom_radius = radius
+	cyl.height = length
+	cyl.radial_segments = 8
+	var inst := _mesh_inst(cyl, color)
+	inst.position = (p_from + p_to) * 0.5
+	var y_axis := diff.normalized()
+	var z_axis := y_axis.cross(Vector3.UP)
+	if z_axis.length_squared() < 0.001:
+		z_axis = y_axis.cross(Vector3.FORWARD)
+	z_axis = z_axis.normalized()
+	var x_axis := y_axis.cross(z_axis).normalized()
+	inst.transform.basis = Basis(x_axis, y_axis, z_axis)
+	root.add_child(inst)
 
 
 static func _build_screw_drive(parent_node: Node3D, base_size: Vector3, base_color: Color = Color.DARK_GOLDENROD, tweaks: Dictionary = {}):
@@ -6394,7 +6283,6 @@ const MONOLITHIC_TWEAK_AXES := {
 	"cluster_dispenser": {"dispersion": Vector3(1, 0, 1), "payload_size": Vector3(1, 1, 1), "tube_count": Vector3(1, 0, 0)},
 	"mortar_array": {"tube_count": Vector3(1, 0, 1)},
 	"missile_pod": {"grid_size": Vector3(1, 0, 1), "warhead_size": Vector3(1, 1, 0), "motor_length": Vector3(0, 0, 1), "seeker_size": Vector3(1, 1, 0), "engine_length": Vector3(0, 0, 1)},
-	"tesla_coil": {"caliber": Vector3(1, 1, 1), "arc_frequency": Vector3(0, 0, 1), "surge_capacity": Vector3(0, 1, 1)},
 	"ion_cannon": {"beam_width": Vector3(1, 1, 0), "ion_density": Vector3(0, 0, 1)},
 }
 
@@ -6469,25 +6357,6 @@ static func _build_propulsion_module(type_id: String, parent_node: Node3D, base_
 				trunk.position = Vector3(0, 0.1, 0.2)
 				trunk.rotation = Vector3(PI / 2, 0, 0)
 				parent_node.add_child(trunk)
-
-		"overdrive_gearbox":
-			var motor_size = tweaks.get("motor_size", 1.0)
-			var bell_mesh = _part("gearbox_bell")
-			if bell_mesh:
-				var bell = _mesh_inst(bell_mesh, base_color.darkened(0.15))
-				bell.scale = Vector3.ONE * motor_size
-				bell.position = Vector3(0, 0.17, 0)
-				parent_node.add_child(bell)
-			else:
-				var bell = MeshInstance3D.new()
-				var b_cyl = CylinderMesh.new()
-				b_cyl.top_radius = 0.2 * motor_size
-				b_cyl.bottom_radius = 0.2 * motor_size
-				b_cyl.height = 0.34 * motor_size
-				bell.mesh = b_cyl
-				bell.material_override = _flat_mat(base_color.darkened(0.15))
-				bell.position = Vector3(0, 0.17 * motor_size, 0)
-				parent_node.add_child(bell)
 
 		"hub_motor_array":
 			var motor_size = tweaks.get("motor_size", 1.0)
@@ -6610,53 +6479,6 @@ static func _build_propulsion_module(type_id: String, parent_node: Node3D, base_
 				tube.rotation = Vector3(PI / 2, 0, 0)
 				parent_node.add_child(tube)
 
-		"grav_lifter_assist":
-			var mesh = _part("grav_lifter_dome")
-			if mesh:
-				var dome = _mesh_inst(mesh, base_color)
-				dome.position = Vector3(0, 0.17, 0)
-				parent_node.add_child(dome)
-			else:
-				var dome = MeshInstance3D.new()
-				var d_sphere = SphereMesh.new()
-				d_sphere.radius = 0.35
-				d_sphere.height = 0.35
-				dome.mesh = d_sphere
-				dome.material_override = _flat_mat(base_color)
-				dome.position = Vector3(0, 0.17, 0)
-				parent_node.add_child(dome)
-			
-			# Animation ring
-			var ring_mesh = _part("agp_ring")
-			if ring_mesh:
-				var ring_pivot = Node3D.new()
-				ring_pivot.name = SPIN_PIVOT_TURBINE
-				ring_pivot.position = Vector3(0, 0.2, 0)
-				ring_pivot.rotation = Vector3(PI / 2.0, 0, 0)
-				parent_node.add_child(ring_pivot)
-				var ring = _mesh_inst(ring_mesh, base_color.darkened(0.45), Color(0.35, 0.75, 1.0), 0.5)
-				ring.scale = Vector3.ONE * 0.9
-				ring_pivot.add_child(ring)
-
-		"jet_thrusters":
-			var mesh = _part("jet_thruster_nozzle")
-			if mesh:
-				var nozzle = _mesh_inst(mesh, base_color.darkened(0.2))
-				nozzle.position = Vector3(0, 0.2, 0.2)
-				nozzle.rotation = Vector3(PI / 2, 0, 0)
-				parent_node.add_child(nozzle)
-			else:
-				var nozzle = MeshInstance3D.new()
-				var n_cyl = CylinderMesh.new()
-				n_cyl.top_radius = 0.4
-				n_cyl.bottom_radius = 0.4
-				n_cyl.height = 0.8
-				nozzle.mesh = n_cyl
-				nozzle.material_override = _flat_mat(base_color.darkened(0.2))
-				nozzle.position = Vector3(0, 0.2, 0.2)
-				nozzle.rotation = Vector3(PI / 2, 0, 0)
-				parent_node.add_child(nozzle)
-
 		_:
 			# Fallback for generic propulsion/support modules that lack a specific hand-authored builder
 			var frame = MeshInstance3D.new()
@@ -6672,7 +6494,7 @@ static func _apply_tweak_deformations(type_id: String, parent: Node3D, tweaks: D
 	if children.is_empty(): return
 
 	match type_id:
-		"basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flamethrower", "tesla_coil", "ion_cannon", "heavy_laser", "laser_cannon", "plasma_lobber", "plasma_launcher", "ciws", "pd_laser", "point_defense_laser", "flak_cannon", "flak_battery", "drone_carrier", "resource_harvester", "repair_array", "sensor_suite", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "coil_gun", "autocannon", "napalm_mortar", "mine_layer", "ballista", "anti_materiel_rifle", "arc_projector", "microwave_emitter", "particle_lance", "spigot_mortar", "rocket_artillery", "hypervelocity_missile", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "chaff_dispenser", "laser_dazzler", "aps_interceptor", "aa_autocannon", "jammer_mast", "sentry_deployer", "sensor_beacon_launcher", "decoy_projector", "turbocharger", "overdrive_gearbox", "hub_motor_array", "nitrous_injector", "booster_rack", "grav_lifter_assist", "jet_thrusters":
+		"basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flamethrower", "ion_cannon", "heavy_laser", "laser_cannon", "plasma_lobber", "plasma_launcher", "ciws", "pd_laser", "point_defense_laser", "flak_cannon", "flak_battery", "drone_carrier", "resource_harvester", "repair_array", "sensor_suite", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "coil_gun", "autocannon", "napalm_mortar", "mine_layer", "ballista", "anti_materiel_rifle", "arc_projector", "microwave_emitter", "particle_lance", "spigot_mortar", "rocket_artillery", "hypervelocity_missile", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "aa_autocannon", "sensor_beacon_launcher", "turbocharger", "hub_motor_array", "nitrous_injector", "booster_rack":
 			return
 
 # Builds a wedge (triangular prism) mesh from a base_size Vector3.
@@ -7081,7 +6903,7 @@ static func _build_rocker_bogie(parent_node: Node3D, base_size: Vector3, base_co
 
 
 ## Air-cushion skirt: one continuous bag around the module's footprint, with
-## the lift fans set into the plenum deck above it.
+## the lift fans set into the sealed plenum deck above it.
 static func _build_air_cushion_skirt(parent_node: Node3D, base_size: Vector3, base_color: Color = Color(0.55, 0.52, 0.42), tweaks: Dictionary = {}):
 	var diameter := float(tweaks.get("skirt_diameter", 1.0))
 	var fans := int(tweaks.get("lift_fan_count", 3.0))
@@ -7091,58 +6913,63 @@ static func _build_air_cushion_skirt(parent_node: Node3D, base_size: Vector3, ba
 	var fx := float(tweaks.get("footprint_x", base_size.x))
 	var fz := float(tweaks.get("footprint_z", base_size.z))
 
-	# ONE skirt, wrapping the whole hull. acs_skirt is authored as a swept
-	# wedge around a UNIT rounded rectangle (half-extent 0.5), so scaling X and
-	# Z by the hull's own length and width lands the bag exactly on its bottom
-	# edge - see build_acs_skirt() in tools/blender/build_locomotion_rework.py.
-	# skirt_diameter now inflates it slightly PROUD of that edge rather than
-	# setting an absolute size, which is what it means on a part that has to
-	# match the hull it is fitted to.
+	const SKIRT_INNER_UNIT := 0.5
+	const AUTHORED_SECTION_HEIGHT := 0.52
+	var proud: float = 1.0 + 0.08 * (diameter - 1.0)
+	var depth: float = 0.86 * (0.85 + 0.30 * plenum)
+
+	# 1. Continuous rubber bag wrapping the lower hull chine
 	var skirt_mesh := _part("acs_skirt")
 	if skirt_mesh:
 		var skirt := _mesh_inst(skirt_mesh, base_color.darkened(0.35))
-		# SKIRT_INNER_UNIT is the authored half-extent of the bag's INNER
-		# wall - the face that laps the hull's sides - and build_acs_skirt()
-		# in tools/blender/build_locomotion_rework.py authors it at exactly
-		# this value. The two must change together. Scaling by the hull's own
-		# width and length therefore lands that wall flush on the hull's sides,
-		# with the outer bulge extending past it, which is correct: the bag is
-		# wider than the vehicle.
-		#
-		# Deliberately NOT fitted to the mesh's AABB, unlike the screw drum and
-		# the rocker arm. The AABB is the OUTER extent, and fitting that to the
-		# hull would tuck the bag under the floor - the exact "bottom-to-top"
-		# arrangement Chris asked to get away from.
-		const SKIRT_INNER_UNIT := 0.5
-		const AUTHORED_SECTION_HEIGHT := 0.52
-		var proud: float = 1.0 + 0.10 * (diameter - 1.0)
-		# Plenum pressure inflates the bag vertically rather than widening it -
-		# a separate axis from skirt_diameter, so both sliders read distinctly.
-		# Depth is its own number: tying it to the footprint made the bag
-		# deeper on longer hulls, which is not what a skirt does.
-		var depth: float = 0.86 * (0.85 + 0.30 * plenum)
 		skirt.scale = Vector3(
 			(fx * proud) / (SKIRT_INNER_UNIT * 2.0),
 			depth / AUTHORED_SECTION_HEIGHT,
 			(fz * proud) / (SKIRT_INNER_UNIT * 2.0))
+		skirt.position = Vector3(0, -depth * 0.40, 0)
 		parent_node.add_child(skirt)
 
+	# 2. Rubberized Plenum Sealing Deck / Collar
+	# Closes the interior opening of the bag and extends upward into the hull belly,
+	# ensuring an airtight visual seal on all hull geometries.
+	var deck := BoxMesh.new()
+	deck.size = Vector3(fx * 0.94, depth * 0.75, fz * 0.94)
+	var deck_inst := _mesh_inst(deck, base_color.darkened(0.65))
+	deck_inst.position = Vector3(0, -depth * 0.18, 0)
+	parent_node.add_child(deck_inst)
+
+	# Sealing rim flange overlapping the hull chine contact edge
+	var seal_lip := BoxMesh.new()
+	seal_lip.size = Vector3(fx * 1.01, 0.09, fz * 1.01)
+	var lip_inst := _mesh_inst(seal_lip, base_color.darkened(0.48))
+	lip_inst.position = Vector3(0, 0.02, 0)
+	parent_node.add_child(lip_inst)
+
+	# 3. Lift Fans set into the sealed plenum deck
 	var fan_mesh := _part("acs_lift_fan")
 	if fan_mesh:
+		var fan_s: float = (0.75 + 0.25 * diameter) * maxf(1.0, fx * 0.35)
 		for i in range(fans):
-			var fan_pivot := Node3D.new()
-			# Named so _animate_locomotion() spins it: a hovercraft with still
-			# fans is the same "is this broken?" read the frozen road wheels had.
-			fan_pivot.name = SPIN_PIVOT_TURBINE
-			# Spread down the vehicle's LENGTH inside the bag, which is where a
-			# hovercraft's lift fans actually sit - a ring of them made sense
-			# when each was its own module, but there is one plenum now.
 			var t: float = 0.0 if fans <= 1 else (float(i) / float(fans - 1)) - 0.5
-			fan_pivot.position = Vector3(0.0, 0.16, t * fz * 0.55)
+			var fan_pos := Vector3(0.0, 0.04, t * fz * 0.55)
+
+			# Protective cowling bezel ring
+			var cowl := CylinderMesh.new()
+			cowl.top_radius = fan_s * 0.46
+			cowl.bottom_radius = fan_s * 0.48
+			cowl.height = 0.14
+			var cowl_inst := _mesh_inst(cowl, Color(0.22, 0.23, 0.25))
+			cowl_inst.position = fan_pos
+			parent_node.add_child(cowl_inst)
+
+			var fan_pivot := Node3D.new()
+			fan_pivot.name = SPIN_PIVOT_TURBINE
+			fan_pivot.position = fan_pos
 			fan_pivot.rotation = Vector3(PI / 2.0, 0, 0)
 			parent_node.add_child(fan_pivot)
+
 			var fan := _mesh_inst(fan_mesh, Color(0.30, 0.32, 0.34))
-			fan.scale = Vector3.ONE * (0.75 + 0.25 * diameter) * maxf(1.0, fx * 0.35)
+			fan.scale = Vector3.ONE * fan_s
 			fan_pivot.add_child(fan)
 
 
@@ -7151,16 +6978,92 @@ static func _build_air_cushion_skirt(parent_node: Node3D, base_size: Vector3, ba
 ## motion cue is the ring - which is exactly why dropping the ring for speed
 ## is a visible trade and not just a number.
 static func _build_anti_grav_plate(parent_node: Node3D, base_size: Vector3, base_color: Color = Color(0.35, 0.65, 0.85), tweaks: Dictionary = {}):
-	build_mount_kit(parent_node, "anti_grav_plate", Color(0.32, 0.34, 0.37).lerp(base_color, 0.12), 1.0, float(tweaks.get("field_strength", 1.0)), float(tweaks.get("kit_reach", 0.0)), Vector3(float(tweaks.get("kit_anchor_x", 0.0)), float(tweaks.get("kit_anchor_y", 0.0)), float(tweaks.get("kit_anchor_z", 0.0))), tweaks)
 	var plates := int(tweaks.get("plate_count", 4.0))
 	var field := float(tweaks.get("field_strength", 1.0))
 	var has_ring: bool = bool(tweaks.get("stabilizer_ring", true))
+	var struct_color := Color(0.28, 0.30, 0.33).lerp(base_color, 0.08)
+
+	const HEAD_SCALE := 2.3
+	var pad_radius: float = 0.5 * HEAD_SCALE * (0.8 + 0.3 * field)
+
+	# 1. Radial Outrigger Pylon / Mounting Arm spanning from emitter hub to hull contact point
+	var anchor := Vector3(
+		float(tweaks.get("kit_anchor_x", tweaks.get("mount_reach_x", 0.0))),
+		float(tweaks.get("kit_anchor_y", tweaks.get("mount_reach_y", 0.0))),
+		float(tweaks.get("kit_anchor_z", tweaks.get("mount_reach_z", 0.0)))
+	)
+	var station := MountReachScript.station_from(tweaks)
+	var surface := MountReachScript.surface_for(parent_node)
+	
+	var dir_to_hull := anchor.normalized() if anchor.length_squared() > 0.001 else (-station).normalized()
+	var span_vec := dir_to_hull * (anchor.length() if anchor.length() > 0.05 else pad_radius)
+	var hull_normal := -dir_to_hull
+
+	if not surface.is_empty():
+		var eff_station := station
+		var hit: Dictionary = HullProjectionScript.raycast(surface, eff_station, dir_to_hull)
+		if hit.get("hit", false):
+			span_vec = hit["position"] - eff_station
+			hull_normal = hit["normal"]
+		else:
+			for pitch_deg in [-10.0, 10.0, -20.0, 20.0, -35.0, 35.0]:
+				var test_axis := Vector3.UP.cross(dir_to_hull)
+				if test_axis.length_squared() > 0.001:
+					test_axis = test_axis.normalized()
+					var test_dir := dir_to_hull.rotated(test_axis, deg_to_rad(pitch_deg))
+					var hit2: Dictionary = HullProjectionScript.raycast(surface, eff_station, test_dir)
+					if hit2.get("hit", false):
+						span_vec = hit2["position"] - eff_station
+						hull_normal = hit2["normal"]
+						break
+
+	var span_len: float = span_vec.length()
+	if span_len > 0.05:
+		var arm := Node3D.new()
+		arm.name = "MountArm"
+		parent_node.add_child(arm)
+		
+		# Look towards span vector
+		arm.look_at_from_position(Vector3.ZERO, span_vec, Vector3.UP)
+
+		var beam_thick: float = 0.22
+		var beam_reach: float = span_len + 0.08
+		var beam := BoxMesh.new()
+		beam.size = Vector3(beam_thick * 1.4, beam_thick * 1.1, 1.0)
+		var beam_inst := _mesh_inst(beam, struct_color)
+		beam_inst.position = Vector3(0, 0, -beam_reach * 0.5)
+		beam_inst.scale = Vector3(1, 1, beam_reach)
+		arm.add_child(beam_inst)
+
+		# Diagonal upper reinforcement gusset
+		var diag_strut := BoxMesh.new()
+		diag_strut.size = Vector3(beam_thick * 1.0, beam_thick * 0.7, 1.0)
+		var diag_inst := _mesh_inst(diag_strut, struct_color.darkened(0.1))
+		diag_inst.position = Vector3(0, beam_thick * 0.45, -beam_reach * 0.5)
+		diag_inst.scale = Vector3(1, 1, beam_reach * 0.9)
+		diag_inst.rotation = Vector3(deg_to_rad(-8.0), 0, 0)
+		arm.add_child(diag_inst)
+
+		# Heavy structural hull mounting flange bracket placed directly on hull contact point
+		# and oriented FLUSH and ALIGNED with the hull face normal!
+		var bracket := BoxMesh.new()
+		bracket.size = Vector3(beam_thick * 2.4, beam_thick * 2.2, beam_thick * 0.8)
+		var bracket_inst := _mesh_inst(bracket, struct_color.darkened(0.25).lightened(0.2))
+		bracket_inst.position = Vector3(span_vec.x, span_vec.y, span_vec.z)
+		
+		# Align bracket basis flush with hull normal
+		var b_norm := hull_normal.normalized()
+		if absf(b_norm.dot(Vector3.UP)) < 0.95:
+			var b_forward := -b_norm
+			var b_right := b_forward.cross(Vector3.UP).normalized()
+			var b_up := b_right.cross(b_forward).normalized()
+			bracket_inst.transform.basis = Basis(b_right, b_up, -b_forward)
+		parent_node.add_child(bracket_inst)
 
 	# PROMINENCE. Chris: both this and the hover pad "need to be larger and
 	# more prominent on the ends of their pylons". The emitter is the point of
 	# the module - the pylon is just what holds it out there - so the head
 	# grows and the mount does not.
-	const HEAD_SCALE := 2.3
 	var plate_mesh := _part("agp_plate")
 	if plate_mesh:
 		for i in range(plates):

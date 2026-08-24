@@ -14,11 +14,15 @@
 #   - Inner band (existing D13 verb wedges, unchanged): 12, 3, 6, 9 o'clock.
 #   - Outer band (new tweak stations): 1, 2, 4, 5, 7, 8, 10, 11 o'clock - the
 #     8 clock positions NOT already claimed by a verb wedge.
-# A module missing a given tweak simply leaves that station empty - stations
-# never compact toward each other, so the map stays memorizable across the
-# whole roster. A module with more than 8 tweaks overflows to a second radial
-# tier at the SAME angle (station distance + one panel height), not a ninth
-# angle - the 8 angular slots are the whole alphabet.
+# A module missing a given tweak simply leaves that station empty. When two
+# of one module's tweaks share an angle (the table is per NAME, so collisions
+# across names are expected - rotary cannon's barrel_count and motor_size both
+# live at 11), the newcomer takes the nearest free outer-band station first:
+# the first layer fills before anything builds outward. Only when all eight
+# are taken does a second tier open at the canonical angle (station distance +
+# one panel height) - the 8 angular slots are the whole alphabet, the tier is
+# the overflow valve. Claiming lives in ModuleActionRing.add_tweak_station,
+# which owns what is already placed for this module.
 #
 # No class_name - same convention as module_volume.gd / hull_surface.gd:
 # class_name globals aren't reliable in scripts that can run headless before
@@ -99,10 +103,12 @@ const TWEAK_ANGLES := {
 	"front_axle_size": CLOCK_10,
 	"fuse_setting": CLOCK_11,
 	"grid_size": CLOCK_1,
+	"ground_coupling": CLOCK_2,
 	"hangar_size": CLOCK_2,
 	"hatch_width": CLOCK_4,
 	"helix_depth": CLOCK_5,
 	"hopper_depth": CLOCK_7,
+	"housing_girth": CLOCK_11,
 	"intake_size": CLOCK_8,
 	"launch_catapult": CLOCK_10,
 	"leg_count": CLOCK_11,
@@ -129,6 +135,7 @@ const TWEAK_ANGLES := {
 	"pressure_valve": CLOCK_8,
 	"projector_diameter": CLOCK_10,
 	"prop_count": CLOCK_11,
+	"pylon_height": CLOCK_8,
 	"radar_dish": CLOCK_2,
 	"radar_size": CLOCK_4,
 	"reactor_length": CLOCK_7,
@@ -142,10 +149,13 @@ const TWEAK_ANGLES := {
 	"radiator_fins": CLOCK_10,
 	"core_diameter": CLOCK_2,
 	"heatsink_fins": CLOCK_7,
+	"scan_arc": CLOCK_10,
 	"seeker_size": CLOCK_11,
+	"survey_radius": CLOCK_4,
 	"skirt_diameter": CLOCK_1,
 	"stabilizer_ring": CLOCK_2,
 	"tread_width": CLOCK_4,
+	"track_count": CLOCK_7,
 	"tube_count": CLOCK_5,
 	"turbine_compression": CLOCK_7,
 	"warhead_size": CLOCK_8,
@@ -155,6 +165,7 @@ const TWEAK_ANGLES := {
 	"wing_sweep": CLOCK_2,
 	"wingspan": CLOCK_4,
 	"ammo": CLOCK_5,
+	"drone_type": CLOCK_12,
 }
 
 

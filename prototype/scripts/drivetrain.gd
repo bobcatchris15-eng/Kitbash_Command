@@ -129,13 +129,11 @@ const UNDERLOAD_CEILING := 1.25
 const UNDERLOAD_EXPONENT := 0.7
 
 ## Ceiling on the combined top_speed_mult from every propulsion part fitted
-## (turbocharger, overdrive_gearbox, hub_motor_array, ...). Without a cap,
-## stacking gearboxes is strictly the answer to every speed question a
+## (turbocharger, hub_motor_array, ...). Without a cap, stacking boost parts
+## is strictly the answer to every speed question a
 ## player has - this is the same "an unbounded multiplier makes the whole
 ## rest of the system optional" failure OVERLOAD_FLOOR/UNDERLOAD_CEILING
 ## already guard against, applied to the newest multiplier in the chain.
-## 1.6 chosen so two Overdrive Gearboxes (1.18 each, ~1.39 combined) still
-## has headroom, but four or more genuinely hits the wall.
 const MAX_CHASSIS_SPEED_MULT := 1.6
 
 ## Per-locomotor tweak response, replacing the if/elif chain that used to sit
@@ -217,12 +215,6 @@ const TWEAK_RESPONSE := {
 	# count tweak: it is pad size, so it needs its own factor.
 	"hover_engine": [
 		{"keys": ["emv_level", "size"], "ref": 1.0, "thrust": 0.0, "capacity": 1.0},
-	],
-	# Unlike hover's emv_level, turbine compression is real work being done -
-	# a more compressed core pushes harder, and a physically larger core
-	# carries more, so it earns both. engine_count is a count; omitted.
-	"fixed_wing_engine": [
-		{"keys": ["turbine_compression"], "ref": 1.0, "thrust": 1.0, "capacity": 1.0},
 	],
 	"ornithopter_wing": [
 		{"keys": ["wingspan", "size"], "ref": 1.0, "thrust": 1.0, "capacity": 1.0},
@@ -359,26 +351,9 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	# cost nothing in combat.
 	var armor_wt_mult: float = 1.0
 	var weight: float = ModuleCatalog.compute_hull_weight(hull_type, thickness, material, hull_scale, armor_wt_mult)
-	# Add the painted armor plan's weight on top of the base hull weight.
-	# ArmorPaint.analyze() already computes this from the armor_plan meta;
-	# we add it here so the design's total weight (and therefore speed/load)
-	# reflects painted facets without altering the hull's base weight.
-	var armor_plan_wt: float = 0.0
-	var plan: Dictionary = hull_node.get_meta("armor_plan", {}) if is_instance_valid(hull_node) else {}
-	if not plan.is_empty() and not bool(plan.get("empty", true)):
-		# Re-use ArmorPaint's weight computation without the
-		# side-coverage / coverage overhead.
-		var facets: Dictionary = plan.get("facets", {})
-		for fid in facets.keys():
-			var a: Dictionary = facets[fid]
-			var data = ModuleCatalog.get_module_data(str(a.get("type_id", "")))
-			if data.is_empty(): continue
-			# ARMOR_REFERENCE_AREA is the area one catalog row's stats buy
-			# in square metres (see armor_paint.gd line 49).
-			var ref_area := ArmorPaint.ARMOR_REFERENCE_AREA
-			var units: float = (float(a.get("area", 0.0)) / ref_area) * float(a.get("thickness", 1.0))
-			armor_plan_wt += float(data.get("weight", 0.0)) * units
-	weight += armor_plan_wt
+	# Painted armor adds NO weight: the paint types are cosmetic likenesses
+	# (see ArmorPaint.PAINT_TYPE_IDS). Their catalog stat rows were retired;
+	# only the hull's own material/thickness plate weighs anything.
 	# The locomotor is treated as a self-contained system "tuned for the
 	# unit" (Chris, 2026-08-16): its carrying capacity is for what it
 	# carries beyond the chassis baseline, not for the chassis itself.
@@ -401,7 +376,7 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 
 	var factors := tweak_factors(loco_type, loco_settings)
 
-	# Propulsion parts (turbocharger, overdrive_gearbox, hub_motor_array, ...)
+	# Propulsion parts (turbocharger, hub_motor_array, ...)
 	# raise the chassis ceiling and/or trade capacity for it, on top of the
 	# thrust_bonus/weight_capacity_bonus hooks below. Multiplicative and
 	# accumulated across every part fitted, then clamped once at the end -

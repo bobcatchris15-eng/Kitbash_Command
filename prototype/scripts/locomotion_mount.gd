@@ -166,6 +166,30 @@ static func rebuild(placer: Node3D, type_id: String, settings: Dictionary) -> Ar
 				if type_id in BELT_TYPES:
 					local_pos = _offset_belt(local_pos, frame, hull_size, profile, settings)
 
+		if type_id == "air_cushion_skirt" and HullChineScript.is_valid(profile):
+			var chine_pts: Array[Dictionary] = HullChineScript.chine_run(profile, 1.0, 8)
+			var y_sum := 0.0
+			var max_w := 0.0
+			var min_z := INF
+			var max_z := -INF
+			for cp in chine_pts:
+				var pos_c: Vector3 = cp["position"]
+				y_sum += pos_c.y
+				max_w = maxf(max_w, absf(pos_c.x) * 2.0)
+				min_z = minf(min_z, pos_c.z)
+				max_z = maxf(max_z, pos_c.z)
+			var avg_y: float = y_sum / float(maxi(1, chine_pts.size()))
+			var aabb_prof: AABB = profile.get("aabb", AABB())
+			var belly_y: float = aabb_prof.position.y if aabb_prof.size != Vector3.ZERO else avg_y
+			
+			local_pos.y = avg_y
+			if max_w > 0.1:
+				geo["footprint_x"] = max_w
+			if (max_z - min_z) > 0.1:
+				geo["footprint_z"] = max_z - min_z
+			geo["chine_y"] = avg_y
+			geo["belly_y"] = belly_y
+
 		# Published for every station, not just seated ones: an airborne type is
 		# exactly the case that needs to solve its own reach DOWN to the hull, and
 		# it is never seated.
@@ -241,6 +265,26 @@ static func rebuild(placer: Node3D, type_id: String, settings: Dictionary) -> Ar
 static func clear(placer: Node3D) -> int:
 	if not is_instance_valid(placer.hull):
 		return 0
+	# Remove any AGP running gear and BlimpEnvelope nodes from the hull and its hierarchy
+	var agp_nodes: Array[Node] = placer.hull.find_children("AGPRunningGear", "Node3D", true, false)
+	for agp in agp_nodes:
+		agp.queue_free()
+		if agp.get_parent():
+			agp.get_parent().remove_child(agp)
+	var blimp_nodes: Array[Node] = placer.hull.find_children("BlimpEnvelope", "Node3D", true, false)
+	for b in blimp_nodes:
+		b.queue_free()
+		if b.get_parent():
+			b.get_parent().remove_child(b)
+	if placer.hull.get_parent():
+		var parent_agp: Node = placer.hull.get_parent().get_node_or_null("AGPRunningGear")
+		if parent_agp:
+			parent_agp.queue_free()
+			placer.hull.get_parent().remove_child(parent_agp)
+		var parent_blimp: Node = placer.hull.get_parent().get_node_or_null("BlimpEnvelope")
+		if parent_blimp:
+			parent_blimp.queue_free()
+			placer.hull.get_parent().remove_child(parent_blimp)
 	var removed := 0
 	for child in placer.hull.get_children():
 		if not child.has_meta("module_data"):
@@ -315,6 +359,8 @@ static func _chine_profile(hull: Node3D) -> Dictionary:
 ## the bilge, while rotors, fixed wings, ornithopter shoulders and envelope pods
 ## mount above or around the hull and have no business being dragged down to it.
 static func _seats_to_chine(type_id: String) -> bool:
+	if type_id in ["hover_engine", "anti_grav_plate", "air_cushion_skirt"]:
+		return false
 	return ModuleCatalog.locomotion_touches_ground(type_id)
 
 

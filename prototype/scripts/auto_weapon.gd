@@ -183,10 +183,9 @@ var targets_allies: bool = false
 
 # Energy weapons (ENERGY_AND_BALANCE_SPEC.md #4/#5): cost the FIRING unit's
 # own current_energy per shot (checked/spent via spend_energy() on the
-# vehicle root, duck-typed) and, for tesla_coil/ion_cannon, drain the
-# TARGET's energy pool alongside HP damage. arc_projector is the dedicated
-# pure-drain weapon.
-const ENERGY_WEAPON_TYPES = ["tesla_coil", "arc_projector", "ion_cannon", "microwave_emitter", "particle_lance", "heavy_laser", "pd_laser", "laser_dazzler", "gauss_railgun", "coil_gun", "plasma_lobber"]
+# vehicle root, duck-typed) and, for ion_cannon, drain the TARGET's energy
+# pool alongside HP damage. arc_projector is the dedicated pure-drain weapon.
+const ENERGY_WEAPON_TYPES = ["arc_projector", "ion_cannon", "microwave_emitter", "particle_lance", "heavy_laser", "pd_laser", "gauss_railgun", "coil_gun", "plasma_lobber"]
 var energy_cost_per_shot: float = 0.0
 var energy_drain_per_shot: float = 0.0
 
@@ -202,7 +201,7 @@ var energy_drain_per_shot: float = 0.0
 # because the two concepts are the same thing. A weapon that dealt energy
 # damage without a capacitor cost, or vice versa, would still belong in only
 # one of these two lists.
-const ENERGY_DAMAGE_CLASS_TYPES = ["tesla_coil", "arc_projector", "ion_cannon", "heavy_laser", "plasma_lobber", "pd_laser", "microwave_emitter", "particle_lance", "laser_dazzler", "jammer_mast"]
+const ENERGY_DAMAGE_CLASS_TYPES = ["arc_projector", "ion_cannon", "heavy_laser", "plasma_lobber", "pd_laser", "microwave_emitter", "particle_lance"]
 
 # --- Ammunition (ModuleCatalog.AMMO_TYPES) ---
 # A design-time payload choice stored in the module's own tweaks dict,
@@ -250,12 +249,10 @@ const SMOKE_DISCHARGER_LIFETIME: float = 16.0
 const ILLUM_RADIUS: float = 16.0
 const ILLUM_LIFETIME: float = 12.0
 
-# The APS joins the true munition-interceptors. The AA autocannon
-# deliberately does NOT: it engages AIRCRAFT, which is a different job, and
-# putting it here would have made it ignore the thing it exists to shoot.
-# The dazzler and jammer are counter-guidance rather than interceptors -
-# they never destroy a munition, so they are not PD in this sense either.
-const PD_WEAPON_TYPES = ["ciws", "pd_laser", "flak_cannon", "aps_interceptor"]
+# The true munition-interceptors. The AA autocannon deliberately is NOT one:
+# it engages AIRCRAFT, which is a different job, and putting it here would
+# have made it ignore the thing it exists to shoot.
+const PD_WEAPON_TYPES = ["ciws", "pd_laser", "flak_cannon"]
 # FABLE_REVIEW.md 1.8: the point-defense family finally gets a real anti-AIR
 # identity (previously "flak = AA" was pure flavor - nothing anywhere
 # distinguished air targets, and PD per-shot damage rounded to zero against
@@ -383,7 +380,7 @@ func _deal_weapon_damage(t: Node3D, amount: float):
 
 	# EMP shells drain the target's capacitor alongside their (deliberately
 	# feeble) structural damage, reusing the exact drain_energy() contract
-	# tesla_coil/arc_projector already established.
+	# arc_projector already established.
 	if ammo_type == "emp" and t.has_method("drain_energy"):
 		t.drain_energy(amount * 1.5)
 
@@ -763,7 +760,7 @@ func _ready():
 		elevation_down_limit = ModuleCatalog.get_elevation_down(type_id, data.tweaks)
 
 
-		if type_id in ["basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "ciws", "coil_gun", "autocannon", "ballista", "anti_materiel_rifle", "hypervelocity_missile", "aa_autocannon", "aps_interceptor"]:
+		if type_id in ["basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "ciws", "coil_gun", "autocannon", "ballista", "anti_materiel_rifle", "hypervelocity_missile", "aa_autocannon"]:
 			damage_class = "kinetic"
 		elif type_id in ["artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flak_cannon", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "mine_layer", "spigot_mortar", "rocket_artillery", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile"]:
 			damage_class = "explosive"
@@ -861,7 +858,7 @@ func _ready():
 			energy_cost_per_shot = per_shot_damage * 0.4
 			if type_id == "arc_projector":
 				energy_drain_per_shot = per_shot_damage * 1.5
-			elif type_id in ["tesla_coil", "ion_cannon", "microwave_emitter"]:
+			elif type_id in ["ion_cannon", "microwave_emitter"]:
 				energy_drain_per_shot = per_shot_damage * 0.5
 			else:
 				energy_drain_per_shot = 0.0
@@ -1437,9 +1434,9 @@ func _fire_at_target():
 	var sfx_name = "cannon"
 	match type_id:
 		"basic_cannon", "artillery", "flak_cannon", "plasma_lobber", "recoilless_rifle", "ballista", "napalm_mortar", "anti_materiel_rifle", "spigot_mortar": sfx_name = "cannon"
-		"heavy_machine_gun", "rotary_cannon", "ciws", "autocannon", "mk19_grenade_launcher", "aa_autocannon", "aps_interceptor": sfx_name = "machine_gun"
-		"gauss_railgun", "heavy_laser", "pd_laser", "tesla_coil", "arc_projector", "ion_cannon", "coil_gun", "microwave_emitter", "particle_lance", "laser_dazzler", "jammer_mast": sfx_name = "laser"
-		"guided_missile", "missile_pod", "cluster_dispenser", "smoke_discharger", "mine_layer", "hypervelocity_missile", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "rocket_artillery", "chaff_dispenser", "sentry_deployer", "sensor_beacon_launcher", "decoy_projector": sfx_name = "missile"
+		"heavy_machine_gun", "rotary_cannon", "ciws", "autocannon", "mk19_grenade_launcher", "aa_autocannon": sfx_name = "machine_gun"
+		"gauss_railgun", "heavy_laser", "pd_laser", "arc_projector", "ion_cannon", "coil_gun", "microwave_emitter", "particle_lance": sfx_name = "laser"
+		"guided_missile", "missile_pod", "cluster_dispenser", "smoke_discharger", "mine_layer", "hypervelocity_missile", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "rocket_artillery", "sensor_beacon_launcher": sfx_name = "missile"
 		"resource_harvester", "repair_array": sfx_name = "harvest"
 	if get_node_or_null("/root/AudioManager"):
 		get_node("/root/AudioManager").play_sfx_3d(sfx_name, global_position, null, 50.0)
@@ -1472,22 +1469,10 @@ func _fire_at_target():
 			_fire_bunker_buster()
 		"cruise_missile":
 			_fire_cruise_missile()
-		"chaff_dispenser":
-			_fire_chaff_dispenser()
-		"laser_dazzler":
-			_fire_laser_dazzler()
-		"aps_interceptor":
-			_fire_aps_interceptor()
 		"aa_autocannon":
 			_fire_aa_autocannon()
-		"jammer_mast":
-			_fire_jammer_mast()
-		"sentry_deployer":
-			_fire_sentry_deployer()
 		"sensor_beacon_launcher":
 			_fire_sensor_beacon_launcher()
-		"decoy_projector":
-			_fire_decoy_projector()
 		"missile_pod":
 			_fire_swarm_missiles()
 		"drone_carrier":
@@ -1528,8 +1513,6 @@ func _fire_at_target():
 			_fire_resource_harvester_tether()
 		"repair_array":
 			_fire_repair_array_beam()
-		"tesla_coil":
-			_fire_tesla_coil()
 		"arc_projector":
 			_fire_arc_projector()
 		"microwave_emitter":
@@ -2070,102 +2053,6 @@ func _target_carries_sensors(t: Node) -> bool:
 
 # --- Roster expansion: point defense, deployables ---------------------------
 
-# Chaff: a consumable cloud that breaks seeker locks. Deliberately NOT smoke -
-# it does not obscure vision at all, it only breaks locks, and it is gone
-# almost immediately. Reuses SmokeVolume with a short lifetime because the
-# lock-break machinery (weapon_missile's seeker check) already keys off that
-# volume; a parallel "chaff volume" would duplicate it for no gain.
-const CHAFF_CLOUD_RADIUS: float = 5.0
-const CHAFF_CLOUD_LIFETIME: float = 3.5
-
-func _fire_chaff_dispenser():
-	var parent = _effects_parent()
-	if parent == null: return
-	var up = global_transform.basis.y.normalized()
-	var forward = -global_transform.basis.z.normalized()
-	var burst = global_position + up * 1.6 + forward * 1.2
-	SmokeVolume.spawn(parent, burst, CHAFF_CLOUD_RADIUS, CHAFF_CLOUD_LIFETIME)
-	# Visual: a fast bright scatter rather than a rolling cloud.
-	#
-	# COSMETIC, despite chaff having a very real simulation effect. The lock
-	# breaking is done entirely by the SmokeVolume spawned above, whose radius
-	# and lifetime are constants - the flecks are decoration flying away from
-	# it and touch nothing a missile's seeker reads.
-	for i in range(10):
-		var fleck = MeshInstance3D.new()
-		fleck.mesh = MunitionPool.unit_sphere()
-		fleck.material_override = MunitionPool.emissive(Color(0.9, 0.9, 0.85), Color(0.8, 0.8, 0.75), 0.6)
-		parent.add_child(fleck)
-		fleck.global_position = burst
-		fleck.scale = Vector3.ONE * 0.10
-		var dir = Vector3(randf_range(-1, 1), randf_range(-0.2, 1.0), randf_range(-1, 1)).normalized()
-		var ft = create_tween()
-		ft.tween_property(fleck, "global_position", burst + dir * CHAFF_CLOUD_RADIUS * 0.8, 0.5)
-		ft.parallel().tween_property(fleck, "scale", Vector3.ZERO, 0.5)
-		ft.finished.connect(func(): if is_instance_valid(fleck): fleck.queue_free())
-
-# Dazzler: blinds seekers in a narrow cone in front of it. Breaks the lock of
-# any missile whose flight path it is looking down, which is the directional
-# counterpart to chaff's omnidirectional puff.
-const DAZZLER_HALF_ANGLE: float = 0.30
-
-func _fire_laser_dazzler():
-	var parent = _effects_parent()
-	if parent == null: return
-	var forward = -global_transform.basis.z.normalized()
-	var my_team = get_team()
-
-	for m in get_tree().get_nodes_in_group("missiles"):
-		if not is_instance_valid(m):
-			continue
-		if m.has_meta("team") and my_team != -1 and m.get_meta("team") == my_team:
-			continue
-		var to_m = m.global_position - global_position
-		if to_m.length() > fire_range:
-			continue
-		if forward.angle_to(to_m.normalized()) > DAZZLER_HALF_ANGLE:
-			continue
-		# Break its lock rather than destroying it - it keeps flying, dumb.
-		if "_lock_broken" in m and not m._lock_broken:
-			m._lock_broken = true
-			m._dumb_heading = -m.global_transform.basis.z.normalized()
-
-	var beam = MeshInstance3D.new()
-	beam.mesh = MunitionPool.unit_cylinder()
-	beam.material_override = MunitionPool.emissive(laser_color, laser_color, 1.4)
-	parent.add_child(beam)
-	MunitionPool.aim_beam(beam, global_position, global_position + forward * fire_range, 0.05)
-	var bt = create_tween()
-	bt.tween_property(beam, "scale", Vector3(0.005, beam.scale.y, 0.005), 0.18)
-	bt.finished.connect(func(): if is_instance_valid(beam): beam.queue_free())
-
-# APS: hard kill. Destroys incoming munitions outright, but only very close -
-# it covers the whole arc at once instead of traversing, so its cost is range
-# rather than coverage.
-func _fire_aps_interceptor():
-	var parent = _effects_parent()
-	if parent == null: return
-	var my_team = get_team()
-	for m in get_tree().get_nodes_in_group("missiles"):
-		if not is_instance_valid(m):
-			continue
-		if m.has_meta("team") and my_team != -1 and m.get_meta("team") == my_team:
-			continue
-		if global_position.distance_to(m.global_position) > fire_range:
-			continue
-		if m.has_method("destroy_missile"):
-			var burst = MeshInstance3D.new()
-			burst.mesh = MunitionPool.unit_sphere()
-			burst.material_override = MunitionPool.emissive(laser_color, laser_color, 2.0)
-			parent.add_child(burst)
-			burst.global_position = m.global_position
-			burst.scale = Vector3.ONE * 0.7
-			var t = create_tween()
-			t.tween_property(burst, "scale", Vector3.ZERO, 0.18)
-			t.finished.connect(func(): if is_instance_valid(burst): burst.queue_free())
-			m.destroy_missile(true)
-			return
-
 # AA autocannon: a real gun that happens to prefer aircraft. Fires a flak
 # burst that damages air targets in a small radius, so near misses still
 # count - which is what makes it useful against something fast.
@@ -2175,47 +2062,6 @@ func _fire_aa_autocannon():
 	_fire_kinetic_projectile(0.035, 0.40, 0.10, laser_color, true)
 	if is_instance_valid(target) and _target_is_airborne(target):
 		_deal_aoe_damage(target.global_position, AA_FLAK_RADIUS, dps * fire_rate)
-
-# Jammer: a passive aura, so "firing" is just a periodic sweep that degrades
-# every hostile guided round in radius. No projectile, no aiming.
-func _fire_jammer_mast():
-	var parent = _effects_parent()
-	if parent == null: return
-	var my_team = get_team()
-	for m in get_tree().get_nodes_in_group("missiles"):
-		if not is_instance_valid(m):
-			continue
-		if m.has_meta("team") and my_team != -1 and m.get_meta("team") == my_team:
-			continue
-		if global_position.distance_to(m.global_position) > fire_range:
-			continue
-		# Degrade rather than break: the missile slows and wanders, so a
-		# jammer makes guided weapons unreliable instead of useless.
-		if "speed" in m:
-			m.speed = maxf(3.0, m.speed * 0.94)
-		if "salvo_jitter" in m:
-			m.salvo_jitter = maxf(m.salvo_jitter, 1.4)
-
-	var ring = MeshInstance3D.new()
-	ring.mesh = MunitionPool.unit_sphere()
-	ring.material_override = MunitionPool.alpha(Color(0.55, 0.85, 0.90, 0.10))
-	parent.add_child(ring)
-	ring.global_position = global_position
-	ring.scale = Vector3.ONE * 0.4
-	var rt = create_tween()
-	rt.tween_property(ring, "scale", Vector3.ONE * fire_range, 0.6)
-	rt.parallel().tween_property(ring, "scale:y", 0.4, 0.6)
-	rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
-
-# Sentry deployer: drops an autonomous turret that keeps fighting after the
-# carrier has gone. Built on proximity_mine's self-contained lifecycle model -
-# it must outlive the vehicle that placed it.
-func _fire_sentry_deployer():
-	var parent = _effects_parent()
-	if parent == null: return
-	var back = global_transform.basis.z.normalized()
-	var drop = global_position + back * 1.4 - Vector3(0, 0.4, 0)
-	DeployedSentry.spawn(parent, drop, get_team(), dps * fire_rate, fire_range)
 
 # Sensor beacon: lobs a beacon that reveals fog where it lands. Reuses
 # skirmish.reveal_area(), the same beacon system illumination ammo uses.
@@ -2307,16 +2153,6 @@ func _fire_sensor_beacon_launcher():
 	var _carrier_name := String(get_parent().name) if get_parent() != null else "?"
 	BattleLogger.beacon_fired(_carrier_name, aim)
 	_fire_sensor_beacon_toward(aim)
-
-# Decoy: deploys a false contact that draws fire. Registers in the same
-# groups an enemy scans for, so no AI change is needed - the AI shoots it
-# because as far as target selection is concerned it IS a target.
-func _fire_decoy_projector():
-	var parent = _effects_parent()
-	if parent == null: return
-	var back = global_transform.basis.z.normalized()
-	var spot = global_position + back * 2.2
-	DecoyContact.spawn(parent, spot, get_team())
 
 func _fire_drone_swarm():
 	# Real autonomous drones (drone_unit.gd), not tweened throwaway meshes -
@@ -2887,8 +2723,6 @@ func _fire_napalm_mortar():
 # is a real, persistent world entity that outlives its layer - see
 # proximity_mine.gd.
 const ProximityMine = preload("res://scripts/proximity_mine.gd")
-const DeployedSentry = preload("res://scripts/deployed_sentry.gd")
-const DecoyContact = preload("res://scripts/decoy_contact.gd")
 
 func _fire_mine_layer():
 	var parent = _effects_parent()
@@ -3087,42 +2921,10 @@ func _fire_repair_array_beam():
 	timer.timeout.connect(func(): if is_instance_valid(beam): beam.queue_free())
 
 # --- Energy weapons (ENERGY_AND_BALANCE_SPEC.md #4/#5) ---
-# All three drain the TARGET's current_energy (duck-typed via
-# has_method("drain_energy")) on top of whatever HP damage they deal -
-# energy_drain_per_shot/energy_cost_per_shot are computed once in _ready()
-# from the weapon's own dps*fire_rate, see there for the formula.
-
-func _fire_tesla_coil():
-	# A little silly on purpose (Chris's explicit invitation) - a zigzag
-	# chain-lightning bolt built from a handful of jittered segments,
-	# rather than a straight beam like every other weapon.
-	var segments = 5
-	var prev_pos = global_position + Vector3(0, 0.5, 0)
-	var end_pos = target.global_position
-	for i in range(1, segments + 1):
-		var t = float(i) / float(segments)
-		var pos = global_position.lerp(end_pos, t)
-		if i < segments:
-			# COSMETIC. The zigzag is drawn, not traced - damage is dealt to
-			# `target` directly below regardless of where the segments wandered,
-			# and the last segment is deliberately unjittered so the bolt still
-			# terminates on the target.
-			pos += Vector3(randf_range(-0.4, 0.4), randf_range(-0.3, 0.3), randf_range(-0.4, 0.4))
-		var bolt = MeshInstance3D.new()
-		bolt.mesh = MunitionPool.unit_cylinder()
-		bolt.material_override = MunitionPool.emissive(laser_color, laser_color, 1.5)
-		_effects_parent().add_child(bolt)
-		MunitionPool.aim_beam(bolt, prev_pos, pos, 0.05)
-		var bt = create_tween()
-		bt.tween_interval(0.1)
-		bt.finished.connect(func(): if is_instance_valid(bolt): bolt.queue_free())
-		prev_pos = pos
-
-	if is_instance_valid(target):
-		_deal_weapon_damage(target, dps * fire_rate)
-		if target.has_method("drain_energy"):
-			target.drain_energy(energy_drain_per_shot)
-		_spawn_explosion_visual(end_pos, 0.5, laser_color)
+# arc_projector/ion_cannon/microwave_emitter drain the TARGET's current_energy
+# (duck-typed via has_method("drain_energy")) on top of whatever HP damage
+# they deal - energy_drain_per_shot/energy_cost_per_shot are computed once in
+# _ready() from the weapon's own dps*fire_rate, see there for the formula.
 
 func _fire_arc_projector():
 	# The dedicated pure-drain "disable" weapon - minor HP damage, big

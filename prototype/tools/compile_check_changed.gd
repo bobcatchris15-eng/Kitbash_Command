@@ -18,6 +18,7 @@ const FILES := [
 	"res://scripts/armor_station_panel.gd",
 	"res://scripts/hull_facets.gd",
 	"res://scripts/part_materials.gd",
+	"res://scripts/design_stats.gd",
 ]
 
 func _init():

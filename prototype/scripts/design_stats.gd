@@ -148,24 +148,9 @@ static func analyze(hull: Node3D) -> Dictionary:
 	out["hull_hp"] = ModuleCatalog.compute_hull_max_hp(
 		hull_type, armor_thickness, armor_material, hull_scale
 	)
-	# Add the painted armor plan's HP on top of the base hull HP.
-	# The armor_plan meta stores facet assignments from the paint station;
-	# each facet contributes its type's reference HP scaled by area/thickness,
-	# matching the same computation that ArmorPaint.analyze() uses for weight.
-	var armor_hp: float = 0.0
-	var plan: Dictionary = hull.get_meta("armor_plan", {})
-	if not plan.is_empty() and not bool(plan.get("empty", true)):
-		var facets: Dictionary = plan.get("facets", {})
-		for fid in facets.keys():
-			var a: Dictionary = facets[fid]
-			var data = ModuleCatalog.get_module_data(str(a.get("type_id", "")))
-			if data.is_empty(): continue
-			# ARMOR_REFERENCE_AREA is the area one catalog row's stats buy
-			# in square metres (see armor_paint.gd line 49).
-			var ref_area := 4.0
-			var units: float = (float(a.get("area", 0.0)) / ref_area) * float(a.get("thickness", 1.0))
-			armor_hp += float(data.get("hp", 0.0)) * units
-	out["hull_hp"] += armor_hp
+	# Painted armor adds NO HP: the paint types are cosmetic likenesses (see
+	# ArmorPaint.PAINT_TYPE_IDS). Their catalog stat rows were retired; the
+	# hull's own material/thickness plate is the whole armor pool.
 
 	var hull_cost = ModuleCatalog.compute_hull_cost(
 		hull_type, armor_thickness, armor_material, hull_scale

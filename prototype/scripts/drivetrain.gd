@@ -504,7 +504,7 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	else:
 		power_top_speed = INF
 
-	# Propulsion parts' capacity trade (overdrive_gearbox's tall gearing, for
+	# Propulsion parts' capacity trade (a tall-geared booster's -15%, for
 	# instance) lands on the raw chassis capacity, same place the leg-set and
 	# per-locomotor tweak factors already land - so it participates in
 	# load_ratio/overload/underload exactly like any other capacity change.

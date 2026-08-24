@@ -23,86 +23,6 @@
 	},
 	"modules": [
 		{
-			"facet": "",
-			"facet_size": {},
-			"mount_normal": {
-				"x": 0.0,
-				"y": 1.0,
-				"z": 0.0
-			},
-			"mount_style": "",
-			"name": "Tracked Treads",
-			"position": {
-				"x": -2.2,
-				"y": -1.2,
-				"z": 0.0
-			},
-			"rotation": {
-				"x": 0.0,
-				"y": 0.0,
-				"z": 0.0
-			},
-			"scale": {
-				"x": 1.0,
-				"y": 1.0,
-				"z": 1.0
-			},
-			"scale_flip_x": true,
-			"sponson": false,
-			"stats": {
-				"cost_crystal": 0,
-				"cost_metal": 52,
-				"dps": 0.0,
-				"hp": 160.0,
-				"weight": 150.0
-			},
-			"tweaks": {
-				"tread_width": 1.3
-			},
-			"type_id": "tracked_treads",
-			"yaw_offset": 0.0
-		},
-		{
-			"facet": "",
-			"facet_size": {},
-			"mount_normal": {
-				"x": 0.0,
-				"y": 1.0,
-				"z": 0.0
-			},
-			"mount_style": "",
-			"name": "Tracked Treads",
-			"position": {
-				"x": 2.2,
-				"y": -1.2,
-				"z": 0.0
-			},
-			"rotation": {
-				"x": 0.0,
-				"y": 0.0,
-				"z": 0.0
-			},
-			"scale": {
-				"x": 1.0,
-				"y": 1.0,
-				"z": 1.0
-			},
-			"scale_flip_x": false,
-			"sponson": false,
-			"stats": {
-				"cost_crystal": 0,
-				"cost_metal": 52,
-				"dps": 0.0,
-				"hp": 160.0,
-				"weight": 150.0
-			},
-			"tweaks": {
-				"tread_width": 1.3
-			},
-			"type_id": "tracked_treads",
-			"yaw_offset": 0.0
-		},
-		{
 			"facet": "top",
 			"facet_size": {},
 			"mount_normal": {
@@ -130,15 +50,15 @@
 			"scale_flip_x": false,
 			"sponson": false,
 			"stats": {
-				"cost_crystal": 0,
-				"cost_metal": 54,
+				"cost_crystal": 0.0,
+				"cost_metal": 54.0,
 				"dps": 73.0,
 				"hp": 100.0,
 				"weight": 145.5
 			},
 			"tweaks": {
-				"caliber": 1.2,
-				"barrel_length": 1.3
+				"barrel_length": 1.3,
+				"caliber": 1.2
 			},
 			"type_id": "basic_cannon",
 			"yaw_offset": 0.0
@@ -171,14 +91,138 @@
 			"scale_flip_x": false,
 			"sponson": false,
 			"stats": {
-				"cost_crystal": 0,
-				"cost_metal": 15,
+				"cost_crystal": 0.0,
+				"cost_metal": 15.0,
 				"dps": 32.5,
 				"hp": 60.0,
 				"weight": 40.0
 			},
 			"tweaks": {},
 			"type_id": "heavy_machine_gun",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Tracked Treads",
+			"position": {
+				"x": -2.32887482643127,
+				"y": -0.891708791255951,
+				"z": 0.0
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
+			"scale_flip_x": true,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 64,
+				"dps": 0.0,
+				"hp": 200.0,
+				"weight": 192.0
+			},
+			"tweaks": {
+				"chine_belly_drop": 0.0742911696434021,
+				"chine_clear_x": 0.0743087530136108,
+				"chine_flank_height": 1.77100139856339,
+				"chine_half_width": 1.79999995231628,
+				"chine_normal_x": 0.707106828689575,
+				"chine_normal_y": -0.707106828689575,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.707106828689575,
+				"chine_up_y": 0.707106828689575,
+				"drive_sprocket": true,
+				"kit_anchor_x": 0.504000067710876,
+				"kit_anchor_y": 0.73415994644165,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.579599976539612,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": -2.32887482643127,
+				"station_y": -0.891708791255951,
+				"station_z": 0.0,
+				"target_length": 5.89999961853027,
+				"tread_width": 1.3
+			},
+			"type_id": "tracked_treads",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Tracked Treads",
+			"position": {
+				"x": 2.32887482643127,
+				"y": -0.891691148281097,
+				"z": 0.0
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
+			"scale_flip_x": false,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 64,
+				"dps": 0.0,
+				"hp": 200.0,
+				"weight": 192.0
+			},
+			"tweaks": {
+				"chine_belly_drop": 0.0743088126182556,
+				"chine_clear_x": 0.0742912292480469,
+				"chine_flank_height": 1.77098375558853,
+				"chine_half_width": 1.79999995231628,
+				"chine_normal_x": 0.707106828689575,
+				"chine_normal_y": -0.707106828689575,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.707106828689575,
+				"chine_up_y": 0.707106828689575,
+				"drive_sprocket": true,
+				"kit_anchor_x": -0.504000067710876,
+				"kit_anchor_y": 0.73415994644165,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.579599976539612,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": 2.32887482643127,
+				"station_y": -0.891691148281097,
+				"station_z": 0.0,
+				"target_length": 5.89999961853027,
+				"tread_width": 1.3
+			},
+			"type_id": "tracked_treads",
 			"yaw_offset": 0.0
 		}
 	],

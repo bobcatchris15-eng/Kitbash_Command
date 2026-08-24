@@ -138,12 +138,14 @@ const LAYOUTS := {
 		"node_scale": Vector3.ONE,
 	},
 	"heavy_quad_tracks": {
-		"pattern": Pattern.SIDE_PAIRS, "per_side": 2,
-		"geo_keys": {"tread_width": 1.5, "drive_sprocket": true},
+		"pattern": Pattern.SIDE_PAIRS, "per_side": 1,
+		"geo_keys": {"tread_width": 1.0, "track_count": 4.0},
 		"geo_aliases": {"tread_width": ["width", "size"]},
+		"hull_length_geo_key": "target_length",
 		"normal_is_side": true,
 		"mirror": true,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 	"legs": {
 		"pattern": Pattern.SIDE_PAIRS,
@@ -242,7 +244,8 @@ const LAYOUTS := {
 		"hull_length_geo_key": "target_length",
 		"normal_is_side": true,
 		"mirror": true,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 	"rocker_bogie": {
 		"pattern": Pattern.SIDE_PAIRS, "per_side": 1,
@@ -250,7 +253,8 @@ const LAYOUTS := {
 		"hull_length_geo_key": "target_length",
 		"normal_is_side": true,
 		"mirror": true,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 	"air_cushion_skirt": {
 		# FOOTPRINT, not RING_XZ. A hovercraft's bag is ONE continuous loop
@@ -276,13 +280,9 @@ const LAYOUTS := {
 		"geo_keys": {"drum_diameter": 1.0, "helix_depth": 1.0},
 		"geo_aliases": {"drum_diameter": ["drum_width", "size"]},
 		"normal_is_side": true,
-		# mirror was missing. build_wheel_mount() authors the gearbox and
-		# driveshaft at NEGATIVE local X (inboard), which is only inboard on
-		# the starboard side - without the flip the port assembly reached out
-		# away from the hull instead of into it (Chris). Every other type that
-		# uses that mount already sets this.
 		"mirror": true,
-		"scale_mode": ScaleMode.HULL_RELATIVE,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
 	},
 }
 
@@ -426,8 +426,8 @@ const MAX_WIDTH_FACTOR := {
 	# Ground contact: the running gear must sit under the vehicle, not beside
 	# it. Measured tracked/wheeled types already land at ~1.1-1.25x, so this is
 	# a ceiling the well-behaved types never touch.
-	"wheels": 1.5, "tracked_treads": 1.62, "half_track": 1.5,
-	"rocker_bogie": 1.6, "screw_drive": 1.9,
+	"wheels": 1.5, "tracked_treads": 0.0, "half_track": 0.0,
+	"heavy_quad_tracks": 0.0, "rocker_bogie": 0.0, "screw_drive": 0.0,
 	# A walker legitimately stands wider than its body - that IS the stance -
 	# but 2.69x read as a spider rather than a vehicle.
 	"legs": 1.9,

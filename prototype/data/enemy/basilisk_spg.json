@@ -1,31 +1,54 @@
 {
-	"version": 1.0,
-	"id": "enemy_basilisk_spg",
-	"name": "Basilisk SPG",
-	"hull_type": "rackham_heavy_a",
-	"hull_scale": {"x": 1.0, "y": 1.0, "z": 1.0},
-	"hull_size": {"x": 4.5, "y": 2.3, "z": 7.5},
 	"armor_material": "hardened_steel",
 	"armor_thickness": 1.4,
 	"faction": "industrialists",
+	"hull_scale": {
+		"x": 1.0,
+		"y": 1.0,
+		"z": 1.0
+	},
+	"hull_size": {
+		"x": 4.5,
+		"y": 2.3,
+		"z": 7.5
+	},
+	"hull_type": "rackham_heavy_a",
+	"id": "enemy_basilisk_spg",
 	"locomotion": {
-		"type_id": "tracked_treads",
-		"settings": {"width": 1.5, "drive_sprocket": true}
+		"settings": {
+			"drive_sprocket": true,
+			"width": 1.5
+		},
+		"type_id": "tracked_treads"
 	},
 	"modules": [
 		{
-			"type_id": "artillery",
-			"name": "Artillery",
-			"position": {"x": 0.0, "y": 1.18, "z": -0.4},
-			"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
-			"scale": {"x": 1.0, "y": 1.0, "z": 1.0},
-			"yaw_offset": 0.0,
-			"mount_normal": {"x": 0.0, "y": 1.0, "z": 0.0},
-			"mount_style": "turret",
 			"facet": "top",
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "turret",
+			"name": "Artillery",
+			"position": {
+				"x": 0.0,
+				"y": 1.18,
+				"z": -0.4
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
 			"stats": {
-				"cost_crystal": 18,
-				"cost_metal": 180,
+				"cost_crystal": 18.0,
+				"cost_metal": 180.0,
 				"dps": 162.0,
 				"hp": 150.0,
 				"weight": 450.0
@@ -33,58 +56,170 @@
 			"tweaks": {
 				"barrel_length": 1.5,
 				"caliber": 1.2
-			}
+			},
+			"type_id": "artillery",
+			"yaw_offset": 0.0
 		},
 		{
-			"type_id": "ciws",
-			"name": "CIWS Gatling PD",
-			"position": {"x": 1.2, "y": 1.18, "z": 1.8},
-			"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
-			"scale": {"x": 1.0, "y": 1.0, "z": 1.0},
-			"yaw_offset": 0.0,
-			"mount_normal": {"x": 0.0, "y": 1.0, "z": 0.0},
-			"mount_style": "turret",
 			"facet": "top",
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "turret",
+			"name": "CIWS Gatling PD",
+			"position": {
+				"x": 1.2,
+				"y": 1.18,
+				"z": 1.8
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
 			"stats": {
-				"cost_crystal": 15,
-				"cost_metal": 40,
+				"cost_crystal": 15.0,
+				"cost_metal": 40.0,
 				"dps": 10.0,
 				"hp": 80.0,
 				"weight": 90.0
 			},
-			"tweaks": {}
+			"tweaks": {},
+			"type_id": "ciws",
+			"yaw_offset": 0.0
 		},
 		{
-			"type_id": "tracked_treads",
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
 			"name": "Tracked Treads",
-			"position": {"x": -2.45, "y": -1.15, "z": 0.0},
-			"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
-			"scale": {"x": 1.0, "y": 1.0, "z": 2.0},
-			"yaw_offset": 0.0,
+			"position": {
+				"x": -3.01639413833618,
+				"y": -1.01937222480774,
+				"z": 0.0
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
+			"scale_flip_x": true,
+			"sponson": false,
 			"stats": {
 				"cost_crystal": 0,
-				"cost_metal": 40,
+				"cost_metal": 64,
 				"dps": 0.0,
 				"hp": 200.0,
-				"weight": 120.0
+				"weight": 192.0
 			},
-			"tweaks": {}
+			"tweaks": {
+				"chine_belly_drop": 0.119127750396729,
+				"chine_clear_x": 0.119172334671021,
+				"chine_flank_height": 1.89307218790054,
+				"chine_half_width": 2.25,
+				"chine_normal_x": 0.707106709480286,
+				"chine_normal_y": -0.707106828689575,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.707106828689575,
+				"chine_up_y": 0.707106709480286,
+				"drive_sprocket": true,
+				"kit_anchor_x": 0.629999995231628,
+				"kit_anchor_y": 0.865260004997253,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.683099985122681,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": -3.01639413833618,
+				"station_y": -1.01937222480774,
+				"station_z": 0.0,
+				"target_length": 7.5,
+				"tread_width": 1.5
+			},
+			"type_id": "tracked_treads",
+			"yaw_offset": 0.0
 		},
 		{
-			"type_id": "tracked_treads",
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
 			"name": "Tracked Treads",
-			"position": {"x": 2.45, "y": -1.15, "z": 0.0},
-			"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},
-			"scale": {"x": 1.0, "y": 1.0, "z": 2.0},
-			"yaw_offset": 0.0,
+			"position": {
+				"x": 3.01639413833618,
+				"y": -1.01932775974274,
+				"z": 0.0
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
+			"scale_flip_x": false,
+			"sponson": false,
 			"stats": {
 				"cost_crystal": 0,
-				"cost_metal": 40,
+				"cost_metal": 64,
 				"dps": 0.0,
 				"hp": 200.0,
-				"weight": 120.0
+				"weight": 192.0
 			},
-			"tweaks": {}
+			"tweaks": {
+				"chine_belly_drop": 0.119172215461731,
+				"chine_clear_x": 0.119127750396729,
+				"chine_flank_height": 1.89302772283554,
+				"chine_half_width": 2.25,
+				"chine_normal_x": 0.707106709480286,
+				"chine_normal_y": -0.707106828689575,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.707106828689575,
+				"chine_up_y": 0.707106709480286,
+				"drive_sprocket": true,
+				"kit_anchor_x": -0.629999995231628,
+				"kit_anchor_y": 0.865260004997253,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.683099985122681,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": 3.01639413833618,
+				"station_y": -1.01932775974274,
+				"station_z": 0.0,
+				"target_length": 7.5,
+				"tread_width": 1.5
+			},
+			"type_id": "tracked_treads",
+			"yaw_offset": 0.0
 		}
-	]
+	],
+	"name": "Basilisk SPG",
+	"version": 1.0
 }

@@ -41,7 +41,7 @@ const MountReachScript = preload("res://scripts/mount_reach.gd")
 ## clear the hull's belly to reach the ground and clear its flank so the sprockets
 ## are not buried in the side - so the chine is the reference these are measured
 ## FROM, not the point they sit at.
-const BELT_TYPES := ["tracked_treads", "half_track"]
+const BELT_TYPES := ["tracked_treads", "half_track", "heavy_quad_tracks"]
 
 ## How far a belt stands outboard of the hull's widest point as a fraction of
 ## hull width so the track clears the flank.
@@ -125,6 +125,15 @@ static func rebuild(placer: Node3D, type_id: String, settings: Dictionary) -> Ar
 	# each section it slices, so a paired pattern asking for the same z twice -
 	# once per side, which is most of them - pays for the slice once.
 	var profile: Dictionary = _chine_profile(hull)
+	var aabb_mesh: AABB = profile.get("aabb", AABB())
+	if aabb_mesh.size != Vector3.ZERO:
+		hull_size = aabb_mesh.size * hull_scale
+		hull_height_factor = clampf(hull_size.y / ModuleCatalog.REFERENCE_HULL_SIZE.y, 0.45, 2.25)
+		hull_footprint_factor = clampf(sqrt(
+			(hull_size.x * hull_size.z)
+			/ (ModuleCatalog.REFERENCE_HULL_SIZE.x * ModuleCatalog.REFERENCE_HULL_SIZE.z)),
+			0.45, 2.25)
+
 	var seats_to_chine := _seats_to_chine(type_id)
 
 	var layout_ctx := {
@@ -155,7 +164,7 @@ static func rebuild(placer: Node3D, type_id: String, settings: Dictionary) -> Ar
 				_write_frame_geo(geo, frame, bool(station["mirror"]))
 				seated = true
 				if type_id in BELT_TYPES:
-					local_pos = _offset_belt(local_pos, frame, hull_size, profile)
+					local_pos = _offset_belt(local_pos, frame, hull_size, profile, settings)
 
 		# Published for every station, not just seated ones: an airborne type is
 		# exactly the case that needs to solve its own reach DOWN to the hull, and
@@ -254,7 +263,7 @@ static func clear(placer: Node3D) -> int:
 ## the geometry that is actually there - the gap to `half_width` is the hull's own
 ## bulge above the chine, and `belly_drop` is how much hull hangs below it. Both
 ## are zero on a slab-sided box and both matter on a chamfered or keeled one.
-static func _offset_belt(pos: Vector3, frame: Dictionary, hull_size: Vector3, profile: Dictionary = {}) -> Vector3:
+static func _offset_belt(pos: Vector3, frame: Dictionary, hull_size: Vector3, profile: Dictionary = {}, settings: Dictionary = {}) -> Vector3:
 	var side: float = signf(pos.x)
 	if is_zero_approx(side):
 		side = 1.0
@@ -263,10 +272,11 @@ static func _offset_belt(pos: Vector3, frame: Dictionary, hull_size: Vector3, pr
 	if aabb.size != Vector3.ZERO:
 		widest_x = maxf(widest_x, aabb.size.x * 0.5)
 	var target_length: float = aabb.size.z if aabb.size != Vector3.ZERO else hull_size.z
-	var belt_scale: float = target_length / 2.0
+	var belt_scale: float = target_length / 7.0
 	var sprocket_scale: float = (0.46 * belt_scale) / 0.4
-	var sprocket_width: float = 0.3 * sprocket_scale
-	var station_x: float = widest_x + sprocket_width + 0.05
+	var width_val: float = float(settings.get("tread_width", settings.get("width", settings.get("size", 1.0))))
+	var sprocket_width: float = 0.3 * sprocket_scale * width_val
+	var station_x: float = widest_x + sprocket_width + 0.02
 	var out: float = station_x - absf(pos.x)
 	return Vector3(pos.x + side * maxf(0.0, out), pos.y, pos.z)
 
@@ -275,11 +285,15 @@ static func _placer_ready(placer: Node3D) -> bool:
 	return placer != null and is_instance_valid(placer.hull)
 
 
-## The hull's fitted AABB, which is what the collider carries - set by
-## _place_hull_from_ui / update_hull_appearance from the real mesh extents, not
-## from the catalog's design-time box. Falls back to the reference hull when
-## there is no shape yet, matching the pre-extraction behaviour exactly.
+## The hull's fitted AABB from its actual visible mesh. Falls back to
+## CollisionShape3D and then to the reference hull.
 static func _hull_box(hull: Node3D) -> Vector3:
+	var mesh_inst := MountReachScript._find_mesh_instance(hull)
+	if mesh_inst and mesh_inst.mesh:
+		var aabb: AABB = mesh_inst.get_aabb()
+		if aabb.size.length_squared() > 0.001:
+			var hscale: Vector3 = hull.get_meta("hull_scale") if hull.has_meta("hull_scale") else Vector3.ONE
+			return aabb.size * hscale
 	var shape := hull.get_node_or_null("CollisionShape3D")
 	if shape and shape.shape is BoxShape3D:
 		return (shape.shape as BoxShape3D).size
@@ -287,10 +301,9 @@ static func _hull_box(hull: Node3D) -> Vector3:
 
 
 static func _chine_profile(hull: Node3D) -> Dictionary:
-	var mesh_inst := MountReachScript._find_mesh_instance(hull)
-	if mesh_inst == null or mesh_inst.mesh == null:
+	if hull == null:
 		return {}
-	return HullChineScript.build(mesh_inst)
+	return HullChineScript.build(hull)
 
 
 ## Whether this type's stations belong on the chine.

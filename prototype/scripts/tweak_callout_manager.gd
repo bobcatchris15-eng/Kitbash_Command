@@ -255,6 +255,36 @@ func _generate_locomotion_radial_tweaks(module: Node3D, data: ModuleDataResource
 			count_max = 6.0
 			count_step = 1.0
 			count_val = float(settings.get("prop_count", 2))
+		elif type_id == "half_track":
+			count_key = "bogie_count"
+			count_min = 2.0
+			count_max = 5.0
+			count_step = 1.0
+			count_val = float(settings.get("bogie_count", 3))
+		elif type_id == "rocker_bogie":
+			count_key = "bogie_pairs"
+			count_min = 2.0
+			count_max = 5.0
+			count_step = 1.0
+			count_val = float(settings.get("bogie_pairs", 3))
+		elif type_id == "air_cushion_skirt":
+			count_key = "lift_fan_count"
+			count_min = 2.0
+			count_max = 6.0
+			count_step = 1.0
+			count_val = float(settings.get("lift_fan_count", 3))
+		elif type_id == "anti_grav_plate":
+			count_key = "plate_count"
+			count_min = 3.0
+			count_max = 8.0
+			count_step = 1.0
+			count_val = float(settings.get("plate_count", 4))
+		elif type_id == "heavy_quad_tracks":
+			count_key = "track_count"
+			count_min = 4.0
+			count_max = 6.0
+			count_step = 2.0
+			count_val = float(settings.get("track_count", 4))
 		else:
 			count_val = float(settings.get("count", 4))
 
@@ -527,18 +557,21 @@ func _apply_tweaks():
 	elif type_id == "half_track":
 		settings["tread_width"] = size_slider.value
 		settings["front_axle_size"] = lab.blade_pitch_slider.value
-		settings["bogie_pairs"] = int(count_slider.value)
+		settings["bogie_count"] = int(count_slider.value)
 	elif type_id == "rocker_bogie":
 		settings["wheel_size"] = size_slider.value
 		settings["arm_length"] = lab.blade_pitch_slider.value
-		settings["bogie_count"] = int(count_slider.value)
+		settings["bogie_pairs"] = int(count_slider.value)
 	elif type_id == "air_cushion_skirt":
 		settings["skirt_diameter"] = size_slider.value
 		settings["plenum_pressure"] = lab.blade_pitch_slider.value
 		settings["lift_fan_count"] = int(count_slider.value)
 	elif type_id == "anti_grav_plate":
 		settings["field_strength"] = size_slider.value
-		settings["coil_count"] = int(count_slider.value)
+		settings["plate_count"] = int(count_slider.value)
+	elif type_id == "heavy_quad_tracks":
+		settings["tread_width"] = size_slider.value
+		settings["track_count"] = int(count_slider.value)
 
 	root.update_locomotion(type_id, settings)
 	lab.update_stats(hull)

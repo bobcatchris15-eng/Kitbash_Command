@@ -718,7 +718,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		match type_id:
 			"wheels": _build_wheels(parent_node, base_size, base_color, tweaks)
 			"tracked_treads": _build_tracked_treads(parent_node, base_size, base_color, tweaks)
-			"heavy_quad_tracks": _build_tracked_treads(parent_node, base_size, base_color, tweaks)
+			"heavy_quad_tracks": _build_heavy_quad_tracks(parent_node, base_size, base_color, tweaks)
 			"helicopter_rotors": _build_helicopter_rotors(parent_node, base_size, base_color, tweaks)
 			"hover_engine": _build_hover_engine(parent_node, base_size, base_color, tweaks)
 			"legs": _build_legs(parent_node, base_size, base_color, tweaks)
@@ -4266,21 +4266,22 @@ static func _build_tracked_treads(parent_node: Node3D, base_size: Vector3, base_
 
 	var outboard_x = 0.0
 
-	# Pin front and rear sprockets to the front and rear corners of the visible hull mesh
-	var front_z: float = -target_length * 0.5
-	var rear_z: float = target_length * 0.5
-	var span: float = target_length
-
-	var belt_scale: float = span / (BELT_HALF_SPAN * 2.0)
+	# Sprocket center hubs are pulled in by one full diameter (2 radii)
+	# from the front and back ends of the hull.
+	var belt_scale: float = target_length / (BELT_HALF_SPAN * 2.0 + BELT_DRIVE_RADIUS * 4.0)
 	var sprocket_scale: float = (BELT_DRIVE_RADIUS * belt_scale) / 0.4
 	var sprocket_width_authored: float = 0.3
 	var sprocket_radius: float = BELT_DRIVE_RADIUS * belt_scale
 
-	var belt_center_x: float = outboard_x - sprocket_width_authored * 0.5 * sprocket_scale
+	var front_z: float = -target_length * 0.5 + 2.0 * sprocket_radius
+	var rear_z: float = target_length * 0.5 - 2.0 * sprocket_radius
+	var span: float = rear_z - front_z
 
-	# Lower the track assembly so the upper side of the sprockets aligns with
-	# the hull's lower chine (Y = 0 in module local space).
-	var loop_center_y: float = -sprocket_radius
+	var belt_center_x: float = outboard_x - sprocket_width_authored * 0.5 * sprocket_scale * width
+
+	# Pin the track assembly and sprocket center hubs directly at the
+	# hull's lower chine (Y = 0 in module local space).
+	var loop_center_y: float = 0.0
 
 	# Match radius of treads radius curves to wheels + 5% (1.05 * sprocket_radius)
 	var tread_arc_radius: float = sprocket_radius * 1.05
@@ -4312,13 +4313,19 @@ static func _build_tracked_treads(parent_node: Node3D, base_size: Vector3, base_
 		var shaft_thickness := 0.0
 
 		if is_sprocket:
-			var sp_inboard_x: float = outboard_x - sprocket_width_authored * sprocket_scale
+			var sp_inboard_x: float = outboard_x - sprocket_width_authored * sprocket_scale * width
 			var trap_mesh := _make_trapezoid_gearbox_mesh(r)
 			var trap_inst := _mesh_inst(trap_mesh, base_color.darkened(0.15).lightened(0.25))
 			trap_inst.position = Vector3(sp_inboard_x, axle_y, z_pos)
 			parent_node.add_child(trap_inst)
 
 			var w: float = r * 1.05
+			# If the trapezoidal gearbox already touches or intersects the hull skin,
+			# no driveshaft extension is needed.
+			var trap_reach := MountReachScript.solve(parent_node, station, Vector3(sp_inboard_x, axle_y, z_pos), Vector3.LEFT, -1.0, node_scale, 0.0)
+			if trap_reach > 0.0 and trap_reach <= w + 0.05:
+				return
+
 			bottom_target = Vector3(sp_inboard_x - w, axle_y, z_pos)
 			shaft_thickness = r * 0.70
 		else:
@@ -4340,7 +4347,7 @@ static func _build_tracked_treads(parent_node: Node3D, base_size: Vector3, base_
 			elif absf(z_pos) > 0.1:
 				z_bias = -signf(z_pos) * 0.35
 
-			var elev_angles := [35.0, 45.0, 25.0, 55.0, 15.0, 0.0]
+			var elev_angles := [35.0, 45.0, 25.0, 55.0, 15.0, 0.0, -15.0, -25.0]
 			var z_offsets := [z_bias, z_bias * 1.4, z_bias * 0.6, 0.0, -z_bias * 0.5]
 			for el in elev_angles:
 				var r_el := deg_to_rad(el)
@@ -5790,36 +5797,9 @@ static func _build_buoyant_envelope(parent_node: Node3D, base_size: Vector3, bas
 
 
 static func _build_screw_drive(parent_node: Node3D, base_size: Vector3, base_color: Color = Color.DARK_GOLDENROD, tweaks: Dictionary = {}):
-	# Rebuilt (Chris's ask, 2026-07-24, two passes): drum_width/drum_count
-	# are gone - just two tweaks now (drum_diameter, helix_depth). Each end
-	# now terminates in an explicit gearbox housing, corner-mounted:
-	# The reach-solved diagonal braces are gone. Each end now carries the
-	# SAME assembly the wheels and pontoons use - build_wheel_mount()'s
-	# angled driveshaft into an inboard gearbox - pinned at the hull corner
-	# and descending from there, with the drum slung between the two
-	# gearboxes (Chris's ask: "give the amphibious screw drive those same
-	# gearboxes and struts... then the drum and helix between the
-	# gearboxes"). That mount needs no mount_reach_* channel at all, because
-	# it reaches into the hull by construction rather than by measurement -
-	# see build_wheel_mount()'s own comment.
-	# drum_length (internal) is the corner-to-corner span - the
-	# gearboxes sit at exactly +-drum_length/2 (the corners' own Z), and
-	# the drum's authored tapered tip (which lands at 0.65x the fitted
-	# length, not the full span - see fit_length below) is
-	# scaled to land at that exact same point, so the cone visually plugs
-	# straight into the gearbox face instead of floating short of or past
-	# it ("pin the ends of the cones to the gearbox faces... stretch the
-	# drum between the cones", Chris's ask).
-	#
-	# helix_depth can't continuously re-deform a single baked mesh at
-	# runtime, so it picks among 3 discrete authored variants (shallow/
-	# standard/deep flighting) rather than a smooth scale, the same way
-	# blade_count picks a literal blade count instead of stretching one
-	# blade.
 	var diameter = tweaks.get("drum_diameter", tweaks.get("drum_width", tweaks.get("size", 1.0)))
 	var depth = tweaks.get("helix_depth", 1.0)
-	var span = tweaks.get("drum_length", base_size.z) # corner-to-corner distance
-	var fit_length = span
+	var span = tweaks.get("drum_length", base_size.z) # total hull length
 
 	var drum_variant = "screw_drum"
 	if depth < 0.85:
@@ -5830,84 +5810,102 @@ static func _build_screw_drive(parent_node: Node3D, base_size: Vector3, base_col
 	if not drum_mesh:
 		drum_mesh = _part("screw_drum")
 
-	# Diameter comes off the HULL, not the catalog base_size. A screw drive is
-	# the thing the vehicle rides on, so its drum has to be sized against the
-	# vehicle - the catalog number is a fixed placeholder that came out as a
-	# thin rod under anything bigger than a scout ("the screw is too small",
-	# Chris). drum_bore is the hull's own height, from locomotion_layout.gd.
 	var bore: float = float(tweaks.get("drum_bore", base_size.y))
-	# GIRTH is the drum's own business. mount_ref, NOT drum_d, sizes the
-	# gearboxes and sets how deep the hub hangs - fattening the auger 3x
-	# (Chris) should not also triple the housings and shove the hull into the
-	# sky. The drum thickens about a centreline that stays put.
 	var mount_ref: float = bore * 0.46 * float(diameter)
-	# 2.1, down 30% from 3.0 (Chris) - at 3x the drums read as the vehicle and
-	# the hull as cargo.
 	var drum_d: float = mount_ref * 2.1
-	var actual_size = Vector3(drum_d, drum_d, fit_length)
+	var drum_radius: float = drum_d * 0.5
 
+	# Pin gearboxes at 10% in from each end of the hull (80% total span)
+	var front_z: float = -span * 0.40
+	var rear_z: float = span * 0.40
+	var gearbox_span: float = rear_z - front_z
+
+	# 1.5 drum radii out from the hull
+	var outboard_x: float = 1.5 * drum_radius
+	var hub_y: float = -mount_ref * 0.75
+
+	var station := MountReachScript.station_from(tweaks)
+	var node_scale := MountReachScript.node_scale_from(tweaks)
+
+	var gb_mesh := _part("wheel_gearbox")
+	var ds_mesh := _part("wheel_driveshaft")
+	var gb_sz: float = 0.50 * mount_ref
+
+	for z_end in [front_z, rear_z]:
+		if gb_mesh:
+			var gb := _mesh_inst(gb_mesh, base_color.darkened(0.1).lightened(0.3))
+			gb.scale = Vector3(gb_sz, gb_sz, gb_sz * 1.2)
+			gb.position = Vector3(outboard_x, hub_y, z_end)
+			parent_node.add_child(gb)
+
+		if ds_mesh:
+			var bottom_target := Vector3(outboard_x - 0.5 * gb_sz, hub_y, z_end)
+			var z_aim: float = 0.20 if z_end < 0.0 else -0.20
+			var c_dirs: Array[Vector3] = [
+				Vector3(-cos(deg_to_rad(45.0)), sin(deg_to_rad(45.0)), z_aim).normalized(),
+				Vector3(-cos(deg_to_rad(45.0)), sin(deg_to_rad(45.0)), 0.0),
+				Vector3(-cos(deg_to_rad(30.0)), sin(deg_to_rad(30.0)), z_aim).normalized(),
+				Vector3(-cos(deg_to_rad(30.0)), sin(deg_to_rad(30.0)), 0.0),
+				Vector3(-1.0, 0.0, 0.0)
+			]
+			var best_dir := c_dirs[0]
+			var best_len := -1.0
+			for cd in c_dirs:
+				var l := MountReachScript.solve(parent_node, station, bottom_target, cd, -1.0, node_scale)
+				if l > 0.0:
+					best_dir = cd
+					best_len = l
+					break
+
+			# Reliable fallback if raycast missed chamfer edge
+			if best_len <= 0.0:
+				best_dir = Vector3(-cos(deg_to_rad(45.0)), sin(deg_to_rad(45.0)), z_aim).normalized()
+				best_len = (outboard_x / maxf(cos(deg_to_rad(45.0)), 0.1)) + 0.35 * mount_ref
+
+			var shaft := _mesh_inst(ds_mesh, base_color.darkened(0.25).lightened(0.35))
+			var top_pos := bottom_target + best_dir * best_len
+			var up_vec := best_dir
+			var side_vec := up_vec.cross(Vector3.FORWARD).normalized()
+			if side_vec.length_squared() < 0.001:
+				side_vec = Vector3.RIGHT
+			var fwd_vec := side_vec.cross(up_vec).normalized()
+			var shaft_thickness: float = 0.32 * mount_ref
+			shaft.transform = Transform3D(
+				Basis(side_vec * shaft_thickness, up_vec * best_len, fwd_vec * shaft_thickness),
+				top_pos
+			)
+			parent_node.add_child(shaft)
+
+	# Drum slung between gearboxes at outboard_x
 	var spin = Node3D.new()
 	spin.name = "ScrewSpin"
+	spin.position = Vector3(outboard_x, hub_y, 0)
 	parent_node.add_child(spin)
+
+	var drum_target_len: float = gearbox_span * 1.05
+	var actual_size = Vector3(drum_d, drum_d, drum_target_len)
 
 	var drum: MeshInstance3D
 	if drum_mesh:
 		drum = _mesh_inst(drum_mesh, base_color)
-		# Scale solved against the mesh's OWN measured AABB, not against
-		# hardcoded authored constants. Those constants said 0.29 across by
-		# 1.6 long; the re-authored drum is 0.66 by 1.895, and the three
-		# helix-depth variants differ in diameter from each other. So the
-		# drum came out ~2x too fat and ~10% short of the gearboxes, and no
-		# amount of adjusting the length target fixed it because the divisor
-		# was wrong. A measured fit cannot go stale the next time the mesh is
-		# re-authored, which is the actual lesson.
 		var da: AABB = drum_mesh.get_aabb()
 		drum.scale = Vector3(
 			actual_size.y / maxf(da.size.x, 0.001),
 			actual_size.y / maxf(da.size.y, 0.001),
-			# 1.04: the drum runs THROUGH each bearing housing rather than
-			# stopping on its centre, so the two read as assembled.
-			(span * 1.04) / maxf(da.size.z, 0.001))
+			drum_target_len / maxf(da.size.z, 0.001)
+		)
 	else:
 		drum = MeshInstance3D.new()
 		var cyl = CylinderMesh.new()
 		cyl.top_radius = actual_size.y * 0.4
 		cyl.bottom_radius = actual_size.y * 0.4
-		cyl.height = span
+		cyl.height = drum_target_len
 		drum.mesh = cyl
 		var mat = StandardMaterial3D.new()
 		mat.albedo_color = base_color
 		drum.material_override = mat
 		drum.rotation = Vector3(PI / 2.0, 0, 0)
 	spin.add_child(drum)
-
-	# One shared mount per end. `mount_s` sizes it so the gearbox housing
-	# (0.46 * mount_s across) comes out visibly LARGER than the drum it
-	# carries (0.85 * actual_size.y across) - a bearing block smaller than
-	# its own shaft reads as a part that could not possibly hold it.
-	# 1.5, not 2.2: at 2.2 the housing came out as wide as the drum itself and
-	# the strut as thick as a leg, so the mounting read as the main object and
-	# the auger as an accessory hung off it.
-	var mount_s: float = mount_ref * 1.5
-	# Hung a full drum-diameter below the hull rather than at the mount's own
-	# default depth: Chris wants the drums "spread out and low to hold the hull
-	# up above terrain", which is a longer strut, not a bigger gearbox.
-	# STRUT_INSET pulls the mounts in from the hull's very ends (Chris) - a
-	# bearing hung off the extreme corner reads as an afterthought bolted on,
-	# and the drum's tapered nose wants to overhang it anyway. The drum still
-	# spans the full length, so the ends now cantilever past the bearings the
-	# way a real auger does.
-	const STRUT_INSET := 0.86
-	var hub_y := 0.0
-	for z_end in [span * 0.5 * STRUT_INSET, -span * 0.5 * STRUT_INSET]:
-		var hub := build_wheel_mount(parent_node, base_color, mount_s, z_end,
-			mount_ref * 0.7, mount_ref * 1.0, tweaks)
-		hub_y = hub.y
-
-	# The drum hangs at the mounts' own hub line, not at the module origin,
-	# so its axis passes through both bearing bores instead of floating
-	# above them.
-	spin.position = Vector3(0, hub_y, 0)
 
 
 ## Geometric Polish Pass (Section 3): a real thinning taper for
@@ -6773,95 +6771,245 @@ static func _build_half_track(parent_node: Node3D, base_size: Vector3, base_colo
 	var bogies := int(tweaks.get("bogie_count", 3.0))
 	var front_size := float(tweaks.get("front_axle_size", 1.0))
 	var width := float(tweaks.get("tread_width", 1.0))
-	# The assembly spans the hull it is mounted on, like tracked_treads.
 	var target_length := float(tweaks.get("target_length", base_size.z))
 	var half := target_length * 0.5
 
-	# VERTICAL SIZE. Both parts are authored at a fixed depth (the belt loop
-	# spans ~0.43 in Blender Z, the tyre is 0.245 in radius), which against a
-	# real hull read as a paper ribbon with bicycle wheels (Chris: "the track
-	# and the wheel are too small vertically"). Depth is now a fraction of the
-	# assembly's own length, the same way tracked_treads derives everything
-	# from its belt span, so it stays in proportion on any hull.
-	const AUTHORED_LOOP_DEPTH := 0.43
+	const AUTHORED_LOOP_DEPTH := 0.430881
+	const AUTHORED_WHEEL_DIAM := 0.936
 	var depth: float = target_length * 0.22
 	var v_scale: float = depth / AUTHORED_LOOP_DEPTH
 
-	var axle_mesh := _part("ht_front_axle")
-	if axle_mesh:
-		# The steered wheel is a wheel, so it rolls - under its own named pivot
-		# like every other ground-contact drive element in the roster.
+	var station := MountReachScript.station_from(tweaks)
+	var node_scale := MountReachScript.node_scale_from(tweaks)
+
+	# 1. Front Steered Wheel (uses the exact same Wheel Hub mesh & mount as Wheel drive)
+	var wheel_mesh := _part("wheel_hub")
+	var gb_mesh := _part("wheel_gearbox")
+	var ds_mesh := _part("wheel_driveshaft")
+
+	# Scale wheel so its diameter matches the track bogie height
+	var wheel_s: float = (depth / AUTHORED_WHEEL_DIAM) * front_size
+	var wheel_radius: float = 0.468 * wheel_s
+	var front_wheel_z: float = -half + wheel_radius * 1.5
+
+	if wheel_mesh:
 		var axle_pivot := Node3D.new()
 		axle_pivot.name = SPIN_PIVOT_WHEEL
-		axle_pivot.position = Vector3(0, 0, -half + 0.30 * front_size * v_scale)
+		axle_pivot.position = Vector3(0.0, 0.0, front_wheel_z)
 		parent_node.add_child(axle_pivot)
-		var axle := _mesh_inst(axle_mesh, base_color.lightened(0.05))
-		# The steered wheel grows with the track it shares an axle line with -
-		# a half-track whose front wheel is half the height of its bogie looks
-		# like two vehicles spliced together.
-		axle.scale = Vector3(width * v_scale * 0.55, front_size * v_scale, front_size * v_scale)
-		axle_pivot.add_child(axle)
 
+		var wheel := _mesh_inst(wheel_mesh, Color(0.1, 0.1, 0.12))
+		wheel.scale = Vector3(wheel_s, wheel_s, wheel_s)
+		wheel.rotation = Vector3(0, 0, -PI / 2.0)
+		axle_pivot.add_child(wheel)
+
+		# Sturdy steering knuckle / gearbox affixed to inboard face of wheel hub
+		var front_gb_x: float = -0.18 * wheel_s
+		var gb_dim: float = 0.44 * wheel_s
+		if gb_mesh:
+			var front_gb := _mesh_inst(gb_mesh, base_color.darkened(0.1).lightened(0.3))
+			front_gb.scale = Vector3(gb_dim, gb_dim, gb_dim)
+			front_gb.position = Vector3(front_gb_x, 0.0, front_wheel_z)
+			parent_node.add_child(front_gb)
+
+		var front_reach := MountReachScript.solve(parent_node, station, Vector3(front_gb_x, 0.0, front_wheel_z), Vector3.LEFT, -1.0, node_scale, 0.0)
+		var front_touches_skin := (front_reach > 0.0 and front_reach <= gb_dim + 0.05)
+
+		if ds_mesh and not front_touches_skin:
+			var shaft_angle := deg_to_rad(45.0)
+			var shaft_dir := Vector3(-cos(shaft_angle), sin(shaft_angle), 0.0)
+			var bottom_target := Vector3(front_gb_x - 0.5 * gb_dim, 0.0, front_wheel_z)
+			var shaft_len := MountReachScript.solve(parent_node, station, bottom_target, shaft_dir, 1.2 * wheel_s, node_scale)
+			if shaft_len > 0.0:
+				var shaft := _mesh_inst(ds_mesh, base_color.darkened(0.25).lightened(0.35))
+				var top_pos := bottom_target + shaft_dir * shaft_len
+				var up_vec := shaft_dir
+				var side_vec := up_vec.cross(Vector3.FORWARD).normalized()
+				if side_vec.length_squared() < 0.001:
+					side_vec = Vector3.RIGHT
+				var fwd_vec := side_vec.cross(up_vec).normalized()
+				var shaft_thickness: float = 0.28 * wheel_s
+				shaft.transform = Transform3D(
+					Basis(side_vec * shaft_thickness, up_vec * shaft_len, fwd_vec * shaft_thickness),
+					top_pos
+				)
+				parent_node.add_child(shaft)
+
+	# 2. Track Bogie Portion
 	var bogie_mesh := _part("ht_track_bogie")
 	if bogie_mesh:
-		# ONE track, not one per bogie. This used to instance the authored
-		# bogie `bogies` times down the run, so what read as "the track" was
-		# actually three short closed loops parked nose to tail - every join
-		# between them showed two belt ends meeting, which is what made the
-		# front and back of the track portion look wrong (Chris). A half-track
-		# has a single belt; bogie_count now sets how LONG that belt is, which
-		# is the stat it was always standing in for.
-		var run: float = target_length * 0.42 * (1.0 + 0.16 * float(bogies - 3))
+		var run: float = target_length * 0.50 * (1.0 + 0.14 * float(bogies - 3))
 		var bogie_pivot := Node3D.new()
 		bogie_pivot.name = SPIN_PIVOT_TREAD
 		bogie_pivot.position = Vector3(0, 0, half - run * 0.5)
 		parent_node.add_child(bogie_pivot)
-		var bogie := _mesh_inst(bogie_mesh, base_color)
-		# Z is the fore/aft axis here, not Y: the parts are authored with
-		# Blender +Y forward, which imports as Godot -Z. Scaling Y instead
-		# squashed the assembly flat and left the track a paper ribbon.
-		# 0.9 is the authored frame length end to end.
-		bogie.scale = Vector3(width * v_scale * 0.55, v_scale, run / 0.9)
+
+		var bogie := _mesh_inst(bogie_mesh, Color(0.18, 0.18, 0.2))
+		# 20% narrower track width (1.24 factor instead of 1.55)
+		var bogie_width_scale: float = width * v_scale * 1.24
+		bogie.scale = Vector3(bogie_width_scale, v_scale, run / 1.2)
 		bogie_pivot.add_child(bogie)
 
-		# SUSPENSION STRUTS. Chris: "add a series of the struts on the inside
-		# attaching to the underside of the hull." The bogie carries its own
-		# mounting spine, but nothing visibly tied that spine to the vehicle -
-		# the track just floated alongside the hull edge.
-		#
-		# The module origin sits AT the hull's underside (that invariant again -
-		# see build_wheel_mount), so a strut running up and INBOARD from the
-		# track's top rail arrives inside the hull by construction; no reach
-		# solving, no hull measurement. mount_strut_tapered is authored along
-		# local +Y spanning 0..1, thin at the root and flaring at the far end,
-		# so it is oriented here by building a basis around the span vector -
-		# the same technique the rotor and hover pylons use.
-		var strut_mesh := _part("mount_strut_tapered")
-		if strut_mesh:
-			# One per bogie: the count that used to spawn a whole extra track
-			# now spawns the suspension station it always meant.
-			var n: int = maxi(2, bogies)
-			# Start at the top of the track's own frame and run a SHORT way up
-			# and inboard. First pass used a span of (-0.42, 0.30) * v_scale
-			# with a 0.14 * v_scale cross-section, which on a real hull came
-			# out as two great blades reaching most of the way to the
-			# centreline. A suspension strut is a short thick link between two
-			# things that are already almost touching.
-			var rail_y: float = 0.02 * v_scale
-			var strut_w: float = 0.10
-			for i in range(n):
-				var t: float = (float(i) + 0.5) / float(n)
-				var z: float = half - run * t
-				# Up and inboard, from the top of the track into the hull.
-				var span := Vector3(-0.16 * v_scale, 0.26 * v_scale, 0.0)
-				var len_s: float = span.length()
-				var dir: Vector3 = span / len_s
-				var right: Vector3 = dir.cross(Vector3.FORWARD).normalized()
-				var fwd: Vector3 = right.cross(dir).normalized()
-				var strut := _mesh_inst(strut_mesh, base_color.darkened(0.2))
+		# 3. Bulky, Sturdy Mounting Gear Affixed Directly to Track Inner Spine
+		var n: int = maxi(2, bogies)
+		var inner_spine_x: float = -0.025 * bogie_width_scale
+		var gb_sz: float = 0.36 * depth
+
+		for i in range(n):
+			var t: float = (float(i) + 0.5) / float(n)
+			var z_station: float = half - run * t
+
+			# Gearbox / mounting bracket seated directly against inner frame of track
+			var bogie_gb_x: float = inner_spine_x - 0.5 * gb_sz
+			if gb_mesh:
+				var bogie_gb := _mesh_inst(gb_mesh, base_color.darkened(0.15).lightened(0.25))
+				bogie_gb.scale = Vector3(gb_sz, gb_sz, gb_sz * 1.2)
+				bogie_gb.position = Vector3(bogie_gb_x, 0.0, z_station)
+				parent_node.add_child(bogie_gb)
+
+			# Check if gearbox is already touching the hull skin
+			var gb_reach := MountReachScript.solve(parent_node, station, Vector3(inner_spine_x, 0.0, z_station), Vector3.LEFT, -1.0, node_scale, 0.0)
+			var gb_touches_skin := (gb_reach > 0.0 and gb_reach <= gb_sz + 0.05)
+
+			# Only extend driveshaft if gearbox is not already in direct contact with skin
+			if ds_mesh and not gb_touches_skin:
+				var c_dirs: Array[Vector3] = [
+					Vector3(-cos(deg_to_rad(30.0)), sin(deg_to_rad(30.0)), 0.0),
+					Vector3(-cos(deg_to_rad(45.0)), sin(deg_to_rad(45.0)), 0.0),
+					Vector3(-cos(deg_to_rad(15.0)), sin(deg_to_rad(15.0)), 0.0),
+					Vector3(-1.0, 0.0, 0.0)
+				]
+				var start_pt := Vector3(bogie_gb_x - 0.5 * gb_sz, 0.0, z_station)
+				var best_dir := Vector3.ZERO
+				var best_len := -1.0
+				for cd in c_dirs:
+					var l := MountReachScript.solve(parent_node, station, start_pt, cd, -1.0, node_scale)
+					if l > 0.0:
+						best_dir = cd
+						best_len = l
+						break
+
+				if best_len > 0.0:
+					var strut := _mesh_inst(ds_mesh, base_color.darkened(0.3).lightened(0.3))
+					var top_p := start_pt + best_dir * best_len
+					var up_v := best_dir
+					var side_v := up_v.cross(Vector3.FORWARD).normalized()
+					if side_v.length_squared() < 0.001:
+						side_v = Vector3.RIGHT
+					var fwd_v := side_v.cross(up_v).normalized()
+					var strut_thick: float = 0.30 * depth
+					strut.transform = Transform3D(
+						Basis(side_v * strut_thick, up_v * best_len, fwd_v * strut_thick),
+						top_p
+					)
+					parent_node.add_child(strut)
+
+
+## Heavy Quad Tracks: 4 articulated track pods (2 per side).
+## Front sprocket pinned 1 radius in from front corner, covering 35% hull length.
+## Rear sprocket pinned 1 radius in from rear corner, covering 35% hull length.
+static func _build_heavy_quad_tracks(parent_node: Node3D, base_size: Vector3, base_color: Color = Color.DARK_SLATE_GRAY, tweaks: Dictionary = {}):
+	var width := float(tweaks.get("tread_width", 1.0))
+	var target_length := float(tweaks.get("target_length", base_size.z))
+	var half := target_length * 0.5
+
+	var total_count: int = int(tweaks.get("track_count", tweaks.get("pod_count", 4)))
+	var per_side: int = maxi(2, int(total_count / 2))
+
+	const AUTHORED_LOOP_DEPTH := 0.430881
+	var depth: float = target_length * 0.20
+	var v_scale: float = depth / AUTHORED_LOOP_DEPTH
+	var bogie_width_scale: float = width * v_scale * 1.24
+	var sprocket_radius: float = depth * 0.5
+
+	# Pod length scales dynamically based on count (35% for 4 tracks, 25% for 6 tracks)
+	var pod_len_frac: float = 0.35 if per_side == 2 else clampf(0.75 / float(per_side), 0.18, 0.35)
+	var pod_length: float = target_length * pod_len_frac
+
+	var station := MountReachScript.station_from(tweaks)
+	var node_scale := MountReachScript.node_scale_from(tweaks)
+
+	# Front Pod: front sprocket pinned 1 radius in from front corner
+	var front_sprocket_z: float = -half + sprocket_radius
+	var front_pod_center_z: float = front_sprocket_z + 0.5 * pod_length
+
+	# Rear Pod: rear sprocket pinned 1 radius in from rear corner
+	var rear_sprocket_z: float = half - sprocket_radius
+	var rear_pod_center_z: float = rear_sprocket_z - 0.5 * pod_length
+
+	var bogie_mesh := _part("ht_track_bogie")
+	var gb_mesh := _part("wheel_gearbox")
+	var ds_mesh := _part("wheel_driveshaft")
+	var inner_spine_x: float = -0.025 * bogie_width_scale
+	var gb_sz: float = 0.36 * depth
+
+	var pods: Array[Dictionary] = []
+	for i in range(per_side):
+		var t: float = float(i) / float(per_side - 1)
+		var cz: float = lerpf(front_pod_center_z, rear_pod_center_z, t)
+		pods.append({
+			"name": "SpinPivot_Tread_%d" % i,
+			"center_z": cz
+		})
+
+	for pod_info in pods:
+		var z_center: float = pod_info["center_z"]
+		if bogie_mesh:
+			var bogie_pivot := Node3D.new()
+			bogie_pivot.name = pod_info["name"]
+			bogie_pivot.position = Vector3(0, 0, z_center)
+			parent_node.add_child(bogie_pivot)
+
+			var bogie := _mesh_inst(bogie_mesh, Color(0.18, 0.18, 0.2))
+			bogie.scale = Vector3(bogie_width_scale, v_scale, pod_length / 1.2)
+			bogie_pivot.add_child(bogie)
+
+		# 2 Mounting Gearboxes & Struts per pod (fore & aft of the pod)
+		for z_offset_frac in [-0.32, 0.32]:
+			var z_station: float = z_center + z_offset_frac * pod_length
+			var bogie_gb_x: float = inner_spine_x - 0.5 * gb_sz
+			if gb_mesh:
+				var bogie_gb := _mesh_inst(gb_mesh, base_color.darkened(0.15).lightened(0.25))
+				bogie_gb.scale = Vector3(gb_sz, gb_sz, gb_sz * 1.2)
+				bogie_gb.position = Vector3(bogie_gb_x, 0.0, z_station)
+				parent_node.add_child(bogie_gb)
+
+			var gb_reach := MountReachScript.solve(parent_node, station, Vector3(inner_spine_x, 0.0, z_station), Vector3.LEFT, -1.0, node_scale, 0.0)
+			var gb_touches_skin := (gb_reach > 0.0 and gb_reach <= gb_sz + 0.05)
+
+			if ds_mesh and not gb_touches_skin:
+				var c_dirs: Array[Vector3] = [
+					Vector3(-cos(deg_to_rad(30.0)), sin(deg_to_rad(30.0)), 0.0),
+					Vector3(-cos(deg_to_rad(45.0)), sin(deg_to_rad(45.0)), 0.0),
+					Vector3(-cos(deg_to_rad(15.0)), sin(deg_to_rad(15.0)), 0.0),
+					Vector3(-1.0, 0.0, 0.0)
+				]
+				var start_pt := Vector3(bogie_gb_x - 0.5 * gb_sz, 0.0, z_station)
+				var best_dir := Vector3.ZERO
+				var best_len := -1.0
+				for cd in c_dirs:
+					var l := MountReachScript.solve(parent_node, station, start_pt, cd, -1.0, node_scale)
+					if l > 0.0:
+						best_dir = cd
+						best_len = l
+						break
+
+				if best_len <= 0.0:
+					best_dir = Vector3(-cos(deg_to_rad(30.0)), sin(deg_to_rad(30.0)), 0.0)
+					best_len = 0.5 * depth
+
+				var strut := _mesh_inst(ds_mesh, base_color.darkened(0.3).lightened(0.3))
+				var top_p := start_pt + best_dir * best_len
+				var up_v := best_dir
+				var side_v := up_v.cross(Vector3.FORWARD).normalized()
+				if side_v.length_squared() < 0.001:
+					side_v = Vector3.RIGHT
+				var fwd_v := side_v.cross(up_v).normalized()
+				var strut_thick: float = 0.30 * depth
 				strut.transform = Transform3D(
-					Basis(right * strut_w, dir * len_s, fwd * strut_w),
-					Vector3(0.0, rail_y, z))
+					Basis(side_v * strut_thick, up_v * best_len, fwd_v * strut_thick),
+					top_p
+				)
 				parent_node.add_child(strut)
 
 
@@ -6875,25 +7023,7 @@ static func _build_rocker_bogie(parent_node: Node3D, base_size: Vector3, base_co
 	var target_length := float(tweaks.get("target_length", base_size.z))
 	var span := target_length * 0.42
 
-	# SIZE. Every part here was used at its authored scale, which has no
-	# relationship to any hull - against a real one the whole linkage came out
-	# as a handful of pebbles under the belly, which is what made it read as
-	# both floating and flimsy (Chris). Scale is now derived from the span the
-	# assembly actually has to cover, the same way half_track and
-	# tracked_treads derive theirs, so it stays in proportion on any hull.
-	# AUTHORED_SPAN is rb_rocker_arm's MEASURED fore/aft extent (0.83 along Z),
-	# not a guessed round number - the first pass assumed 1.30 and the arms
-	# came out well short of the wheels they were meant to reach. Same mistake
-	# as the screw drum's stale fit divisors, so it is measured here
-	# too: `span` is a half-extent, hence the doubling.
 	const AUTHORED_ARM_Z := 0.83
-	# Two factors, not one. z_s stretches the linkage fore/aft to cover the
-	# span; p_s sizes the parts themselves - cross-sections, the drop to the
-	# axle line, and the wheels. Driving all of it off z_s made the wheels grow
-	# with the hull's LENGTH and lifted the body to 3.5 units on a medium hull.
-	# How long a suspension is and how big its wheels are are separate
-	# questions, and conflating them is the same error as scaling the legs by
-	# the hull's height.
 	var z_s: float = maxf(0.4, (span * 2.0) / AUTHORED_ARM_Z)
 	var p_s: float = clampf(z_s * 0.42, 0.85, 1.7)
 	var v_scale: float = p_s
@@ -6901,18 +7031,12 @@ static func _build_rocker_bogie(parent_node: Node3D, base_size: Vector3, base_co
 	var rocker_mesh := _part("rb_rocker_arm")
 	var bogie_mesh := _part("rb_bogie_arm")
 	var wheel_mesh := _part("rb_wheel")
+	var gb_mesh := _part("wheel_gearbox")
 
-	# THE ATTACHMENT. A rocker-bogie hangs the whole linkage off ONE pivot per
-	# side - that differential pivot is the only thing joining it to the body,
-	# and it had nothing at all here ("the lack of running gear of any kind
-	# attaching it to the hull"). build_wheel_mount() is that pivot: the
-	# gearbox reads as the bearing housing and the driveshaft as the trunnion
-	# arm running up into the hull. Same mount as the wheels and pontoons, for
-	# the same reason it works there - the module origin is already at the
-	# hull's underside.
-	const WHEEL_GROWTH := 2.2
-	var pivot_s: float = 0.55 * v_scale
-	var hub := build_wheel_mount(parent_node, base_color, pivot_s, 0.0, 0.45 * pivot_s, -1.0, tweaks)
+	# Heavy differential trunnion mount connecting the rocker suspension to the hull
+	const WHEEL_GROWTH := 2.0
+	var pivot_s: float = 0.90 * v_scale
+	var hub := build_wheel_mount(parent_node, base_color, pivot_s, 0.0, 0.55 * pivot_s, -1.0, tweaks)
 
 	var chain := Node3D.new()
 	chain.position = hub
@@ -6920,7 +7044,8 @@ static func _build_rocker_bogie(parent_node: Node3D, base_size: Vector3, base_co
 
 	if rocker_mesh:
 		var rocker := _mesh_inst(rocker_mesh, base_color)
-		rocker.scale = Vector3(p_s * 0.9, arm_len * p_s, z_s)
+		# Heavy forged cross-section for the primary rocker arm
+		rocker.scale = Vector3(p_s * 2.2, arm_len * p_s * 1.5, z_s)
 		chain.add_child(rocker)
 
 	for i in range(pairs):
@@ -6928,49 +7053,30 @@ static func _build_rocker_bogie(parent_node: Node3D, base_size: Vector3, base_co
 		var z: float = (-span + 2.0 * span * t)
 		if bogie_mesh and i > 0:
 			var bogie := _mesh_inst(bogie_mesh, base_color.darkened(0.08))
-			bogie.scale = Vector3(p_s * 0.9, arm_len * p_s, z_s * 0.42)
-			bogie.position = Vector3(0, -0.10 * arm_len * v_scale, z)
+			# Heavy forged cross-section for the bogie arm
+			bogie.scale = Vector3(p_s * 2.0, arm_len * p_s * 1.4, z_s * 0.48)
+			bogie.position = Vector3(0, -0.08 * arm_len * v_scale, z)
 			chain.add_child(bogie)
 		if wheel_mesh:
 			var wheel_pivot := Node3D.new()
 			wheel_pivot.name = SPIN_PIVOT_WHEEL
-			# COLLAPSED UP. The linkage was spread over a drop of 0.30 * arm
-			# length with wheels sized at p_s, which left daylight between
-			# every pair of parts and read as a set of loose components rather
-			# than one suspension (Chris: "it mostly just all needs to collapse
-			# upwards, so the pieces actually connect"). The drop is more than
-			# halved and the wheels are scaled up to close the rest of the gap
-			# themselves - rb_wheel's authored radius is 0.211, so WHEEL_GROWTH
-			# takes it to roughly twice what it was.
-			# Outboard by half a wheel width (Chris) - rb_wheel is authored
-			# 0.20 across, so half of that times the rendered scale. Keeps the
-			# tyre clear of the arm it hangs on instead of straddling it.
 			var wheel_scale: float = wheel_size * p_s * WHEEL_GROWTH
 			wheel_pivot.position = Vector3(
-				0.14 * wheel_size * p_s + 0.10 * wheel_scale,
-				-0.12 * arm_len * p_s, z)
+				0.18 * wheel_size * p_s + 0.12 * wheel_scale,
+				-0.10 * arm_len * p_s, z)
 			chain.add_child(wheel_pivot)
-			var wheel := _mesh_inst(wheel_mesh, Color(0.20, 0.20, 0.22))
+			var wheel := _mesh_inst(wheel_mesh, Color(0.18, 0.18, 0.20))
 			wheel.scale = Vector3.ONE * wheel_scale
 			wheel_pivot.add_child(wheel)
-			# HUB CARRIER. Stepping the wheel outboard by half its width opens
-			# a gap between the arm's outer face and the tyre's inner one -
-			# measured as 4 islands where there had been 1. A real suspension
-			# has a carrier spanning exactly that gap, so this is the part the
-			# geometry was asking for rather than a fudge to close a number.
-			# Static (a sibling of the spin pivot, not a child) - the carrier
-			# does not turn with the wheel.
-			var carrier_mesh := _part("wheel_gearbox")
-			if carrier_mesh:
-				var carrier := _mesh_inst(carrier_mesh, base_color.lightened(0.2))
-				# Sized to SPAN the gap, not to fill the space: a 0.34 cube
-				# closed the islands but took the module to 0.996 bulk, i.e.
-				# the suspension weighed as much as the vehicle. Long on X
-				# (the axis the gap is on), slim on the other two.
-				carrier.scale = Vector3(0.26, 0.15, 0.15) * wheel_scale
+
+			# Sturdy, heavy-duty hub carrier / axle gearbox
+			if gb_mesh:
+				var carrier := _mesh_inst(gb_mesh, base_color.lightened(0.2))
+				var c_w: float = 0.35 * wheel_scale
+				carrier.scale = Vector3(c_w, 0.32 * wheel_scale, 0.32 * wheel_scale)
 				carrier.position = Vector3(
-					0.16 * wheel_size * p_s,
-					-0.12 * arm_len * p_s, z)
+					0.18 * wheel_size * p_s,
+					-0.10 * arm_len * p_s, z)
 				chain.add_child(carrier)
 
 

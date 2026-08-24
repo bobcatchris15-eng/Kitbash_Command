@@ -23,130 +23,6 @@
 	},
 	"modules": [
 		{
-			"facet": "",
-			"facet_size": {},
-			"mount_normal": {
-				"x": 0.0,
-				"y": 1.0,
-				"z": 0.0
-			},
-			"mount_style": "",
-			"name": "Tracked Treads",
-			"position": {
-				"x": -2.52350044250488,
-				"y": -1.56065571308136,
-				"z": 0.0
-			},
-			"rotation": {
-				"x": 0.0,
-				"y": 0.0,
-				"z": 0.0
-			},
-			"scale": {
-				"x": 1.0,
-				"y": 1.0,
-				"z": 1.0
-			},
-			"scale_flip_x": true,
-			"sponson": false,
-			"stats": {
-				"cost_crystal": 0,
-				"cost_metal": 56,
-				"dps": 0.0,
-				"hp": 200.0,
-				"weight": 168.0
-			},
-			"tweaks": {
-				"chine_belly_drop": 0.0875422954559326,
-				"chine_clear_x": 0.0875577926635742,
-				"chine_flank_height": 2.14156186580658,
-				"chine_half_width": 2.24540042877197,
-				"chine_normal_x": 0.707031786441803,
-				"chine_normal_y": -0.707181751728058,
-				"chine_seated": 1.0,
-				"chine_up_x": 0.707181751728058,
-				"chine_up_y": 0.707031786441803,
-				"drive_sprocket": true,
-				"kit_anchor_x": 0.648899912834167,
-				"kit_anchor_y": 0.891217803955078,
-				"kit_anchor_z": 0.0,
-				"kit_reach": 0.703592991828919,
-				"mount_rise": 0.0,
-				"node_scale_x": 1.0,
-				"node_scale_y": 1.0,
-				"node_scale_z": 1.0,
-				"station_x": -2.52350044250488,
-				"station_y": -1.56065571308136,
-				"station_z": 0.0,
-				"target_length": 7.90000009536743,
-				"tread_width": 1.4
-			},
-			"type_id": "tracked_treads",
-			"yaw_offset": 0.0
-		},
-		{
-			"facet": "",
-			"facet_size": {},
-			"mount_normal": {
-				"x": 0.0,
-				"y": 1.0,
-				"z": 0.0
-			},
-			"mount_style": "",
-			"name": "Tracked Treads",
-			"position": {
-				"x": 2.52345037460327,
-				"y": -1.56065571308136,
-				"z": 0.0
-			},
-			"rotation": {
-				"x": 0.0,
-				"y": 0.0,
-				"z": 0.0
-			},
-			"scale": {
-				"x": 1.0,
-				"y": 1.0,
-				"z": 1.0
-			},
-			"scale_flip_x": false,
-			"sponson": false,
-			"stats": {
-				"cost_crystal": 0,
-				"cost_metal": 56,
-				"dps": 0.0,
-				"hp": 200.0,
-				"weight": 168.0
-			},
-			"tweaks": {
-				"chine_belly_drop": 0.0875577926635742,
-				"chine_clear_x": 0.0875422954559326,
-				"chine_flank_height": 2.14154636859894,
-				"chine_half_width": 2.24535036087036,
-				"chine_normal_x": 0.707032203674316,
-				"chine_normal_y": -0.707181394100189,
-				"chine_seated": 1.0,
-				"chine_up_x": 0.707181394100189,
-				"chine_up_y": 0.707032203674316,
-				"drive_sprocket": true,
-				"kit_anchor_x": -0.648899912834167,
-				"kit_anchor_y": 0.891217803955078,
-				"kit_anchor_z": 0.0,
-				"kit_reach": 0.703592991828919,
-				"mount_rise": 0.0,
-				"node_scale_x": 1.0,
-				"node_scale_y": 1.0,
-				"node_scale_z": 1.0,
-				"station_x": 2.52345037460327,
-				"station_y": -1.56065571308136,
-				"station_z": 0.0,
-				"target_length": 7.90000009536743,
-				"tread_width": 1.4
-			},
-			"type_id": "tracked_treads",
-			"yaw_offset": 0.0
-		},
-		{
 			"facet": "top",
 			"facet_size": {},
 			"mount_normal": {
@@ -174,8 +50,8 @@
 			"scale_flip_x": false,
 			"sponson": false,
 			"stats": {
-				"cost_crystal": 7,
-				"cost_metal": 62,
+				"cost_crystal": 7.0,
+				"cost_metal": 62.0,
 				"dps": 132.5,
 				"hp": 80.0,
 				"weight": 109.0
@@ -215,14 +91,138 @@
 			"scale_flip_x": false,
 			"sponson": false,
 			"stats": {
-				"cost_crystal": 0,
-				"cost_metal": 15,
+				"cost_crystal": 0.0,
+				"cost_metal": 15.0,
 				"dps": 32.5,
 				"hp": 60.0,
 				"weight": 40.0
 			},
 			"tweaks": {},
 			"type_id": "heavy_machine_gun",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Tracked Treads",
+			"position": {
+				"x": -3.00378847122192,
+				"y": -1.05095767974854,
+				"z": 0.0
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
+			"scale_flip_x": true,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 64,
+				"dps": 0.0,
+				"hp": 200.0,
+				"weight": 192.0
+			},
+			"tweaks": {
+				"chine_belly_drop": 0.0875422954559326,
+				"chine_clear_x": 0.0875577926635742,
+				"chine_flank_height": 2.14156186580658,
+				"chine_half_width": 2.24540042877197,
+				"chine_normal_x": 0.707031786441803,
+				"chine_normal_y": -0.707181751728058,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.707181751728058,
+				"chine_up_y": 0.707031786441803,
+				"drive_sprocket": true,
+				"kit_anchor_x": 0.629999995231628,
+				"kit_anchor_y": 0.865260004997253,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.683099985122681,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": -3.00378847122192,
+				"station_y": -1.05095767974854,
+				"station_z": 0.0,
+				"target_length": 7.89999961853027,
+				"tread_width": 1.4
+			},
+			"type_id": "tracked_treads",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Tracked Treads",
+			"position": {
+				"x": 3.00378847122192,
+				"y": -1.05094218254089,
+				"z": 0.0
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
+			"scale_flip_x": false,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 64,
+				"dps": 0.0,
+				"hp": 200.0,
+				"weight": 192.0
+			},
+			"tweaks": {
+				"chine_belly_drop": 0.0875577926635742,
+				"chine_clear_x": 0.0875422954559326,
+				"chine_flank_height": 2.14154636859894,
+				"chine_half_width": 2.24535036087036,
+				"chine_normal_x": 0.707032203674316,
+				"chine_normal_y": -0.707181394100189,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.707181394100189,
+				"chine_up_y": 0.707032203674316,
+				"drive_sprocket": true,
+				"kit_anchor_x": -0.629999995231628,
+				"kit_anchor_y": 0.865260004997253,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.683099985122681,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": 3.00378847122192,
+				"station_y": -1.05094218254089,
+				"station_z": 0.0,
+				"target_length": 7.89999961853027,
+				"tread_width": 1.4
+			},
+			"type_id": "tracked_treads",
 			"yaw_offset": 0.0
 		}
 	],

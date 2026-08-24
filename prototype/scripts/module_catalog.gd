@@ -3766,6 +3766,10 @@ const LOCOMOTION_TWEAK_SPECS = {
 		{"name": "tread_width", "label": "Tread Track Width", "min": 0.5, "max": 2.5, "step": 0.1, "default": 1.0},
 		{"name": "drive_sprocket", "label": "Exposed Sprocket", "type": "bool", "default": true}
 	],
+	"heavy_quad_tracks": [
+		{"name": "track_count", "label": "Track Pod Count", "min": 4.0, "max": 6.0, "step": 2.0, "default": 4.0},
+		{"name": "tread_width", "label": "Tread Track Width", "min": 0.5, "max": 2.5, "step": 0.1, "default": 1.0}
+	],
 	# Knee Height is gone. It was meaningful while the limb was solved as two
 	# spans between computed points - it decided where the knee sat. The six
 	# authored sets have the knee where the artist put it, so the slider had
@@ -3809,7 +3813,7 @@ const LOCOMOTION_TWEAK_SPECS = {
 		{"name": "tread_width", "label": "Track Width", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
 	],
 	"rocker_bogie": [
-		{"name": "bogie_pairs", "label": "Bogie Pairs", "min": 2.0, "max": 4.0, "step": 1.0, "default": 3.0},
+		{"name": "bogie_pairs", "label": "Bogie Pairs", "min": 2.0, "max": 5.0, "step": 1.0, "default": 3.0},
 		{"name": "arm_length", "label": "Rocker Arm Length", "min": 0.6, "max": 1.8, "step": 0.1, "default": 1.0},
 		{"name": "wheel_size", "label": "Wheel Size", "min": 0.6, "max": 2.0, "step": 0.1, "default": 1.0}
 	],

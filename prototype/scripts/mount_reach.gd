@@ -69,7 +69,7 @@ static func cache_hull(hull: Node3D) -> void:
 	if _surface_cache.has(key):
 		_active_surface = _surface_cache[key]
 		return
-	var surface: Dictionary = HullProjectionScript.build_surface(mesh_inst)
+	var surface: Dictionary = HullProjectionScript.build_surface(hull)
 	if (surface.get("tris", PackedVector3Array()) as PackedVector3Array).size() >= 3:
 		_surface_cache[key] = surface
 		_active_surface = surface
@@ -144,7 +144,7 @@ static func surface_for(module: Node3D) -> Dictionary:
 				var key := mesh_inst.mesh.get_instance_id()
 				if _surface_cache.has(key):
 					return _surface_cache[key]
-				var surface: Dictionary = HullProjectionScript.build_surface(mesh_inst)
+				var surface: Dictionary = HullProjectionScript.build_surface(hull)
 				if (surface.get("tris", PackedVector3Array()) as PackedVector3Array).size() >= 3:
 					_surface_cache[key] = surface
 					return surface

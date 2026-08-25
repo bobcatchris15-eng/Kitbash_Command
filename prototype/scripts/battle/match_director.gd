@@ -3891,6 +3891,15 @@ func get_nearby_damageable(pos: Vector3, radius: float) -> Array:
 func _process(delta: float) -> void:
 	var _t := Profiler.start()
 	Profiler.stop("render_frame", _t)
+	# Vision's shroud-disc rebuilds are amortized: the 0.6 s vision tick only
+	# ENQUEUES changed viewers (see vision_service.gd's AMORTIZED DISC REBUILDS
+	# note), and this pump drains them across frames under a ms budget so no
+	# single frame carries the whole scan. Own profiler section - after a
+	# playtest, "vision" is the enqueue cost and "vision.pump" the drain.
+	if vision != null:
+		var _vt := Profiler.start()
+		vision.process_pending_discs()
+		Profiler.stop("vision.pump", _vt)
 	# SKIRMISH_PERF_TROUBLESHOOTING.md §10.1. The single most important number
 	# in the 2026-08-19T19-57-23 capture - 4.53 rendered fps against a 14.56 Hz
 	# sim on a 30 Hz target - was not written in the log anywhere. It had to be

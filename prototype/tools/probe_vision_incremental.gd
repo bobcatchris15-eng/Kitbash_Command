@@ -113,6 +113,23 @@ func _init() -> void:
 	_check(vs._viewer_discs.is_empty(), "all viewer discs dropped")
 	_check(vs._beacon_discs.is_empty(), "all beacon discs dropped")
 
+	# --- Test 8: budgeted mode defers rebuilds to the frame pump -------------
+	print("Test 8: amortized (budgeted) shroud updates enqueue then drain")
+	vs._update_shroud(viewers, []) # restore the discs Test 4's wholesale drop removed
+	var mover8: Node3D = viewers[1]
+	var disc_before_8: Dictionary = vs._viewer_discs[mover8.get_instance_id()]
+	mover8.position.x += 40.0
+	vs._update_shroud(viewers, [], 3.0)
+	_check(vs._viewer_discs[mover8.get_instance_id()] == disc_before_8,
+		"budgeted update leaves the stale disc acquired (coverage never flickers)")
+	_check(vs._disc_queue.size() == 1, "changed viewer was enqueued exactly once")
+	vs._update_shroud(viewers, [], 3.0)
+	_check(vs._disc_queue.size() == 1, "a re-changed queued viewer does not duplicate its entry")
+	vs.process_pending_discs(10000.0)
+	_check(vs._disc_queue.is_empty(), "pump drained the queue")
+	_check(int(vs._viewer_discs[mover8.get_instance_id()].pos.x * 2.0) == int(mover8.position.x * 2.0),
+		"queued viewer rebuilt from live node state by the pump")
+
 	# --- Test 5+6: sweep, beacon lifecycle, refcount integrity ---------------
 	print("Test 5: freed viewers are swept without leaking coverage")
 	for v in viewers:

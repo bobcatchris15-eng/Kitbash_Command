@@ -38,6 +38,7 @@ const PowerBudgetScript = preload("res://scripts/power_budget.gd")
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
 const VFXBurstScript = preload("res://scripts/vfx_burst.gd")
+const VisualBuilderScript = preload("res://scripts/visual_builder.gd")
 
 signal died(unit)
 signal order_completed(unit)
@@ -208,9 +209,9 @@ var _separation_radius: float = 3.0
 # Per-match UI preference: should the selection-time range discs be drawn
 # at all? Lives on the unit because that is where the discs are built; the
 # command-card toggle and the F12 key both write to it through
-# set_range_overlay_visible(). Default true because the discs are the
-# player's main source of "what can this thing actually do".
-var show_range_overlay: bool = true
+# set_range_overlay_visible(). Default false - the discs only appear once the
+# player asks for them (they cover a lot of ground and obscure orders).
+var show_range_overlay: bool = false
 
 # --- Range overlay constants --------------------------------------------------
 #
@@ -434,6 +435,12 @@ func setup(blueprint_data: Dictionary, unit_team: int, bp_manager: Node,
 	# if the fade were a hard cut).
 	if is_instance_valid(hull_node):
 		_apply_unit_visibility_range(hull_node)
+	# Deferred locomotion extras. The hull template is built DETACHED and
+	# duplicated per spawn, so anything that waits on tree_entered (the blimp
+	# envelope's rigging) never fires for battle copies - apply it explicitly
+	# now that this unit is inside the match tree.
+	if is_instance_valid(hull_node):
+		VisualBuilderScript.ensure_blimp_envelope(self)
 	return true
 
 

@@ -507,6 +507,16 @@ func tick() -> void:
 		var beacons := _live_beacons(viewing_team)
 		var previous: Dictionary = _team_visible.get(viewing_team, {})
 		var seen: Dictionary = {}
+		# AMORTIZED SCAN (2026-08-25). The skirmish log battle_2026-08-25T18-27-43
+		# had the vision section at 17.7 ms mean across 839 ticks - one spike
+		# every TICK_INTERVAL. A large share of that was the spotted scan paying
+		# PER-(viewer, target) PAIR for work that is per-VIEWER: effective_vision()
+		# (a terrain height sample through the controller), property/meta fetches,
+		# and forward-vector math were all re-evaluated once per target per viewer
+		# - ~1800 redundant evaluations a tick at 30v30 - when nothing changes
+		# mid-tick. Snapshot each viewer once, then the target loop is pure
+		# distance math against precomputed numbers.
+		var profiles := _viewer_profiles(viewers)
 		for c in targets:
 			if not is_instance_valid(c):
 				continue
@@ -514,7 +524,7 @@ func tick() -> void:
 			# team that cannot come off a shared flag, which is the second reason
 			# visibility is stored per team.
 			var was_visible: bool = previous.has(c.get_instance_id())
-			if reveal_all or _is_spotted(c, viewers, beacons, was_visible):
+			if reveal_all or _is_spotted(c, profiles, beacons, was_visible):
 				seen[c.get_instance_id()] = true
 		next[viewing_team] = seen
 	_team_visible = next
@@ -528,7 +538,34 @@ func tick() -> void:
 			local_constructs.append(c)
 		elif c.has_method("set_fog_visible"):
 			c.set_fog_visible(reveal_all or local_seen.has(c.get_instance_id()))
-	_update_shroud(local_constructs, _live_beacons(_local_team))
+	_update_shroud(local_constructs, _live_beacons(_local_team), DISC_REBUILD_BUDGET_MS)
+
+
+# Per-viewer snapshot of everything the spotted scan reads, taken once per tick
+# instead of once per (viewer, target) pair - see tick()'s AMORTIZED SCAN note.
+func _viewer_profiles(viewers: Array) -> Array:
+	var out: Array = []
+	for o in viewers:
+		if not is_instance_valid(o):
+			continue
+		var dir_sensors = _get_prop(o, "directional_sensors")
+		var has_dir: bool = dir_sensors is Array and not (dir_sensors as Array).is_empty()
+		var fwd_2d := Vector2.ZERO
+		if has_dir:
+			var fwd := _forward_of(o)
+			fwd_2d = Vector2(fwd.x, fwd.z).normalized()
+		out.append({
+			"node": o,
+			"pos": _pos_of(o),
+			"flying": bool(_get_prop(o, "is_flying", false)),
+			"vision": effective_vision(o),
+			"seismic": float(_get_prop(o, "seismic_range", 0.0)),
+			"dir": dir_sensors if has_dir else null,
+			"fwd_2d": fwd_2d,
+			"thermal": bool(_get_prop(o, "has_thermal_sight", false)) or \
+				(is_instance_valid(o.get("hull_node")) and o.hull_node.has_meta("has_thermal_sight") and o.hull_node.get_meta("has_thermal_sight")),
+		})
+	return out
 
 
 func _pos_of(n: Node) -> Vector3:
@@ -557,7 +594,9 @@ func _get_prop(o: Object, prop: String, default_val = null):
 	return default_val
 
 
-func _is_spotted(c, viewers: Array, beacons: Array, was_visible: bool) -> bool:
+# `viewer_profiles` is _viewer_profiles()' snapshot array, not live nodes - the
+# per-viewer property reads happened once in tick(), not once per pair here.
+func _is_spotted(c, viewer_profiles: Array, beacons: Array, was_visible: bool) -> bool:
 	var c_flying: bool = bool(_get_prop(c, "is_flying", false))
 	var c_moving: bool = false
 	var vel = _get_prop(c, "velocity")
@@ -568,54 +607,48 @@ func _is_spotted(c, viewers: Array, beacons: Array, was_visible: bool) -> bool:
 
 	var c_pos := _pos_of(c)
 
-	for o in viewers:
-		if not is_instance_valid(o):
-			continue
-
-		var o_pos := _pos_of(o)
+	for p in viewer_profiles:
+		var o_pos: Vector3 = p.pos
 
 		# 1. Seismic Sensing: Non-line-of-sight ground vibration sensing
-		var seismic: float = float(_get_prop(o, "seismic_range", 0.0))
+		var seismic: float = p.seismic
 		if seismic > 0.0 and not c_flying and c_moving:
 			var reach_seis := seismic * HIDE_RANGE_MULT if was_visible else seismic
-			if c_pos.distance_to(o_pos) <= reach_seis:
+			if c_pos.distance_squared_to(o_pos) <= reach_seis * reach_seis:
 				return true
 
 		# 2. Check Directional Radar Sensors (focused sector reach)
-		var dir_sensors = _get_prop(o, "directional_sensors")
+		var dir_sensors = p.dir
 		if dir_sensors is Array and not dir_sensors.is_empty():
-			var fwd := _forward_of(o)
-			var fwd_2d := Vector2(fwd.x, fwd.z).normalized()
+			var fwd_2d: Vector2 = p.fwd_2d
 			for ds in dir_sensors:
 				var ds_range: float = float(ds.get("range", 0.0))
 				var ds_arc_rad: float = float(ds.get("arc_rad", PI / 3.0))
 				var ds_reach := ds_range * HIDE_RANGE_MULT if was_visible else ds_range
 				var to_c: Vector3 = c_pos - o_pos
-				var dist: float = to_c.length()
-				if dist <= ds_reach and dist > 0.001:
+				var dist_sq: float = to_c.length_squared()
+				if dist_sq <= ds_reach * ds_reach and dist_sq > 0.000001:
+					var dist: float = sqrt(dist_sq)
 					var to_c_2d := Vector2(to_c.x, to_c.z).normalized()
 					var dot_val := clampf(fwd_2d.dot(to_c_2d), -1.0, 1.0)
 					var angle := acos(dot_val)
 					if angle <= ds_arc_rad * 0.5:
-						var o_flying: bool = bool(_get_prop(o, "is_flying", false))
-						if o_flying or c_flying:
+						if p.flying or c_flying:
 							return true
-						var has_thermal: bool = bool(_get_prop(o, "has_thermal_sight", false)) or \
-							(is_instance_valid(o.get("hull_node")) and o.hull_node.has_meta("has_thermal_sight") and o.hull_node.get_meta("has_thermal_sight"))
-						if _check_los_cached(o, c, has_thermal):
+						if _check_los_cached(p.node, c, p.thermal):
 							return true
 
 		# 3. Standard Omni Vision (and Thermal FLIR Sight)
-		var vision := effective_vision(o)
+		var vision: float = p.vision
 		if vision > 0.0:
 			var reach := vision * HIDE_RANGE_MULT if was_visible else vision
-			if c_pos.distance_to(o_pos) <= reach:
-				var o_flying: bool = bool(_get_prop(o, "is_flying", false))
-				if o_flying or c_flying:
+			if c_pos.distance_squared_to(o_pos) <= reach * reach:
+				if p.flying or c_flying:
 					return true
-				var has_thermal: bool = bool(_get_prop(o, "has_thermal_sight", false)) or \
-					(is_instance_valid(o.get("hull_node")) and o.hull_node.has_meta("has_thermal_sight") and o.hull_node.get_meta("has_thermal_sight"))
-				if _check_los_cached(o, c, has_thermal):
+				# NOTE: the thermal flag is passed through as the LOS check's
+				# ignore-smoke argument; it gates smoke occlusion, not whether
+				# the raycast runs at all.
+				if _check_los_cached(p.node, c, p.thermal):
 					return true
 
 	for b in beacons:
@@ -847,13 +880,26 @@ func _world_to_cell(x: float, z: float) -> Vector2i:
 # move, so a developed base costs one dictionary compare per structure per tick.
 # Pixels are rewritten only on 0<->1 coverage transitions (see acquire/release),
 # which replaces the old whole-set diff against _prev_cells.
-func _update_shroud(local_constructs: Array, beacons: Array) -> void:
+#
+# AMORTIZED DISC REBUILDS (2026-08-25). The skirmish log battle_2026-08-25T18-27-43
+# still had the vision section at 17.7 ms mean per tick after the incremental
+# rewrite, because on an active battlefield every MOVER rescans its disc every
+# tick (a unit at combat speed crosses the 0.5 m fingerprint quantum several
+# times between ticks) and each rescan is ~500 cells x grid-march in GDScript.
+# Passing a non-negative `budget_ms` changes the contract from "every changed
+# viewer rebuilt before this call returns" to "changed viewers are ENQUEUED and
+# rebuilt across successive process_pending_discs() calls within that budget" -
+# the same spread-across-frames treatment the overlay system already has. A
+# viewer awaiting its rebuild keeps its PREVIOUS disc acquired, so coverage
+# never flickers; it just lags its position by however long the queue takes to
+# drain (frames, not ticks - the dedupe set bounds the queue at one entry per
+# construct). Callers that need the old synchronous behaviour - the behavioral
+# probe pins it - pass a negative budget.
+func _update_shroud(local_constructs: Array, beacons: Array, budget_ms: float = -1.0) -> void:
 	if _texture == null:
 		return
-	_shroud_dirty = false
 	var geo := _los_geom_version
 	var seen_ids := {}
-	var cell_size := _cell_size()
 
 	for o in local_constructs:
 		if not is_instance_valid(o):
@@ -866,7 +912,6 @@ func _update_shroud(local_constructs: Array, beacons: Array) -> void:
 		var v := effective_vision(o)
 		var dir_sensors = _get_prop(o, "directional_sensors")
 		var has_dir: bool = dir_sensors is Array and not (dir_sensors as Array).is_empty()
-		var topo_r: float = float(_get_prop(o, "topographic_range", 0.0))
 
 		var disc: Dictionary = _viewer_discs.get(oid, {})
 		# Fingerprint keeps the old _inputs_unchanged quantisation (0.5 m steps,
@@ -887,52 +932,11 @@ func _update_shroud(local_constructs: Array, beacons: Array) -> void:
 		if same:
 			continue
 
-		if not disc.is_empty():
-			_release_cells(disc.cells)
-		var cells := {}
-		if v > 0.0:
-			cells = _scan_viewer_cells(o_pos, v, o_flying)
-		if has_dir:
-			# Directional sensors add sector-clipped discs on top of the omni
-			# one; both land in the same refcounted cell set.
-			var fwd_2d := Vector2(o_fwd.x, o_fwd.z).normalized()
-			for ds in dir_sensors:
-				var ds_r: float = float(ds.get("range", 0.0))
-				if ds_r > 0.0:
-					var sub := _scan_viewer_cells(
-						o_pos, ds_r, o_flying, fwd_2d, float(ds.get("arc_rad", PI / 3.0)))
-					for k in sub:
-						cells[k] = true
-		_viewer_discs[oid] = {
-			"cells": cells, "geo": geo, "pos": o_pos, "fwd": o_fwd,
-			"vision": v, "is_flying": o_flying, "has_dir": has_dir,
-		}
-		_acquire_cells(cells)
-
-		# Topographic survey mapping rides along with the rebuild. Like the
-		# disc itself, it can only uncover something new when the scanner
-		# moved or its range changed - terrain does not move under it.
-		if topo_r > 0.0:
-			var t_radius := int(ceil(topo_r / cell_size)) + 1
-			var t0 := _world_to_cell(o_pos.x, o_pos.z)
-			for dz in range(-t_radius, t_radius + 1):
-				var gz := t0.y + dz
-				if gz < 0 or gz >= _dim:
-					continue
-				for dx in range(-t_radius, t_radius + 1):
-					var gx := t0.x + dx
-					if gx < 0 or gx >= _dim:
-						continue
-					var cc := Vector2i(gx, gz)
-					if _cell_refs.has(cc):
-						continue
-					var wx := -_half + (gx + 0.5) * cell_size
-					var wz := -_half + (gz + 0.5) * cell_size
-					if Vector2(wx - o_pos.x, wz - o_pos.z).length() <= topo_r:
-						var cur_col := _image.get_pixel(gx, gz)
-						if cur_col.a >= UNEXPLORED_ALPHA - 0.01:
-							_image.set_pixel(gx, gz, Color(0, 0, 0, EXPLORED_ALPHA))
-							_shroud_dirty = true
+		if budget_ms < 0.0:
+			_rebuild_viewer_disc(o)
+		elif not _disc_queued.has(oid):
+			_disc_queued[oid] = true
+			_disc_queue.append({"oid": oid, "node": o})
 
 	# Sweep discs whose construct vanished this tick (death, despawn). Their
 	# cells MUST be released or the coverage leaks as a permanently-visible
@@ -957,12 +961,117 @@ func _update_shroud(local_constructs: Array, beacons: Array) -> void:
 			_release_cells(_beacon_discs[uid].cells)
 			_beacon_discs.erase(uid)
 
-	if _shroud_dirty:
-		_texture.update(_image)
-		# Bumped only on a real change so readers that keep a derived copy (the
-		# minimap builds a re-shaded one) can skip rebuilding on the many ticks
-		# where nothing uncovered a new cell.
-		shroud_version += 1
+	_flush_shroud_texture()
+
+
+# --- Amortized disc rebuild queue --------------------------------------------
+
+# Per-frame ms budget the game path drains the rebuild queue with. Sized against
+# the same logic as the range-overlay budget: small enough that a frame carrying
+# 3 ms of vision work still fits a 30 Hz sim tick alongside the ~5 ms unit loop,
+# large enough that a full army's worth of movers drains inside a few frames.
+const DISC_REBUILD_BUDGET_MS := 3.0
+
+# FIFO of {"oid": int, "node": Node} pending rebuilds, plus an oid set so a
+# viewer that changes again before being processed does not queue twice - at
+# pop time the LIVE node state is what gets scanned, so a stale entry can only
+# ever produce a fresher answer, never a wrong one.
+var _disc_queue: Array = []
+var _disc_queued: Dictionary = {}
+
+
+# Drain deferred viewer-disc rebuilds within a per-call millisecond budget.
+# Called once per rendered frame by the match director between vision ticks;
+# no-op when nothing is queued, so an idle battlefield pays one branch.
+func process_pending_discs(budget_ms: float = DISC_REBUILD_BUDGET_MS) -> void:
+	if _disc_queue.is_empty():
+		return
+	var deadline := Time.get_ticks_usec() + int(maxf(budget_ms, 0.0) * 1000.0)
+	while not _disc_queue.is_empty():
+		var entry: Dictionary = _disc_queue.pop_front()
+		_disc_queued.erase(int(entry.oid))
+		var node = entry.node
+		# The construct may have died or been freed while queued - the next
+		# tick's death sweep owns its disc release, not this scan.
+		if not is_instance_valid(node) or ("is_dead" in node and node.is_dead):
+			continue
+		_rebuild_viewer_disc(node)
+		if Time.get_ticks_usec() >= deadline:
+			break
+	_flush_shroud_texture()
+
+
+# The expensive half of a fingerprint miss, extracted verbatim from the old
+# inline rebuild branch so both the synchronous and queued paths share it.
+func _rebuild_viewer_disc(o) -> void:
+	var oid: int = o.get_instance_id()
+	var o_pos := _pos_of(o)
+	var o_fwd := _forward_of(o)
+	var o_flying: bool = bool(_get_prop(o, "is_flying", false))
+	var v := effective_vision(o)
+	var dir_sensors = _get_prop(o, "directional_sensors")
+	var has_dir: bool = dir_sensors is Array and not (dir_sensors as Array).is_empty()
+
+	var disc: Dictionary = _viewer_discs.get(oid, {})
+	if not disc.is_empty():
+		_release_cells(disc.cells)
+	var cells := {}
+	if v > 0.0:
+		cells = _scan_viewer_cells(o_pos, v, o_flying)
+	if has_dir:
+		# Directional sensors add sector-clipped discs on top of the omni
+		# one; both land in the same refcounted cell set.
+		var fwd_2d := Vector2(o_fwd.x, o_fwd.z).normalized()
+		for ds in dir_sensors:
+			var ds_r: float = float(ds.get("range", 0.0))
+			if ds_r > 0.0:
+				var sub := _scan_viewer_cells(
+					o_pos, ds_r, o_flying, fwd_2d, float(ds.get("arc_rad", PI / 3.0)))
+				for k in sub:
+					cells[k] = true
+	_viewer_discs[oid] = {
+		"cells": cells, "geo": _los_geom_version, "pos": o_pos, "fwd": o_fwd,
+		"vision": v, "is_flying": o_flying, "has_dir": has_dir,
+	}
+	_acquire_cells(cells)
+
+	# Topographic survey mapping rides along with the rebuild. Like the
+	# disc itself, it can only uncover something new when the scanner
+	# moved or its range changed - terrain does not move under it.
+	var topo_r: float = float(_get_prop(o, "topographic_range", 0.0))
+	if topo_r > 0.0:
+		var cell_size := _cell_size()
+		var t_radius := int(ceil(topo_r / cell_size)) + 1
+		var t0 := _world_to_cell(o_pos.x, o_pos.z)
+		for dz in range(-t_radius, t_radius + 1):
+			var gz := t0.y + dz
+			if gz < 0 or gz >= _dim:
+				continue
+			for dx in range(-t_radius, t_radius + 1):
+				var gx := t0.x + dx
+				if gx < 0 or gx >= _dim:
+					continue
+				var cc := Vector2i(gx, gz)
+				if _cell_refs.has(cc):
+					continue
+				var wx := -_half + (gx + 0.5) * cell_size
+				var wz := -_half + (gz + 0.5) * cell_size
+				if Vector2(wx - o_pos.x, wz - o_pos.z).length() <= topo_r:
+					var cur_col := _image.get_pixel(gx, gz)
+					if cur_col.a >= UNEXPLORED_ALPHA - 0.01:
+						_image.set_pixel(gx, gz, Color(0, 0, 0, EXPLORED_ALPHA))
+						_shroud_dirty = true
+
+
+# Upload the shroud image iff pixels actually moved this frame. Bumped only on
+# a real change so readers that keep a derived copy (the minimap builds a
+# re-shaded one) can skip rebuilding on the many frames where nothing changed.
+func _flush_shroud_texture() -> void:
+	if not _shroud_dirty:
+		return
+	_texture.update(_image)
+	shroud_version += 1
+	_shroud_dirty = false
 
 
 # Per-viewer cached visibility discs. Keyed by instance_id (constructs) and

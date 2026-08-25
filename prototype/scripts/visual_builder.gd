@@ -5479,6 +5479,18 @@ static func _build_blimp_envelope(parent_node: Node3D, base_size: Vector3, base_
 	if not is_instance_valid(parent_node):
 		return
 	if not parent_node.is_inside_tree() or parent_node.get_parent() == null:
+		# BATTLE TEMPLATE CASE. unit_assembly.gd builds its cached hull template
+		# into a DETACHED holder and never puts it in a tree - so tree_entered
+		# below would never fire for it - and Node.duplicate() drops signal
+		# connections anyway, so every spawned copy used to silently miss the
+		# envelope entirely (the "blimp drive has no blimp in battle" report).
+		# Park the build params as metadata; ensure_blimp_envelope() picks them
+		# up once the live copy is inside the match tree.
+		parent_node.set_meta("blimp_pending", {
+			"base_size": base_size,
+			"base_color": base_color,
+			"tweaks": tweaks.duplicate(true),
+		})
 		if not parent_node.is_connected("tree_entered", Callable(VisualBuilder, "_on_blimp_parent_tree_entered")):
 			parent_node.tree_entered.connect(_on_blimp_parent_tree_entered.bind(parent_node, base_size, base_color, tweaks), CONNECT_ONE_SHOT)
 		return
@@ -5486,6 +5498,25 @@ static func _build_blimp_envelope(parent_node: Node3D, base_size: Vector3, base_
 
 static func _on_blimp_parent_tree_entered(parent_node: Node3D, base_size: Vector3, base_color: Color, tweaks: Dictionary) -> void:
 	Callable(VisualBuilder, "_apply_blimp_envelope").call_deferred(parent_node, base_size, base_color, tweaks)
+
+# Apply any deferred envelopes riding on this subtree. Called once per spawned
+# unit from unit.gd's setup(), after the duplicated template is inside the
+# match tree. The meta is consumed on apply, so a node can never be built twice.
+static func ensure_blimp_envelope(root: Node) -> void:
+	if root == null or not is_instance_valid(root):
+		return
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if not is_instance_valid(n):
+			continue
+		if n.has_meta("blimp_pending"):
+			var p: Dictionary = n.get_meta("blimp_pending")
+			n.remove_meta("blimp_pending")
+			_apply_blimp_envelope(n, p.get("base_size", Vector3.ONE),
+				p.get("base_color", Color(0.4, 0.44, 0.4)), p.get("tweaks", {}))
+		for c in n.get_children():
+			stack.append(c)
 
 static func _apply_blimp_envelope(parent_node: Node3D, base_size: Vector3, base_color: Color, tweaks: Dictionary = {}) -> void:
 	if not is_instance_valid(parent_node) or not parent_node.is_inside_tree():

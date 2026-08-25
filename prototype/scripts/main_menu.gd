@@ -294,14 +294,20 @@ func _build_3d_background() -> void:
 	var scene = Node3D.new()
 	vp.add_child(scene)
 
-	# Studio WorldEnvironment (ACES Filmic, SSAO, Glow)
-	# Studio WorldEnvironment (Featureless Studio Grey, ACES Filmic, SSAO)
+	# DARK BENCH ENVIRONMENT (2026-08-25). Was a flat featureless studio grey
+	# lit wall-to-wall by two directionals - everything equally visible,
+	# nothing emphasised. Now the room is near-black with ambient disabled and
+	# the only real light is one warm spot raked onto the showcased model (plus
+	# a faint cool omni behind it for rim separation). The cutting mat runs to
+	# the frame edges and simply disappears into the falloff, which is what
+	# lets a finite slab read as an endless bench.
 	var env_node = WorldEnvironment.new()
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.38, 0.40, 0.42, 1.0) # Featureless studio grey
+	env.background_color = Color(0.016, 0.018, 0.021)
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.15
+	env.tonemap_exposure = 1.3
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_DISABLED
 	env.ssao_enabled = true
 	env.ssao_radius = 1.4
 	env.ssao_intensity = 2.4
@@ -311,19 +317,27 @@ func _build_3d_background() -> void:
 	env_node.environment = env
 	scene.add_child(env_node)
 
-	# Main Key Light
-	var sun = DirectionalLight3D.new()
-	sun.light_color = Color(1.0, 0.96, 0.88)
-	sun.light_energy = 1.35
-	sun.rotation_degrees = Vector3(-38, -30, 0)
-	sun.shadow_enabled = true
-	scene.add_child(sun)
+	# KEY LIGHT: one warm spot over the turntable. Energy is high because the
+	# cone's inverse-square falloff has to carry the whole image now.
+	var key = SpotLight3D.new()
+	key.position = Vector3(-1.2, 9.5, 5.5)
+	key.light_color = Color(1.0, 0.93, 0.82)
+	key.light_energy = 15.0
+	key.spot_range = 28.0
+	key.spot_attenuation = 1.1
+	key.spot_angle = 37.0
+	key.shadow_enabled = true
+	scene.add_child(key)
+	key.look_at(Vector3(-3.4, 0.4, 0.0))
 
-	# Cool Fill Light
-	var rim = DirectionalLight3D.new()
-	rim.light_color = Color(0.65, 0.75, 0.85)
-	rim.light_energy = 0.85
-	rim.rotation_degrees = Vector3(25, 145, 0)
+	# RIM: faint cool omni behind-left of the model. Range-limited so it kisses
+	# the hull's trailing edges and dies before it paints the mat.
+	var rim = OmniLight3D.new()
+	rim.position = Vector3(-8.5, 3.0, -6.5)
+	rim.light_color = Color(0.55, 0.68, 0.85)
+	rim.light_energy = 2.2
+	rim.omni_range = 14.0
+	rim.omni_attenuation = 2.0
 	scene.add_child(rim)
 
 	# Camera framed at center turntable - Zoomed way farther out
@@ -333,9 +347,13 @@ func _build_3d_background() -> void:
 	cam.fov = 46.0
 	scene.add_child(cam)
 
-	# Turntable Base & Model Container
+	# Turntable Base & Model Container.
+	# 2026-08-25: shifted left of the viewport centre (-3.4) so the showcased
+	# model clears the spec placard column on the right edge instead of
+	# disappearing behind it. The placard shrank to fit its content in the
+	# same pass (see _build_status_column).
 	_turntable_node = Node3D.new()
-	_turntable_node.position = Vector3(0.5, -0.4, 0.0)
+	_turntable_node.position = Vector3(-3.4, -0.4, 0.0)
 	scene.add_child(_turntable_node)
 
 	var platform_mesh = MeshInstance3D.new()
@@ -355,6 +373,245 @@ func _build_3d_background() -> void:
 
 	_turntable_model_container = Node3D.new()
 	_turntable_node.add_child(_turntable_model_container)
+
+	# Hobby-bench floor under the turntable: a self-healing cutting mat dressed
+	# with modeller's tools. Deliberately a SIBLING of the rotating node, not a
+	# child - only the vehicle turns; scattered tools stay put like a real bench.
+	_build_cutting_mat(scene)
+
+
+# --- Cutting-mat floor -------------------------------------------------------
+
+# The mat slab plus the tools scattered on it. Everything here is procedural
+# primitives with flat materials - the same authoring rule as the rest of the
+# art pipeline, just small. The slab is far larger than any plausible tool
+# layout on purpose: it runs past every edge of the frame, and the dark-bench
+# lighting (see _build_3d_background) swallows it before its far corners could
+# ever show. Tool positions still ring the turntable puck (radius ~5.2) so
+# nothing intrudes under the showcased model.
+func _build_cutting_mat(parent: Node3D) -> void:
+	var root := Node3D.new()
+	# x tracks the turntable so the mat reads as the floor beneath it; y puts
+	# the slab's top face at -0.43, clear of the puck's underside at -0.40 so
+	# the two never sit co-planar and z-fight. z is centred between a front
+	# edge past the bottom of the frame (~z +10 at this camera) and a back edge
+	# that dissolves into the light falloff.
+	root.position = Vector3(-3.4, -0.49, -8.0)
+	parent.add_child(root)
+
+	var slab = MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(56.0, 0.12, 44.0)
+	slab.mesh = box
+	var slab_mat := StandardMaterial3D.new()
+	slab_mat.albedo_texture = _make_cutting_mat_texture()
+	slab_mat.roughness = 0.93
+	# Triplanar, object-local: a slab this size tiled per-face would stretch
+	# one texture copy across 56 m of grid. World-scale tiling keeps each grid
+	# cell ~25 cm no matter how far the slab runs.
+	slab_mat.uv1_triplanar = true
+	slab_mat.uv1_scale = Vector3(0.25, 0.25, 0.25)
+	slab.material_override = slab_mat
+	root.add_child(slab)
+
+	_dress_cutting_mat(root)
+
+
+# The printed face of a self-healing cutting mat: deep service-green, a fine
+# 32 px grid with heavier lines every fourth, a lighter boundary frame, and
+# seeded wear speckles. Drawn once into an ImageTexture at menu build.
+func _make_cutting_mat_texture() -> ImageTexture:
+	var w := 512
+	var h := 352
+	var img := Image.create(w, h, false, Image.FORMAT_RGB8)
+	var base := Color(0.106, 0.185, 0.153)
+	var grid := Color(0.137, 0.227, 0.192)
+	var major := Color(0.176, 0.278, 0.235)
+	var frame := Color(0.208, 0.322, 0.275)
+	img.fill(base)
+	for x in range(0, w, 32):
+		img.fill_rect(Rect2i(x, 0, 1, h), grid)
+	for y in range(0, h, 32):
+		img.fill_rect(Rect2i(0, y, w, 1), grid)
+	for x in range(0, w, 128):
+		img.fill_rect(Rect2i(x, 0, 2, h), major)
+	for y in range(0, h, 128):
+		img.fill_rect(Rect2i(0, y, w, 2), major)
+	img.fill_rect(Rect2i(8, 8, 4, h - 16), frame)
+	img.fill_rect(Rect2i(w - 12, 8, 4, h - 16), frame)
+	img.fill_rect(Rect2i(8, 8, w - 16, 4), frame)
+	img.fill_rect(Rect2i(8, h - 12, w - 16, 4), frame)
+	# Seeded, not random(): regenerating the menu must stay deterministic.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260825
+	for i in range(900):
+		img.set_pixelv(
+			Vector2i(rng.randi_range(0, w - 1), rng.randi_range(0, h - 1)),
+			base.darkened(rng.randf_range(0.05, 0.22)))
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+func _dress_cutting_mat(root: Node3D) -> void:
+	# Positions are MAT-LOCAL (mat root sits at world (-3.4, -8)). The key
+	# spot's ground pool centres on the puck at about world (-3.5, -0.2) with
+	# its bright band spilling forward (world z 0..+7, toward the camera), so
+	# everything here is arranged in that front arc - clearly inside or on the
+	# lip of the light, never behind the model where the falloff eats it. All
+	# radii stay outside the puck's ~5.2 m footprint.
+	var scatter := [
+		[_tool_snippers(), Vector3(-4.8, 0.0, 11.6), 18.0],
+		[_tool_paintbrush(Color(0.75, 0.20, 0.16)), Vector3(4.6, 0.0, 11.0), -30.0],
+		[_tool_paintbrush(Color(0.20, 0.38, 0.75)), Vector3(-6.0, 0.0, 9.2), 40.0],
+		[_tool_sandpaper(), Vector3(-4.2, 0.0, 13.4), 65.0],
+		[_tool_glue_tube(), Vector3(5.6, 0.0, 7.2), -20.0],
+		[_tool_glue_tube(), Vector3(6.3, 0.0, 5.8), 8.0],
+		[_tool_paint_tin(Color(0.72, 0.16, 0.14)), Vector3(-2.8, 0.0, 14.8), 0.0],
+		[_tool_paint_tin(Color(0.85, 0.65, 0.12)), Vector3(3.8, 0.0, 12.4), 0.0],
+		[_tool_paint_tin(Color(0.20, 0.42, 0.62)), Vector3(-6.8, 0.0, 7.2), 0.0],
+		[_tool_paint_tube(Color(0.50, 0.14, 0.50)), Vector3(1.4, 0.0, 13.6), 0.0],
+	]
+	for s in scatter:
+		var tool_node: Node3D = s[0]
+		tool_node.position = s[1]
+		tool_node.rotation_degrees.y = s[2]
+		root.add_child(tool_node)
+
+
+func _flat_mat(color: Color, roughness: float = 0.85, metallic: float = 0.0) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = roughness
+	m.metallic = metallic
+	return m
+
+
+func _box_mesh_instance(size: Vector3, mat: StandardMaterial3D) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mi.mesh = mesh
+	mi.material_override = mat
+	return mi
+
+
+func _cyl_mesh_instance(top_r: float, bottom_r: float, h: float, mat: StandardMaterial3D) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = top_r
+	mesh.bottom_radius = bottom_r
+	mesh.height = h
+	mi.mesh = mesh
+	mi.material_override = mat
+	return mi
+
+
+# Side cutters: two safety-orange handles splayed into a shallow V, metal jaws
+# closing the other way, one pivot block holding the pair together.
+func _tool_snippers() -> Node3D:
+	var root := Node3D.new()
+	var plastic := _flat_mat(Color(0.85, 0.33, 0.12), 0.55)
+	var metal := _flat_mat(Color(0.72, 0.74, 0.76), 0.35, 0.9)
+	for side in [-1.0, 1.0]:
+		var handle := _box_mesh_instance(Vector3(0.13, 0.09, 1.15), plastic)
+		handle.position = Vector3(side * 0.09, 0.07, 0.42)
+		handle.rotation_degrees.y = side * 7.0
+		root.add_child(handle)
+		var jaw := _box_mesh_instance(Vector3(0.07, 0.05, 0.55), metal)
+		jaw.position = Vector3(side * 0.035, 0.07, -0.42)
+		jaw.rotation_degrees.y = -side * 4.0
+		root.add_child(jaw)
+	var pivot := _box_mesh_instance(Vector3(0.20, 0.11, 0.24), metal)
+	pivot.position = Vector3(0.0, 0.07, 0.0)
+	root.add_child(pivot)
+	return root
+
+
+# A brush lying on its side: wooden handle, bright metal ferrule, bristles
+# dipped in `tip_color`.
+func _tool_paintbrush(tip_color: Color) -> Node3D:
+	var root := Node3D.new()
+	var handle := _cyl_mesh_instance(0.048, 0.056, 1.05,
+		_flat_mat(Color(0.58, 0.42, 0.26), 0.7))
+	handle.rotation_degrees.x = 90.0
+	handle.position = Vector3(0.0, 0.06, -0.5)
+	root.add_child(handle)
+	var ferrule := _cyl_mesh_instance(0.052, 0.052, 0.24,
+		_flat_mat(Color(0.75, 0.76, 0.78), 0.35, 0.85))
+	ferrule.rotation_degrees.x = 90.0
+	ferrule.position = Vector3(0.0, 0.06, 0.18)
+	root.add_child(ferrule)
+	var bristles := _cyl_mesh_instance(0.03, 0.055, 0.30, _flat_mat(tip_color, 0.9))
+	bristles.rotation_degrees.x = 90.0
+	bristles.position = Vector3(0.0, 0.055, 0.44)
+	root.add_child(bristles)
+	return root
+
+
+# A small stack of grit sheets, fanned slightly so the edges read as layers.
+func _tool_sandpaper() -> Node3D:
+	var root := Node3D.new()
+	var sheets := [
+		[Color(0.77, 0.64, 0.45), 0.0],
+		[Color(0.63, 0.61, 0.58), 6.0],
+		[Color(0.42, 0.40, 0.37), -4.0],
+	]
+	for i in range(sheets.size()):
+		var sheet := _box_mesh_instance(Vector3(1.05, 0.02, 0.78),
+			_flat_mat(sheets[i][0], 0.95))
+		sheet.position = Vector3(0.0, 0.02 + i * 0.022, 0.0)
+		sheet.rotation_degrees.y = sheets[i][1]
+		root.add_child(sheet)
+	return root
+
+
+# A glue tube on its side: amber body, tapering shoulder, nozzle with an
+# orange cap - polystyrene-cement shape language.
+func _tool_glue_tube() -> Node3D:
+	var root := Node3D.new()
+	var body := _cyl_mesh_instance(0.125, 0.125, 0.60,
+		_flat_mat(Color(0.92, 0.86, 0.70), 0.5))
+	body.rotation_degrees.z = -90.0
+	body.position = Vector3(-0.22, 0.135, 0.0)
+	root.add_child(body)
+	var shoulder := _cyl_mesh_instance(0.035, 0.125, 0.14,
+		_flat_mat(Color(0.92, 0.86, 0.70), 0.5))
+	shoulder.rotation_degrees.z = -90.0
+	shoulder.position = Vector3(0.16, 0.135, 0.0)
+	root.add_child(shoulder)
+	var cap := _cyl_mesh_instance(0.032, 0.032, 0.10,
+		_flat_mat(Color(0.85, 0.33, 0.12), 0.55))
+	cap.rotation_degrees.z = -90.0
+	cap.position = Vector3(0.28, 0.135, 0.0)
+	root.add_child(cap)
+	return root
+
+
+# An enamel paint tin: squat coloured body, silver lid.
+func _tool_paint_tin(color: Color) -> Node3D:
+	var root := Node3D.new()
+	var body := _cyl_mesh_instance(0.17, 0.17, 0.14, _flat_mat(color, 0.45))
+	body.position.y = 0.08
+	root.add_child(body)
+	var lid := _cyl_mesh_instance(0.175, 0.175, 0.03,
+		_flat_mat(Color(0.75, 0.76, 0.78), 0.3, 0.9))
+	lid.position.y = 0.165
+	root.add_child(lid)
+	return root
+
+
+# An acrylic paint tube standing on its cap, leaning slightly.
+func _tool_paint_tube(color: Color) -> Node3D:
+	var root := Node3D.new()
+	var body := _cyl_mesh_instance(0.095, 0.115, 0.42,
+		_flat_mat(Color(0.88, 0.88, 0.86), 0.6))
+	body.position.y = 0.21
+	root.add_child(body)
+	var cap := _cyl_mesh_instance(0.05, 0.05, 0.08, _flat_mat(color, 0.5))
+	cap.position.y = 0.46
+	root.add_child(cap)
+	root.rotation_degrees.z = 7.0
+	return root
 
 func _build_3d_showcase_model(item: Dictionary, parent: Node3D) -> void:
 	var model_root = Node3D.new()
@@ -633,7 +890,10 @@ func _add_deck_card(parent: Control, title_text: String, description: String, sc
 
 func _build_status_column(parent: Control) -> void:
 	var col = VBoxContainer.new()
-	col.custom_minimum_size = Vector2(460, 0)
+	# 460 -> 400: FRONT_DESK renders five short rows; 460 left a wide blank
+	# margin down the panel's whole right edge and pushed the turntable further
+	# under the card than it needed to be.
+	col.custom_minimum_size = Vector2(400, 0)
 	col.size_flags_horizontal = Control.SIZE_SHRINK_END
 	col.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	parent.add_child(col)
@@ -662,9 +922,14 @@ func _build_status_column(parent: Control) -> void:
 	# selection panel and the after-action report render, at the detail level
 	# this screen wants (UX_REDESIGN_PLAN.md's "unifying component"). Replaces
 	# a hand-built stat table that was this screen's own private vocabulary.
+	#
+	# NO vertical EXPAND_FILL. The old line stretched the panel over the entire
+	# mid-row height (~700 px) to hold five rows' worth of ~250 px content -
+	# the dead space the player read as "empty card". A PanelContainer without
+	# an expand flag hugs its content; the space it gives back shows the
+	# turntable backdrop instead of blank CardPanel.
 	_spec_placard = SpecPlacardScript.new()
 	_spec_placard.level = SpecPlacardScript.Level.FRONT_DESK
-	_spec_placard.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(_spec_placard)
 
 func _update_placard_ui(item: Dictionary) -> void:

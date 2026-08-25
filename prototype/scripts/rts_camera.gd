@@ -17,9 +17,19 @@ extends Camera3D
 # the DOF wiring becomes a no-op on scenes that don't have it.
 
 @export var pan_speed: float = 30.0
-@export var zoom_speed: float = 8.0
+# Multiplicative zoom: each wheel notch multiplies the camera height by this
+# ratio rather than adding a fixed number of metres. The old additive step
+# (zoom_speed * world_scale metres) meant one notch jumped ~32 m on a
+# world_scale=4 map across a 10..160 range - about five notches for the whole
+# sweep, with the bottom notch launching straight off the ground. A ratio step
+# is small in metres near the floor where framing precision matters and grows
+# with distance out where coverage matters, and is inherently scale-free: the
+# same perceived zoom-per-notch at any world_scale, so unlike the additive
+# version it must NOT be multiplied by world_scale here (pan speed below still
+# tracks world_scale for traversal).
+@export var zoom_step: float = 1.15
 @export var rotate_speed: float = 90.0
-@export var min_height: float = 10.0
+@export var min_height: float = 16.0
 # Skirmish refinement pass: maps grew to ~3x their original size (see
 # map_catalog.gd - two scale-up passes, 1.5x then another 2x after the
 # first still read as too small) and the old 45-unit cap meant you could
@@ -193,8 +203,11 @@ func ray_plane_hit(screen_pos: Vector2, plane_y: float = 0.0):
 # Zoom-to-cursor: keep the world point under the cursor at the same screen
 # position before and after the height change. Done by ray-plane hitting
 # before and after and shifting the camera by the world delta.
-func _on_zoom(screen_pos: Vector2, height_delta: float):
-	height = clamp(height + height_delta, min_height, max_height)
+#
+# `notches` is a signed wheel-notch count: each notch scales the height by
+# zoom_step (see its comment above for why this replaced the additive step).
+func _on_zoom(screen_pos: Vector2, notches: float):
+	height = clamp(height * pow(zoom_step, notches), min_height, max_height)
 	_apply_pitch()
 	_apply_dof_distances()
 	var before = ray_plane_hit(screen_pos)
@@ -216,9 +229,9 @@ var _middle_drag_last: Vector2 = Vector2.ZERO
 
 func _unhandled_input(event):
 	if event.is_action_pressed("cam_zoom_in"):
-		_on_zoom(get_viewport().get_mouse_position(), -zoom_speed * world_scale)
+		_on_zoom(get_viewport().get_mouse_position(), -1.0)
 	elif event.is_action_pressed("cam_zoom_out"):
-		_on_zoom(get_viewport().get_mouse_position(), zoom_speed * world_scale)
+		_on_zoom(get_viewport().get_mouse_position(), 1.0)
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
 			_middle_drag_origin = event.position

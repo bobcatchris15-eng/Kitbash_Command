@@ -677,6 +677,25 @@ static func _looking_at_safe(dir: Vector3) -> Basis:
 		up_ref = Vector3.BACK
 	return Basis.looking_at(d, up_ref)
 
+
+# AIM RELATIVE TO REST, not absolute. _looking_at_safe() returns a basis in the
+# parent (hull) frame pointing -Z straight at the target with world-style up.
+# Written ABSOLUTELY onto transform.basis it silently discards the mount's
+# authored orientation - invisible on a roof mount whose rest is near identity,
+# but a belly mount's rest carries the flip that points its barrel down/outward,
+# so the absolute look-at made the whole module swing through the hull: the
+# "the entire model rotates and pitches, not just the weapon" report. Instead,
+# re-express the target direction in the REST frame (where the barrel's
+# canonical forward is -Z), build only the offset from rest, and compose it
+# back on top - preserving every mount's authored flip, roll and cant.
+static func _aim_basis_from_rest(q_rest: Quaternion, parent_dir: Vector3) -> Basis:
+	var d := parent_dir.normalized()
+	if d.length_squared() < 0.5:
+		return Basis(q_rest)
+	var rest_dir := q_rest.inverse() * d
+	var q_off := _looking_at_safe(rest_dir).get_rotation_quaternion()
+	return Basis(q_rest * q_off)
+
 func _ready():
 	resting_transform = transform
 	# PERFORMANCE_PLAN.md P1a: random phase so every weapon doesn't reacquire
@@ -1000,7 +1019,8 @@ func _tick_weapon(delta):
 			# toward a target and then simply never actually fires.
 			var target_local_pos = get_parent().to_local(target_pos)
 			var local_dir = (target_local_pos - position).normalized()
-			var target_local_basis = _looking_at_safe(local_dir)
+			var target_local_basis = _aim_basis_from_rest(
+				resting_transform.basis.get_rotation_quaternion(), local_dir)
 
 			# Gradually rotate local basis towards target using Quaternions
 			var q_current = transform.basis.get_rotation_quaternion()
@@ -3262,21 +3282,34 @@ func _tick_heavy_barrier(delta: float) -> void:
 
 	var turret_body = get_node_or_null("TurretBody")
 	var pivot_node = turret_body if turret_body else self
+	# The pivot's rest orientation: authored identity for a TurretBody child,
+	# this module's own resting_transform when there is no child and the module
+	# itself pivots (a belly mount keeps its authored flip).
+	var pivot_rest_q := Quaternion.IDENTITY if pivot_node != self \
+			else resting_transform.basis.get_rotation_quaternion()
+	# Aim direction must be expressed in the PIVOT'S PARENT space - the weapon
+	# module for a TurretBody child, the hull for the self case. The old code
+	# always read hull space and wrote it onto a pivot living in weapon space,
+	# which drifted whenever the weapon itself was mounted off-identity.
+	var pivot_parent := pivot_node.get_parent() as Node3D
 
 	# Smoothly pivot to aim at nearest enemy or face forward if none
 	if target and is_instance_valid(target) and not ("is_dead" in target and target.is_dead):
 		var target_pos = target.global_position + Vector3(0, 0.5, 0)
-		var target_local_pos = get_parent().to_local(target_pos)
-		var local_dir = (target_local_pos - position).normalized()
-		var target_local_basis = _looking_at_safe(local_dir)
+		var dir_in_pivot_parent: Vector3
+		if pivot_parent != null and is_instance_valid(pivot_parent):
+			dir_in_pivot_parent = (pivot_parent.to_local(target_pos) - pivot_node.position).normalized()
+		else:
+			dir_in_pivot_parent = (target_pos - pivot_node.global_position).normalized()
+		var target_local_basis := _aim_basis_from_rest(pivot_rest_q, dir_in_pivot_parent)
 		var q_current = pivot_node.transform.basis.get_rotation_quaternion()
 		var q_target = target_local_basis.get_rotation_quaternion()
 		var q_next = q_current.slerp(q_target, traverse_speed * delta)
 		pivot_node.transform.basis = Basis(q_next).scaled(pivot_node.transform.basis.get_scale())
 	else:
-		# Return smoothly to forward-facing resting orientation
+		# Return smoothly to the pivot's own resting orientation
 		var q_current = pivot_node.transform.basis.get_rotation_quaternion()
-		var q_target = Quaternion.IDENTITY
+		var q_target = pivot_rest_q
 		var q_next = q_current.slerp(q_target, traverse_speed * delta)
 		pivot_node.transform.basis = Basis(q_next).scaled(pivot_node.transform.basis.get_scale())
 

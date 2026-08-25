@@ -22,6 +22,7 @@ const RadialDial = preload("res://scripts/ui/radial_dial.gd")
 const UIShell = preload("res://scripts/ui_shell.gd")
 const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
 const StampedButtonScript = preload("res://scripts/ui_stamped_button.gd")
+const ModuleVolume = preload("res://scripts/module_volume.gd")
 
 @export var max_blocks: int = 400
 @export var grid_unit: float = 1.0  # 1-unit increments for strict grid snapping
@@ -1228,23 +1229,23 @@ func _open_block_radial_menu(idx: int, screen_pos: Vector2) -> void:
 		# 1. LENGTH (X) at 0° (Right / 3:00)
 		var dial_x := RadialDial.new("len_x", "Length X", 1.0, 8.0, 1.0, float(dim.x))
 		dial_x.value_changed.connect(func(v: float): _set_block_dim_axis(idx, 0, roundi(v)))
-		menu.add_satellite_control(dial_x, 0.0, 142.0)
+		menu.add_satellite_control(dial_x, 0.0, 180.0)
 
 		# 2. HEIGHT (Y) at -90° (Top / 12:00)
 		var dial_y := RadialDial.new("hgt_y", "Height Y", 1.0, 8.0, 1.0, float(dim.y))
 		dial_y.value_changed.connect(func(v: float): _set_block_dim_axis(idx, 1, roundi(v)))
-		menu.add_satellite_control(dial_y, -PI * 0.5, 142.0)
+		menu.add_satellite_control(dial_y, -PI * 0.5, 180.0)
 
 		# 3. DEPTH (Z) at 180° (Left / 9:00)
 		var dial_z := RadialDial.new("dep_z", "Depth Z", 1.0, 8.0, 1.0, float(dim.z))
 		dial_z.value_changed.connect(func(v: float): _set_block_dim_axis(idx, 2, roundi(v)))
-		menu.add_satellite_control(dial_z, PI, 142.0)
+		menu.add_satellite_control(dial_z, PI, 180.0)
 
 	elif b_type == BlockType.WEDGE_45:
 		# Lateral Width Extension (1-unit increments, 1 to 8 units)
 		var dial_w := RadialDial.new("width_x", "Width", 1.0, 8.0, 1.0, float(dim.x))
 		dial_w.value_changed.connect(func(v: float): _step_wedge_width(idx, v, dial_w))
-		menu.add_satellite_control(dial_w, -PI * 0.25, 142.0)
+		menu.add_satellite_control(dial_w, -PI * 0.25, 180.0)
 
 	menu.dismissed.connect(func():
 		if _active_radial_menu == menu:
@@ -1253,7 +1254,16 @@ func _open_block_radial_menu(idx: int, screen_pos: Vector2) -> void:
 
 	_active_radial_menu = menu
 	add_child(menu)
-	menu.open_at(screen_pos)
+
+	var target_screen_pos := screen_pos
+	if menu.target_node and is_instance_valid(menu.target_node):
+		var camera := get_viewport().get_camera_3d()
+		if camera:
+			var pos_3d := ModuleVolume.center_of_mass_world(menu.target_node)
+			if not camera.is_position_behind(pos_3d):
+				target_screen_pos = camera.unproject_position(pos_3d)
+
+	menu.open_at(target_screen_pos)
 
 func _step_block_rotation(idx: int, axis: Vector3, dir: int) -> void:
 	if idx < 0 or idx >= blocks.size():

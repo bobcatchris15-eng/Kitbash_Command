@@ -108,6 +108,15 @@ const REACQUIRE_INTERVAL: float = 0.2
 var _fog_scan_timer: float = 0.0
 const FOG_SCAN_INTERVAL: float = 1.8   # seconds between fog scans
 
+# Heavy Barrier Projector (Aegis Field) state
+var barrier_max_hp: float = 600.0
+var barrier_current_hp: float = 600.0
+var barrier_collapse_timer: float = 0.0
+var is_barrier_active: bool = true
+var field_width_mult: float = 1.0
+var barrier_capacity_mult: float = 1.0
+var projection_dist: float = 25.0
+
 # frame_built weapons (ModuleCatalog.get_traverse_limit_angle == 0.0 exactly -
 # the barrel is fixed to the hull, so the whole vehicle aims instead, see
 # unit.gd's has_frame_built_weapon) still need a real, reachable
@@ -772,6 +781,13 @@ func _ready():
 		else:
 			damage_class = "thermal"
 
+		if type_id == "heavy_barrier_projector":
+			field_width_mult = float(data.tweaks.get("field_width", 1.0))
+			barrier_capacity_mult = float(data.tweaks.get("barrier_capacity", 1.0))
+			projection_dist = float(data.tweaks.get("projection_distance", 25.0))
+			barrier_max_hp = 600.0 * barrier_capacity_mult
+			barrier_current_hp = barrier_max_hp
+
 		# Ammo resolution, applied AFTER the native damage_class chain above
 		# so a loaded round overrides the weapon's own class rather than the
 		# other way round. "standard" (and every weapon with no ammo
@@ -920,6 +936,16 @@ func _tick_weapon(delta):
 			dish.rotate_y(delta * 2.5)
 		return
 
+	if type_id == "heavy_sensor_suite":
+		var radome = get_node_or_null("multispectrum_radome")
+		if radome:
+			radome.rotate_y(delta * 1.5)
+		var pod = get_node_or_null("amr_sensor_pod")
+		if pod:
+			var t: float = float(Time.get_ticks_msec()) * 0.002
+			pod.rotation.y = sin(t) * 0.35
+		return
+
 	if type_id == "directional_radar":
 		var dish = get_node_or_null("directional_radar_dish")
 		if dish:
@@ -928,41 +954,14 @@ func _tick_weapon(delta):
 			dish.rotation.y = sin(t) * 0.4
 		return
 
-	if type_id == "topographic_radar":
-		var dome = get_node_or_null("topographic_scanner_dome")
-		if dome:
-			dome.rotate_y(delta * 1.8)
-		return
-
-	if type_id == "thermal_imager":
-		var pod = get_node_or_null("thermal_flir_pod")
-		if pod:
-			var t: float = float(Time.get_ticks_msec()) * 0.0015
-			pod.rotation.y = sin(t) * 0.25
-		return
-
-	if type_id == "fire_control_radar":
-		var dish = get_node_or_null("fire_control_radar_dish")
-		if not dish:
-			dish = get_node_or_null("RadarDish")
-		if dish:
-			dish.rotate_y(delta * 3.0)
-		return
-
 	if type_id == "energy_barrier_projector":
 		var arr = get_node_or_null("energy_barrier_projector_array")
 		if arr:
 			arr.rotate_y(delta * 1.5)
 		return
 
-	if type_id == "laser_designator":
-		_find_nearest_target(delta)
-		if target and is_instance_valid(target):
-			target.set_meta("is_laser_painted", true)
-			target.set_meta("laser_painted_timer", 0.5)
-			var head = get_node_or_null("laser_designator_head")
-			if head:
-				head.look_at(target.global_position, Vector3.UP)
+	if type_id == "heavy_barrier_projector":
+		_tick_heavy_barrier(delta)
 		return
 
 	time_since_last_shot += delta
@@ -1210,13 +1209,15 @@ func _damageable_candidates(pos: Vector3, radius: float) -> Array:
 	if scene and scene.has_method("get_nearby_damageable"):
 		return scene.get_nearby_damageable(pos, radius)
 	return get_tree().get_nodes_in_group("damageable")
-
 # delta defaults to -1.0 (a "forced/manual scan" sentinel, distinct from any
 # real physics delta which is always >= 0.0) so every direct/manual caller in
 # run_tests.gd - which calls this with no arguments and expects a synchronous,
 # unthrottled scan - keeps working unchanged. Only real _physics_process(delta)
 # ticks (delta >= 0.0) are subject to the throttle below.
 func _find_nearest_target(delta: float = -1.0):
+	if not is_inside_tree():
+		return
+
 	# A player-issued ground order outranks auto-acquisition for its whole
 	# duration - the point of attack-ground is to shoot where you were TOLD
 	# to, so a passing enemy must not silently steal the aim point.
@@ -2035,8 +2036,8 @@ func _target_is_airborne(t: Node) -> bool:
 # Does this target carry anything that emits? Walks its module children for a
 # sensor/radar module, which is exactly the thing the missile homes on.
 const SENSOR_MODULE_IDS := [
-	"sensor_suite", "directional_radar", "topographic_radar",
-	"fire_control_radar", "ciws", "sam_launcher", "microwave_emitter"
+	"sensor_suite", "heavy_sensor_suite", "directional_radar",
+	"ciws", "sam_launcher", "microwave_emitter"
 ]
 
 func _target_carries_sensors(t: Node) -> bool:
@@ -3253,3 +3254,90 @@ func _fire_standard_laser():
 	
 	var timer = get_tree().create_timer(0.08)
 	timer.timeout.connect(func(): if is_instance_valid(laser): laser.queue_free())
+
+# --- Heavy Barrier Projector (Aegis Field) Logic ---
+
+func _tick_heavy_barrier(delta: float) -> void:
+	_find_nearest_target(delta)
+
+	var turret_body = get_node_or_null("TurretBody")
+	var pivot_node = turret_body if turret_body else self
+
+	# Smoothly pivot to aim at nearest enemy or face forward if none
+	if target and is_instance_valid(target) and not ("is_dead" in target and target.is_dead):
+		var target_pos = target.global_position + Vector3(0, 0.5, 0)
+		var target_local_pos = get_parent().to_local(target_pos)
+		var local_dir = (target_local_pos - position).normalized()
+		var target_local_basis = _looking_at_safe(local_dir)
+		var q_current = pivot_node.transform.basis.get_rotation_quaternion()
+		var q_target = target_local_basis.get_rotation_quaternion()
+		var q_next = q_current.slerp(q_target, traverse_speed * delta)
+		pivot_node.transform.basis = Basis(q_next).scaled(pivot_node.transform.basis.get_scale())
+	else:
+		# Return smoothly to forward-facing resting orientation
+		var q_current = pivot_node.transform.basis.get_rotation_quaternion()
+		var q_target = Quaternion.IDENTITY
+		var q_next = q_current.slerp(q_target, traverse_speed * delta)
+		pivot_node.transform.basis = Basis(q_next).scaled(pivot_node.transform.basis.get_scale())
+
+	# Barrier recharge / brownout lifecycle
+	if barrier_collapse_timer > 0.0:
+		barrier_collapse_timer -= delta
+		is_barrier_active = false
+		if barrier_collapse_timer <= 0.0:
+			barrier_current_hp = barrier_max_hp
+			is_barrier_active = true
+	else:
+		var root_veh = get_vehicle_root()
+		if root_veh and root_veh.get("current_energy") != null and root_veh.current_energy <= 0.0:
+			is_barrier_active = false
+		else:
+			is_barrier_active = true
+			barrier_current_hp = minf(barrier_max_hp, barrier_current_hp + 20.0 * delta)
+
+	# Update visual field node
+	var field = get_node_or_null("ProjectedAegisField")
+	if field:
+		field.visible = is_barrier_active
+		if is_barrier_active and field.material_override is ShaderMaterial:
+			var mat = field.material_override as ShaderMaterial
+			var current_flash: float = float(mat.get_shader_parameter("impact_flash")) if mat.get_shader_parameter("impact_flash") != null else 0.0
+			if current_flash > 0.01:
+				mat.set_shader_parameter("impact_flash", maxf(0.0, current_flash - delta * 2.5))
+
+func get_aegis_field_info() -> Dictionary:
+	if not is_barrier_active or barrier_current_hp <= 0.0:
+		return {"is_active": false}
+	var turret_body = get_node_or_null("TurretBody")
+	var basis_to_use: Basis
+	if turret_body:
+		basis_to_use = turret_body.global_transform.basis if is_inside_tree() else turret_body.transform.basis
+	else:
+		basis_to_use = global_transform.basis if is_inside_tree() else transform.basis
+	var forward = -basis_to_use.z.normalized()
+	var pos = global_position if is_inside_tree() else position
+	var center = pos + forward * projection_dist
+	return {
+		"is_active": true,
+		"center": center,
+		"radius": 9.0 * field_width_mult,
+		"half_depth": 5.5 * field_width_mult,
+		"height": 4.5 * sqrt(field_width_mult),
+		"barrier_hp": barrier_current_hp,
+		"max_barrier_hp": barrier_max_hp,
+		"projector": self,
+		"forward": forward
+	}
+
+func absorb_aegis_damage(amount: float) -> float:
+	if not is_barrier_active or barrier_current_hp <= 0.0:
+		return amount
+	var absorbed = minf(amount, barrier_current_hp)
+	barrier_current_hp -= absorbed
+	var field = get_node_or_null("ProjectedAegisField")
+	if field and field.material_override is ShaderMaterial:
+		field.material_override.set_shader_parameter("impact_flash", 0.6)
+	if barrier_current_hp <= 0.0:
+		is_barrier_active = false
+		barrier_collapse_timer = 6.0 # Collapse recharge cooldown
+	return amount - absorbed

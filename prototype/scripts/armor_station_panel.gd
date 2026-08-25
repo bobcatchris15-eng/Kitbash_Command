@@ -3,7 +3,7 @@ extends Control
 # replaces the parts bin when the player enters the paint workspace.
 #
 # NOT A SEPARATE SCREEN. The MainLab scene is the only one the player
-# ever sees for both build AND paint workflows. The toolbar's "PAINT
+# ever sees for both build AND paint workflows. The toolbar's "ARMOR
 # STATION" button plays a horizontal pan_blur sweep; behind that blur,
 # three things swap simultaneously:
 #   1. UI_PartsMenu hides, UI_ArmorStationPanel shows (this file)
@@ -11,23 +11,7 @@ extends Control
 #      wood desktop + paint supplies show
 #   3. The module_placer strips the hull's modules and accepts paint
 #      input on the bare hull instead
-# The reverse pan undoes all three. The player reads it as a single
-# "turn to the workbench" gesture rather than three discrete changes.
-#
-# WHY NO PREVIEW SUBVIEWPORT. The old armor_bay_screen.gd built its own
-# SubViewport with a stripped hull, dedicated camera rig, and the wood
-# environment. The redesign drops all of that: the MainLab SubViewport
-# is the only one, the same Hull node the placer manages, the same
-# Camera3D. The only thing that changes is which environment renders
-# below it and which inputs are active.
-#
-# The paint itself is still armor_paint_visual.gd doing the same work it
-# has always done - the plan is on the hull's `armor_plan` meta, the
-# visual reads it. The only NEW thing is the click-to-paint path: this
-# panel installs an _unhandled_input on MainLab while paint mode is
-# active, raycasts the camera into the world, and dispatches to
-# _paint_at() exactly the way armor_bay_screen.gd used to on its
-# preview SubViewport.
+# The top toolbar button changes to "BACK TO WORKBENCH" to reverse all three.
 
 signal back_requested
 
@@ -44,26 +28,27 @@ const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const LiveryScript = preload("res://scripts/livery.gd")
 const PanTransitionOverlayScript = preload("res://scripts/pan_transition.gd")
 
-const TYPE_LABELS := {
-	"armor_plating": "PLATE",
-	"slat_armor": "SLAT",
-	"spaced_composite": "COMPOSITE",
-	"ablative_foam": "ABLATIVE",
+const ARMOR_TYPES := [
+	"steel_plate",
+	"ceramic_ablative",
+	"ballistic_nylon",
+	"composite_plate",
+]
+
+const ARMOR_TYPE_LABELS := {
+	"steel_plate": "STEEL PLATE",
+	"ceramic_ablative": "CERAMIC ABLATIVE",
+	"ballistic_nylon": "BALLISTIC NYLON",
+	"composite_plate": "COMPOSITE PLATE",
 }
-const MATERIAL_LABELS := {
-	"hardened_steel": "HARDENED STEEL",
-	"reactive_armor": "REACTIVE",
-	"ablative_ceramic": "ABLATIVE CERAMIC",
-	"carbon_fiber": "CARBON FIBRE",
-	"titanium_plate": "TITANIUM",
+
+const ARMOR_TYPE_HINTS := {
+	"steel_plate": "Rolled homogeneous steel plate. Reliable baseline kinetic protection.",
+	"ceramic_ablative": "Dense ceramic tile matrix. High-temperature thermal ablation.",
+	"ballistic_nylon": "High-tensile woven fiber weave. Lightweight structural reinforcement.",
+	"composite_plate": "Thick layered composite with tessellated triangle bulges and divots.",
 }
-const MATERIAL_HINTS := {
-	"hardened_steel": "Flat rolled plate. No relief - the baseline.",
-	"reactive_armor": "Staggered explosive blocks. Best against explosive, poor against kinetic.",
-	"ablative_ceramic": "Small square tiles. The thermal answer.",
-	"carbon_fiber": "Fine weave, barely raised. Light, but shatters under kinetic.",
-	"titanium_plate": "Large panels, pronounced seams. The kinetic answer, and heavy.",
-}
+
 const PRESETS := {
 	"FRONTAL": ["front"],
 	"ALL-ROUND": ["front", "back", "left", "right", "top", "bottom"],
@@ -72,26 +57,17 @@ const PRESETS := {
 }
 
 # External handles wired in by MainLab / the placer via enter()/exit().
-# The placer is responsible for stripping modules and routing clicks
-# while paint mode is active. This panel only knows about paint state;
-# it does not know the placer exists, beyond the call signatures below.
 var _hull: Node3D = null
 var _placer: Node = null
 var _bp_manager: Node = null
 
 # Paint state
 var _assignments: Dictionary = {}        # facet_id -> assignment dict
-var _brush_type: String = "armor_plating"
-var _brush_material: String = "hardened_steel"
+var _brush_armor_type: String = "steel_plate"
 var _brush_thickness: float = 1.0
 var _refine: bool = false                # false = whole side, true = one facet
 var _erase: bool = false
 
-# Saved/restored state on enter/exit so the build workflow comes back
-# exactly as the player left it. The placer REPARENTS the modules to
-# a holding node on entry and re-parents them back to the hull on
-# exit; we hold the references across the session so the round trip
-# is identity-preserving (no queue_free, no re-instantiation).
 var _modules_before_strip: Array = []
 
 # Coverage labels
@@ -107,45 +83,25 @@ var is_paint_mode: bool = false
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Built in the same shape as the parts menu (left vertical dock) so
-	# when the swap happens, the player's eye doesn't have to re-find the
-	# controls.
 	_build_header()
 	_build_dock()
 
 
-# Public API. Called by the placer when the toolbar's "PAINT STATION"
-# button is pressed (forward pan) and by the same call site when the
-# player clicks "BACK TO WORKBENCH" (reverse pan).
-#
-# enter() takes a hull node (the live StaticBody3D in MainLab) and
-# the placer (for module strip + restore and click routing).
 func enter(hull: Node3D, placer: Node) -> void:
 	_hull = hull
 	_placer = placer
 	_bp_manager = get_node_or_null("/root/MainLab/BlueprintManager")
 	is_paint_mode = true
-	# Tell the placer to back off its own _unhandled_input. The placer
-	# reads this on every input event and returns early if true. The
-	# panel's _unhandled_input then runs unimpeded.
 	if _placer and "paint_mode_active" in _placer:
 		_placer.paint_mode_active = true
-	# Capture the live module list, then ask the placer to detach them
-	# from the hull. We hold the references across the session and the
-	# placer re-parents them back on exit. The capture must succeed
-	# before the strip so we can re-add in the same order.
 	if _placer and _placer.has_method("capture_modules_for_paint"):
 		_modules_before_strip = _placer.capture_modules_for_paint()
 	if _placer and _placer.has_method("strip_modules_for_paint"):
 		_placer.strip_modules_for_paint(_modules_before_strip)
-	# Pre-warm the segment cache so the first click doesn't pay the
-	# cost of the live facet computation.
 	if _hull:
 		var mesh_instance := _find_hull_mesh(_hull)
 		if mesh_instance and mesh_instance.mesh:
 			HullFacets.cached_segment(mesh_instance.mesh)
-		# Load any existing assignments from the hull's meta so a saved
-		# paint plan comes back.
 		for a in _hull.get_meta("armor_assignments", []):
 			if a is Dictionary:
 				_assignments[int(a.get("facet_id", -1))] = a
@@ -154,26 +110,16 @@ func enter(hull: Node3D, placer: Node) -> void:
 
 func exit() -> void:
 	is_paint_mode = false
-	# Hand input back to the placer BEFORE restoring modules, so the
-	# placer's _unhandled_input is re-enabled for any click during the
-	# restore.
 	if _placer and "paint_mode_active" in _placer:
 		_placer.paint_mode_active = false
-	# Persist the paint plan back to the hull and the scratch file so
-	# the placer's next save_scratch() picks it up.
 	_persist_assignments()
-	# Re-parent the modules back to the hull. The placer handles the
-	# actual reparent + state re-eval; we just hand back the list.
 	if _placer and _placer.has_method("restore_modules_after_paint"):
 		_placer.restore_modules_after_paint(_modules_before_strip)
-	# Free any held references so a re-enter() doesn't double-capture.
 	_modules_before_strip.clear()
 	_hull = null
 	_placer = null
 
 
-# Public, called by the placer so this panel can stay out of the
-# placer's input-dispatch logic. We do the raycast + paint here.
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_paint_mode:
 		return
@@ -186,10 +132,6 @@ func _unhandled_input(event: InputEvent) -> void:
 # --- Layout -----------------------------------------------------------------
 
 func _build_header() -> void:
-	# Reserved for future header text above the dock (workstation
-	# name, save status, etc.). The toolbar owns the screen title
-	# ("PAINT STATION") so this is a placeholder. Kept as a function
-	# so the future addition is one-line.
 	pass
 
 
@@ -197,9 +139,7 @@ func _build_dock() -> void:
 	var dock := PanelContainer.new()
 	dock.theme_type_variation = "WoodPanel"
 	UITheme.apply_material(dock, "wood")
-	# Left-edge anchor + full height, narrower than the parts menu.
-	# DOCK_LEFT_INSET mirrors parts_menu.gd's number (20) so the swap
-	# keeps the left edge stationary.
+
 	var dlc := Control.new()
 	dlc.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	dlc.offset_left = 20.0
@@ -214,22 +154,7 @@ func _build_dock() -> void:
 	inner.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	dock.add_child(inner)
 
-	# Back-to-workbench button at the top of the dock. The toolbar
-	# listener that triggered the swap binds to the "back_requested"
-	# signal; the panel doesn't know about the placer or the pan
-	# transition, it just signals intent.
-	var back := Button.new()
-	back.text = "BACK TO WORKBENCH"
-	back.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
-	UIFeedbackScript.wire(back)
-	back.pressed.connect(func():
-		if not is_paint_mode:
-			return
-		back_requested.emit())
-	inner.add_child(back)
-	inner.add_child(HSeparator.new())
-
-	# Section: brush
+	# Section: brush mode & erase
 	inner.add_child(_section_label("BRUSH"))
 	var mode_row := HBoxContainer.new()
 	mode_row.add_theme_constant_override("separation", Tokens.SPACE_XS)
@@ -254,23 +179,19 @@ func _build_dock() -> void:
 	erase.toggled.connect(func(p: bool): _erase = p)
 	mode_row.add_child(erase)
 
-	# Section: type
-	inner.add_child(_section_label("TYPE"))
-	inner.add_child(_swatch_grid(ArmorPaint.PAINT_TYPE_IDS, TYPE_LABELS,
-		func(id: String): _brush_type = id, func(): return _brush_type))
+	# Section: armor type (consolidated)
+	inner.add_child(_section_label("ARMOR TYPE"))
+	var type_hint := Label.new()
+	type_hint.theme_type_variation = "HintLabel"
+	type_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	type_hint.text = str(ARMOR_TYPE_HINTS.get(_brush_armor_type, ""))
 
-	# Section: material
-	inner.add_child(_section_label("MATERIAL"))
-	var mat_hint := Label.new()
-	mat_hint.theme_type_variation = "HintLabel"
-	mat_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	mat_hint.text = str(MATERIAL_HINTS.get(_brush_material, ""))
-	inner.add_child(_swatch_grid(MATERIAL_LABELS.keys(), MATERIAL_LABELS,
+	inner.add_child(_swatch_grid(ARMOR_TYPES, ARMOR_TYPE_LABELS,
 		func(id: String):
-			_brush_material = id
-			mat_hint.text = str(MATERIAL_HINTS.get(id, "")),
-		func(): return _brush_material))
-	inner.add_child(mat_hint)
+			_brush_armor_type = id
+			type_hint.text = str(ARMOR_TYPE_HINTS.get(id, "")),
+		func(): return _brush_armor_type))
+	inner.add_child(type_hint)
 
 	# Section: thickness
 	inner.add_child(_section_label("THICKNESS"))
@@ -313,7 +234,7 @@ func _build_dock() -> void:
 	UIFeedbackScript.wire(strip_all)
 	strip_all.pressed.connect(func():
 		_assignments.clear()
-		_apply_and_refresh("Stripped."))
+		_apply_and_refresh("Stripped all armor."))
 	inner.add_child(strip_all)
 
 	inner.add_child(HSeparator.new())
@@ -437,8 +358,8 @@ func _paint_facet(fid: int) -> void:
 	_assignments[fid] = {
 		"facet_id": fid,
 		"side": str(facet_sides[fid]) if fid < facet_sides.size() else "",
-		"type_id": _brush_type,
-		"material": _brush_material,
+		"type_id": _brush_armor_type,
+		"material": _brush_armor_type,
 		"thickness": _brush_thickness,
 		"normal": {"x": normals[fid].x, "y": normals[fid].y, "z": normals[fid].z},
 		"centroid": {"x": centroids[fid].x, "y": centroids[fid].y, "z": centroids[fid].z},
@@ -478,22 +399,9 @@ func _apply_and_refresh(status: String = "") -> void:
 
 
 func _persist_assignments() -> void:
-	# The placer's save_scratch() reads current_blueprint, which it
-	# maintains from a separate code path. The paint plan is on the
-	# hull's `armor_assignments` and `armor_plan` meta (set by
-	# _apply_and_refresh). When the player clicks "BACK TO WORKBENCH"
-	# the toolbar calls save_scratch() AFTER the panel exits, so any
-	# save_scratch() path here would race with the toolbar's call.
-	#
-	# The only contract this function has: ensure the hull's meta
-	# reflects the live _assignments dict. _apply_and_refresh
-	# already does that, so this is a no-op safety net.
 	if not is_instance_valid(_hull):
 		return
 	_hull.set_meta("armor_assignments", _assignments.values())
-	# Refresh the telemetry rail in real-time so the player sees updated
-	# HP/weight/cost as they paint, rather than only after jumping back
-	# to the design lab.
 	var main_lab = get_parent()
 	if is_instance_valid(main_lab):
 		var rail: Control = main_lab.get_node_or_null("UI_StatBlock")
@@ -521,19 +429,7 @@ func _set_status(msg: String) -> void:
 		_status_label.text = msg
 
 
-# --- Module strip / restore (delegated) ------------------------------------
-
-# The placer owns the live module list. enter() calls
-# capture_modules_for_paint() and strip_modules_for_paint(); exit() calls
-# restore_modules_after_paint(). This panel only holds the captured
-# reference list across the session.
-
-
-# --- Helpers ----------------------------------------------------------------
-
 func _find_hull_mesh(hull: Node3D) -> MeshInstance3D:
-	# The MainLab Hull is a StaticBody3D. Its child MeshInstance3D is the
-	# chassis (excluding the "PhysicsMesh" name collision proxy).
 	for c in hull.get_children():
 		if c is MeshInstance3D and c.name != "PhysicsMesh":
 			return c

@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode blend_add, cull_back, unshaded, depth_draw_never;
+render_mode blend_add, cull_disabled, unshaded, depth_draw_never;
 
 // The energy_shielding hull material's visible bubble.
 //
@@ -95,7 +95,7 @@ void vertex() {
 
 void fragment() {
 	vec3 n = normalize(NORMAL);
-	float fres = pow(1.0 - clamp(dot(n, normalize(VIEW)), 0.0, 1.0), fresnel_power);
+	float fres = pow(1.0 - clamp(abs(dot(n, normalize(VIEW))), 0.0, 1.0), fresnel_power);
 
 	float t = TIME * crackle_speed;
 

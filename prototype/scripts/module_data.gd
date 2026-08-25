@@ -70,7 +70,7 @@ func get_weight() -> float:
 	
 	for tweak_name in tweaks:
 		var val = tweaks[tweak_name]
-		if tweak_name in ["caliber", "barrel_length", "drum_size", "motor_size", "rod_thickness", "seeker_size", "warhead_size", "motor_length", "ascent_thruster", "payload_size", "nozzle_width", "pressure_valve", "lens_aperture", "containment", "radar_dish", "cooling_jacket", "extractor_size", "bay_volume", "mast_height", "dispersion", "elevation", "fuse_setting", "dish_aperture", "charge_time", "focal_length", "wheel_size", "tread_width", "blade_length", "leg_length", "leg_width", "emv_level", "nacelle_size", "turbine_compression", "wingspan", "drum_width", "drum_diameter", "wheels_per_axle", "foot_size", "cutter_head", "arm_reach", "projector_diameter", "optic_aperture", "mast_extension", "radar_size", "busbar_gauge", "reactor_length", "cooling_radiator", "skirt_diameter", "plenum_pressure", "field_strength", "strut_height", "intake_size", "front_axle_size", "arm_length", "survey_radius", "pylon_height", "ground_coupling", "housing_girth"]:
+		if tweak_name in ["caliber", "barrel_length", "drum_size", "motor_size", "rod_thickness", "seeker_size", "warhead_size", "motor_length", "booster_length", "booster_width", "field_width", "barrier_capacity", "ascent_thruster", "payload_size", "nozzle_width", "pressure_valve", "lens_aperture", "containment", "radar_dish", "cooling_jacket", "extractor_size", "bay_volume", "mast_height", "dispersion", "elevation", "fuse_setting", "dish_aperture", "charge_time", "focal_length", "wheel_size", "tread_width", "blade_length", "leg_length", "leg_width", "emv_level", "nacelle_size", "turbine_compression", "wingspan", "drum_width", "drum_diameter", "wheels_per_axle", "foot_size", "cutter_head", "arm_reach", "projector_diameter", "optic_aperture", "mast_extension", "radar_size", "busbar_gauge", "reactor_length", "cooling_radiator", "skirt_diameter", "plenum_pressure", "field_strength", "strut_height", "intake_size", "front_axle_size", "arm_length", "survey_radius", "pylon_height", "ground_coupling", "housing_girth"]:
 			if typeof(val) == TYPE_FLOAT or typeof(val) == TYPE_INT:
 				weight *= val
 		elif tweak_name == "scan_arc":
@@ -124,7 +124,7 @@ func get_cost() -> Vector2i:
 
 	for tweak_name in tweaks:
 		var val = tweaks[tweak_name]
-		if tweak_name in ["caliber", "barrel_length", "drum_size", "motor_size", "rod_thickness", "seeker_size", "warhead_size", "motor_length", "ascent_thruster", "payload_size", "nozzle_width", "pressure_valve", "lens_aperture", "containment", "radar_dish", "cooling_jacket", "extractor_size", "bay_volume", "mast_height", "dispersion", "elevation", "fuse_setting", "dish_aperture", "charge_time", "focal_length", "wheel_size", "tread_width", "blade_length", "leg_length", "leg_width", "emv_level", "nacelle_size", "turbine_compression", "wingspan", "drum_width", "drum_diameter", "wheels_per_axle", "foot_size", "cutter_head", "arm_reach", "projector_diameter", "optic_aperture", "mast_extension", "radar_size", "busbar_gauge", "reactor_length", "cooling_radiator", "skirt_diameter", "plenum_pressure", "field_strength", "strut_height", "intake_size", "front_axle_size", "arm_length", "survey_radius", "pylon_height", "ground_coupling", "housing_girth"]:
+		if tweak_name in ["caliber", "barrel_length", "drum_size", "motor_size", "rod_thickness", "seeker_size", "warhead_size", "motor_length", "booster_length", "booster_width", "field_width", "barrier_capacity", "ascent_thruster", "payload_size", "nozzle_width", "pressure_valve", "lens_aperture", "containment", "radar_dish", "cooling_jacket", "extractor_size", "bay_volume", "mast_height", "dispersion", "elevation", "fuse_setting", "dish_aperture", "charge_time", "focal_length", "wheel_size", "tread_width", "blade_length", "leg_length", "leg_width", "emv_level", "nacelle_size", "turbine_compression", "wingspan", "drum_width", "drum_diameter", "wheels_per_axle", "foot_size", "cutter_head", "arm_reach", "projector_diameter", "optic_aperture", "mast_extension", "radar_size", "busbar_gauge", "reactor_length", "cooling_radiator", "skirt_diameter", "plenum_pressure", "field_strength", "strut_height", "intake_size", "front_axle_size", "arm_length", "survey_radius", "pylon_height", "ground_coupling", "housing_girth"]:
 			if typeof(val) == TYPE_FLOAT or typeof(val) == TYPE_INT:
 				m = int(m * val)
 				c = int(c * val)
@@ -229,15 +229,25 @@ func get_vision_bonus() -> float:
 		var arc: float = maxf(15.0, float(tweaks["scan_arc"]))
 		bonus *= sqrt(60.0 / arc)
 	if tweaks.has("mast_height"):
-		bonus *= tweaks["mast_height"]
+		bonus *= float(tweaks["mast_height"])
+	if tweaks.has("pylon_height"):
+		bonus *= float(tweaks["pylon_height"])
 	if tweaks.has("dish_aperture"):
-		bonus *= tweaks["dish_aperture"]
+		bonus *= float(tweaks["dish_aperture"])
+	if tweaks.has("radome_scale"):
+		bonus *= float(tweaks["radome_scale"])
+	if tweaks.has("whip_length"):
+		bonus *= (0.8 + 0.2 * float(tweaks["whip_length"]))
+	if tweaks.has("optics_aperture"):
+		bonus *= (0.85 + 0.15 * float(tweaks["optics_aperture"]))
+	if tweaks.has("array_gain"):
+		bonus *= float(tweaks["array_gain"])
 	if tweaks.has("optic_aperture"):
-		bonus *= tweaks["optic_aperture"]
+		bonus *= float(tweaks["optic_aperture"])
 	if tweaks.has("mast_extension"):
-		bonus *= tweaks["mast_extension"]
+		bonus *= float(tweaks["mast_extension"])
 	if tweaks.has("radar_size"):
-		bonus *= tweaks["radar_size"]
+		bonus *= float(tweaks["radar_size"])
 	if tweaks.has("array_faces"):
 		bonus *= float(tweaks["array_faces"]) / ModuleCatalogScript.count_tweak_normalizer(type_id, "array_faces")
 	return GlobalConfig.round_to_half(bonus)
@@ -246,25 +256,6 @@ func get_scan_arc() -> float:
 	if type_id == "directional_radar":
 		return float(tweaks.get("scan_arc", 60.0))
 	return 360.0
-
-func get_survey_radius() -> float:
-	if type_id == "topographic_radar":
-		var base_r := 140.0
-		var mult := float(tweaks.get("survey_radius", 1.0))
-		var pylon := float(tweaks.get("pylon_height", 1.0))
-		return GlobalConfig.round_to_half(base_r * mult * (1.0 + (pylon - 1.0) * 0.25) * _get_volume_mult())
-	return 0.0
-
-func get_seismic_range() -> float:
-	if type_id == "seismic_sensor":
-		var base_r := 75.0
-		var coupling := float(tweaks.get("ground_coupling", 1.0))
-		var girth := float(tweaks.get("housing_girth", 1.0))
-		return GlobalConfig.round_to_half(base_r * coupling * (1.0 + (girth - 1.0) * 0.15) * _get_volume_mult())
-	return 0.0
-
-func is_thermal_sensor() -> bool:
-	return type_id == "thermal_imager"
 
 func get_dps() -> float:
 	var vol = _get_volume_mult()
@@ -290,3 +281,31 @@ func get_dps() -> float:
 				dps *= float(val) / ModuleCatalogScript.count_tweak_normalizer(type_id, tweak_name)
 
 	return GlobalConfig.round_to_half(dps)
+
+func get_boost_profile() -> Dictionary:
+	if type_id != "booster_rack":
+		return {}
+	var base_dur: float = 3.0
+	var base_mult: float = 1.8
+	var base_cd: float = 24.0
+
+	var b_len: float = float(tweaks.get("booster_length", tweaks.get("motor_length", 1.0)))
+	var b_width: float = float(tweaks.get("booster_width", tweaks.get("tube_diameter", 1.0)))
+	var b_tubes: float = float(tweaks.get("nozzle_count", 3.0))
+
+	# Longer -> increases length of boost
+	var dur: float = base_dur * b_len
+	# Wider -> increases amount of boost (thrust multiplier)
+	var mult: float = 1.0 + (base_mult - 1.0) * b_width
+	# More tubes on this rack -> shortens recharge
+	var tube_factor: float = b_tubes / 3.0
+	var cd: float = base_cd / (0.5 + 0.5 * tube_factor)
+
+	return {
+		"speed_mult": mult,
+		"duration": dur,
+		"cooldown": cd,
+		"charges": 0,
+		"energy_per_sec": 0.0,
+		"tubes": b_tubes
+	}

@@ -30,14 +30,12 @@
 const HullFacets = preload("res://scripts/hull_facets.gd")
 const LiveryScript = preload("res://scripts/livery.gd")
 
-# The four paintable armor types. PURELY COSMETIC: each is a skin likeness
-# the armor station paints onto facet triangles (HullFacets.SURFACE_PATTERNS
-# drives the cut/relief pattern; see armor_paint_visual.gd). They used to be
-# ModuleCatalog rows whose hp/weight/metal/crystal priced every painted patch
-# and fed a per-type damage-class bias - that stat layer was retired with the
-# rows; MATERIAL and THICKNESS are the only mechanical axes left. This list is
-# the visual palette, nothing more.
-const PAINT_TYPE_IDS := ["armor_plating", "slat_armor", "spaced_composite", "ablative_foam"]
+# The paintable armor types: Steel Plate, Ceramic Ablative, Ballistic Nylon, Composite Plate.
+const PAINT_TYPE_IDS := [
+	"steel_plate", "ceramic_ablative", "ballistic_nylon", "composite_plate",
+	"hardened_steel", "reactive_armor", "ablative_ceramic", "carbon_fiber", "titanium_plate",
+	"armor_plating", "spaced_composite", "ablative_foam", "slat_armor"
+]
 
 const SIDES := ["front", "back", "left", "right", "top", "bottom"]
 

@@ -341,35 +341,27 @@ const TWEAK_SPECS = {
 	],
 	"sensor_suite": [
 		{"name": "mast_height", "label": "Radar Mast Height", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "dish_aperture", "label": "Radar Dish Diameter", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
+		{"name": "dish_aperture", "label": "Dish Diameter", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
+		{"name": "whip_length", "label": "Whip Antenna Length", "min": 0.6, "max": 1.8, "step": 0.1, "default": 1.0}
+	],
+	"heavy_sensor_suite": [
+		{"name": "pylon_height", "label": "Array Pylon Height", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
+		{"name": "radome_scale", "label": "Multispectrum Radome Scale", "min": 0.6, "max": 1.8, "step": 0.1, "default": 1.0},
+		{"name": "optics_aperture", "label": "EO/IR Sensor Aperture", "min": 0.6, "max": 1.8, "step": 0.1, "default": 1.0}
 	],
 	"directional_radar": [
 		{"name": "scan_arc", "label": "Sector Scan Arc (°)", "min": 40.0, "max": 120.0, "step": 5.0, "default": 60.0},
-		{"name": "mast_height", "label": "Array Mast Height", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
-	],
-	"topographic_radar": [
-		{"name": "survey_radius", "label": "Survey Radius Scale", "min": 0.6, "max": 1.8, "step": 0.1, "default": 1.0},
-		{"name": "pylon_height", "label": "Survey Pylon Mast", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
-	],
-	"seismic_sensor": [
-		{"name": "ground_coupling", "label": "Probe Spike Penetration", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "housing_girth", "label": "Acoustic Damper Girth", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
-	],
-	"thermal_imager": [
-		{"name": "optic_aperture", "label": "FLIR Sensor Aperture", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "mast_height", "label": "Telescoping Mast Height", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
+		{"name": "mast_height", "label": "Gimbal Mast Height", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
+		{"name": "array_gain", "label": "Phased Array Gain", "min": 0.6, "max": 1.8, "step": 0.1, "default": 1.0}
 	],
 	"energy_barrier_projector": [
 		{"name": "projector_diameter", "label": "Array Diameter", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
 		{"name": "coil_count", "label": "Capacitor Coil Count", "min": 2.0, "max": 6.0, "step": 1.0, "default": 4.0}
 	],
-	"laser_designator": [
-		{"name": "optic_aperture", "label": "Optics Aperture", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "mast_extension", "label": "Targeting Mast Height", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
-	],
-	"fire_control_radar": [
-		{"name": "radar_size", "label": "Array Face Size", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "array_faces", "label": "Radar Panel Count", "min": 1.0, "max": 4.0, "step": 1.0, "default": 2.0}
+	"heavy_barrier_projector": [
+		{"name": "field_width", "label": "Field Width / Area", "min": 0.6, "max": 2.0, "step": 0.1, "default": 1.0},
+		{"name": "barrier_capacity", "label": "Absorption Capacity", "min": 0.5, "max": 2.5, "step": 0.1, "default": 1.0},
+		{"name": "projection_distance", "label": "Projection Range (m)", "min": 15.0, "max": 35.0, "step": 1.0, "default": 25.0}
 	],
 	"capacitor_bank": [
 		{"name": "bank_capacity", "label": "Capacitor Cell Count", "min": 2.0, "max": 6.0, "step": 1.0, "default": 4.0},
@@ -430,26 +422,11 @@ const TWEAK_SPECS = {
 		{"name": "lens_aperture", "label": "Ion Focusing Lens", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
 		{"name": "barrel_length", "label": "Barrel Length", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
 	],
-	# --- Propulsion modules (speed pass, 2026-08-08) ---
-	# Every tweak name here is reused from LINEAR_SCALE_WEAPON_TWEAKS/
-	# module_data.gd's scaling lists rather than invented, so weight/cost
-	# scaling works with no new plumbing - the same convention the roster
-	# expansion weapons above already follow.
-	"turbocharger": [
-		{"name": "turbine_compression", "label": "Turbine Compression", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "intake_size", "label": "Intake Size", "min": 0.6, "max": 1.8, "step": 0.1, "default": 1.0}
-	],
-	"hub_motor_array": [
-		{"name": "motor_size", "label": "Hub Motor Size", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "coil_count", "label": "Stator Coil Count", "min": 2.0, "max": 8.0, "step": 1.0, "default": 4.0}
-	],
-	"nitrous_injector": [
-		{"name": "drum_size", "label": "Coolant Bottle Size", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "pressure_valve", "label": "Feed Pressure", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
-	],
+	# --- Rocket Booster (Support sprint ability) ---
 	"booster_rack": [
-		{"name": "nozzle_count", "label": "Booster Tube Count", "min": 1.0, "max": 4.0, "step": 1.0, "default": 3.0},
-		{"name": "motor_length", "label": "Booster Tube Length", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
+		{"name": "booster_length", "label": "Booster Length (Duration)", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
+		{"name": "booster_width", "label": "Booster Width (Thrust)", "min": 0.6, "max": 1.8, "step": 0.1, "default": 1.0},
+		{"name": "nozzle_count", "label": "Booster Tubes (Recharge)", "min": 1.0, "max": 4.0, "step": 1.0, "default": 3.0}
 	]
 }
 

@@ -176,6 +176,42 @@ static func bounds_in_frame(module: Node3D, xf: Transform3D) -> AABB:
 	return merged_aabb(out)
 
 
+## Calculates the module's center of mass (volume-weighted geometric center)
+## in the module's own local space. Weights each constituent mesh box by its
+## volume so large bodies (receivers, main chassis) dominate over thin barrels/greebles.
+static func center_of_mass(module: Node3D) -> Vector3:
+	if module == null or not is_instance_valid(module):
+		return Vector3.ZERO
+	var b_list := boxes(module)
+	if b_list.is_empty():
+		return Vector3.ZERO
+	var total_vol := 0.0
+	var weighted_pos := Vector3.ZERO
+	for b in b_list:
+		var h0: Vector3 = b.get("h0", Vector3.ZERO)
+		var h1: Vector3 = b.get("h1", Vector3.ZERO)
+		var h2: Vector3 = b.get("h2", Vector3.ZERO)
+		var l0 := h0.length()
+		var l1 := h1.length()
+		var l2 := h2.length()
+		var vol := 8.0 * l0 * l1 * l2
+		if vol <= 0.000001:
+			vol = 0.001
+		var c: Vector3 = b.get("c", Vector3.ZERO)
+		weighted_pos += c * vol
+		total_vol += vol
+	if total_vol > 0.0:
+		return weighted_pos / total_vol
+	return merged_aabb(b_list).get_center()
+
+
+## Calculates the module's center of mass in world space.
+static func center_of_mass_world(module: Node3D) -> Vector3:
+	if module == null or not is_instance_valid(module):
+		return Vector3.ZERO
+	return module.global_transform * center_of_mass(module)
+
+
 # --- Overlap ------------------------------------------------------------------
 
 ## Do two modules' visible meshes actually intersect?

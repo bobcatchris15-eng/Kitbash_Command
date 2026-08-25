@@ -126,6 +126,21 @@ func get_boost_summary() -> Dictionary:
 		"active_remaining": maxf(0.0, _active_remaining),
 	}
 
+func can_activate() -> bool:
+	if _boost_config.is_empty():
+		return false
+	if state != State.IDLE:
+		return false
+	if _cooldown_remaining > 0.0:
+		return false
+	return true
+
+func activate() -> bool:
+	if not can_activate():
+		return false
+	_engage()
+	return true
+
 func _can_engage() -> bool:
 	if _boost_config.is_empty():
 		return false

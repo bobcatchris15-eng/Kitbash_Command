@@ -86,6 +86,7 @@ var _redo_btn
 var _compare_btn: MenuButton
 var _mirror_icon
 var _name_roll_button
+var _armor_station_btn: Button
 var toolbar
 
 func _push_undo():
@@ -211,6 +212,16 @@ func _on_library_pressed():
 # reads it as a single "turn to the workbench" gesture, not three
 # discrete changes. The reverse pan (triggered by the panel's
 # back_requested signal) undoes all three in lockstep.
+func _on_armor_station_button_pressed() -> void:
+	var root = lab.get_node_or_null("/root/MainLab")
+	if not root:
+		return
+	var armor_panel: Control = root.get_node_or_null("UI_ArmorStationPanel")
+	if armor_panel and armor_panel.visible:
+		_on_armor_station_back(root)
+	else:
+		_on_paint_station_pressed()
+
 func _on_paint_station_pressed():
 	var root = lab.get_node("/root/MainLab")
 	var blueprint_manager = root.get_node_or_null("BlueprintManager") if root else null
@@ -285,16 +296,14 @@ func _apply_paint_mode_swap(root: Node) -> void:
 	var paint_env: Node3D = root.get_node_or_null("PaintStationEnvironment")
 	if paint_env:
 		paint_env.visible = true
+	if _armor_station_btn:
+		_armor_station_btn.text = "BACK TO WORKBENCH"
+		_armor_station_btn.tooltip_text = "Return to parts workbench"
+		if _armor_station_btn.has_meta("full_label"):
+			_armor_station_btn.set_meta("full_label", "BACK TO WORKBENCH")
 	if armor_panel and armor_panel.has_method("enter") and root:
 		var hull: Node3D = root.get_node_or_null("Hull")
 		armor_panel.enter(hull, root)
-		# The panel is a Control already in the tree (UI_ArmorStationPanel
-		# node). Its _unhandled_input fires for any unhandled mouse
-		# event; mouse_filter = MOUSE_FILTER_IGNORE on the panel root
-		# means the click falls through to the 3D viewport, and the
-		# panel's _unhandled_input claims the event with
-		# set_input_as_handled() so the placer doesn't try to operate
-		# on the (now-empty) hull.
 
 
 # The three reverse swaps. Also runs in one frame.
@@ -311,6 +320,11 @@ func _apply_build_mode_swap(root: Node) -> void:
 	var paint_env: Node3D = root.get_node_or_null("PaintStationEnvironment")
 	if paint_env:
 		paint_env.visible = false
+	if _armor_station_btn:
+		_armor_station_btn.text = "ARMOR STATION"
+		_armor_station_btn.tooltip_text = "Open armor station"
+		if _armor_station_btn.has_meta("full_label"):
+			_armor_station_btn.set_meta("full_label", "ARMOR STATION")
 
 
 func _on_test_pressed():
@@ -465,7 +479,7 @@ func _build_toolbar() -> void:
 	# the chassis stripped of modules and a camera that can reach the belly -
 	# neither of which this screen can offer without a mode gate it does not
 	# have. The scratch design is the handoff, exactly as with the Test Range.
-	_toolbar_button(row, "ARMOR STATION", "icon_armor", _on_paint_station_pressed)
+	_armor_station_btn = _toolbar_button(row, "ARMOR STATION", "icon_armor", func(): _on_armor_station_button_pressed())
 
 	row.add_child(VSeparator.new())
 

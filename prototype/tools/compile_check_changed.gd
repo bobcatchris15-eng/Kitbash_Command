@@ -16,9 +16,11 @@ const FILES := [
 	"res://scripts/module_placer.gd",
 	"res://scripts/armor_paint.gd",
 	"res://scripts/armor_station_panel.gd",
-	"res://scripts/hull_facets.gd",
-	"res://scripts/part_materials.gd",
-	"res://scripts/design_stats.gd",
+	"res://scripts/module_volume.gd",
+	"res://scripts/ui/module_action_ring.gd",
+	"res://scripts/ui_radial_menu.gd",
+	"res://scripts/modular_hull_builder.gd",
+	"res://scripts/tweak_callout_manager.gd",
 ]
 
 func _init():

@@ -39,30 +39,21 @@ const ELEVATION_COMBAT_PIERCE_MULTIPLIER: float = 0.85
 # energy); ablative_ceramic is moderate (ablative/heat-resistant materials
 # have some real answer to it, just not a dedicated one).
 const ARMOR_TABLE = {
+	"steel_plate": {"kinetic": [15.0, 0.7], "thermal": [5.0, 0.9], "explosive": [10.0, 0.8], "energy": [8.0, 0.85]},
+	"composite_plate": {"kinetic": [20.0, 0.65], "thermal": [18.0, 0.6], "explosive": [25.0, 0.45], "energy": [15.0, 0.7]},
+	"ceramic_ablative": {"kinetic": [8.0, 0.9], "thermal": [25.0, 0.3], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
+	"ballistic_nylon": {"kinetic": [7.0, 0.85], "thermal": [22.0, 0.4], "explosive": [24.0, 0.5], "energy": [12.0, 0.7]},
+	# Aliases & Legacy
 	"hardened_steel": {"kinetic": [15.0, 0.7], "thermal": [5.0, 0.9], "explosive": [10.0, 0.8], "energy": [8.0, 0.85]},
+	"armor_plating": {"kinetic": [15.0, 0.7], "thermal": [5.0, 0.9], "explosive": [10.0, 0.8], "energy": [8.0, 0.85]},
 	"reactive_armor": {"kinetic": [10.0, 0.8], "thermal": [10.0, 0.8], "explosive": [30.0, 0.4], "energy": [8.0, 0.85]},
+	"spaced_composite": {"kinetic": [20.0, 0.65], "thermal": [18.0, 0.6], "explosive": [25.0, 0.45], "energy": [15.0, 0.7]},
 	"ablative_ceramic": {"kinetic": [8.0, 0.9], "thermal": [25.0, 0.3], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
-	# energy_shielding kinetic row weakened (FABLE_REVIEW.md 1.2): it used to
-	# be best-or-tied in EVERY damage class on top of the best HP-per-weight,
-	# making the material dropdown a solved choice. "Shields stop beams, not
-	# shells": now the WORST kinetic threshold in the table, completing a real
-	# rock-paper-scissors (steel=kinetic, reactive=explosive, ablative=thermal,
-	# shielding=energy).
+	"ablative_foam": {"kinetic": [8.0, 0.9], "thermal": [25.0, 0.3], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
 	"energy_shielding": {"kinetic": [10.0, 0.75], "thermal": [20.0, 0.5], "explosive": [20.0, 0.5], "energy": [35.0, 0.3]},
-	# --- Higher-end paint materials (Armor Bay, exotics-gated) ---
-	#
-	# Both are deliberately NOT strictly better than the tier-1 three, or the
-	# material choice collapses into "buy the expensive one" the way
-	# energy_shielding once did before its kinetic row was weakened.
-	#
-	# carbon_fiber: light and very good against shaped/thermal effects, poor
-	# against raw kinetic - it shatters rather than deforms. Its real advantage
-	# is weight, which it pays out through ArmorPaint's area-scaled mass rather
-	# than through this table.
 	"carbon_fiber": {"kinetic": [7.0, 0.85], "thermal": [22.0, 0.4], "explosive": [24.0, 0.5], "energy": [12.0, 0.7]},
-	# titanium_plate: the kinetic answer, beating hardened_steel head-on, but
-	# heavy and unremarkable against everything else.
 	"titanium_plate": {"kinetic": [26.0, 0.55], "thermal": [8.0, 0.85], "explosive": [14.0, 0.7], "energy": [9.0, 0.8]},
+	"slat_armor": {"kinetic": [15.0, 0.7], "thermal": [5.0, 0.9], "explosive": [10.0, 0.8], "energy": [8.0, 0.85]},
 }
 
 # --- Hit damage math (FABLE_REVIEW.md 1.1 / 3.6 / 2.5) ---

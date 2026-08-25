@@ -1,4 +1,4 @@
-﻿class_name ModuleCatalog
+class_name ModuleCatalog
 
 const HullLoader = preload("res://scripts/hull_loader.gd")
 const GlobalConfigScript = preload("res://scripts/global_config.gd")
@@ -1131,86 +1131,47 @@ static func _build_catalog_literal() -> Dictionary:
 			"dps": 0.0,
 			"heal_rate": 30.0,
 			"targets_allies": true,
-			"size": Vector3(0.8, 0.8, 1.0),
+			"size": Vector3(2.0, 2.0, 2.5),
 			"color": Color.DARK_TURQUOISE
 		},
 		"sensor_suite": {
-			"name": "Radar Mast Suite",
+			"name": "Standard Sensor Mast",
 			"category": "module",
 			"hp": 60.0,
-			"weight": 50.0,
-			"metal": 30,
-			"crystal": 30,
+			"weight": 45.0,
+			"metal": 25,
+			"crystal": 20,
 			"dps": 0.0,
-			"vision_bonus": 47.5,
-			"size": Vector3(0.5, 2.5, 0.5),
+			"vision_bonus": 38.0,
+			"size": Vector3(0.6, 2.2, 0.6),
 			"color": Color.MEDIUM_PURPLE
 		},
-		"directional_radar": {
-			"name": "Phased Array Sector Radar",
+		"heavy_sensor_suite": {
+			"name": "Advanced Sensor Array",
 			"category": "module",
 			"required_building": "tech_lab",
-			"hp": 75.0,
-			"weight": 65.0,
-			"metal": 40,
-			"crystal": 50,
-			"dps": 0.0,
-			"vision_bonus": 85.0,
-			"scan_arc": 60.0,
-			"size": Vector3(0.9, 2.2, 0.6),
-			"color": Color.ROYAL_BLUE
-		},
-		"topographic_radar": {
-			"name": "Topographic Lidar Surveyor",
-			"category": "module",
-			"required_building": "tech_lab",
-			"hp": 90.0,
-			"weight": 75.0,
-			"metal": 45,
+			"hp": 120.0,
+			"weight": 95.0,
+			"metal": 75,
 			"crystal": 60,
 			"dps": 0.0,
-			"survey_radius": 140.0,
-			"size": Vector3(1.2, 2.0, 1.2),
-			"color": Color.MEDIUM_SEA_GREEN
+			"vision_bonus": 114.0,
+			"size": Vector3(1.1, 2.5, 1.1),
+			"color": Color.ROYAL_BLUE
 		},
-		"seismic_sensor": {
-			"name": "Seismic Acoustic Array",
-			"category": "module",
-			"required_building": "physics_lab",
-			"hp": 110.0,
-			"weight": 85.0,
-			"metal": 50,
-			"crystal": 25,
-			"dps": 0.0,
-			"seismic_range": 75.0,
-			"size": Vector3(0.8, 1.0, 0.8),
-			"color": Color.DARK_SLATE_GRAY
-		},
-		"thermal_imager": {
-			"name": "Cryo FLIR Thermal Imager",
-			"category": "module",
-			"required_building": "physics_lab",
-			"hp": 50.0,
-			"weight": 40.0,
-			"metal": 25,
-			"crystal": 45,
-			"dps": 0.0,
-			"vision_bonus": 35.0,
-			"thermal_sight": true,
-			"size": Vector3(0.6, 1.8, 0.6),
-			"color": Color.ORANGE_RED
-		},
-		"laser_designator": {
-			"name": "Laser Target Painter",
+		"directional_radar": {
+			"name": "Directional Phased Array",
 			"category": "module",
 			"required_building": "tech_lab",
-			"hp": 80.0,
-			"weight": 40.0,
-			"metal": 25,
-			"crystal": 35,
+			"hp": 100.0,
+			"weight": 80.0,
+			"metal": 75,
+			"crystal": 60,
 			"dps": 0.0,
-			"size": Vector3(0.6, 0.7, 0.6),
-			"color": Color.PALE_VIOLET_RED
+			"vision_bonus": 230.0,
+			"scan_arc": 60.0,
+			"size": Vector3(1.0, 2.4, 0.8),
+			"color": Color.DEEP_SKY_BLUE
 		},
 		"energy_barrier_projector": {
 			"name": "Energy Barrier Projector",
@@ -1224,17 +1185,25 @@ static func _build_catalog_literal() -> Dictionary:
 			"size": Vector3(1.0, 0.4, 1.0),
 			"color": Color.DEEP_SKY_BLUE
 		},
-		"fire_control_radar": {
-			"name": "Fire Control Radar",
-			"category": "module",
-			"required_building": "tech_lab",
-			"hp": 90.0,
-			"weight": 65.0,
-			"metal": 45,
-			"crystal": 40,
+		"heavy_barrier_projector": {
+			"name": "Heavy Barrier Projector",
+			"category": "weapon",
+			"description": "Turreted Aegis barrier emitter. Automatically pivots to track incoming threats and projects a wide, terrain-conforming forcefield 20-30m ahead to shelter the vehicle and all friendly units within its zone.",
+			"required_building": "exotics_lab",
+			"hp": 400.0,
+			"weight": 160.0,
+			"metal": 90,
+			"crystal": 75,
 			"dps": 0.0,
-			"size": Vector3(0.7, 1.8, 0.7),
-			"color": Color.DODGER_BLUE
+			"default_tweaks": {
+				"field_width": 1.0,
+				"barrier_capacity": 1.0,
+				"projection_distance": 25.0
+			},
+			"size": Vector3(1.2, 0.9, 1.4),
+			"color": Color(0.2, 0.75, 0.95),
+			"traverse_limit_angle": 360.0,
+			"traverse_speed": 2.5
 		},
 
 		# --- GENERATORS (Energy resource, ENERGY_AND_BALANCE_SPEC.md #1) ---
@@ -1358,74 +1327,33 @@ static func _build_catalog_literal() -> Dictionary:
 		# Drivetrain.analyze()), plus two new hooks - top_speed_mult and
 		# capacity_mult - that raise or trade against the chassis ceiling
 		# itself. A hull carrying only one of these and no weapon/support
-		# module is still correctly an illegal build (validate_build_legality
-		# never treats "module" category as satisfying that check on its own).
-		#
-		# role "Propulsion" (see MODULE_ROLES/MODULE_ROLE_ORDER below) routes
-		# them to the Design Lab's Drives toolbox alongside the locomotion
-		# types they modify, not into Support with the generators.
-		"turbocharger": {
-			"name": "Turbocharger",
+		# --- ROCKET BOOSTERS (SUPPORT / BURST SPRINT) ---
+		# Solid-fuel rocket booster enabling a burst speed ability with a recharge cycle.
+		# Adding more boosters shortens recharge, making them longer extends boost duration,
+		# and making them wider increases boost speed multiplier.
+		"booster_rack": {
+			"name": "Solid-Fuel Rocket Booster",
 			"category": "module",
-			"description": "Forced induction for the drivetrain. Real thrust, real weight - does nothing once the chassis is already at its own speed ceiling.",
-			"hp": 45.0,
-			"weight": 40.0,
-			"metal": 30,
-			"crystal": 5,
-			"dps": 0.0,
-			# Pure thrust, no ceiling change - the honest turbo. A design
-			# already capacity_limited (see Drivetrain.analyze()) gains
-			# nothing from this, and the Lab says so.
-			"thrust_bonus": 90.0,
-			"size": Vector3(0.6, 0.5, 0.6),
-			"color": Color(0.5, 0.5, 0.55)
-		},
-		"hub_motor_array": {
-			"name": "Electric Hub Motors",
-			"category": "module",
-			"description": "Direct-drive motors at each wheel or drum. Real thrust and a real ceiling gain, paid for out of the power budget rather than the load budget.",
+			"description": "Strap-on solid rocket booster system. Grants a burst sprint ability followed by a recharge cooldown. Making them longer increases boost duration, wider increases boost speed, and fitting additional boosters accelerates recharge.",
 			"hp": 40.0,
-			"weight": 35.0,
-			"metal": 25,
-			"crystal": 35,
-			"dps": 0.0,
-			"thrust_bonus": 70.0,
-			"top_speed_mult": 1.08,
-			"size": Vector3(0.5, 0.4, 0.5),
-			"color": Color(0.3, 0.55, 0.75)
-		},
-		"nitrous_injector": {
-			"name": "Coolant Injection",
-			"category": "module",
-			"description": "A chemical speed burst: markedly faster for a short window, then a real cooldown before it can fire again. Drains the energy buffer while lit.",
-			"hp": 30.0,
-			"weight": 25.0,
-			"metal": 15,
+			"weight": 45.0,
+			"metal": 35,
 			"crystal": 15,
 			"dps": 0.0,
-			# See BoostController - the burst is applied to live movement, not
-			# to this design-time analysis, so it never inflates the quoted
-			# top speed. duration/cooldown in seconds; energy_per_sec drains
-			# the buffer only while the boost is actually lit.
-			"boost": {"speed_mult": 1.45, "duration": 5.0, "cooldown": 14.0, "energy_per_sec": 6.0, "charges": 0},
-			"size": Vector3(0.5, 0.5, 0.9),
-			"color": Color(0.65, 0.85, 0.95)
-		},
-		"booster_rack": {
-			"name": "Solid-Fuel Booster Rack",
-			"category": "module",
-			"description": "Strap-on solid rocket motors. Absurd and short-lived: three of the hardest kicks in the game, and once they're spent, they're spent.",
-			"hp": 35.0,
-			"weight": 55.0,
-			"metal": 40,
-			"crystal": 5,
-			"dps": 0.0,
-			# The wild card. No cooldown at all - only three charges, ever,
-			# for this design's whole battle. Heavy enough that fitting it is
-			# a real decision, not a free extra gear.
-			"boost": {"speed_mult": 2.2, "duration": 2.5, "cooldown": 0.0, "energy_per_sec": 0.0, "charges": 3},
+			"default_tweaks": {
+				"booster_length": 1.0,
+				"booster_width": 1.0,
+				"nozzle_count": 3.0
+			},
+			"boost": {
+				"speed_mult": 1.8,
+				"duration": 3.0,
+				"cooldown": 24.0,
+				"energy_per_sec": 0.0,
+				"charges": 0
+			},
 			"size": Vector3(0.9, 0.5, 1.1),
-			"color": Color(0.75, 0.25, 0.2)
+			"color": Color(0.85, 0.35, 0.2)
 		},
 
 		# --- LOCOMOTION ARCHETYPES ---
@@ -1896,11 +1824,9 @@ const MODULE_FLAVOR = {
 	# Support
 	"resource_harvester": "Extracts and hauls. Slow, unarmed, and statistically the first thing shot at.",
 	"repair_array": "Field repair. Restores structure. Does not restore crews, morale, or paperwork.",
-	"sensor_suite": "Extends detection range. Emits constantly, and is therefore also easily detected.",
-	"directional_radar": "High-gain phased sector array. Exceptional reach forward; utterly blind behind.",
-	"topographic_radar": "Interferometric contour surveyor. Maps terrain elevations and horizons; ignores tactical contacts.",
-	"seismic_sensor": "Subsurface acoustic geophone. Detects moving ground hulls through solid rock; oblivious to air and idle units.",
-	"thermal_imager": "Cryogenically cooled infrared optics. Sees heat straight through smoke screens and obscurants.",
+	"sensor_suite": "Standard 360-degree radar mast. Doubles base hull detection range with active pulse scanning.",
+	"heavy_sensor_suite": "Heavy multispectrum sensor array. Quadruples base detection range across a 360-degree sphere.",
+	"directional_radar": "High-gain phased sector array. Exceptional reach forward in a focused sector cone; blind behind.",
 	# Power
 	"fusion_generator": "Supplies heavy base power. Rated safe. Rating issued by the manufacturer.",
 	"diesel_generator": "Internal combustion turbine. Rugged, thirsty, and loud enough to mask minor engineering errors.",
@@ -2231,8 +2157,8 @@ static func needs_combat_script(type_id: String) -> bool:
 const SUPPORT_CATEGORIES = ["generator"]
 const SUPPORT_TYPE_IDS = [
 	"repair_array", "drone_carrier", "resource_harvester", "sensor_suite",
-	"laser_designator", "energy_barrier_projector", "fire_control_radar",
-	"directional_radar", "topographic_radar", "seismic_sensor", "thermal_imager"
+	"heavy_sensor_suite", "directional_radar", "energy_barrier_projector",
+	"heavy_barrier_projector", "booster_rack"
 ]
 
 # --- Continuous power draw --------------------------------------------------
@@ -2246,9 +2172,7 @@ const SUPPORT_TYPE_IDS = [
 # radar and a jammer, see half the map, and pay nothing for it.
 #
 # Everything here is a device that is doing work continuously, and the numbers
-# are ordered by how loud that work is rather than by how big the part is:
-# fire_control_radar costs more than sensor_suite because it is actively
-# tracking rather than passively listening.
+# are ordered by how loud that work is rather than by how big the part is.
 #
 # ENERGY WEAPONS ARE DELIBERATELY ABSENT. They spend per shot through
 # spend_energy(), which is a burst cost, and putting them here as well would
@@ -2261,13 +2185,10 @@ const SUPPORT_TYPE_IDS = [
 # the pool it spends to absorb a hit (unit.gd's _absorb_with_barrier).
 const POWER_DRAW := {
 	"sensor_suite": 2.5,
-	"directional_radar": 3.5,
-	"topographic_radar": 5.0,
-	"seismic_sensor": 1.5,
-	"thermal_imager": 2.0,
-	"fire_control_radar": 4.0,
-	"laser_designator": 2.0,
+	"heavy_sensor_suite": 6.0,
+	"directional_radar": 6.0,
 	"energy_barrier_projector": 5.0,
+	"heavy_barrier_projector": 12.0,
 	"repair_array": 3.5,
 	"drone_carrier": 4.0,
 }
@@ -2352,19 +2273,11 @@ const MODULE_ROLES = {
 	"repair_array": "Support",
 	"resource_harvester": "Support",
 	"sensor_suite": "Support",
+	"heavy_sensor_suite": "Support",
 	"directional_radar": "Support",
-	"topographic_radar": "Support",
-	"seismic_sensor": "Support",
-	"thermal_imager": "Support",
-
-	# Speed as a real, affectable stat (2026-08-08): category "module" like
-	# everything above, but browsed with the locomotion types they modify
-	# rather than with the generators - see the TIERS/DRIVE_ROLES comment in
-	# parts_menu.gd for why that split doesn't need a new top-level toolbox.
-	"turbocharger": "Propulsion",
-	"hub_motor_array": "Propulsion",
-	"nitrous_injector": "Propulsion",
-	"booster_rack": "Propulsion",
+	"energy_barrier_projector": "Support",
+	"heavy_barrier_projector": "Support",
+	"booster_rack": "Support",
 }
 
 # Display order for the module tab's drawers. Roughly "things that shoot" ->
@@ -2372,7 +2285,7 @@ const MODULE_ROLES = {
 # order a build actually gets assembled in.
 const MODULE_ROLE_ORDER = [
 	"Direct-Fire Guns", "Energy & Electromagnetic", "Indirect Fire", "Missiles",
-	"Point Defense", "Deployables", "Armor", "Propulsion", "Power", "Support",
+	"Point Defense", "Deployables", "Armor", "Power", "Support",
 ]
 
 # Fallback for anything MODULE_ROLES doesn't name (a mod, or a part added here
@@ -3583,7 +3496,6 @@ const COUNT_TWEAK_DEFAULTS := {
 	"repair_array":             {"welder_count": 2.0},
 	"energy_barrier_projector": {"coil_count": 4.0},
 	"hub_motor_array":          {"coil_count": 4.0},
-	"fire_control_radar":       {"array_faces": 2.0},
 	"capacitor_bank":           {"bank_capacity": 4.0},
 	"solid_state_battery":      {"cell_layers": 4.0},
 	"booster_rack":             {"nozzle_count": 3.0},

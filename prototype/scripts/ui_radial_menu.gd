@@ -36,6 +36,7 @@ const Tokens = preload("res://scripts/ui_tokens.gd")
 const UIAnim = preload("res://scripts/ui_anim.gd")
 const UIIcons = preload("res://scripts/ui_icons.gd")
 const RingDraw = preload("res://scripts/ui/ring_draw.gd")
+const ModuleVolume = preload("res://scripts/module_volume.gd")
 
 signal action_invoked(action_id: String)
 signal action_invoked_button(action_id: String, button_index: int)
@@ -46,13 +47,13 @@ signal dismissed()
 # HUB_RADIUS is deliberately generous. A small dead zone means a player who
 # opens the ring and changes their mind has to aim to cancel, and aiming to
 # cancel is the single most annoying thing a radial menu can ask for.
-const HUB_RADIUS := 30.0
-const RING_INNER := 38.0
-const RING_OUTER := 84.0
+const HUB_RADIUS := 28.0
+const RING_INNER := 84.0
+const RING_OUTER := 128.0
 # Padding beyond RING_OUTER for the legend text, which is drawn outside the
 # ring so it never fights the tick marks for space.
 const LABEL_GAP := 14.0
-const CANVAS_PAD := 115.0
+const CANVAS_PAD := 80.0
 
 const TICK_COUNT := 48
 const TICK_LEN_MINOR := 4.0
@@ -89,7 +90,7 @@ func _init() -> void:
 
 
 # Registers a satellite outer control (like RadialDial) orbiting the ring
-func add_satellite_control(ctrl: Control, angle_rad: float, radius: float = 142.0) -> void:
+func add_satellite_control(ctrl: Control, angle_rad: float, radius: float = 180.0) -> void:
 	_satellite_controls.append(ctrl)
 	add_child(ctrl)
 	var center := size * 0.5
@@ -157,7 +158,8 @@ func _ready() -> void:
 	if target_node and is_instance_valid(target_node):
 		var camera := get_viewport().get_camera_3d()
 		if camera:
-			_center_on(camera.unproject_position(target_node.global_position))
+			var pos_3d := ModuleVolume.center_of_mass_world(target_node)
+			_center_on(camera.unproject_position(pos_3d))
 
 
 func _process(delta: float) -> void:
@@ -174,7 +176,7 @@ func _process(delta: float) -> void:
 	if camera == null or target_node == null:
 		return
 
-	var pos_3d := target_node.global_position
+	var pos_3d := ModuleVolume.center_of_mass_world(target_node)
 	if camera.is_position_behind(pos_3d):
 		modulate.a = 0.0
 		return

@@ -14,26 +14,21 @@ const TweakStations = preload("res://scripts/ui/tweak_stations.gd")
 signal action_invoked(action_id: String)
 signal dismissed()
 
-const MIN_INNER_RADIUS := 42.0
-const MAX_INNER_RADIUS := 400.0
+const FIXED_INNER_RADIUS := 84.0
 const BAND_WIDTH := 44.0
-const CLEARANCE_MARGIN := 16.0
+const FIXED_OUTER_RADIUS := FIXED_INNER_RADIUS + BAND_WIDTH  # 128.0
 const HUB_RADIUS := 28.0
-const STATION_RADIAL_OFFSET := 56.0
-# Radial gap between stacked stations that share a clock angle. A dial is 72 px
-# tall including its caption badge, so one step clears the tier below.
+const STATION_RADIAL_OFFSET := 52.0                          # Station orbit at 180.0
 const STATION_TIER_OFFSET := 76.0
-# Canvas slack beyond the ring: must fit the station orbit plus two overflow
-# tiers plus half a station control (56 + 2*76 + ~40).
-const ORBIT_MARGIN := 250.0
+const ORBIT_MARGIN := 200.0
 
 var target_node: Node3D = null
 var subject_label: String = ""
 var spec_stats_text: String = ""
 var max_zoom_distance: float = 40.0
 
-var inner_radius: float = MIN_INNER_RADIUS
-var outer_radius: float = MIN_INNER_RADIUS + BAND_WIDTH
+var inner_radius: float = FIXED_INNER_RADIUS
+var outer_radius: float = FIXED_OUTER_RADIUS
 
 var _actions: Array = []  # [{id, label, icon, enabled}]
 var _tweak_stations: Array = [] # [{name, label, control, angle, tier}]
@@ -187,7 +182,7 @@ func open_for_module(module: Node3D, label_text: String = "") -> void:
 	subject_label = label_text
 	_is_open = true
 	visible = true
-	_size_to_module()
+	_update_canvas_size()
 	_update_screen_position()
 	_update_station_positions()
 	UIAnim.ring_pop(self)
@@ -218,77 +213,10 @@ func _process(delta: float) -> void:
 	_update_station_positions()
 
 
-# Measured once when the ring opens: the hole clears the module it was opened
-# on, and the geometry stays put from then on. The ring used to re-project the
-# module's silhouette every frame and breathe with camera zoom, which shrank
-# and grew the station orbit under a player's cursor mid-drag.
-func _size_to_module() -> void:
+func _get_target_3d_center() -> Vector3:
 	if target_node == null or not is_instance_valid(target_node):
-		return
-	var camera := get_viewport().get_camera_3d()
-	if not camera or camera.is_position_behind(target_node.global_position):
-		return
-
-	var half_diag := _compute_projected_half_diagonal(camera, target_node)
-	var vp_size: Vector2 = get_viewport().get_visible_rect().size
-	var viewport_cap: float = minf(vp_size.x, vp_size.y) * 0.40
-	inner_radius = clampf(half_diag + CLEARANCE_MARGIN, MIN_INNER_RADIUS, minf(MAX_INNER_RADIUS, viewport_cap))
-
-	outer_radius = inner_radius + BAND_WIDTH
-	_update_canvas_size()
-	queue_redraw()
-
-
-func _compute_projected_half_diagonal(camera: Camera3D, node: Node3D) -> float:
-	var aabb: AABB = ModuleVolume.bounds(node)
-	if aabb.size == Vector3.ZERO:
-		aabb = AABB(Vector3(-0.5, -0.5, -0.5), Vector3.ONE)
-
-	var center_3d: Vector3 = node.global_position
-	var center_2d: Vector2 = camera.unproject_position(center_3d)
-
-	var max_dist: float = MIN_INNER_RADIUS
-	var corners := _aabb_corners(aabb)
-	for c in corners:
-		var world_pos: Vector3 = node.global_transform * c
-		if not camera.is_position_behind(world_pos):
-			var screen_pos: Vector2 = camera.unproject_position(world_pos)
-			var d := (screen_pos - center_2d).length()
-			if d > max_dist:
-				max_dist = d
-
-	var box_list: Array = ModuleVolume.boxes(node)
-	if box_list.size() > 1:
-		for box in box_list:
-			var c: Vector3 = box.get("c", Vector3.ZERO)
-			var h0: Vector3 = box.get("h0", Vector3.ZERO)
-			var h1: Vector3 = box.get("h1", Vector3.ZERO)
-			var h2: Vector3 = box.get("h2", Vector3.ZERO)
-			for sx in [-1.0, 1.0]:
-				for sy in [-1.0, 1.0]:
-					for sz in [-1.0, 1.0]:
-						var local_pt: Vector3 = c + h0 * sx + h1 * sy + h2 * sz
-						var world_pos: Vector3 = node.global_transform * local_pt
-						if not camera.is_position_behind(world_pos):
-							var screen_pos: Vector2 = camera.unproject_position(world_pos)
-							var d := (screen_pos - center_2d).length()
-							if d > max_dist:
-								max_dist = d
-
-	return max_dist
-
-
-static func _aabb_corners(aabb: AABB) -> Array:
-	return [
-		Vector3(aabb.position.x, aabb.position.y, aabb.position.z),
-		Vector3(aabb.end.x, aabb.position.y, aabb.position.z),
-		Vector3(aabb.position.x, aabb.end.y, aabb.position.z),
-		Vector3(aabb.position.x, aabb.position.y, aabb.end.z),
-		Vector3(aabb.end.x, aabb.end.y, aabb.position.z),
-		Vector3(aabb.end.x, aabb.position.y, aabb.end.z),
-		Vector3(aabb.position.x, aabb.end.y, aabb.end.z),
-		Vector3(aabb.end.x, aabb.end.y, aabb.end.z),
-	]
+		return Vector3.ZERO
+	return ModuleVolume.center_of_mass_world(target_node)
 
 
 func _update_screen_position() -> void:
@@ -298,14 +226,19 @@ func _update_screen_position() -> void:
 	if not camera:
 		return
 
-	var dist := camera.global_position.distance_to(target_node.global_position)
-	if dist > max_zoom_distance or camera.is_position_behind(target_node.global_position):
+	var center_3d := _get_target_3d_center()
+	if camera.is_position_behind(center_3d):
+		modulate.a = 0.0
+		return
+
+	var dist := camera.global_position.distance_to(center_3d)
+	if dist > max_zoom_distance:
 		modulate.a = 0.0
 		return
 	else:
 		modulate.a = clampf(1.0 - (dist - (max_zoom_distance - 8.0)) / 8.0, 0.0, 1.0)
 
-	_target_screen_center = camera.unproject_position(target_node.global_position)
+	_target_screen_center = camera.unproject_position(center_3d)
 	position = _target_screen_center - size * 0.5
 
 

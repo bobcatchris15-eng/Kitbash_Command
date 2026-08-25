@@ -3455,6 +3455,11 @@ func _place_defence_impl(blueprint: Dictionary, structure_team: int, at: Vector3
 	VFXEffectsScript.dust_cloud(self, s.position, foot * 0.5)
 	# Displace overlapping terrain props (greebles, grass, rocks).
 	_displace_terrain_props(at, foot * 0.5)
+	# Apply distance-based visibility range to defense hull/turret mesh subtree
+	_apply_structure_visibility_range(s)
+	if vision != null:
+		var fp: Vector3 = s.footprint if "footprint" in s else Vector3(4, 3, 4)
+		vision.invalidate_los_cache(s.global_position, maxf(fp.x, fp.z))
 	if not under_construction:
 		structure_built.emit(structure_team, "defense")
 	return s

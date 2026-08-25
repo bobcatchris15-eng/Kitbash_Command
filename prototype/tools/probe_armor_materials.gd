@@ -1,24 +1,17 @@
 extends SceneTree
 # Renders one hull flank painted with each armor material in turn, so the
-# RELIEF signatures can be compared by eye. Materials are meant to be told apart
-# without colour (livery repaints everything), so this is the only test that
-# actually checks the thing that matters.
-#
-# WINDOWED, not headless: the headless dummy renderer does not rasterize, so a
-# headless run writes blank images that agree with themselves.
-#
-# Run: Godot_v4.7.1-stable_win64.exe --path . --script res://tools/probe_armor_materials.gd
+# RELIEF signatures can be compared by eye.
 
 const MeshAssetLoader = preload("res://scripts/mesh_asset_loader.gd")
 const HullFacets = preload("res://scripts/hull_facets.gd")
 const ArmorPaint = preload("res://scripts/armor_paint.gd")
 const ArmorPaintVisual = preload("res://scripts/armor_paint_visual.gd")
+const HullMaterialBuilder = preload("res://scripts/hull_material_builder.gd")
 
 const HULL := "brenntal_medium_a"
 const SIDE := "left"
 const OUT_DIR := "user://armor_materials"
-const MATERIALS := ["hardened_steel", "reactive_armor", "ablative_ceramic",
-	"carbon_fiber", "titanium_plate"]
+const MATERIALS := ["steel_plate", "composite_plate", "ceramic_ablative", "ballistic_nylon"]
 
 
 func _init() -> void:
@@ -42,8 +35,6 @@ func _init() -> void:
 	world.add_child(cam)
 
 	var key := DirectionalLight3D.new()
-	# Raking light. Relief is only visible if something casts a shadow across
-	# it, so this is deliberately low and across the flank being painted.
 	key.rotation_degrees = Vector3(-18.0, 62.0, 0.0)
 	key.light_energy = 1.5
 	world.add_child(key)
@@ -57,58 +48,73 @@ func _init() -> void:
 	e.background_mode = Environment.BG_COLOR
 	e.background_color = Color(0.05, 0.05, 0.06)
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.6, 0.62, 0.6)
-	e.ambient_light_energy = 0.55
+	e.ambient_light_color = Color(0.35, 0.35, 0.38)
+	e.ambient_light_energy = 0.4
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.environment = e
 	world.add_child(env)
 
-	var table := HullFacets.load_map(HULL)
+	var table := HullFacets.cached_segment(mesh)
 	var normals: PackedVector3Array = table.get("normal", PackedVector3Array())
 	var centroids: PackedVector3Array = table.get("centroid", PackedVector3Array())
 	var areas: PackedFloat32Array = table.get("area", PackedFloat32Array())
 
 	for material in MATERIALS:
-		var hull := Node3D.new()
-		world.add_child(hull)
-		var mi := MeshInstance3D.new()
-		mi.mesh = mesh
-		var hull_mat := StandardMaterial3D.new()
-		# A pale livery green, so the test is "can I see the relief" and not
-		# "can I see a colour difference".
-		hull_mat.albedo_color = Color(0.55, 0.60, 0.50)
-		hull_mat.roughness = 0.75
-		mi.material_override = hull_mat
-		hull.add_child(mi)
+		for thick in [1.0, 2.5]:
+			var thick_suffix := "" if thick == 1.0 else ("_thick%.1f" % thick)
 
-		var rows := []
-		for f in ArmorPaint.facets_for_side(HULL, SIDE):
-			rows.append({
-				"facet_id": int(f), "side": SIDE,
-				"type_id": "armor_plating", "material": material, "thickness": 1.0,
-				"normal": {"x": normals[f].x, "y": normals[f].y, "z": normals[f].z},
-				"centroid": {"x": centroids[f].x, "y": centroids[f].y, "z": centroids[f].z},
-				"area": float(areas[f]),
-			})
-		hull.set_meta("armor_plan", ArmorPaint.build_plan(HULL, rows))
-		var built := ArmorPaintVisual.rebuild(hull, mi)
+			# 1. DESIGN LAB (Scale model finish)
+			var hull_lab := Node3D.new()
+			world.add_child(hull_lab)
+			var mi_lab := MeshInstance3D.new()
+			mi_lab.mesh = mesh
+			HullMaterialBuilder.apply_scale_model_finish(mi_lab)
+			hull_lab.add_child(mi_lab)
 
-		var tris := 0
-		var holder = hull.get_node_or_null(ArmorPaintVisual.HOLDER_NAME)
-		if holder:
-			for c in holder.get_children():
-				if c is MeshInstance3D and c.mesh:
-					tris += c.mesh.get_faces().size() / 3
+			var rows := []
+			for f in ArmorPaint.facets_for_side(HULL, SIDE, mesh):
+				rows.append({
+					"facet_id": int(f), "side": SIDE,
+					"type_id": material, "material": material, "thickness": thick,
+					"normal": {"x": normals[f].x, "y": normals[f].y, "z": normals[f].z},
+					"centroid": {"x": centroids[f].x, "y": centroids[f].y, "z": centroids[f].z},
+					"area": float(areas[f]),
+				})
+			hull_lab.set_meta("armor_plan", ArmorPaint.build_plan(HULL, rows, mesh, Transform3D.IDENTITY, ""))
+			var built_lab := ArmorPaintVisual.rebuild(hull_lab, mi_lab)
 
-		for i in range(6):
+			for i in range(6):
+				await process_frame
+			var img_lab := root.get_texture().get_image()
+			var path_lab := "%s/lab_%s%s.png" % [OUT_DIR, material, thick_suffix]
+			img_lab.save_png(ProjectSettings.globalize_path(path_lab))
+			print("LAB:   %-18s (thick %.1fx) %d skins -> %s" % [material, thick, built_lab, path_lab])
+
+			world.remove_child(hull_lab)
+			hull_lab.queue_free()
 			await process_frame
-		var img := root.get_texture().get_image()
-		var path := "%s/%s.png" % [OUT_DIR, material]
-		img.save_png(ProjectSettings.globalize_path(path))
-		print("%-18s %d skins, %5d tris -> %s" % [material, built, tris, path])
 
-		world.remove_child(hull)
-		hull.queue_free()
-		await process_frame
+			# 2. MATCH / BATTLE (Livery finish)
+			var hull_match := Node3D.new()
+			world.add_child(hull_match)
+			var mi_match := MeshInstance3D.new()
+			mi_match.mesh = mesh
+			HullMaterialBuilder.apply_hull_materials(mi_match, "nato_bronzegreen")
+			hull_match.add_child(mi_match)
+
+			hull_match.set_meta("armor_plan", ArmorPaint.build_plan(HULL, rows, mesh, Transform3D.IDENTITY, "nato_bronzegreen"))
+			var built_match := ArmorPaintVisual.rebuild(hull_match, mi_match)
+
+			for i in range(6):
+				await process_frame
+			var img_match := root.get_texture().get_image()
+			var path_match := "%s/match_%s%s.png" % [OUT_DIR, material, thick_suffix]
+			img_match.save_png(ProjectSettings.globalize_path(path_match))
+			print("MATCH: %-18s (thick %.1fx) %d skins -> %s" % [material, thick, built_match, path_match])
+
+			world.remove_child(hull_match)
+			hull_match.queue_free()
+			await process_frame
 
 	print("Wrote to ", ProjectSettings.globalize_path(OUT_DIR))
 	quit(0)

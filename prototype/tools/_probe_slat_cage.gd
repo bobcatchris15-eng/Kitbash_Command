@@ -14,6 +14,8 @@ const HullFacets = preload("res://scripts/hull_facets.gd")
 const ArmorPaint = preload("res://scripts/armor_paint.gd")
 const ArmorPaintVisual = preload("res://scripts/armor_paint_visual.gd")
 
+const HullMaterialBuilder = preload("res://scripts/hull_material_builder.gd")
+
 const HULL := "brenntal_medium_a"
 const SIDE := "left"
 const OUT_DIR := "user://slat_cage_probe"
@@ -46,8 +48,6 @@ func _init() -> void:
 	world.add_child(cam)
 
 	var key := DirectionalLight3D.new()
-	# Raking light. Relief is only visible if something casts a shadow across
-	# it, so this is deliberately low and across the flank being painted.
 	key.rotation_degrees = Vector3(-18.0, 62.0, 0.0)
 	key.light_energy = 1.5
 	world.add_child(key)
@@ -66,7 +66,7 @@ func _init() -> void:
 	env.environment = e
 	world.add_child(env)
 
-	var table := HullFacets.load_map(HULL)
+	var table := HullFacets.cached_segment(mesh)
 	var normals: PackedVector3Array = table.get("normal", PackedVector3Array())
 	var centroids: PackedVector3Array = table.get("centroid", PackedVector3Array())
 	var areas: PackedFloat32Array = table.get("area", PackedFloat32Array())
@@ -76,16 +76,11 @@ func _init() -> void:
 		world.add_child(hull)
 		var mi := MeshInstance3D.new()
 		mi.mesh = mesh
-		var hull_mat := StandardMaterial3D.new()
-		# A pale livery green, so the test is "can I see the relief" and not
-		# "can I see a colour difference".
-		hull_mat.albedo_color = Color(0.55, 0.60, 0.50)
-		hull_mat.roughness = 0.75
-		mi.material_override = hull_mat
+		HullMaterialBuilder.apply_hull_materials(mi, "nato_bronzegreen")
 		hull.add_child(mi)
 
 		var rows := []
-		for f in ArmorPaint.facets_for_side(HULL, SIDE):
+		for f in ArmorPaint.facets_for_side(HULL, SIDE, mesh):
 			rows.append({
 				"facet_id": int(f), "side": SIDE,
 				"type_id": "slat_armor", "material": material, "thickness": 1.0,
@@ -93,7 +88,7 @@ func _init() -> void:
 				"centroid": {"x": centroids[f].x, "y": centroids[f].y, "z": centroids[f].z},
 				"area": float(areas[f]),
 			})
-		hull.set_meta("armor_plan", ArmorPaint.build_plan(HULL, rows, mesh))
+		hull.set_meta("armor_plan", ArmorPaint.build_plan(HULL, rows, mesh, Transform3D.IDENTITY, "nato_bronzegreen"))
 		var built := ArmorPaintVisual.rebuild(hull, mi)
 		print("rows=", rows.size())
 

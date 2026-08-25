@@ -241,7 +241,12 @@ static func _get_mascot_texture(faction: String) -> ImageTexture:
 		"star_propeller": return _get_texture("mascot_star_propeller", func(img): _draw_star(img, 3, 0.4, 0.55))
 		_: return _get_texture("mascot_gear", _draw_gear)
 
+static var _decal_material_cache: Dictionary = {}
+
 static func _make_decal_material(texture: Texture2D, color: Color) -> StandardMaterial3D:
+	var key := "%d_%d" % [texture.get_instance_id() if texture else 0, color.to_rgba32()]
+	if _decal_material_cache.has(key):
+		return _decal_material_cache[key]
 	var mat = StandardMaterial3D.new()
 	mat.albedo_texture = texture
 	mat.albedo_color = color
@@ -255,6 +260,7 @@ static func _make_decal_material(texture: Texture2D, color: Color) -> StandardMa
 	# smaller mascot icons), the opposite of the crisp, blocky "real cut
 	# stencil" look this whole system is going for.
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	_decal_material_cache[key] = mat
 	return mat
 
 # Surface-projected placement (hull_projection.gd): the caller says roughly

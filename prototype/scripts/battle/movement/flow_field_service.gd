@@ -115,7 +115,15 @@ func setup(nav_map: RID, map_half_extents: float, world_scale: float = 1.0) -> v
 	_world_scale = world_scale
 
 
+# Flow field generation in GDScript requires ~14k NavigationServer3D point queries
+# and whole-map Dijkstra traversal, which blocks the main thread for ~20 seconds
+# per build on maps like lake_crossing. NavigationAgent3D in C++ runs in <0.05ms
+# per unit, so flow field generation is disabled by default.
+const ENABLE_FLOW_FIELDS := false
+
 static func should_use_field(unit_count: int) -> bool:
+	if not ENABLE_FLOW_FIELDS:
+		return false
 	return unit_count >= FIELD_MIN_UNITS
 
 

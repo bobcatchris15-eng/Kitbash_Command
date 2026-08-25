@@ -384,12 +384,7 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	# keep compounding.
 	var chassis_speed_mult := 1.0
 	var propulsion_capacity_mult := 1.0
-	# The strongest burst-boost part fitted, for the Design Lab to display and
-	# for BoostController to read - see boost_controller.gd. Deliberately not
-	# folded into chassis_top_speed/move_speed here: this is the design-time
-	# analysis, and a burst that inflated the quoted top speed would make the
-	# Lab's number a lie. "Strongest" by speed_mult, since a design fitting
-	# more than one boost part in practice only ever gets to use one at a time.
+	var booster_profiles: Array[Dictionary] = []
 	var boost_summary := {}
 
 	if is_instance_valid(hull_node):
@@ -423,15 +418,11 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 				if slowest_top_speed <= 0.0 or chassis_top < slowest_top_speed:
 					slowest_top_speed = chassis_top
 			else:
-				# Propulsion parts, weapons, generators, sensors, harvesters,
-				# hull extensions - everything the locomotor is actually
+				# Support modules, weapons, generators, sensors, harvesters,
+				# hull extensions - everything the locomotor actually
 				# CARRIES. This is what the capacity is rated against.
 				carried_weight += data.get_weight()
-			# Mobility ADD-ONS (wing/thruster/propeller_prop/pusher_prop/
-			# paddle_wheel/ship_screw/propulsion parts) are attachable parts,
-			# not a primary locomotion choice, so they contribute from any
-			# category: wings raise the load budget, the rest add real
-			# thrust or reshape the chassis ceiling.
+			# Mobility ADD-ONS (wings raise load budget, thrusters add real thrust)
 			var catalog_entry := ModuleCatalog.get_module_data(data.type_id)
 			var wc_bonus: float = catalog_entry.get("weight_capacity_bonus", 0.0)
 			var thrust_bonus: float = catalog_entry.get("thrust_bonus", 0.0)
@@ -439,25 +430,36 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 				capacity += wc_bonus * footprint
 			if thrust_bonus > 0.0:
 				thrust += thrust_bonus * footprint
-			# Propulsion parts scale their bonus by their OWN tweak-driven
-			# mass rather than a separate size stat - a bigger turbo makes
-			# more thrust and weighs more, with no new scaling table. Ratio
-			# against base_weight rather than absolute weight so a part
-			# authored heavier for flavor doesn't silently punch above its
-			# catalog thrust_bonus/top_speed_mult.
-			var part_scale := 1.0
-			if data.base_weight > 0.0:
-				part_scale = data.get_weight() / data.base_weight
-			var top_speed_mult: float = catalog_entry.get("top_speed_mult", 1.0)
-			if top_speed_mult != 1.0:
-				chassis_speed_mult *= 1.0 + (top_speed_mult - 1.0) * part_scale
-			var capacity_mult: float = catalog_entry.get("capacity_mult", 1.0)
-			if capacity_mult != 1.0:
-				propulsion_capacity_mult *= 1.0 + (capacity_mult - 1.0) * part_scale
-			var boost: Dictionary = catalog_entry.get("boost", {})
-			if not boost.is_empty():
-				if boost_summary.is_empty() or float(boost.get("speed_mult", 1.0)) > float(boost_summary.get("speed_mult", 1.0)):
-					boost_summary = boost
+
+			if data.type_id == "booster_rack":
+				var b_prof: Dictionary = data.get_boost_profile() if data.has_method("get_boost_profile") else catalog_entry.get("boost", {})
+				if not b_prof.is_empty():
+					booster_profiles.append(b_prof)
+
+		# Aggregate all fitted rocket booster modules into a combined ability profile
+		if not booster_profiles.is_empty():
+			var total_racks: int = booster_profiles.size()
+			var max_speed_mult: float = 1.0
+			var max_duration: float = 0.0
+			var sum_cooldown: float = 0.0
+			var total_tubes: float = 0.0
+			for b in booster_profiles:
+				max_speed_mult = maxf(max_speed_mult, float(b.get("speed_mult", 1.8)))
+				max_duration = maxf(max_duration, float(b.get("duration", 3.0)))
+				sum_cooldown += float(b.get("cooldown", 24.0))
+				total_tubes += float(b.get("tubes", 3.0))
+			var avg_cd = sum_cooldown / max(1, total_racks)
+			# Adding more booster modules shortens recharge!
+			var combined_cd = avg_cd / (1.0 + 0.4 * (total_racks - 1))
+			boost_summary = {
+				"speed_mult": max_speed_mult,
+				"duration": max_duration,
+				"cooldown": combined_cd,
+				"charges": 0,
+				"energy_per_sec": 0.0,
+				"booster_count": total_racks,
+				"tubes_total": total_tubes
+			}
 
 	# A design with no locomotion does not move, and has no capacity to be
 	# over - reporting a load ratio here would light the overweight warning

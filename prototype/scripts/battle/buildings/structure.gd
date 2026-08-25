@@ -418,8 +418,12 @@ func begin_construction(_build_time: float = 0.0) -> void:
 	update_construction_progress(0.0, false)
 
 
+var _visual_node_transforms: Dictionary = {}
+var _last_progress_pct: int = -1
+
 func _gather_visual_nodes() -> void:
 	_visual_nodes.clear()
+	_visual_node_transforms.clear()
 	var b_mesh = get_node_or_null("BuildingMesh")
 	if b_mesh is Node3D:
 		_visual_nodes.append(b_mesh)
@@ -427,6 +431,11 @@ func _gather_visual_nodes() -> void:
 		_visual_nodes.append(_mesh)
 	if defense_hull != null and is_instance_valid(defense_hull):
 		_visual_nodes.append(defense_hull)
+	for node in _visual_nodes:
+		_visual_node_transforms[node.get_instance_id()] = {
+			"scale": node.scale,
+			"position": node.position,
+		}
 
 
 func _build_construction_visuals() -> void:
@@ -533,38 +542,43 @@ func _build_construction_visuals() -> void:
 
 func update_construction_progress(progress: float, is_stalled: bool = false) -> void:
 	construction_progress = clampf(progress, 0.0, 1.0)
+	var pct := int(round(construction_progress * 100.0))
 	
 	# Animate the visual model rising / scaling from foundation
 	var y_scale = clampf(construction_progress, 0.04, 1.0)
 	for node in _visual_nodes:
 		if is_instance_valid(node):
-			node.scale = Vector3(1.0, y_scale, 1.0)
+			var orig = _visual_node_transforms.get(node.get_instance_id(), {"scale": Vector3.ONE, "position": node.position})
+			var orig_scale: Vector3 = orig["scale"]
+			var orig_pos: Vector3 = orig["position"]
+			node.scale = Vector3(orig_scale.x, orig_scale.y * y_scale, orig_scale.z)
 			# Anchor base to ground during scale
-			node.position = Vector3(node.position.x, 0.0, node.position.z)
+			node.position = Vector3(orig_pos.x, orig_pos.y * y_scale, orig_pos.z)
 
 	# Move welding spark height with the rising roof
 	if _spark_particles != null and is_instance_valid(_spark_particles):
 		_spark_particles.position.y = footprint.y * construction_progress + 0.2
 		_spark_particles.emitting = not is_stalled and construction_progress < 1.0
 
-	# Update 3D Progress readout
-	if _progress_label != null and is_instance_valid(_progress_label):
-		var pct := int(round(construction_progress * 100.0))
-		if is_stalled:
-			_progress_label.text = "STALLED (%d%%)" % pct
-			_progress_label.modulate = Color(1.0, 0.4, 0.3)
-		else:
-			_progress_label.text = "BUILDING %d%%" % pct
-			_progress_label.modulate = Color(0.35, 0.9, 1.0)
+	# Throttle 3D Progress readout updates to whole percentage changes
+	if pct != _last_progress_pct:
+		_last_progress_pct = pct
+		if _progress_label != null and is_instance_valid(_progress_label):
+			if is_stalled:
+				_progress_label.text = "STALLED (%d%%)" % pct
+				_progress_label.modulate = Color(1.0, 0.4, 0.3)
+			else:
+				_progress_label.text = "BUILDING %d%%" % pct
+				_progress_label.modulate = Color(0.35, 0.9, 1.0)
 
-	if _progress_bar_fill != null and is_instance_valid(_progress_bar_fill):
-		var fill_pct = maxf(0.01, construction_progress)
-		_progress_bar_fill.scale = Vector3(fill_pct, 1.0, 1.0)
-		_progress_bar_fill.position.x = -1.18 * (1.0 - fill_pct)
-		if _progress_bar_fill.material_override != null:
-			_progress_bar_fill.material_override.albedo_color = (
-				Color(1.0, 0.4, 0.2) if is_stalled else Color(0.2, 0.85, 0.95)
-			)
+		if _progress_bar_fill != null and is_instance_valid(_progress_bar_fill):
+			var fill_pct = maxf(0.01, construction_progress)
+			_progress_bar_fill.scale = Vector3(fill_pct, 1.0, 1.0)
+			_progress_bar_fill.position.x = -1.18 * (1.0 - fill_pct)
+			if _progress_bar_fill.material_override != null:
+				_progress_bar_fill.material_override.albedo_color = (
+					Color(1.0, 0.4, 0.2) if is_stalled else Color(0.2, 0.85, 0.95)
+				)
 
 
 func finish_construction() -> void:
@@ -572,11 +586,12 @@ func finish_construction() -> void:
 	is_under_construction = false
 	construction_progress = 1.0
 
-	# Restore full mesh transforms
+	# Restore full original mesh transforms and scales
 	for node in _visual_nodes:
 		if is_instance_valid(node):
-			node.scale = Vector3.ONE
-			node.position = Vector3(node.position.x, 0.0, node.position.z)
+			var orig = _visual_node_transforms.get(node.get_instance_id(), {"scale": Vector3.ONE, "position": node.position})
+			node.scale = orig["scale"]
+			node.position = orig["position"]
 
 	# Remove scaffolding and progress UI
 	if _construction_root != null and is_instance_valid(_construction_root):

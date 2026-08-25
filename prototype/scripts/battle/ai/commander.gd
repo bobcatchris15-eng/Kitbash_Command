@@ -355,7 +355,11 @@ func tick(delta: float) -> void:
 func read_state() -> Dictionary:
 	var economy = _world.economy
 	var own_units: Array = _world.get_team_units(team)
-	var own_structures: Array = _world.get_team_structures(team)
+	# Pass include_incomplete = true so structures currently being constructed
+	# are counted in state (refineries, manufactories, defenses, power plants)
+	# rather than ignored, which previously caused AI to spam dozens of duplicate
+	# structures while earlier ones were still building.
+	var own_structures: Array = _world.get_team_structures(team, true)
 
 	var harvesters := 0
 	var combat: Array = []
@@ -710,7 +714,8 @@ func _execute(action: int, state: Dictionary) -> void:
 		Action.ADD_PRODUCTION:
 			# The director picks WHICH manufactory - it knows about hull tiers and
 			# this does not need to.
-			_world.ai_build_production(team)
+			if _build_rate_ok("production"):
+				_world.ai_build_production(team)
 		Action.BUILD_ANTI_AIR:
 			_world.ai_build_unit(team, "anti_air")
 		Action.BUILD_ANTI_ARMOR:
@@ -720,7 +725,8 @@ func _execute(action: int, state: Dictionary) -> void:
 		Action.DEFEND:
 			_world.ai_defend(team, state["combat"])
 		Action.BUILD_DEFENSE:
-			_world.ai_build_defence(team)
+			if _build_rate_ok("defense"):
+				_world.ai_build_defence(team)
 		Action.PUSH:
 			_world.ai_push(team, state["combat"])
 		# --- AI OVERHAUL: damage-type-aware execution ---

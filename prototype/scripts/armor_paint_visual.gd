@@ -1,54 +1,40 @@
 # ArmorPaintVisual: turns an armor plan into the skins you can see on a hull.
 #
-# No class_name / no `extends`, matching hull_facets.gd and hull_surface.gd.
-#
-# WHY THE GEOMETRY IS REBUILT RATHER THAN SAVED. A painted facet's skin is the
-# hull's own triangles, lifted by a z-fighting epsilon and cut by the type's
-# pattern. That is GEOMETRY: it is not expressible as a node scale, and it is
-# not in the blueprint JSON. The previous system tried to carry it as a placed
-# module and lost it on every save - node scale went to (1,1,1) because the mesh
-# carried the extent, and reloading rebuilt the authored 2 x 0.275 x 2 plate at
-# that scale. A design's armor silently stopped fitting the moment it was saved,
-# and no unit ever fought with the armor its designer drew. Deriving it from the
-# facet id at build time means there is nothing to go stale.
-#
-# ONE NODE PER PAINTED FACET, all parented to a single `ArmorPaint` holder so a
-# repaint is one free_children() rather than a hunt through the hull's modules.
+# In the Design Lab: renders the unpainted scale model plastic finish (grey-green)
+# with the armor's physical tactile normal relief applied.
+# In Match / Battle: seamlessly inherits the underlying hull's livery (zones,
+# camouflage/patterns, textures, and weathering) with the armor normals on top.
 
 const HullFacets = preload("res://scripts/hull_facets.gd")
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const PartMaterials = preload("res://scripts/part_materials.gd")
 const LiveryScript = preload("res://scripts/livery.gd")
+const HullMaterialBuilder = preload("res://scripts/hull_material_builder.gd")
+const VisualTuning = preload("res://scripts/visual_tuning.gd")
 
 const HOLDER_NAME := "ArmorPaint"
 
-# Per-material SHIFTS, applied to the hull's own colour rather than replacing
-# it. The armor ROLE (part_materials' "armor", livery zone hull_upper) supplies
-# metallic/roughness/wear.
-#
-# THESE USED TO BE ABSOLUTE TINTS and it looked wrong. The role's `tint` weight
-# is 0.95, so a flat grey swatch almost entirely overrode the base colour: on a
-# pale green livery hull the armor rendered as near-black mottled patches - a
-# bolted-on billboard, which is precisely the read this whole system exists to
-# remove. Armor is meant to look like a slightly different SECTION OF THE HULL,
-# so the hull's colour is the starting point and the material only bends it.
-#
-# BLEND is how far toward the material's character the hull colour moves. Low on
-# purpose: enough that reactive reads warmer than ablative side by side, not so
-# much that the vehicle looks two-tone.
-const MATERIAL_BLEND := 0.22
-const MATERIAL_SHIFTS := {
-	# value multiplier, hue direction (the colour the material leans toward)
-	"hardened_steel": {"value": 0.92, "toward": Color(0.55, 0.57, 0.60)},
-	"reactive_armor": {"value": 0.88, "toward": Color(0.62, 0.42, 0.36)},
-	"ablative_ceramic": {"value": 1.08, "toward": Color(0.78, 0.76, 0.70)},
-	"carbon_fiber": {"value": 0.78, "toward": Color(0.30, 0.31, 0.33)},
-	"titanium_plate": {"value": 1.02, "toward": Color(0.66, 0.65, 0.68)},
-	# Retained so a design that still carries it (a hull-global choice, or a
-	# pre-Armor-Bay save) renders. Not paintable - see the Bay's material list.
-	"energy_shielding": {"value": 0.96, "toward": Color(0.45, 0.60, 0.72)},
+# Per-material surface signature. `pattern` selects the shader branch, `cell`
+# is the feature size IN METRES (UVs are metres of facet surface), `relief` how
+# hard the normal is pushed, `seam` the groove width as a fraction of a cell.
+const MATERIAL_FINISH := {
+	"steel_plate": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
+	"composite_plate": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.45, "relief": 0.75, "seam": 0.05},
+	"ceramic_ablative": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.22, "relief": 0.50, "seam": 0.10},
+	"ballistic_nylon": {"metallic": 0.25, "roughness": 0.45, "pattern": 3, "cell": 0.07, "relief": 0.35, "seam": 0.06},
+	# Backward-compatibility aliases
+	"hardened_steel": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
+	"armor_plating": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
+	"reactive_armor": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.45, "relief": 0.75, "seam": 0.05},
+	"spaced_composite": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.45, "relief": 0.75, "seam": 0.05},
+	"ablative_ceramic": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.22, "relief": 0.50, "seam": 0.10},
+	"ablative_foam": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.22, "relief": 0.50, "seam": 0.10},
+	"carbon_fiber": {"metallic": 0.25, "roughness": 0.45, "pattern": 3, "cell": 0.07, "relief": 0.35, "seam": 0.06},
+	"titanium_plate": {"metallic": 0.80, "roughness": 0.38, "pattern": 0, "cell": 0.85, "relief": 0.25, "seam": 0.035},
+	"slat_armor": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
 }
-const FALLBACK_HULL_TINT := Color(0.52, 0.54, 0.50)
+
+const ARMOR_SHADER = preload("res://shaders/armor_surface.gdshader")
 
 
 # Rebuilds every painted skin on `hull` from its `armor_plan` meta.
@@ -74,218 +60,100 @@ static func rebuild(hull: Node3D, mesh_inst: MeshInstance3D) -> int:
 	holder.name = HOLDER_NAME
 	hull.add_child(holder)
 
-	# The player's livery colour is the base every painted facet starts from, so
-	# armor reads as the same vehicle with a different surface rather than as a
-	# patch of somebody else's paint. Read it directly from the Livery API via
-	# the plan's faction id — reverse-engineering it from shader parameters was
-	# fragile and gave the wrong colour (base_color is a darkening multiplier,
-	# not the livery).
-	var faction := str(plan.get("faction", LiveryScript.NO_LIVERY))
-	var hull_tint: Color
-	if faction != "":
-		hull_tint = LiveryScript.zone_color(faction, "hull_upper")
-	else:
-		hull_tint = _hull_albedo(mesh_inst)
+	var faction := str(plan.get("faction", LiveryScript.PLAYER_ID))
+	if faction == "" or faction == LiveryScript.NO_LIVERY:
+		faction = LiveryScript.PLAYER_ID
+
+	# Detect whether the hull is in Design Lab / scale model mode (grey-green plastic)
+	var is_scale_model := false
+	if plan.get("is_designer", false):
+		is_scale_model = true
+	elif mesh_inst != null:
+		var mat: Material = mesh_inst.material_override
+		if mat == null and mesh_inst.mesh != null and mesh_inst.mesh.get_surface_count() > 0:
+			mat = mesh_inst.get_surface_override_material(0)
+			if mat == null:
+				mat = mesh_inst.get_active_material(0)
+		if mat is StandardMaterial3D:
+			is_scale_model = true
+
+	var texture_world_size := HullMaterialBuilder._DEFAULT_TEXTURE_WORLD_SIZE
+	var bounds_y := Vector2(-0.5, 0.5)
+	var bounds_x := Vector2(-0.5, 0.5)
+	var bounds_z := Vector2(-0.5, 0.5)
+	if mesh_inst.mesh:
+		var aabb = mesh_inst.mesh.get_aabb()
+		var extents = aabb.size * mesh_inst.scale
+		texture_world_size = (extents.x + extents.y + extents.z) / 3.0
+		bounds_y = Vector2(aabb.position.y, aabb.position.y + aabb.size.y)
+		bounds_x = Vector2(aabb.position.x, aabb.position.x + aabb.size.x)
+		bounds_z = Vector2(aabb.position.z, aabb.position.z + aabb.size.z)
 
 	var built := 0
 	for fid in facets.keys():
 		var entry: Dictionary = facets[fid]
-		var type_id := str(entry.get("type_id", ""))
+		var type_id := str(entry.get("type_id", "steel_plate"))
+		var material_id := str(entry.get("material", type_id))
+		var thickness := float(entry.get("thickness", 1.0))
 		var frame := HullFacets.facet_frame(hull_type, int(fid), mesh_inst.transform, mesh_inst.mesh)
 		if not bool(frame.get("valid", false)):
 			continue
 		var cat: Dictionary = ModuleCatalog.get_module_data(type_id)
 		var mesh := HullFacets.build_plate(mesh_inst, hull_type, int(fid), type_id,
 			cat.get("size", Vector3.ONE), frame["center"], frame["basis"],
-			str(entry.get("material", "hardened_steel")), float(entry.get("thickness", 1.0)))
+			material_id, thickness)
 		if mesh == null:
 			continue
 
 		var inst := MeshInstance3D.new()
 		inst.name = "Armor_%d" % int(fid)
 		inst.mesh = mesh
-		# build_plate returns the skin already in the facet's frame, so the node
-		# carries that frame and NOTHING else. Any inherited scale or offset here
-		# is the bug that made these read as floating slabs.
 		inst.transform = Transform3D(frame["basis"], frame["center"])
-		# Cage-mode types (slat) get a flat StandardMaterial3D: the bars carry
-		# the visual structure themselves, and the armor shader's normal-map
-		# pipeline would be wrong on a closed box's per-face UVs. Skin types
-		# stay on the shader, which is where the per-material signature lives.
-		var material_id := str(entry.get("material", ""))
-		if _is_cage_type(type_id):
-			inst.material_override = _cage_material(material_id, hull_tint)
-		else:
-			inst.material_override = _armor_material(material_id, hull_tint)
+
+		inst.material_override = _armor_material(material_id, is_scale_model, faction,
+			bounds_y, bounds_x, bounds_z, mesh_inst.scale, texture_world_size, inst.transform, thickness)
 		inst.set_meta("armor_facet_id", int(fid))
 		holder.add_child(inst)
 		built += 1
 	return built
 
 
-# True for paint types whose `mode` in HullFacets.SURFACE_PATTERNS is "cage".
-# Kept as a single source of truth in hull_facets.gd and read here rather than
-# mirrored as another constant - if a future type joins the cage path, only
-# the SURFACE_PATTERNS row needs editing.
-static func _is_cage_type(type_id: String) -> bool:
-	if type_id == "":
-		return false
-	# Late-bind the lookup to avoid a preload cycle: armor_paint_visual.gd is
-	# preloaded by hull_facets.gd's caller chain, and re-preloading it would
-	# fail at parse time.
-	var patterns: Dictionary = _surface_patterns()
-	return str(patterns.get(type_id, {}).get("mode", "skin")) == "cage"
-
-
-static func _surface_patterns() -> Dictionary:
-	# Cache the lookup so the per-facet rebuild does not re-evaluate it for
-	# every painted facet.
-	if _patterns_cache.is_empty():
-		var script = load("res://scripts/hull_facets.gd")
-		if script != null and script.has_method("get_surface_patterns"):
-			_patterns_cache = script.get_surface_patterns()
-	return _patterns_cache
-
-
-static var _patterns_cache: Dictionary = {}
-
-
-# The cage's material: a flat StandardMaterial3D with the armor's per-material
-# finish (tint + metallic + roughness) but no normal map, no shader. The bars
-# themselves are the visual structure, so the per-material height field in
-# armor_surface.gdshader would be wrong on a closed box's per-face UVs.
-#
-# Cached per (material, tint) for the same reason _armor_material is: a hull
-# paints up to ~20 facets and otherwise each one would allocate an identical
-# StandardMaterial3D.
-static var _cage_mat_cache: Dictionary = {}
-
-
-static func _cage_material(material_id: String, hull_tint: Color) -> StandardMaterial3D:
-	var key := "cage|%s|%.3f_%.3f_%.3f" % [material_id, hull_tint.r, hull_tint.g, hull_tint.b]
-	if _cage_mat_cache.has(key):
-		return _cage_mat_cache[key]
-	var f: Dictionary = MATERIAL_FINISH.get(material_id, MATERIAL_FINISH["hardened_steel"])
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = _tint_for(material_id, hull_tint)
-	mat.metallic = float(f["metallic"])
-	mat.roughness = float(f["roughness"])
-	# No texture, no normal map. The bars are the visual.
-	# Back-face culling is the Godot 4 default (CULL_BACK) but we set it
-	# EXPLICITLY here: the bar is a closed box and the user has reported
-	# what reads as "I can see through the bar to its opposite face",
-	# which is exactly the failure mode of an inherited CULL_DISABLED
-	# or a mirrored-basis normal that gets unculled on the back side.
-	# Pinning CULL_BACK at the material level means a mesh-resource
-	# default or a viewport setting cannot flip it under us.
-	mat.cull_mode = BaseMaterial3D.CULL_BACK
-	# Depth test on (the default), depth write on (the default). The bar
-	# is fully opaque and must occlude anything behind it.
-	mat.no_depth_test = false
-	# No transparency. The bar is solid.
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-	_cage_mat_cache[key] = mat
-	return mat
-
-
-static func clear_material_cache() -> void:
-	_mat_cache.clear()
-	_cage_mat_cache.clear()
-
-
-# The hull's rendered livery colour, so armor paint reads as a surface
-# treatment on the same vehicle rather than a patch of somebody else's paint.
-#
-# The livery lives in the zone uniforms (zone_upper_color / zone_lower_color),
-# NOT in base_color (which is a darkening multiplier, typically 0.7 for the
-# structural material). Reading base_color gave a flat grey and made every
-# painted facet override the player's scheme.
-static func _hull_albedo(mesh_inst: MeshInstance3D) -> Color:
-	var mat: Material = mesh_inst.material_override
-	if mat == null and mesh_inst.mesh != null:
-		var surf_count := mesh_inst.mesh.get_surface_count()
-		# Surface 1+ carries the undarkened livery; surface 0 is the
-		# structural (darkened to 0.7). Prefer the armour material so the
-		# tint starts from the player's actual chosen colour.
-		if surf_count > 1:
-			mat = mesh_inst.get_active_material(1)
-		elif surf_count > 0:
-			mat = mesh_inst.get_active_material(0)
-	if mat is ShaderMaterial:
-		for param in ["zone_upper_color", "zone_lower_color", "stripe_color"]:
-			var v = (mat as ShaderMaterial).get_shader_parameter(param)
-			if v is Color:
-				return v
-	if mat is StandardMaterial3D:
-		return (mat as StandardMaterial3D).albedo_color
-	return FALLBACK_HULL_TINT
-
-
-# The armor surface material, built HERE rather than taken from
-# PartMaterials.get_material("armor", tint).
-#
-# WHY NOT THE SHARED ROLE. That role was tuned when armor was a bolt-on plate -
-# a separate piece of hardware that was SUPPOSED to read as distinct from the
-# hull. Its base is a dark grey and its `wear` is 0.70, which together swamp
-# whatever tint the caller passes: rendered on a pale livery hull, a painted
-# facet came out as a near-black mottled patch no matter what colour was
-# requested. Confirmed by render, not by reasoning - the tint was being passed
-# correctly and the result was still black.
-#
-# Armor is now a surface treatment on the hull's own skin, so it starts from the
-# hull's albedo and differs by FINISH (metallic/roughness) and by relief. The
-# role is left untouched because energy_barrier_projector and the greeble pass
-# still use it for actual bolt-on hardware.
-#
-# Cached per (material, tint): a hull paints up to ~20 facets and they would
-# otherwise each allocate an identical StandardMaterial3D.
-static var _mat_cache: Dictionary = {}
-
-# Per-material surface signature. `pattern` selects the shader branch, `cell`
-# is the feature size IN METRES (UVs are metres of facet surface), `relief` how
-# hard the normal is pushed, `seam` the groove width as a fraction of a cell.
-#
-# Read these as a family: steel is the flat reference, ceramic and carbon are
-# fine, reactive and titanium are coarse. If two materials ever need to be told
-# apart at gameplay zoom, cell size is the knob that matters - relief only
-# changes how hard the light catches, and past about 1.5 it reads as noise.
-const MATERIAL_FINISH := {
-	"hardened_steel": {"metallic": 0.45, "roughness": 0.58, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
-	"reactive_armor": {"metallic": 0.20, "roughness": 0.70, "pattern": 1, "cell": 0.42, "relief": 0.45, "seam": 0.07},
-	"ablative_ceramic": {"metallic": 0.05, "roughness": 0.80, "pattern": 2, "cell": 0.22, "relief": 0.40, "seam": 0.10},
-	"carbon_fiber": {"metallic": 0.25, "roughness": 0.35, "pattern": 3, "cell": 0.07, "relief": 0.30, "seam": 0.06},
-	"titanium_plate": {"metallic": 0.72, "roughness": 0.40, "pattern": 4, "cell": 0.85, "relief": 0.40, "seam": 0.035},
-	"energy_shielding": {"metallic": 0.30, "roughness": 0.45, "pattern": 2, "cell": 0.40, "relief": 0.70, "seam": 0.08},
-}
-
-const ARMOR_SHADER = preload("res://shaders/armor_surface.gdshader")
-
-
-static func _armor_material(material_id: String, hull_tint: Color) -> ShaderMaterial:
-	var key := "%s|%.3f_%.3f_%.3f" % [material_id, hull_tint.r, hull_tint.g, hull_tint.b]
-	if _mat_cache.has(key):
-		return _mat_cache[key]
-	var f: Dictionary = MATERIAL_FINISH.get(material_id, MATERIAL_FINISH["hardened_steel"])
+static func _armor_material(material_id: String, is_scale_model: bool, faction: String,
+		bounds_y: Vector2, bounds_x: Vector2, bounds_z: Vector2,
+		mesh_scale: Vector3, texture_world_size: float,
+		facet_xf: Transform3D, thickness: float = 1.0) -> ShaderMaterial:
+	var f: Dictionary = MATERIAL_FINISH.get(material_id, MATERIAL_FINISH["steel_plate"])
 	var mat := ShaderMaterial.new()
 	mat.shader = ARMOR_SHADER
-	mat.set_shader_parameter("albedo", _tint_for(material_id, hull_tint))
-	mat.set_shader_parameter("metallic_amount", float(f["metallic"]))
-	mat.set_shader_parameter("roughness_amount", float(f["roughness"]))
+	mat.set_shader_parameter("scale_model_mode", 1.0 if is_scale_model else 0.0)
+	mat.set_shader_parameter("scale_model_color", HullMaterialBuilder.SCALE_MODEL_ALBEDO)
+	mat.set_shader_parameter("texture_scale", HullMaterialBuilder._texture_scale_for_size(texture_world_size))
+	mat.set_shader_parameter("mesh_scale", mesh_scale)
+	mat.set_shader_parameter("shield_mode", 0.0)
+	mat.set_shader_parameter("alpha_base", 1.0)
+
+	var textures = HullMaterialBuilder._get_surface_textures()
+	mat.set_shader_parameter("albedo_tex", textures.albedo)
+	mat.set_shader_parameter("normal_tex", textures.normal)
+	mat.set_shader_parameter("roughness_tex", textures.roughness)
+
+	HullMaterialBuilder.apply_livery_zones(mat, faction)
+	HullMaterialBuilder.apply_local_bounds(mat, bounds_y, bounds_x, bounds_z)
+	VisualTuning.apply(mat)
+
+	mat.set_shader_parameter("facet_to_hull", facet_xf)
 	mat.set_shader_parameter("pattern_id", int(f["pattern"]))
 	mat.set_shader_parameter("cell", float(f["cell"]))
 	mat.set_shader_parameter("relief", float(f["relief"]))
 	mat.set_shader_parameter("seam", float(f["seam"]))
-	_mat_cache[key] = mat
+	mat.set_shader_parameter("thickness", float(thickness))
+	mat.set_shader_parameter("armor_metallic", float(f["metallic"]))
+	mat.set_shader_parameter("armor_roughness", float(f["roughness"]))
 	return mat
 
 
-static func _tint_for(material_id: String, hull_tint: Color) -> Color:
-	var shift: Dictionary = MATERIAL_SHIFTS.get(material_id, MATERIAL_SHIFTS["hardened_steel"])
-	var toward: Color = shift["toward"]
-	var out := hull_tint.lerp(toward, MATERIAL_BLEND)
-	var v := float(shift["value"])
-	return Color(clampf(out.r * v, 0.0, 1.0), clampf(out.g * v, 0.0, 1.0),
-		clampf(out.b * v, 0.0, 1.0), 1.0)
+static func clear_material_cache() -> void:
+	pass
 
 
 static func clear(hull: Node3D) -> void:

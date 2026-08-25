@@ -608,9 +608,6 @@ func _is_spotted(c, viewers: Array, beacons: Array, was_visible: bool) -> bool:
 		# 3. Standard Omni Vision (and Thermal FLIR Sight)
 		var vision := effective_vision(o)
 		if vision > 0.0:
-			if is_instance_valid(o.get("hull_node")) and o.hull_node.has_meta("has_fire_control_radar") \
-					and o.hull_node.get_meta("has_fire_control_radar"):
-				vision = maxf(vision, float(o.hull_node.get_meta("fire_control_max_range", vision)))
 			var reach := vision * HIDE_RANGE_MULT if was_visible else vision
 			if c_pos.distance_to(o_pos) <= reach:
 				var o_flying: bool = bool(_get_prop(o, "is_flying", false))

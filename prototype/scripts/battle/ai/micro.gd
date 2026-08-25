@@ -296,8 +296,7 @@ static func _is_support_unit(unit) -> bool:
 		for m in unit.blueprint.get("modules", []):
 			var tid: String = str(m.get("type_id", ""))
 			if tid in ["repair_array", "artillery", "mortar_array", "rocket_artillery",
-					"sensor_suite", "directional_radar", "topographic_radar",
-					"seismic_sensor", "thermal_imager", "laser_designator", "fire_control_radar"]:
+					"sensor_suite", "heavy_sensor_suite", "directional_radar"]:
 				return true
 	return false
 

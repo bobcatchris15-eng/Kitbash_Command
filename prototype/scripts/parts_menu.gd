@@ -105,7 +105,7 @@ const DRIVE_ROLES: Array = []
 # Display order within the Support tab. Propulsion sits last so the
 # utility/infrastructure groupings (Armor, Power, general Support) read
 # first and the speed-modifiers are a logical follow-on.
-const SUPPORT_ROLE_ORDER = ["Armor", "Power", "Support", "Propulsion"]
+const SUPPORT_ROLE_ORDER = ["Armor", "Power", "Support"]
 
 const CARD_MIN_WIDTH := 80
 const CARD_HEIGHT := 100

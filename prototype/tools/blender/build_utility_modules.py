@@ -597,144 +597,215 @@ def build_resource_harvester_drill():
 
 
 # ---------------------------------------------------------------------------
-# REPAIR ARRAY
+# ---------------------------------------------------------------------------
+# REPAIR ARRAY  (Folded Industrial Factory Robot Arms Rework)
 # ---------------------------------------------------------------------------
 # Three separate GLBs:
-#   repair_array_mount.glb   — octagonal pedestal with central energy coupling
-#   repair_array_arm.glb     — telescoping shoulder post + elbow arm segment
-#   repair_array_welder.glb  — torch nozzle + camera head + arc electrode tip
+#   repair_array_mount.glb   — octagonal pedestal with central power core & arm stations
+#   repair_array_arm.glb     — articulated folded industrial robot arm (shoulder, high bicep, elbow, forearm, wrist)
+#   repair_array_welder.glb  — industrial arc welding torch head, swan neck, seam-tracking optics, electrode tip
 #
-# visual_builder.gd spawns welder_count (1-4) arms in a radial ring at r=0.12,
-# each arm.rotation.y = -angle, and welder placed at the same radial offset.
+# visual_builder.gd spawns welder_count (1-4) arms in a radial ring at r=0.14,
+# each arm.rotation.y = -angle, with welder head precisely attached to the wrist flange.
 
 def build_repair_array_mount():
     """
-    Octagonal deck pedestal with central energy coupling dome and power conduit trunks.
+    Heavy industrial deck turntable pedestal with central power core,
+    rotary transformer hub, hydraulic manifold, and radial supply trunks.
     """
     bm = bmesh.new()
 
-    # Main octagonal base plate
-    add_cyl_z(bm, (0, 0, 0.04), 0.28, 0.08, segments=8)
-    # Top octagonal step
-    add_cyl_z(bm, (0, 0, 0.10), 0.20, 0.04, segments=8)
-    # Central energy coupling dome
-    add_cone_z(bm, (0, 0, 0.14), 0.12, 0.08, 0.06, segments=16)
-    add_cyl_z(bm, (0, 0, 0.17), 0.055, 0.03, segments=14)
+    # 1. Main octagonal cast deck base plate (Z = 0.0 to 0.06)
+    add_cyl_z(bm, (0, 0, 0.03), 0.30, 0.06, segments=8)
+    # Beveled step
+    add_cyl_z(bm, (0, 0, 0.065), 0.26, 0.02, segments=8)
+    # Perimeter mounting bolt circle
+    bolt_ring_z(bm, 0.060, 0.275, count=8, bolt_r=0.007, bolt_h=0.012)
 
-    # Bolt ring on base
-    bolt_ring_z(bm, 0.085, 0.22, count=8, bolt_r=0.008, bolt_h=0.014)
+    # 2. Central rotary transformer & utility core (Z = 0.06 to 0.18)
+    add_cyl_z(bm, (0, 0, 0.095), 0.10, 0.05, segments=16)
+    # Core cooling louvers / ventilation collar
+    add_cyl_z(bm, (0, 0, 0.125), 0.085, 0.02, segments=16)
+    # Domed service cover with diagnostic port
+    add_cone_z(bm, (0, 0, 0.145), 0.085, 0.045, 0.025, segments=16)
+    add_cyl_z(bm, (0, 0, 0.165), 0.035, 0.018, segments=6)
 
-    # Four power conduit trunks at cardinal points
+    # 3. Turntable seat recesses and radial hydraulic/power conduits
     for i in range(4):
-        a = math.radians(i * 90)
-        cx = math.cos(a) * 0.20
-        cy = math.sin(a) * 0.20
-        # Conduit block
-        add_box(bm, (cx, cy, 0.07), (0.04, 0.05, 0.08), bevel=0.005)
-        # Round conduit stub leading outward
-        add_tube_between(bm, (cx, cy, 0.07),
-                         (math.cos(a) * 0.27, math.sin(a) * 0.27, 0.07),
-                         radius=0.012, segments=6)
+        a = i * (math.tau / 4.0)
+        ca = math.cos(a)
+        sa = math.sin(a)
+        # Recessed circular turntable seat plate at r=0.14
+        add_cyl_z(bm, (ca * 0.14, sa * 0.14, 0.076), 0.062, 0.012, segments=16)
+        # Turntable retaining ring
+        add_cyl_z(bm, (ca * 0.14, sa * 0.14, 0.083), 0.056, 0.005, segments=16)
 
-    # Holographic emitter ring (small cylinders evenly spaced on outer step)
-    for i in range(8):
-        a = math.radians(i * 45 + 22.5)
-        add_cyl_z(bm, (math.cos(a) * 0.17, math.sin(a) * 0.17, 0.125), 0.012, 0.018, segments=8)
+        # Heavy high-voltage braided cable trunk from central core to arm seat
+        add_tube_between(bm, (ca * 0.085, sa * 0.085, 0.09),
+                         (ca * 0.13, sa * 0.13, 0.08), radius=0.010, segments=8)
+
+        # Hydraulic manifold block between seats
+        a_diag = a + (math.tau / 8.0)
+        cda = math.cos(a_diag)
+        sda = math.sin(a_diag)
+        add_box(bm, (cda * 0.18, sda * 0.18, 0.075), (0.045, 0.045, 0.035), bevel=0.004)
+        # Status LED indicator lens
+        add_cyl_z(bm, (cda * 0.18, sda * 0.18, 0.095), 0.008, 0.006, segments=8)
 
     export_bmesh(bm, "repair_array_mount", "repair_array_mount.glb",
-                 color=(0.18, 0.20, 0.26), metallic=0.72, roughness=0.36)
+                 color=(0.18, 0.21, 0.26), metallic=0.75, roughness=0.32)
 
 
 def build_repair_array_arm():
     """
-    Telescoping shoulder post with articulated elbow and forearm.
-    Origin at base (Blender Z=0) — the arm foot sits on the mount.
-    The arm extends upward and outward, with the welder tip at the top.
-    visual_builder.gd positions this at (ax, 0, az) and rotates by -angle.
+    Folded Industrial Factory Robot Arm (KUKA/ABB 6-axis style).
+    Stands upright with bicep rising steeply to high elbow, forearm folding downward.
+    Origin at base (Z=0) — sits directly on the mount turntable seat.
     """
     bm = bmesh.new()
 
-    # Shoulder post (vertical column rising from mount surface)
-    add_cone_z(bm, (0, 0, 0.12), 0.030, 0.022, 0.24, segments=12)
+    # 1. BASE TURNTABLE & SHOULDER SWIVEL (Z = 0.0 to 0.12)
+    # Turntable disc
+    add_cyl_z(bm, (0, 0, 0.015), 0.052, 0.030, segments=16)
+    bolt_ring_z(bm, 0.028, 0.042, count=6, bolt_r=0.004, bolt_h=0.006)
 
-    # Shoulder joint knuckle at top of post
-    add_cyl_y(bm, (0, 0, 0.245), 0.030, 0.06, segments=12)
-    # Servo actuator for shoulder joint
-    add_box(bm, (0.04, 0, 0.245), (0.038, 0.038, 0.045), bevel=0.005)
+    # Shoulder upright yoke casting (dual vertical ears)
+    add_box(bm, (-0.034, 0.0, 0.085), (0.016, 0.068, 0.085), bevel=0.004)
+    add_box(bm, (0.034, 0.0, 0.085), (0.016, 0.068, 0.085), bevel=0.004)
 
-    # Upper arm box section (from shoulder joint extending forward/outward)
-    add_box(bm, (0, 0.14, 0.245), (0.040, 0.28, 0.038), bevel=0.007)
-    # Upper arm stiffener rib on top
-    add_box(bm, (0, 0.14, 0.268), (0.014, 0.27, 0.010), bevel=0.002, bevel_segments=1)
+    # Shoulder pivot hub (X-axis transverse)
+    add_cyl_x(bm, (0, 0, 0.10), 0.028, 0.078, segments=14)
+    # Shoulder servo drive canister (left side)
+    add_cyl_x(bm, (-0.048, 0, 0.10), 0.034, 0.024, segments=14)
+    # Servo cooling rings
+    for c in range(3):
+        add_tube_between(bm, (-0.042 - c * 0.007, 0, 0.10), (-0.044 - c * 0.007, 0, 0.10), radius=0.036, segments=12)
 
-    # Elbow joint at forearm
-    add_cyl_y(bm, (0, 0.28, 0.245), 0.025, 0.055, segments=12)
+    # 2. LOWER ARM / BICEP BOOM (Rising UPWARDS from Z=0.10 to high elbow Z=0.52, Y=0.12)
+    p_shoulder = mathutils.Vector((0, 0, 0.10))
+    p_elbow = mathutils.Vector((0, 0.12, 0.52))
 
-    # Forearm — shorter, angled slightly downward (arm reaches forward to target)
-    add_box(bm, (0, 0.38, 0.228), (0.032, 0.18, 0.030), bevel=0.005)
+    # Main structural bicep casting
+    add_tube_between(bm, p_shoulder, p_elbow, radius=0.028, segments=12)
 
-    # Wrist joint at forearm tip
-    add_cyl_y(bm, (0, 0.47, 0.228), 0.022, 0.048, segments=10)
+    # Reinforcement side web plates along the bicep
+    boom_dir = (p_elbow - p_shoulder).normalized()
+    boom_len = (p_elbow - p_shoulder).length
+    boom_mid = p_shoulder + boom_dir * (boom_len * 0.50)
 
-    # Cable conduit running from shoulder to wrist (outer arc of arm)
-    add_tube_between(bm, (0.024, 0.0, 0.245), (0.024, 0.46, 0.228), radius=0.007, segments=6)
+    # Cast stiffener flanges on front and rear faces of bicep
+    add_tube_between(bm, p_shoulder + mathutils.Vector((0, 0.016, 0.012)),
+                     p_elbow + mathutils.Vector((0, 0.016, -0.012)), radius=0.012, segments=8)
+    add_tube_between(bm, p_shoulder + mathutils.Vector((0, -0.016, -0.012)),
+                     p_elbow + mathutils.Vector((0, -0.016, 0.012)), radius=0.012, segments=8)
 
-    # Power pack / capacitor housing on upper arm
-    add_box(bm, (0, 0.16, 0.270), (0.024, 0.075, 0.020), bevel=0.003, bevel_segments=1)
+    # Hydraulic Counterbalance Cylinder (parallel to lower boom on right side)
+    cyl_base = mathutils.Vector((0.032, -0.030, 0.065))
+    cyl_mid = mathutils.Vector((0.032, 0.035, 0.28))
+    cyl_rod_end = mathutils.Vector((0.032, 0.090, 0.44))
+
+    # Cylinder barrel (dark hydraulic body)
+    add_tube_between(bm, cyl_base, cyl_mid, radius=0.014, segments=10)
+    add_cyl_x(bm, cyl_base, 0.012, 0.018, segments=8)
+    # Chrome extending rod
+    add_tube_between(bm, cyl_mid, cyl_rod_end, radius=0.0075, segments=8)
+    add_cyl_x(bm, cyl_rod_end, 0.010, 0.016, segments=8)
+
+    # 3. HIGH ELBOW JOINT KNUCKLE (Z = 0.52, Y = 0.12)
+    # Main elbow pivot cylinder
+    add_cyl_x(bm, p_elbow, 0.032, 0.082, segments=16)
+    # High-torque elbow servo motor (right side)
+    add_cyl_x(bm, (0.048, 0.12, 0.52), 0.034, 0.024, segments=14)
+    # Bearing end cap with center bolt
+    add_cyl_x(bm, (-0.044, 0.12, 0.52), 0.026, 0.010, segments=12)
+
+    # 4. FOREARM BOOM (Folding DOWNWARDS and reaching forward from Z=0.52, Y=0.12 to Z=0.28, Y=0.36)
+    p_wrist = mathutils.Vector((0, 0.36, 0.28))
+
+    # Main forearm structural beam
+    add_tube_between(bm, p_elbow, p_wrist, radius=0.022, segments=12)
+    # Forearm top spine rib
+    add_tube_between(bm, p_elbow + mathutils.Vector((0, 0.012, 0.012)),
+                     p_wrist + mathutils.Vector((0, 0.012, 0.012)), radius=0.009, segments=8)
+
+    # 5. WRIST 3-AXIS GIMBAL & TOOL FLANGE (Z = 0.28, Y = 0.36)
+    # Pitch axis knuckle
+    add_cyl_x(bm, p_wrist, 0.022, 0.054, segments=12)
+    # Tool mounting collar extending to flange
+    p_flange = mathutils.Vector((0, 0.39, 0.26))
+    add_tube_between(bm, p_wrist, p_flange, radius=0.020, segments=10)
+    # Circular tool mounting flange
+    add_tube_between(bm, p_flange - mathutils.Vector((0, 0.006, -0.004)),
+                     p_flange + mathutils.Vector((0, 0.006, -0.004)), radius=0.028, segments=14)
+
+    # 6. FLEXIBLE CONDUIT / CABLE DRESS PACK (Looping over shoulder, bicep, and elbow)
+    add_tube_between(bm, (0.024, -0.02, 0.04), (0.026, -0.01, 0.12), radius=0.008, segments=6)
+    add_tube_between(bm, (0.026, -0.01, 0.12), (0.024, 0.05, 0.32), radius=0.008, segments=6)
+    # Loop over high elbow
+    add_tube_between(bm, (0.024, 0.05, 0.32), (0.026, 0.10, 0.54), radius=0.008, segments=6)
+    add_tube_between(bm, (0.026, 0.10, 0.54), (0.024, 0.22, 0.44), radius=0.008, segments=6)
+    add_tube_between(bm, (0.024, 0.22, 0.44), (0.022, 0.34, 0.30), radius=0.008, segments=6)
 
     export_bmesh(bm, "repair_array_arm", "repair_array_arm.glb",
-                 color=(0.22, 0.25, 0.30), metallic=0.68, roughness=0.38)
+                 color=(0.24, 0.27, 0.32), metallic=0.72, roughness=0.35)
 
 
 def build_repair_array_welder():
     """
-    Multi-sensor torch head: targeting camera, plasma nozzle, arc electrode.
-    Origin corresponds to the wrist joint (Blender at Z=0.228 in arm space),
-    but in this GLB the origin is at (0,0,0) and geometry hangs from there.
-    visual_builder.gd places it at (ax, 0, az) with rotation.y = -angle,
-    matching the arm's own position — so this should visually be the torch head
-    sitting at the arm tip.
-
-    Art rules:
-      - Boxed camera housing with lens disc on outside face
-      - No human grip or eyepiece
-      - Plasma nozzle + electrode = the working end
+    Industrial Arc Welding End Effector & Laser Seam Tracker.
+    Mounts directly onto the robot arm wrist tool flange at (0, 0.39, 0.26).
     """
     bm = bmesh.new()
 
-    # Tool head base block (attaches to wrist)
-    add_box(bm, (0, 0, 0.0), (0.055, 0.055, 0.055), bevel=0.007)
+    p_flange = mathutils.Vector((0, 0.39, 0.26))
 
-    # Camera/targeting head on top (art: boxed EO sensor, lens on front face)
-    add_box(bm, (0, 0.04, 0.028), (0.045, 0.042, 0.040), bevel=0.005)
-    # Lens disc protruding from front face
-    add_cyl_y(bm, (0, 0.068, 0.028), 0.014, 0.012, segments=14)
-    # Sunshade above lens
-    add_box(bm, (0, 0.058, 0.040), (0.050, 0.022, 0.008), bevel=0.002, bevel_segments=1)
-    # LIDAR side puck
-    add_cyl_z(bm, (0.030, 0.036, 0.038), 0.011, 0.018, segments=10)
+    # 1. Tool Base Adapter & Quick-Change Collar (attaches to wrist flange)
+    add_tube_between(bm, p_flange, p_flange + mathutils.Vector((0, 0.025, -0.016)), radius=0.026, segments=12)
 
-    # Junction box / power coupler on rear
-    add_box(bm, (0, -0.040, 0.0), (0.042, 0.038, 0.040), bevel=0.004)
-    # Conduit stubs (two)
-    add_cyl_y(bm, (0.010, -0.062, 0.010), 0.008, 0.02, segments=6)
-    add_cyl_y(bm, (-0.010, -0.062, -0.005), 0.008, 0.02, segments=6)
+    p_torch_body = p_flange + mathutils.Vector((0, 0.035, -0.022))
+    # Insulated torch main body block
+    add_box(bm, p_torch_body, (0.048, 0.055, 0.045), bevel=0.005)
 
-    # Plasma nozzle / torch barrel (extends forward in Blender +Y)
-    add_cone_z(bm, (0, 0.06, -0.025), 0.022, 0.015, 0.065, segments=14)  # nozzle taper
-    add_cyl_z(bm, (0, 0.06, -0.065), 0.015, 0.030, segments=12)          # electrode barrel
+    # Wire-feed servo motor housing on torch body top
+    add_cyl_y(bm, p_torch_body + mathutils.Vector((0, 0.0, 0.032)), 0.016, 0.040, segments=12)
 
-    # Arc electrode tip — a pointed cone, the actual arc emitter
-    add_cone_z(bm, (0, 0.06, -0.094), 0.012, 0.003, 0.022, segments=10)
+    # 2. Optical Seam Tracker & Dual-Lens Camera Pod (mounted on top of torch)
+    p_cam = p_torch_body + mathutils.Vector((0, 0.020, 0.052))
+    add_box(bm, p_cam, (0.042, 0.036, 0.028), bevel=0.003)
+    # Stereo camera lenses aiming toward the weld arc
+    add_cyl_y(bm, p_cam + mathutils.Vector((-0.012, 0.020, 0.0)), 0.007, 0.008, segments=10)
+    add_cyl_y(bm, p_cam + mathutils.Vector((0.012, 0.020, 0.0)), 0.007, 0.008, segments=10)
+    # Sunshade hood
+    add_box(bm, p_cam + mathutils.Vector((0, 0.018, 0.016)), (0.044, 0.016, 0.005), bevel=0.001)
 
-    # Heat dissipation fins on nozzle sides (small flat fins)
-    for i in range(3):
-        fz = -0.025 - i * 0.015
-        add_box(bm, (0.025, 0.06, fz), (0.020, 0.008, 0.010), bevel=0.002, bevel_segments=1)
-        add_box(bm, (-0.025, 0.06, fz), (0.020, 0.008, 0.010), bevel=0.002, bevel_segments=1)
+    # 3. Industrial Swan-Neck Welding Torch Nozzle
+    p_neck_start = p_torch_body + mathutils.Vector((0, 0.025, -0.015))
+    p_neck_bend = p_torch_body + mathutils.Vector((0, 0.065, -0.065))
+    p_nozzle_base = p_torch_body + mathutils.Vector((0, 0.085, -0.125))
+
+    # Curved swan-neck copper conduit
+    add_tube_between(bm, p_neck_start, p_neck_bend, radius=0.012, segments=10)
+    add_tube_between(bm, p_neck_bend, p_nozzle_base, radius=0.011, segments=10)
+
+    # Heavy-duty conical gas nozzle cup
+    p_nozzle_tip = p_nozzle_base + mathutils.Vector((0, 0.015, -0.045))
+    nozzle_axis = (p_nozzle_tip - p_nozzle_base).normalized()
+    add_tube_between(bm, p_nozzle_base, p_nozzle_tip, radius=0.016, segments=14)
+
+    # Cooling shroud fins on nozzle base
+    for f in range(3):
+        f_pos = p_nozzle_base + nozzle_axis * (0.010 * f)
+        add_tube_between(bm, f_pos - nozzle_axis * 0.002, f_pos + nozzle_axis * 0.002, radius=0.019, segments=12)
+
+    # Ceramic insulator ring
+    add_tube_between(bm, p_nozzle_tip - nozzle_axis * 0.005, p_nozzle_tip, radius=0.012, segments=10)
+
+    # Tungsten arc electrode / welding wire tip protruding from nozzle center
+    p_electrode_tip = p_nozzle_tip + nozzle_axis * 0.025
+    add_cone_z(bm, p_electrode_tip, r_bot=0.005, r_top=0.001, height=0.025, segments=8)
 
     export_bmesh(bm, "repair_array_welder", "repair_array_welder.glb",
-                 color=(0.18, 0.20, 0.24), metallic=0.72, roughness=0.28)
+                 color=(0.18, 0.22, 0.26), metallic=0.80, roughness=0.25)
 
 
 # ---------------------------------------------------------------------------

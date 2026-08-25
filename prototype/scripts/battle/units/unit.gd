@@ -216,20 +216,13 @@ var show_range_overlay: bool = true
 #
 # Both overlays are projected via Decal nodes vertically onto the terrain,
 # conforming smoothly over slopes, hills, ravines, and obstacles.
-const _OVERLAY_RAY_SEGMENTS := 64
+const _OVERLAY_RAY_SEGMENTS := 32
 const _OVERLAY_TEX_SIZE := 64
-const _OVERLAY_REBUILD_MOVE_THRESHOLD := 0.5
-# Rebuild budget (2026-08-23 playtest). One rebuild is a 64-ray terrain
-# shadowcast plus two texture uploads, and the old throttles only applied while
-# MOVING - box-select an army, have it stop or take a range-changing hit, and
-# every selected unit rebuilt in the same physics tick. The log caught a single
-# frame paying 973 ms of unit.overlays. Two guards now:
-#   - _OVERLAY_REBUILD_MIN_INTERVAL_MS: per-unit hard cooldown even when the
-#     range changed (a shrinking circle updating at 5 Hz still reads fine).
-#   - a static per-frame cap: at most this many units across the WHOLE army
-#     rebuild in one physics tick; the rest retry next tick.
-const _OVERLAY_REBUILD_MIN_INTERVAL_MS := 200
-const _OVERLAY_MAX_BUILDS_PER_FRAME := 2
+const _OVERLAY_REBUILD_MOVE_THRESHOLD := 3.0
+# Rebuild budget: avoids shadowcasting & CPU texture allocations while moving or
+# spamming rebuilds when multiple units are selected.
+const _OVERLAY_REBUILD_MIN_INTERVAL_MS := 1500
+const _OVERLAY_MAX_BUILDS_PER_FRAME := 1
 # Sensor-coverage disc colour: crisp, subtle tactical emerald green.
 const _OVERLAY_VISION_COLOR := Color(0.24, 0.94, 0.58, 0.90)
 # Weapon-coverage disc colour: crisp, subtle tactical amber-orange.
@@ -239,6 +232,7 @@ const _OVERLAY_RAY_HEIGHT := 1.5
 # Shared rebuild budget state - static so it spans every unit instance.
 static var _overlay_budget_frame: int = -1
 static var _overlay_budget_used: int = 0
+static var _cached_circle_textures: Dictionary = {}
 
 
 # Claims one rebuild slot for this physics frame. False when the army has
@@ -476,7 +470,6 @@ func _recalculate_energy() -> void:
 func _recalculate_vision() -> void:
 	var base: float = ModuleCatalog.get_base_vision(_hull_type)
 	var bonus := 0.0
-	var has_radar := false
 	directional_sensors.clear()
 	topographic_range = 0.0
 	seismic_range = 0.0
@@ -486,7 +479,7 @@ func _recalculate_vision() -> void:
 		var data = m.get_meta("module_data")
 		if data == null:
 			continue
-		if data.type_id == "sensor_suite":
+		if data.type_id in ["sensor_suite", "heavy_sensor_suite"]:
 			bonus += data.get_vision_bonus()
 		elif data.type_id == "directional_radar":
 			var dir_reach = base + data.get_vision_bonus()
@@ -497,21 +490,6 @@ func _recalculate_vision() -> void:
 				"arc_rad": deg_to_rad(arc),
 				"node": m
 			})
-		elif data.type_id == "topographic_radar":
-			if data.has_method("get_survey_radius"):
-				topographic_range = maxf(topographic_range, data.get_survey_radius())
-			else:
-				topographic_range = maxf(topographic_range, 140.0)
-		elif data.type_id == "seismic_sensor":
-			if data.has_method("get_seismic_range"):
-				seismic_range = maxf(seismic_range, data.get_seismic_range())
-			else:
-				seismic_range = maxf(seismic_range, 75.0)
-		elif data.type_id == "thermal_imager":
-			bonus += data.get_vision_bonus()
-			has_thermal_sight = true
-		elif data.type_id == "fire_control_radar":
-			has_radar = true
 
 	var brownout_mult = PowerBudgetScript.vision_multiplier(_brownout)
 	vision_range = (base + bonus) * brownout_mult
@@ -521,11 +499,6 @@ func _recalculate_vision() -> void:
 		ds["range"] *= brownout_mult
 
 	if is_instance_valid(hull_node):
-		# Read off the HULL by auto_weapon.gd's spotting check, not off the unit -
-		# a radar lets this unit's weapons engage out to their own reach rather
-		# than only as far as it can see.
-		hull_node.set_meta("has_fire_control_radar", has_radar)
-		hull_node.set_meta("fire_control_max_range", maxf(vision_range, attack_range))
 		hull_node.set_meta("has_thermal_sight", has_thermal_sight)
 	# Refresh the sensor-range disc on every recalc. Brownout, sensor module
 	# strip, and hull change all land here, and they all change vision_range.
@@ -1148,6 +1121,17 @@ func _recalculate_weapons() -> void:
 
 # --- Boost controller helper methods ---
 
+func has_boost_ability() -> bool:
+	return boost_controller != null and not boost_controller.get_boost_summary().is_empty()
+
+func can_activate_boost() -> bool:
+	return boost_controller != null and boost_controller.can_activate()
+
+func activate_boost() -> bool:
+	if boost_controller != null and boost_controller.can_activate():
+		return boost_controller.activate()
+	return false
+
 func get_remaining_distance() -> float:
 	if current_order != null and current_order.has_destination():
 		var dest := current_order.position
@@ -1609,18 +1593,13 @@ func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = nu
 
 	var modules := DamageModelScript.active_modules(hull_node)
 
+	# Aegis Field Projector: wide projected forcefield that shelters this unit and any friendly units
+	amount = _absorb_with_aegis_fields(amount, hit_origin)
+	if amount <= 0.0:
+		return
+
 	# Energy Barrier Projector: a frontal shield that spends the capacitor to eat
 	# the hit. Checked before armour because it is in front of the armour.
-	#
-	# Shields are the FIRST thing a brownout sheds (PowerBudget's threshold
-	# ordering), and this is where that happens. Deliberately gated on the
-	# brownout state rather than on `current_energy > 0` alone: without it, a
-	# design in deficit would keep eating hits with the last few points in its
-	# buffer, which is precisely the energy its weapons and optics need to stay
-	# up. Dropping the shield early is what leaves something in reserve for the
-	# systems that shed later, and it is the cue to the player that the design is
-	# under-powered - a shield that silently stops working at zero looks like a
-	# bug, one that drops at half looks like a consequence.
 	if hit_origin != null and current_energy > 0.0 and not _brownout.get("shields_offline", false):
 		amount = _absorb_with_barrier(amount, modules, hit_origin)
 		if amount <= 0.0:
@@ -1731,6 +1710,52 @@ func _try_emergency_smoke(hit_origin) -> void:
 			return   # one smoke pop per hit; stop after the first ready weapon
 
 
+func _absorb_with_aegis_fields(amount: float, hit_origin) -> float:
+	if is_dead or amount <= 0.0:
+		return amount
+
+	var my_pos = global_position if is_inside_tree() else position
+
+	# Check own modules first
+	if is_instance_valid(hull_node):
+		for m in hull_node.get_children():
+			if m.has_method("get_aegis_field_info"):
+				var info: Dictionary = m.get_aegis_field_info()
+				if info.get("is_active", false):
+					var center: Vector3 = info.get("center", Vector3.ZERO)
+					var radius: float = float(info.get("radius", 9.0))
+					var dist_sq = Vector2(my_pos.x - center.x, my_pos.z - center.z).length_squared()
+					if dist_sq <= radius * radius:
+						amount = m.absorb_aegis_damage(amount)
+						if amount <= 0.0:
+							return 0.0
+
+	# Check ally units in the area
+	var tree = get_tree() if is_inside_tree() else null
+	var units: Array = []
+	if tree != null:
+		units = tree.get_nodes_in_group("units")
+	elif get_parent() != null:
+		units = get_parent().find_children("*", "", true, false).filter(func(c): return c is CharacterBody3D and "team" in c)
+
+	for u in units:
+		if not is_instance_valid(u) or u == self or ("is_dead" in u and u.is_dead) or u.team != team:
+			continue
+		if not is_instance_valid(u.hull_node):
+			continue
+		for m in u.hull_node.get_children():
+			if m.has_method("get_aegis_field_info"):
+				var info: Dictionary = m.get_aegis_field_info()
+				if info.get("is_active", false):
+					var center: Vector3 = info.get("center", Vector3.ZERO)
+					var radius: float = float(info.get("radius", 9.0))
+					var dist_sq = Vector2(my_pos.x - center.x, my_pos.z - center.z).length_squared()
+					if dist_sq <= radius * radius:
+						amount = m.absorb_aegis_damage(amount)
+						if amount <= 0.0:
+							return 0.0
+	return amount
+
 # Spend the capacitor to absorb a frontal hit, returning what is left of it.
 #
 # Frontal only, and that is the whole balance of the module: it rewards facing
@@ -1775,8 +1800,7 @@ func _strip_module(module: Node3D, amount: float) -> void:
 	var was_locomotion: bool = data != null and data.category == "locomotion"
 	var was_generator: bool = data != null and data.category == "generator"
 	var was_sensor: bool = data != null and data.type_id in [
-		"sensor_suite", "directional_radar", "topographic_radar",
-		"seismic_sensor", "thermal_imager", "fire_control_radar"
+		"sensor_suite", "heavy_sensor_suite", "directional_radar"
 	]
 	var was_weapon: bool = data != null and ModuleCatalog.needs_combat_script(data.type_id)
 	module.queue_free()
@@ -2012,9 +2036,13 @@ func _create_targetable_overlay() -> void:
 			_targetable_overlay = null
 		_overlay_last_targetable_range = -1.0
 		return
-	var reaches := _compute_terrain_reach(
-		attack_range, _OVERLAY_RAY_SEGMENTS,
-		_is_main_weapon_indirect() or is_flying or is_naval or is_amphibious)
+	var is_indirect := _is_main_weapon_indirect() or is_flying or is_naval or is_amphibious
+	var tex: ImageTexture = null
+	if is_indirect:
+		tex = _get_uniform_circle_texture(_OVERLAY_WEAPONS_COLOR)
+	else:
+		var reaches := _compute_terrain_reach(attack_range, _OVERLAY_RAY_SEGMENTS, false)
+		tex = _generate_range_overlay_texture(reaches, attack_range, _OVERLAY_WEAPONS_COLOR)
 	if not is_instance_valid(_targetable_overlay):
 		_targetable_overlay = Decal.new()
 		_targetable_overlay.name = "TargetableOverlay"
@@ -2026,8 +2054,7 @@ func _create_targetable_overlay() -> void:
 	_targetable_overlay.size = Vector3(attack_range * 2.0, proj_depth, attack_range * 2.0)
 	_targetable_overlay.global_position = global_position
 	_targetable_overlay.rotation = Vector3.ZERO
-	_targetable_overlay.texture_albedo = _generate_range_overlay_texture(
-		reaches, attack_range, _OVERLAY_WEAPONS_COLOR)
+	_targetable_overlay.texture_albedo = tex
 	_targetable_overlay.albedo_mix = 1.0
 	_targetable_overlay.visible = _is_selected and show_range_overlay
 	_overlay_last_targetable_range = attack_range
@@ -2043,9 +2070,13 @@ func _create_visible_overlay() -> void:
 			_visible_overlay = null
 		_overlay_last_visible_range = -1.0
 		return
-	var reaches := _compute_terrain_reach(
-		vision_range, _OVERLAY_RAY_SEGMENTS,
-		is_flying or is_naval or is_amphibious)
+	var is_flat := is_flying or is_naval or is_amphibious
+	var tex: ImageTexture = null
+	if is_flat:
+		tex = _get_uniform_circle_texture(_OVERLAY_VISION_COLOR)
+	else:
+		var reaches := _compute_terrain_reach(vision_range, _OVERLAY_RAY_SEGMENTS, false)
+		tex = _generate_range_overlay_texture(reaches, vision_range, _OVERLAY_VISION_COLOR)
 	if not is_instance_valid(_visible_overlay):
 		_visible_overlay = Decal.new()
 		_visible_overlay.name = "VisibleOverlay"
@@ -2057,8 +2088,7 @@ func _create_visible_overlay() -> void:
 	_visible_overlay.size = Vector3(vision_range * 2.0, proj_depth, vision_range * 2.0)
 	_visible_overlay.global_position = global_position
 	_visible_overlay.rotation = Vector3.ZERO
-	_visible_overlay.texture_albedo = _generate_range_overlay_texture(
-		reaches, vision_range, _OVERLAY_VISION_COLOR)
+	_visible_overlay.texture_albedo = tex
 	_visible_overlay.albedo_mix = 1.0
 	_visible_overlay.visible = _is_selected and show_range_overlay
 	_overlay_last_visible_range = vision_range
@@ -2098,7 +2128,7 @@ func _compute_terrain_reach(max_range: float, segments: int,
 	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state if is_inside_tree() else null
 
 	reaches.resize(segments)
-	var step_size: float = maxf(1.5, max_range / 24.0)
+	var step_size: float = maxf(2.0, max_range / 16.0)
 	var num_steps: int = maxi(2, int(ceil(max_range / step_size)))
 
 	# Building query to check static structure occluders
@@ -2163,13 +2193,25 @@ func _compute_terrain_reach(max_range: float, segments: int,
 	return reaches
 
 
+static func _get_uniform_circle_texture(color: Color) -> ImageTexture:
+	var col_key := color.to_rgba32()
+	if _cached_circle_textures.has(col_key):
+		return _cached_circle_textures[col_key]
+	var reaches: Array = []
+	reaches.resize(_OVERLAY_RAY_SEGMENTS)
+	for i in range(_OVERLAY_RAY_SEGMENTS):
+		reaches[i] = 100.0
+	var tex := _generate_range_overlay_texture_static(reaches, 100.0, color)
+	_cached_circle_textures[col_key] = tex
+	return tex
+
+
 # Generates a subtle, high-precision tactical contour texture for the Decal.
-#
-# Ultra-fast PackedByteArray writing: renders in < 0.15ms on CPU.
-# The center is completely clear (0 alpha) so units and ground textures are unobstructed.
-# The boundary is rendered as a crisp, anti-aliased luminous contour line with subtle
-# inner falloff and military reticle accents.
 func _generate_range_overlay_texture(reaches: Array, max_range: float, border_color: Color) -> ImageTexture:
+	return _generate_range_overlay_texture_static(reaches, max_range, border_color)
+
+
+static func _generate_range_overlay_texture_static(reaches: Array, max_range: float, border_color: Color) -> ImageTexture:
 	var dim: int = _OVERLAY_TEX_SIZE
 	var half_dim: float = float(dim) * 0.5
 	var n_reaches: int = reaches.size()
@@ -2250,6 +2292,11 @@ func _refresh_overlays_if_stale() -> void:
 	if is_instance_valid(_visible_overlay) and _visible_overlay.top_level:
 		_visible_overlay.global_position = global_position
 
+	# While moving, never rebuild textures or raycast; the decal follows position above.
+	var is_moving: bool = velocity.length_squared() > 0.05
+	if is_moving:
+		return
+
 	var moved: float = global_position.distance_to(_overlay_last_pos)
 	var range_changed: bool = attack_range != _overlay_last_targetable_range \
 			or vision_range != _overlay_last_visible_range
@@ -2257,20 +2304,12 @@ func _refresh_overlays_if_stale() -> void:
 	if not range_changed and moved < _OVERLAY_REBUILD_MOVE_THRESHOLD:
 		return
 
-	# If the unit is actively moving, avoid re-shadowcasting every frame;
-	# update position smoothly and only re-cast when stopping or on a throttled interval
 	var now: int = Time.get_ticks_msec()
-	var is_moving: bool = velocity.length_squared() > 0.05
-	if is_moving and (now - _overlay_last_rebuild_time) < 1200 and not range_changed:
-		return
-	# Hard cooldown, range change or not. Module-stripping in a fight can flap
-	# attack_range every few ticks; without this the rebuild runs per-tick.
+	# Hard cooldown even when range changed or moved
 	if (now - _overlay_last_rebuild_time) < _OVERLAY_REBUILD_MIN_INTERVAL_MS:
 		return
-	# Army-wide frame budget: defer rather than rebuild so twenty selected units
-	# stopping at once spread their shadowcasts over consecutive ticks instead
-	# of stacking them into one. Not consuming the cooldown/position state here
-	# means deferred units simply retry next tick.
+
+	# Army-wide frame budget: at most 1 unit rebuilds per frame
 	if not _overlay_try_claim_budget():
 		return
 

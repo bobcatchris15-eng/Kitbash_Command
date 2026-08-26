@@ -26,12 +26,24 @@ const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
 # these controls are ever reused there - an untagged payload would be accepted.
 const DRAG_TYPE = "roster_blueprint"
 
-# A FLOOR, not a fixed size. The slots expand to share the full width of the
-# tray (see _build_slot_grid), so this only sets how small one is allowed to get
-# on a narrow window. Raised from 96x78: at that height the thumbnail had barely
-# 56px left under the name line, which is not enough to tell two similar
-# kitbashes apart at a glance - the entire job of the slot.
+const HARVESTER_SLOT_INDEX = 11  # 0-indexed: slot 12 of 12
+
+# Card tint colors. Harvesters get green, repair units get blue. These are
+# light washes applied to the card background so the card reads as a
+# CATEGORY at a glance without obscuring the thumbnail or stat text.
+const HARVESTER_TINT := Color(0.15, 0.30, 0.12, 0.45)
+const REPAIR_TINT := Color(0.12, 0.18, 0.30, 0.45)
+
+	# A FLOOR, not a fixed size. The slots expand to share the full width of the
+	# tray (see _build_slot_grid), so this only sets how small one is allowed to get
+	# on a narrow window. Raised from 96x78: at that height the thumbnail had barely
+	# 56px left under the name line, which is not enough to tell two similar
+	# kitbashes apart at a glance - the entire job of the slot.
 const SLOT_SIZE = Vector2(104, 132)
+# Library card height. Tall enough for thumbnail + wrapped name + four-line spec
+# block. Kept at 240 so two library strips (combat + harvester) plus the slot
+# grid all fit on a 900px viewport without scrolling the parent VBoxContainer.
+const CARD_SIZE = Vector2(168, 240)
 # Tall enough for the thumbnail plus a wrapped name plus a four-line spec block.
 # The first version was 120x104 and forced the name to a single ellipsised line,
 # which is the worst thing to truncate on a card whose whole job is telling two
@@ -55,7 +67,6 @@ const SLOT_SIZE = Vector2(104, 132)
 # outgrew it would not scroll, it would clip the extra row off the bottom,
 # hiding exactly the line that was added to be noticed. 20px per row is one 13px
 # monospace line plus its leading.
-const CARD_SIZE = Vector2(168, 288)
 const CARD_THUMB_H = 78
 # The drag ghost stays compact deliberately - it is not a card, it is a token of
 # one. A full spec block following the cursor obscures the wells it is about to
@@ -71,107 +82,149 @@ var _slots: Array = []
 var _baker: BlueprintThumbnail = null
 var _slot_grid: GridContainer = null
 var _library_row: HBoxContainer = null
+var _harvester_row: HBoxContainer = null
 var _counter: Label = null
 var _capacity: int = 12
 var _data_by_path: Dictionary = {}
+var _harvester_paths: Dictionary = {}  # path -> entry, for slot validation
 
 
 # `entries` is blueprint_manager.list_blueprints(true) output.
 func setup(entries: Array, capacity: int) -> void:
 	_capacity = capacity
-	add_theme_constant_override("separation", Tokens.SPACE_MD)
+	add_theme_constant_override("separation", Tokens.SPACE_SM)
 
 	_baker = BlueprintThumbnailScript.new()
 	add_child(_baker)
 
-	# Load each blueprint ONCE, up front. The cards need the full document for
-	# their spec block (armour, locomotion and module count are not in
-	# list_blueprints()' summary entries) and the baker needs it to reconstruct
-	# the vehicle. Parsing it twice would be the obvious version of this and would
-	# also let the two copies drift.
 	for entry in entries:
 		var path := str(entry.get("path", ""))
 		if path != "":
 			_data_by_path[path] = _load_blueprint(path)
 
-	_build_library(entries)
-	_build_slot_grid()
+	# --- Top row: two library strips side by side ---
+	var lib_row := HBoxContainer.new()
+	lib_row.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	lib_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(lib_row)
+
+	lib_row.add_child(_build_combat_scroll(entries))
+	lib_row.add_child(_build_harvester_scroll(entries))
+
+	# --- Bottom: slot grid (6×2) ---
+	add_child(_build_slot_section())
 	_update_counter()
 
-	# Thumbnails are baked after the layout exists, one per frame-ish, so the
-	# screen is interactive immediately and fills in rather than blocking on a
-	# dozen 3D renders before anything draws.
 	_bake_thumbnails(entries)
 
 
-func _build_library(entries: Array) -> void:
+func _build_combat_scroll(entries: Array) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.size_flags_stretch_ratio = 3.0
+	col.add_theme_constant_override("separation", Tokens.SPACE_XS)
+
 	var heading := Label.new()
 	heading.text = "BLUEPRINT LIBRARY"
 	heading.theme_type_variation = "HeadingLabel"
-	add_child(heading)
+	col.add_child(heading)
 
-	if entries.is_empty():
+	var combat_entries := []
+	for entry in entries:
+		if not entry.get("is_harvester", false):
+			combat_entries.append(entry)
+
+	if combat_entries.is_empty():
 		var hint := Label.new()
-		hint.text = "No saved designs yet - name and save a design in the Lab to field it. The match will use bundled defaults."
+		hint.text = "No saved designs yet — save a design in the Lab to field it."
 		hint.theme_type_variation = "HintLabel"
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		add_child(hint)
-		return
+		col.add_child(hint)
+		return col
 
 	var scroll := ScrollContainer.new()
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_LG)
-	add_child(scroll)
+	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_SM)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(scroll)
 
 	_library_row = HBoxContainer.new()
 	_library_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	scroll.add_child(_library_row)
 
-	for entry in entries:
+	for entry in combat_entries:
 		var card := RosterCard.new()
 		card.configure(entry, _data_by_path.get(str(entry.get("path", "")), {}))
 		_library_row.add_child(card)
-	# The strip sweeps in rather than appearing whole. Deferred because stagger_in
-	# reads each child's position, which the HBox has not assigned yet.
+
 	call_deferred("_animate_library_entrance")
+	return col
 
 
-func _build_slot_grid() -> void:
+func _build_harvester_scroll(entries: Array) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.size_flags_stretch_ratio = 2.0
+	col.add_theme_constant_override("separation", Tokens.SPACE_XS)
+
 	var heading := Label.new()
-	heading.text = "MATCH ROSTER"
-	# Same variation as the library heading above, deliberately: the two halves
-	# are peers in one exchange, not a hierarchy.
+	heading.text = "HARVESTER BAY"
 	heading.theme_type_variation = "HeadingLabel"
-	add_child(heading)
+	col.add_child(heading)
+
+	var harv_entries := []
+	for entry in entries:
+		if entry.get("is_harvester", false):
+			harv_entries.append(entry)
+			_harvester_paths[str(entry.get("path", ""))] = entry
+
+	if harv_entries.is_empty():
+		var hint := Label.new()
+		hint.text = "No harvesters saved yet — add a Resource Harvester in the Lab."
+		hint.theme_type_variation = "HintLabel"
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		col.add_child(hint)
+		return col
+
+	var scroll := ScrollContainer.new()
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_SM)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(scroll)
+
+	_harvester_row = HBoxContainer.new()
+	_harvester_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	scroll.add_child(_harvester_row)
+
+	for entry in harv_entries:
+		var card := RosterCard.new()
+		card.configure(entry, _data_by_path.get(str(entry.get("path", "")), {}))
+		_harvester_row.add_child(card)
+
+	return col
+
+
+func _build_slot_section() -> VBoxContainer:
+	var section := VBoxContainer.new()
+	section.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var heading := Label.new()
+	heading.text = "MATCH ROSTER  (slot 12 = harvester only)"
+	heading.theme_type_variation = "HeadingLabel"
+	section.add_child(heading)
 
 	_counter = Label.new()
 	_counter.theme_type_variation = "StatLabel"
-	add_child(_counter)
+	section.add_child(_counter)
 
 	var well := PanelContainer.new()
-	# InsetPanel is the recessed well variation - the grid is a tray the units
-	# are dropped INTO, so it should read as set into the screen, not floating.
 	well.theme_type_variation = "InsetPanel"
-	# The tray claims the full width of the screen frame; the grid inside it then
-	# shares that width out. Without this the well shrinks to the grid's minimum
-	# and the "fill the whole bottom segment" arrangement collapses back to a
-	# left-packed cluster.
 	well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(well)
+	section.add_child(well)
 
 	_slot_grid = GridContainer.new()
-	# ONE ROW, spanning the full width of the tray.
-	#
-	# This was 6x2, on the reasoning that a single row of twelve would force the
-	# slots too narrow to read. That held only while the slots were a FIXED 96px:
-	# now they expand to share whatever width the tray has, so on any window wider
-	# than about 1300px a single row gives each slot MORE space than the two-row
-	# grid did, not less - and the roster reads as one ordered magazine rather
-	# than as two rows whose relationship has to be inferred.
-	#
-	# SLOT_SIZE remains the floor, so a narrow window degrades to smaller slots
-	# rather than to a horizontal scrollbar.
-	_slot_grid.columns = _capacity
+	_slot_grid.columns = 6
 	_slot_grid.add_theme_constant_override("h_separation", Tokens.SPACE_SM)
 	_slot_grid.add_theme_constant_override("v_separation", Tokens.SPACE_SM)
 	_slot_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -180,12 +233,11 @@ func _build_slot_grid() -> void:
 	for i in range(_capacity):
 		var slot := RosterSlot.new()
 		slot.configure(i, self)
-		# Every slot takes an equal share of the leftover width. Without this the
-		# GridContainer packs them at their minimum size and leaves the rest of the
-		# tray empty on the right.
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_slot_grid.add_child(slot)
 		_slots.append(slot)
+
+	return section
 
 
 func _animate_library_entrance() -> void:
@@ -193,6 +245,8 @@ func _animate_library_entrance() -> void:
 		# From the LEFT, not from below: the strip is a horizontal rack, and cards
 		# arriving upward would read as unrelated to the direction it scrolls.
 		UIAnimScript.stagger_in(_library_row, Vector2(-16, 0))
+	if is_instance_valid(_harvester_row):
+		UIAnimScript.stagger_in(_harvester_row, Vector2(-16, 0))
 
 
 func _bake_thumbnails(entries: Array) -> void:
@@ -237,12 +291,13 @@ func _load_blueprint(path: String) -> Dictionary:
 
 
 func _cards() -> Array:
-	if _library_row == null:
-		return []
 	var out := []
-	for c in _library_row.get_children():
-		if c is RosterCard:
-			out.append(c)
+	for row in [_library_row, _harvester_row]:
+		if row == null:
+			continue
+		for c in row.get_children():
+			if c is RosterCard:
+				out.append(c)
 	return out
 
 
@@ -256,11 +311,13 @@ func _update_counter() -> void:
 	if _counter == null:
 		return
 	var n := ordered_paths().size()
-	_counter.text = "%d / %d slots filled" % [n, _capacity]
-	# Full is a neutral fact, not a warning - the grid physically cannot exceed
-	# capacity, so there is no over-cap state to signal any more. That is the
-	# other thing the slot grid buys: the old screen needed a HAZARD message
-	# because nothing stopped you checking fifteen boxes.
+	var harv_slot_filled := false
+	for slot in _slots:
+		if slot.index == HARVESTER_SLOT_INDEX and slot.entry_path != "":
+			harv_slot_filled = true
+			break
+	var harv_text := "  (harvester slot: %s)" % ("filled" if harv_slot_filled else "empty")
+	_counter.text = "%d / %d slots filled%s" % [n, _capacity, harv_text]
 	if n == 0:
 		_counter.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
 	else:
@@ -274,6 +331,14 @@ func slot_holding(path: String) -> RosterSlot:
 		if slot.entry_path == path:
 			return slot
 	return null
+
+
+func is_harvester_slot(index: int) -> bool:
+	return index == HARVESTER_SLOT_INDEX
+
+
+func is_harvester_path(path: String) -> bool:
+	return _harvester_paths.has(path)
 
 
 # Fills the slots from an ordered list of paths, as the inverse of
@@ -331,6 +396,14 @@ class RosterCard extends PanelContainer:
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		tooltip_text = "%s\nDrag into a roster slot." % entry_name
 
+		# Category tint: harvesters get green, repair units get blue.
+		# Applied as a StyleBoxFlat background override so the tint is visible
+		# behind the thumbnail and stat text without obscuring them.
+		if entry.get("is_harvester", false):
+			_apply_tint(RosterPicker.HARVESTER_TINT)
+		elif entry.get("has_repair", false):
+			_apply_tint(RosterPicker.REPAIR_TINT)
+
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", Tokens.SPACE_XS)
 		add_child(box)
@@ -379,6 +452,16 @@ class RosterCard extends PanelContainer:
 			# more apart, and a row of images snapping in one by one reads as
 			# stutter.
 			UIAnimScript.fade(_thumb, 1.0, UIAnimScript.DURATION_NORMAL)
+
+	func _apply_tint(tint: Color) -> void:
+		# Create a tinted StyleBoxFlat as the card background. The tint sits
+		# behind the thumbnail and text so the card reads as category-coloured
+		# at a glance without obscuring content.
+		var style := StyleBoxFlat.new()
+		style.bg_color = tint
+		style.set_corner_radius_all(4)
+		style.set_content_margin_all(8)
+		add_theme_stylebox_override("panel", style)
 
 	func _get_drag_data(_at_position: Vector2) -> Variant:
 		if entry_path == "":
@@ -443,21 +526,47 @@ class RosterSlot extends PanelContainer:
 		if _thumb:
 			_thumb.texture = null
 		if _label:
-			_label.text = str(index + 1)
-			_label.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
-		tooltip_text = "Empty slot %d. Drag a design here." % (index + 1)
+			if _picker and _picker.is_harvester_slot(index):
+				_label.text = "HRV"
+				_label.add_theme_color_override("font_color", RosterPicker.HARVESTER_TINT.lightened(0.4))
+			else:
+				_label.text = str(index + 1)
+				_label.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
+		var slot_type := "any design" if not (_picker and _picker.is_harvester_slot(index)) else "harvester only"
+		tooltip_text = "Empty slot %d (%s). Drag a design here." % [index + 1, slot_type]
 
 	func _render_filled() -> void:
 		# CardPanel: a filled slot is an object sitting IN the recess, so it
 		# switches from the recessed variation to the raised one. The elevation
 		# change is doing the work here, not a colour change.
 		theme_type_variation = "CardPanel"
+		# Apply category tint to the filled slot background.
+		if _picker and _picker.is_harvester_path(entry_path):
+			var style := StyleBoxFlat.new()
+			style.bg_color = RosterPicker.HARVESTER_TINT
+			style.set_corner_radius_all(4)
+			style.set_content_margin_all(4)
+			add_theme_stylebox_override("panel", style)
+		elif _has_repair_in_data():
+			var style := StyleBoxFlat.new()
+			style.bg_color = RosterPicker.REPAIR_TINT
+			style.set_corner_radius_all(4)
+			style.set_content_margin_all(4)
+			add_theme_stylebox_override("panel", style)
+		else:
+			remove_theme_stylebox_override("panel")
 		if _thumb:
 			_thumb.texture = _tex
 		if _label:
 			_label.text = entry_name
 			_label.remove_theme_color_override("font_color")
 		tooltip_text = "%s\nDrag out or right-click to clear." % entry_name
+
+	func _has_repair_in_data() -> bool:
+		if _picker == null or entry_path == "":
+			return false
+		var data: Dictionary = _picker._data_by_path.get(entry_path, {})
+		return data.get("has_repair", false)
 
 	func assign(path: String, name_text: String, tex: Texture2D) -> void:
 		entry_path = path
@@ -476,7 +585,13 @@ class RosterSlot extends PanelContainer:
 			_thumb.texture = tex
 
 	func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-		return data is Dictionary and data.get("type", "") == RosterPicker.DRAG_TYPE
+		if not (data is Dictionary and data.get("type", "") == RosterPicker.DRAG_TYPE):
+			return false
+		# Slot 12 (HARVESTER_SLOT_INDEX) only accepts harvesters.
+		if _picker and _picker.is_harvester_slot(index):
+			var path := str(data.get("path", ""))
+			return _picker.is_harvester_path(path)
+		return true
 
 	func _drop_data(_at_position: Vector2, data: Variant) -> void:
 		var path := str(data.get("path", ""))

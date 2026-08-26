@@ -630,12 +630,8 @@ func list_blueprints(named_only: bool = false) -> Array:
 						"name": data.get("name", "Untitled Design"),
 						"hull_type": data.get("hull_type", "brenntal_medium_a"),
 						"faction": data.get("faction", "industrialists"),
-						# Derived here rather than in the Library screen because
-						# `data` - the whole blueprint, modules and all - is in
-						# hand at this exact point and is thrown away on the next
-						# line. Any consumer that wanted this later would have to
-						# re-read and re-parse the JSON file to get it back.
 						"is_harvester": ModuleCatalogScript.blueprint_is_harvester(data),
+						"has_repair": ModuleCatalogScript.blueprint_has_repair(data),
 						"cargo_capacity": HarvesterFSMScript.capacity_for(
 							ModuleCatalogScript.blueprint_harvester_modules(data),
 							str(data.get("hull_type", "brenntal_medium_a")),
@@ -662,12 +658,8 @@ func list_blueprints(named_only: bool = false) -> Array:
 						"name": data.get("name", "Untitled Design"),
 						"hull_type": data.get("hull_type", "brenntal_medium_a"),
 						"faction": data.get("faction", "industrialists"),
-						# Derived here rather than in the Library screen because
-						# `data` - the whole blueprint, modules and all - is in
-						# hand at this exact point and is thrown away on the next
-						# line. Any consumer that wanted this later would have to
-						# re-read and re-parse the JSON file to get it back.
 						"is_harvester": ModuleCatalogScript.blueprint_is_harvester(data),
+						"has_repair": ModuleCatalogScript.blueprint_has_repair(data),
 						"cargo_capacity": HarvesterFSMScript.capacity_for(
 							ModuleCatalogScript.blueprint_harvester_modules(data),
 							str(data.get("hull_type", "brenntal_medium_a")),

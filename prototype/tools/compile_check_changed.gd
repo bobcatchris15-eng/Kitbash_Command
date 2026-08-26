@@ -33,6 +33,9 @@ const FILES := [
 	"res://scripts/vfx_burst.gd",
 	"res://scripts/weapon_missile.gd",
 	"res://scripts/vfx_effects.gd",
+	"res://scripts/roster_picker.gd",
+	"res://scripts/match_setup.gd",
+	"res://scripts/blueprint_manager.gd",
 ]
 
 func _init():

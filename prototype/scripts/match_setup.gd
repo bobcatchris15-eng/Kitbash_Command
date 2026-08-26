@@ -185,7 +185,7 @@ func _ready():
 	root_vbox.add_child(HSeparator.new())
 
 	var library_label = Label.new()
-	library_label.text = "Drag designs into a roster slot (leave the roster empty to auto-include your newest designs)"
+	library_label.text = "Drag combat designs into slots 1-11. Drag harvesters into any slot, or into slot 12 (harvester-only). Leave the roster empty to auto-include your newest designs."
 	library_label.theme_type_variation = "HintLabel"
 	library_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_vbox.add_child(library_label)
@@ -202,6 +202,7 @@ func _ready():
 	# is identical - an ordered Array of blueprint paths - so _on_start_pressed()
 	# below is unchanged apart from where it reads that array from.
 	roster_picker = RosterPickerScript.new()
+	roster_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	roster_picker.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_vbox.add_child(roster_picker)
 	roster_picker.setup(entries, ROSTER_CAP)

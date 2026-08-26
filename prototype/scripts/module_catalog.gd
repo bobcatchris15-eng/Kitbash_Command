@@ -2961,6 +2961,13 @@ static func blueprint_is_harvester(data: Dictionary) -> bool:
 	return blueprint_harvester_modules(data) > 0
 
 
+static func blueprint_has_repair(data: Dictionary) -> bool:
+	for mod in data.get("modules", []):
+		if str(mod.get("type_id", "")) == "repair_array":
+			return true
+	return false
+
+
 static func blueprint_bay_capacity(data: Dictionary) -> float:
 	var total := 0.0
 	for mod in data.get("modules", []):

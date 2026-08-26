@@ -1,0 +1,29 @@
+{
+  "name": "Spectre Glaive",
+  "hp": 702.6,
+  "weight": 502.0,
+  "metal": 170,
+  "crystal": 35,
+  "size": [
+    3.6,
+    1.863,
+    6.2
+  ],
+  "color": [
+    0.388,
+    0.412,
+    0.435,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 75.2,
+  "base_power": 5.62,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Spectre Dynamics",
+  "hull_class": "Medium"
+}

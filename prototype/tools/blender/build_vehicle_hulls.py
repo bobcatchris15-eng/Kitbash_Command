@@ -1,5 +1,5 @@
-# build_vehicle_hulls.py - the vehicle hull catalogue: 11 manufacturers,
-# 114 hulls. One bmesh per hull. Structural features (cabs, sponsons,
+# build_vehicle_hulls.py - the vehicle hull catalogue: 14 manufacturers,
+# 138 hulls. One bmesh per hull. Structural features (cabs, sponsons,
 # casemates, wheel arches, outriggers) are part of the cross-section evolution
 # that gets lofted through, not bolted-on chamfered boxes glued to the main
 # body.
@@ -36,71 +36,73 @@
 #     a face with the body. Still one mesh, just with the tier as its own
 #     loft. add_chamfered_box() / add_wedge() are the tiered helpers.
 #
-# The eleven houses:
+# The fourteen houses:
 #
-#   halvorsen  Boat hulls dragged ashore. Hard-chine section: wide flat deck,
-#              near-vertical topsides, a hard horizontal chine crease, steep
-#              deadrise panels down to a narrow flat keel. Raked stem, high
-#              freeboard, continuous raised bulwark rim around the deck.
+#   halvorsen  Boat hulls dragged ashore. Hard-chine section: wide flat deck
+#              with bow flare (deck widens at bow), near-vertical topsides,
+#              hard chine crease, steep deadrise to narrow flat keel. Raked
+#              stem, high freeboard, continuous raised bulwark rim.
 #
 #   kestrel    Aircraft fuselages with the wings sawn off. Faceted eight-sided
-#              tube with a flat cargo floor, stepped-down tail boom, vertical
-#              fin, angular canopy riding high at the nose, thick wing-root
-#              stubs where the spar used to pass through.
+#              tube with flat cargo floor, mid-fuselage swell (broad width
+#              bulge at mid), stepped-down tail boom, vertical fin, angular
+#              canopy at nose, thick wing-root stubs, dorsal spine ridge.
 #
-#   brenntal   Mobile bunkers. Stacked orthogonal blocks with no taper at all:
-#              wide low plinth, narrower casemate offset rearward, one
-#              enormous frontal glacis plate, full-length sponson shoulders.
+#   brenntal   Mobile bunkers. Dog-bone plan - wide plinth at nose and tail
+#              pinched at mid-hull, T-section with narrower casemate offset
+#              rearward. Casemate now ramps with sloped leading/trailing
+#              faces (side view) and the lower plinth carries the chamfered
+#              hexagonal rear and bulbous front.
 #
-#   tallow     Open spaceframes. There is barely a body - a chassis rail, four
-#              corner posts, a cab jammed against the front bumper, and the
-#              rear two-thirds left as open flatbed framed by rails and thick
-#              transverse beams.
+#   tallow     Closed trucks. Boxy oct section with near-vertical cab rear
+#              wall, flat cargo bed, paired wheel-arch flares (wide fender
+#              bulges at two axle stations). Reads as mule/boxer at 40 m.
 #
-#   orrin      Symmetric salvage. The main mass is a sheared wedge centered on
-#              the longitudinal axis (no port/starboard lean), with a centred
-#              dorsal spine and a rear cap block. No strut, no outrigger -
-#              any asymmetry lives in the cross-section's top/bottom split,
-#              not left/right, so locomotion mounts have a clean AABB to work
-#              against.
+#   orrin      Symmetric salvage + wide belt. Tumblehome trapezoid (wider at
+#              bottom, narrower at top) with a broad mid-height belt bulge at
+#              mid-hull, plus centred dorsal spine/mast peak. No port/star-
+#              board lean, so locomotion mounts stay clean.
 #
-#   rackham    Industrial crawler. Stout muscular body, exposed boiler barrel
-#              running the length as a top ridge, deep forward radiator grille
-#              that grows out of the cross-section at the nose, full-length
-#              side rails at deck level, no curves anywhere.
+#   rackham    Industrial crawler. Stout body with boiler barrel ridge on top,
+#              deep radiator grille at nose, wide flat side-skirt flare at
+#              mid-hull, full-length side rails at deck level, no curves.
 #
-#   calder     Fast-attack wedge. Low-slung, narrow at the nose and full-width
-#              at the tail. Cross-section widens and shortens as z moves aft
-#              so the silhouette tapers forward, and big side sponsons bulge
-#              out of the mid-z range. Rear wing element on top.
+#   calder     Fast-attack wedge. Low-slung, narrow at nose with nose flare,
+#              widening to full-width at tail, mid side sponsons, rear wing,
+#              optional barbette mesa and straight-bevel plan.
 #
-#   pillar     Modular boxy. The body is a stack of chamfered rectangular
-#              "cells" (one cell = 1.0 hull-height cubed), visibly stacked in
-#              cross-section. Transport variants are a 2x2 cell wall with an
-#              open flat well between them; combat variants are solid stacks.
+#   pillar     Modular boxy. Stacked chamfered cells with a wide flat mid-
+#              ridge (broad width bulge) at mid-hull. Transport variants are
+#              a 2x2 cell wall with open well; combat variants are solid stacks
+#              with barbette and ridge.
 #
 #   hartmann   Real tanks. A proper MBT tub: narrow flat belly, lower sides
 #              sloping out to a hard sponson crease, near-vertical sides up to
-#              the deck. The plan view is an ARROWHEAD - width collapses to a
-#              point over the front third, so the glacis plates meet at a
-#              centre seam like a Panther's nose. Rear engine deck sits one
-#              step below the fighting-compartment top. An optional turret
-#              race grows out of the deck as a cross-section mesa.
+#              the deck. Blunt flat glacis bow (70% width at the tip, straight
+#              bevel to full width - no point), long glacis rise in profile,
+#              stepped rear engine deck. Most hulls carry an integrated turret
+#              race mesa for module mounting.
 #
-#   ballard    Submarines. A faceted teardrop: flat keel strip (so locomotion
-#              mounts still work), bilge panels flaring to maximum beam BELOW
-#              mid-height, slanted topsides curving in to a narrower deck.
-#              Blunt rounded bow growth, long parallel midbody, stern tapering
-#              to the propulsion gear in both axes. The conning sail is a
-#              centered mesa on the deck; periscope masts and missile trunks
-#              stay as role elements on top of it.
+#   ballard    Submarines. Faceted teardrop with bow sonar bulb (bulbous
+#              forward widening), flat keel strip, bilge panels to max beam
+#              below mid-height, slanted topsides to narrower deck. Blunt bow
+#              growth, parallel midbody, eased stern taper. Conning sail mesa
+#              on deck; periscope masts and missile trunks on top.
 #
-#   moreau     Wave-formers. The hull never touches its bounding box for most
-#              of its length: a 16-facet rounded superellipse section (flat
-#              keel chord kept for locomotion), BOTH ends taper away (rounded
-#              canoe, sharp arrowhead, or full diamond plan), and an optional
-#              waist pinches the plan view in around midships. Nothing about
-#              a Moreau reads as a box.
+#   moreau     Wave-formers. Rounded superellipse section (flat keel chord),
+#              both ends taper away (canoe/arrowhead/diamond plan), waist
+#              pinch at midships, plus dorsal blister (broad height bump at
+#              mid) for distinct Moreau read. Never touches bounding box.
+#
+#   durham     Regular trucks / APCs. Boxy oct section with near-vertical cab
+#              rear wall, flat cargo bed. Reads as a mule/boxer/HEMTT at 40 m.
+#
+#   spectre    Arrowhead stealth. Sharp delta plan with straight bevel sides
+#              meeting at a ~3-5% tip, low flat profile, optional canopy mesa.
+#
+#   hexton     Hexagonal prism, longer than wide. Flat-top hex section (6 facets),
+#              blunt glacis bow, twin-tube heavy with cross-members and high
+#              aft-cab transport variants.
 
 import json
 import math
@@ -175,6 +177,21 @@ MANUFACTURERS = {
         # Pale bone - the ocean-liner register.
         "color": (0.780, 0.745, 0.660, 1.0),
     },
+    "durham": {
+        "display": "Durham Motors",
+        # Flat utilitarian tan-grey - regular workhorse truck/APC.
+        "color": (0.523, 0.498, 0.412, 1.0),
+    },
+    "spectre": {
+        "display": "Spectre Dynamics",
+        # Matte stealth grey with cold blue tint.
+        "color": (0.388, 0.412, 0.435, 1.0),
+    },
+    "hexton": {
+        "display": "Hexton Works",
+        # Cool industrial teal-grey - hexagonal prism read.
+        "color": (0.415, 0.482, 0.498, 1.0),
+    },
 }
 
 CLASSES = ["scout", "light", "medium", "heavy", "transport", "oddball"]
@@ -215,14 +232,15 @@ CLASSES = ["scout", "light", "medium", "heavy", "transport", "oddball"]
 # --- HALVORSEN YARD ---------------------------------------------------------
 
 def _halvorsen_section(z, hw, hl, w, h, l, chine, keel, deck_cut, rim_h,
-                       bow_drop):
+                       bow_drop, flare_frac, flare_zc, flare_zw):
     """Cross-section for Halvorsen at a given z.
 
     A chine outline is the base, sized to fit the hull's height fraction at
     this z. The keel is always at y = -h/2 (flat underside, no rake), the
     deck is at y = -h/2 + h_frac*h, the chine is in between. The bulwark rim
     is integrated as a small upward bulge of the deck top edges in the
-    mid-z range.
+    mid-z range. A bow flare widens the deck at the bow (top-down flare),
+    giving the boat its raked stem read without a separate solid.
 
     h_frac(z) is the body's vertical fill at this z. At the very bow it is
     small (the bow rises out of the flat underside as a sloped face, not a
@@ -255,12 +273,16 @@ def _halvorsen_section(z, hw, hl, w, h, l, chine, keel, deck_cut, rim_h,
         w_frac = 0.95
 
     h_active = h * h_frac
+    # Bow flare - deck widens at the bow, keel stays narrow.
+    flare_t = HF.smooth_transition(z, flare_zc, flare_zw) if flare_frac > 1e-6 else 0.0
+    w_deck_eff = w * w_frac * (1.0 + flare_frac * flare_t)
+    w_keel_eff = w * w_frac * keel
     # Centre the chine outline so the keel is at -h/2 (flat underside) and
     # the deck is at -h/2 + h_active.
     cy = h_active / 2.0 - h / 2.0
 
     base = HF.chine_outline(
-        w_deck=w * w_frac, w_keel=w * w_frac * keel,
+        w_deck=w_deck_eff, w_keel=w_keel_eff,
         h=h_active, chine_frac=chine, cy=cy, deck_cut=deck_cut,
     )
     if rim_h <= 1e-6:
@@ -280,12 +302,14 @@ def _halvorsen_section(z, hw, hl, w, h, l, chine, keel, deck_cut, rim_h,
 
 
 def body_halvorsen(bm, w, h, l, opt):
-    """Hard-chine boat section, flat keel, integrated bulwark rim.
+    """Hard-chine boat section, flat keel, integrated bulwark rim + bow flare.
 
     ONE loft. The cross-section's keel is always at y = -h/2, the deck is
-    at -h/2 + h_frac(z)*h. The bow rises out of the flat underside as a
-    sloped face (no nose drop), the middle is full height, the stern dips
-    slightly. The bulwark rim is part of the cross-section, not bolted on.
+    at -h/2 + h_frac(z)*h. Bow flare widens the deck at the bow (top-down
+    read) without moving the keel. The bow rises out of the flat underside
+    as a sloped face (no nose drop), the middle is full height, the stern
+    dips slightly. The bulwark rim is part of the cross-section, not bolted
+    on.
     """
     hl = l / 2.0
     chine = opt.get("chine_frac", 0.42)
@@ -293,20 +317,24 @@ def body_halvorsen(bm, w, h, l, opt):
     deck_cut = w * 0.055
     rim_h = h * opt.get("bulwark_h", 0.17) if opt.get("bulwark", True) else 0.0
     bow_drop = opt.get("bow_drop", 0.0)  # kept for backward compat, ignored
+    flare_frac = opt.get("flare", 0.16)
+    flare_zc = hl * opt.get("flare_zc", -0.58)
+    flare_zw = l * opt.get("flare_zw", 0.14)
 
     def sec(z):
         return _halvorsen_section(
             z, w / 2.0, hl, w, h, l, chine, keel, deck_cut, rim_h, bow_drop,
+            flare_frac, flare_zc, flare_zw,
         )
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=8, cap_chamfer=min(w, h) * 0.10)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=min(w, h) * 0.10)
 
 
 # --- KESTREL AEROWORKS ------------------------------------------------------
 
 def _kestrel_section(z, hw, hl, w, h, l, fuse_w, cut, boom_frac, boom_z,
                      stub_w, stub_z, stub_l, wing_root_h, canopy_h,
-                     spine_h, spine_zw):
+                     spine_h, spine_zw, swell_frac, swell_zc, swell_zw):
     """Cross-section for Kestrel at a given z.
 
     A flat-floor octagon is the base, sized to fit the hull's fraction at
@@ -366,6 +394,9 @@ def _kestrel_section(z, hw, hl, w, h, l, fuse_w, cut, boom_frac, boom_z,
     else:
         # Outside stub region: inset by 2*stub_w on the sides
         full_w = w * fw - 2.0 * stub_w
+    # Mid-fuselage swell - wide lateral bulge at mid (distinct Kestrel language)
+    swell_t = HF.smooth_transition(z, swell_zc, swell_zw) if swell_frac > 1e-6 else 0.0
+    full_w *= 1.0 + swell_frac * swell_t
     full_h = h * fh
 
     # Canopy bulge: a centered top peak in the canopy z range.
@@ -447,15 +478,18 @@ def body_kestrel(bm, w, h, l, opt):
     canopy_h = h * 0.30 if opt.get("canopies", (-0.52,)) else 0.0
     spine_h = h * opt.get("spine_h", 0.0)
     spine_zw = l * opt.get("spine_zw", 0.0)
+    swell_frac = opt.get("swell", 0.09)
+    swell_zc = hl * opt.get("swell_zc", 0.05)
+    swell_zw = l * opt.get("swell_zw", 0.20)
 
     def sec(z):
         return _kestrel_section(
             z, w / 2.0, hl, w, h, l, fuse_w, cut, boom_frac, boom_z,
             stub_w, stub_z, stub_l, wing_root_h, canopy_h,
-            spine_h, spine_zw,
+            spine_h, spine_zw, swell_frac, swell_zc, swell_zw,
         )
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=8, cap_chamfer=cut * 0.7)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=cut * 0.7)
 
     # Tail fin - small thin element on top, still a tiered add_solid in the
     # same bmesh (the fin is too thin to fit in the cross-section without
@@ -478,16 +512,21 @@ def body_kestrel(bm, w, h, l, opt):
 
 def _brenntal_section(z, hl, w, h, l, plinth_w, casemate_w, casemate_h, cut,
                      glacis_z_frac, casemate_z_frac, casemate_l_frac,
-                     tiers, top_cap_h, top_cap_l, top_cap_w):
-    """Cross-section for Brenntal at a given z.
+                     tiers, top_cap_h, top_cap_l, top_cap_w,
+                     waist, waist_zc, waist_zw):
+    """Cross-section for Brenntal at a given z - reworked to the sketch.
 
-    The cross-section is a NON-CONVEX T-shape with the wider plinth at the
-    bottom and a narrower casemate on top. The casemate grows out of the
-    plinth as the cross-section evolves: outside the casemate z range, the
-    casemate vertices collapse to the plinth top, so the cross-section
-    becomes a simple wide-topped shape. Inside the range, the casemate
-    vertices rise to the casemate top, creating the T-shape with real
-    plinth shoulders.
+    Top-down: dog-bone plan. Lower plinth is wide at nose and tail, pinched
+    at mid-hull by `waist` (Moreau-style) so the hull reads as two pads
+    joined by a narrow spine — the left sketch's top view.
+
+    Front elevation: bulbous lower plinth with flat underside at y=-h/2,
+    chamfered shoulders, and a narrow centred casemate mesa on top — middle
+    sketch's T-shape.
+
+    Side elevation: long glacis bow rise, full-height mid, slight tail dip;
+    the casemate now ramps with HF.smooth_transition so its leading/trailing
+    faces are sloped (right sketch) not a vertical step.
 
     The bottom of the cross-section is at y = -h/2 (flat underside, no
     drop). The bow rises out of the flat underside as a sloped face.
@@ -505,33 +544,32 @@ def _brenntal_section(z, hl, w, h, l, plinth_w, casemate_w, casemate_h, cut,
         t = (z - (hl - l * casemate_l_frac)) / max(l * casemate_l_frac, 1e-6)
         h_frac = 1.00 - 0.35 * t  # back end dips to 0.65
 
-    # Width fraction. Bow is slightly narrower.
+    # Width fraction. Bow slightly narrower, plus dog-bone waist at mid.
     if z <= -hl:
-        w_frac = 0.94
+        w_frac = 0.92
     elif z <= -hl + l * glacis_z_frac:
         t = (z - (-hl)) / max(l * glacis_z_frac, 1e-6)
-        w_frac = 0.94 + 0.06 * t
+        w_frac = 0.92 + 0.08 * t
     else:
         w_frac = 1.00
+    # Pinch at waist - top-down dog-bone (sketch left)
+    w_frac *= 1.0 - waist * HF.smooth_transition(z, waist_zc, waist_zw)
 
-    # Casemate present factor. Inside the casemate z range (centered at
-    # casemate_z_frac of the length, total length casemate_l_frac of the
-    # length), the casemate vertices are at casemate top. Outside, they
-    # collapse to the plinth top.
+    # Casemate present factor - smooth, not binary, so side elevation ramps.
     cas_center = -hl + l * casemate_z_frac
-    cas_active = 1.0 if abs(z - cas_center) < l * casemate_l_frac / 2.0 else 0.0
+    cas_half = l * casemate_l_frac / 2.0
+    cas_active = HF.smooth_transition(z, cas_center, cas_half)
 
     # Plinth top y, casemate top y. Bottom is always at -h/2 (flat).
     plinth_top_y = -h / 2.0 + h * h_frac
-    casemate_top_y = plinth_top_y + h * 0.30 * cas_active  # casemate is 30% of h tall
+    casemate_top_y = plinth_top_y + h * 0.30 * cas_active  # casemate is 30% of h tall, sloped
     if top_cap_h > 0.0:
-        # Top cap (a tier) - a small box on top of the casemate. Same range
-        # as the casemate.
-        cap_present = abs(z - cas_center) < l * (top_cap_l * 0.5) and cas_active > 0.0
-        if cap_present:
-            cap_top_y = casemate_top_y + h * top_cap_h
-        else:
-            cap_top_y = casemate_top_y
+        # Top cap (a tier) - small box on top of the casemate. Same z range
+        # as casemate, also sloped with it.
+        cap_center = cas_center
+        cap_half = l * (top_cap_l * 0.5)
+        cap_active = HF.smooth_transition(z, cap_center, cap_half) * cas_active
+        cap_top_y = casemate_top_y + h * top_cap_h * cap_active
     else:
         cap_top_y = casemate_top_y
 
@@ -562,47 +600,51 @@ def _brenntal_section(z, hl, w, h, l, plinth_w, casemate_w, casemate_h, cut,
 
 def body_brenntal(bm, w, h, l, opt):
     """Wide low plinth + narrower casemate on top + frontal glacis, all in
-    ONE lofted solid.
+    ONE lofted solid - dog-bone plan rework.
 
     The cross-section is a T-shape with the wider plinth at the bottom
-    (full width) and a narrower casemate on top, integrated into the
-    outline. The casemate grows out of the cross-section as z enters the
-    casemate region. The bottom of the cross-section is always at y=-h/2
-    (flat underside, no drop). The bow rises out of the flat underside
-    as a sloped face.
+    (full width) and a narrower casemate on top. Casemate now ramps with
+    smooth_transition so its front/rear are sloped in side view. Lower
+    plinth pinches at mid-hull via waist (top-down dog-bone). Bottom is
+    always at y=-h/2 (flat underside, no drop). Bow rises as sloped face.
     """
     hl = l / 2.0
-    casemate_w = opt.get("casemate_w", 0.78)
+    casemate_w = opt.get("casemate_w", 0.62)
     casemate_h = opt.get("casemate_h", 0.30)
-    glacis_z_frac = opt.get("glacis_z", 0.24)
-    casemate_z_frac = opt.get("casemate_z_frac", 0.55)
-    casemate_l_frac = opt.get("casemate_l", 0.60)
+    glacis_z_frac = opt.get("glacis_z", 0.20)
+    casemate_z_frac = opt.get("casemate_z_frac", 0.58)
+    casemate_l_frac = opt.get("casemate_l", 0.55)
     tiers = opt.get("tiers", 1)
-    cut = min(w, h) * 0.10
+    cut = min(w, h) * 0.11
     top_cap_h = opt.get("top_cap_h", 0.0)
     top_cap_l = opt.get("top_cap_l", 0.40)
     top_cap_w = opt.get("top_cap_w", 0.62)
+    waist = opt.get("waist", 0.18)
+    waist_zc = hl * opt.get("waist_zc", -0.02)
+    waist_zw = l * opt.get("waist_zw", 0.22)
 
     def sec(z):
         return _brenntal_section(
             z, hl, w, h, l, 1.0, casemate_w, casemate_h, cut,
             glacis_z_frac, casemate_z_frac, casemate_l_frac, tiers,
             top_cap_h, top_cap_l, top_cap_w,
+            waist, waist_zc, waist_zw,
         )
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=8, cap_chamfer=cut)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=12, cap_chamfer=cut)
 
 
 # --- TALLOW & VANCE ---------------------------------------------------------
 
 def _tallow_section(z, hl, l, w, h, frame_w, cab_l_frac, cab_h_frac, cab_w_frac,
-                    cab_rake, cut):
+                    cab_rake, cut, flare_frac, flare_z1, flare_zw1, flare_z2, flare_zw2):
     """Cross-section for Tallow at a given z.
 
     Closed-body truck. The cross-section is an octagon whose height varies
     along z: low chassis at the rear (the flatbed), tall cab at the front
     (with a sloped/raked top to read as a windshield). The bottom is
-    always at y = -h/2 (flat underside).
+    always at y = -h/2 (flat underside). Paired wheel-arch flares widen
+    the body at two axle stations (fenders) — the distinct Tallow read.
 
     The cab has a raked top: at the very front of the cab z range, the
     cross-section's top is at the cab front height; at the rear of the cab
@@ -636,6 +678,12 @@ def _tallow_section(z, hl, l, w, h, frame_w, cab_l_frac, cab_h_frac, cab_w_frac,
         h_frac = 0.40
 
     full_w = frame_w
+    # Wheel-arch flares - wide fender bulges at two axle stations
+    if flare_frac > 1e-6:
+        t1 = HF.smooth_transition(z, flare_z1, flare_zw1)
+        t2 = HF.smooth_transition(z, flare_z2, flare_zw2)
+        flare_t = max(t1, t2)
+        full_w *= 1.0 + flare_frac * flare_t
     full_h = h * h_frac
     cy = full_h / 2.0 - h / 2.0
     return HF.oct_outline(full_w, full_h, cut, cut, cy=cy)
@@ -646,8 +694,9 @@ def body_tallow(bm, w, h, l, opt):
 
     ONE loft. The cross-section's height varies along z: low chassis at
     the flatbed, tall cab with a raked top (windshield shorter than
-    roof) at the front, sloped transition between them. Bottom always at
-    y = -h/2 (flat underside).
+    roof) at the front, sloped transition between them. Paired wheel-arch
+    flares widen the body at two axle stations. Bottom always at y=-h/2
+    (flat underside).
 
     The "open spaceframe" character of the old Tallow is gone - the new
     Tallow is a single closed body. The cab + flatbed vocabulary is kept.
@@ -659,26 +708,32 @@ def body_tallow(bm, w, h, l, opt):
     cab_w_frac = opt.get("cab_w", 0.94)
     cab_rake = opt.get("cab_rake", 0.66)
     cut = min(w, h) * 0.09
+    flare_frac = opt.get("flare", 0.10)
+    flare_z1 = hl * opt.get("flare_z1", -0.22)
+    flare_zw1 = l * opt.get("flare_zw1", 0.10)
+    flare_z2 = hl * opt.get("flare_z2", 0.52)
+    flare_zw2 = l * opt.get("flare_zw2", 0.12)
 
     def sec(z):
         return _tallow_section(
             z, hl, l, w, h, frame_w, cab_l_frac, cab_h_frac, cab_w_frac,
-            cab_rake, cut,
+            cab_rake, cut, flare_frac, flare_z1, flare_zw1, flare_z2, flare_zw2,
         )
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=8, cap_chamfer=cut)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=12, cap_chamfer=cut)
 
 
 # --- ORRIN COLLECTIVE (symmetric, tumblehome) -------------------------------
 
 def body_orrin(bm, w, h, l, opt):
-    """Symmetric salvage with TUMBLEHOME cross-section.
+    """Symmetric salvage with TUMBLEHOME cross-section - now with wide belt.
 
     BILATERALLY symmetric. ONE loft. The cross-section is a trapezoid
     (naval-architecture tumblehome): wider at the bottom (full w), narrower
-    at the top (w * tumblehome_frac, default 0.80). The bottom is always
-    at y = -h/2 (flat underside, no drop). The bow rises out of the flat
-    underside as a sloped face.
+    at the top (w * tumblehome_frac, default 0.80). A wide mid-height belt
+    (broad flat bulge) widens the whole section at mid-hull for a distinct
+    Orrin read. The bottom is always at y = -h/2 (flat underside, no drop).
+    The bow rises out of the flat underside as a sloped face.
 
     Optional centered dorsal spine or tall mast is integrated as a 4-vertex
     mesa peak in its z range, so the peak is a cross-section bulge (not a
@@ -691,6 +746,9 @@ def body_orrin(bm, w, h, l, opt):
     mass_w = w * opt.get("mass_w", 0.85)
     cut = min(w, h) * 0.09
     tumblehome_frac = opt.get("tumblehome_frac", 0.80)
+    belt_frac = opt.get("belt", 0.09)
+    belt_zc = hl * opt.get("belt_zc", 0.05)
+    belt_zw = l * opt.get("belt_zw", 0.24)
 
     # Peak: a spine (wide + low) or a mast (narrow + tall). Mutually
     # exclusive - one peak per hull.
@@ -737,6 +795,10 @@ def body_orrin(bm, w, h, l, opt):
             fh = 1.00 - 0.18 * t
 
         full_w = mass_w * fw
+        # Wide belt - broad mid-hull width bulge
+        if belt_frac > 1e-6:
+            belt_t = HF.smooth_transition(z, belt_zc, belt_zw)
+            full_w *= 1.0 + belt_frac * belt_t
         full_h = h * fh
         top_w = full_w * tumblehome_frac
         deck_y = -h / 2.0 + full_h
@@ -747,7 +809,7 @@ def body_orrin(bm, w, h, l, opt):
             full_w, full_h, top_w, deck_y, cut, peak_w, peak_h, t_peak,
         )
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=cut)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=12, cap_chamfer=cut)
 
 
 def _tumblehome_with_peak(full_w, full_h, top_w, deck_y, cut, peak_w,
@@ -816,13 +878,16 @@ def _tumblehome_with_peak(full_w, full_h, top_w, deck_y, cut, peak_w,
 
 # --- RACKHAM FORGE ----------------------------------------------------------
 
-def _rackham_section(z, hl, l, w, h, cut, mast_w, mast_h, mast_zc, mast_zw):
+def _rackham_section(z, hl, l, w, h, cut, mast_w, mast_h, mast_zc, mast_zw,
+                     skirt_frac, skirt_zc, skirt_zw):
     """Cross-section for Rackham at a given z.
 
     ONE loft. The cross-section is a chassis rectangle (octagon) at the
     bottom, with a centered boiler barrel bulge on top in the mid-z
     range, a taller radiator bulge in the front, and a smokestack bulge
-    in the mid-rear. All bulges are part of the cross-section.
+    in the mid-rear. All bulges are part of the cross-section. A wide
+    flat side skirt flares the chassis width at mid-hull for the distinct
+    Rackham read.
 
     The optional centered mast is a tall thin vertical structure in the
     mast z range - integrated as a 4-vertex mesa peak in the cross-
@@ -838,6 +903,10 @@ def _rackham_section(z, hl, l, w, h, cut, mast_w, mast_h, mast_zc, mast_zw):
     chassis_h = 0.46
     chassis_top_y = -h / 2.0 + h * chassis_h
     chassis_w_at_z = w * (0.92 if z > -hl + l * 0.14 else 0.88 + 0.04 * max(0, (z - (-hl)) / (l * 0.14)))
+    # Wide side skirt flare at mid-hull
+    if skirt_frac > 1e-6:
+        skirt_t = HF.smooth_transition(z, skirt_zc, skirt_zw)
+        chassis_w_at_z *= 1.0 + skirt_frac * skirt_t
 
     # Bulge heights: boiler in mid-z, radiator in front, smokestack mid-rear
     in_boiler = abs(z) < l * 0.32
@@ -898,7 +967,7 @@ def _rackham_section(z, hl, l, w, h, cut, mast_w, mast_h, mast_zc, mast_zw):
 
 def body_rackham(bm, w, h, l, opt):
     """Industrial crawler. ONE loft with integrated boiler, radiator,
-    smokestack, and optional centered mast as cross-section bulges.
+    smokestack, optional centered mast and wide side skirt flare.
     Flat underside, no drop.
     """
     hl = l / 2.0
@@ -907,12 +976,15 @@ def body_rackham(bm, w, h, l, opt):
     mast_h = h * opt.get("mast_h", 0.0)
     mast_zc = hl * opt.get("mast_zc", 0.0)
     mast_zw = l * opt.get("mast_zw", 0.05)
+    skirt_frac = opt.get("skirt", 0.10)
+    skirt_zc = hl * opt.get("skirt_zc", 0.05)
+    skirt_zw = l * opt.get("skirt_zw", 0.28)
 
     def sec(z):
         return _rackham_section(z, hl, l, w, h, cut, mast_w, mast_h,
-                                mast_zc, mast_zw)
+                                mast_zc, mast_zw, skirt_frac, skirt_zc, skirt_zw)
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=8, cap_chamfer=cut)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=cut)
 
 
 # --- CALDER MOBILITY --------------------------------------------------------
@@ -945,7 +1017,7 @@ def _calder_section(z, hw, hl, l, w, h, body_w_min_frac, body_h_min_frac,
 def _calder_section(z, hl, l, w, h, body_w_min_frac, body_h_min_frac,
                     body_h_max_frac, cut, sponson_w, sponson_zc, sponson_zw,
                     wing_h_frac, barbette_w, barbette_h, barbette_zc,
-                    barbette_zw):
+                    barbette_zw, flare_frac, flare_zc, flare_zw):
     """Cross-section for Calder at a given z.
 
     The body width and height grow linearly with z. The body is inset
@@ -954,7 +1026,8 @@ def _calder_section(z, hl, l, w, h, body_w_min_frac, body_h_min_frac,
     is a top bulge in the rear. The optional centered barbette is a
     mesa bump on top of the chassis (or on top of the wing if both
     are active at this z) in the barbette z range - integrated as a
-    4-vertex peak in the cross-section, not bolted on.
+    4-vertex peak in the cross-section, not bolted on. A nose flare
+    widens the forward hull for the wedge read.
 
     12 vertices always. When the barbette is not active, its 4 vertices
     form a flat segment along the bulged top, so the cross-section has
@@ -973,6 +1046,10 @@ def _calder_section(z, hl, l, w, h, body_w_min_frac, body_h_min_frac,
     in_sponson = abs(z - sponson_zc) < sponson_zw
     body_w_at = w if in_sponson else w - 2.0 * sponson_w
     full_w = body_w_at * fw
+    # Nose flare - forward hull flare for wedge read
+    if flare_frac > 1e-6:
+        flare_t = HF.smooth_transition(z, flare_zc, flare_zw)
+        full_w *= 1.0 + flare_frac * flare_t
     full_h = h * fh
     # Top: in the rear, add the wing as a centered top bulge.
     in_wing = z > hl * 0.55
@@ -1029,7 +1106,7 @@ def _calder_section(z, hl, l, w, h, body_w_min_frac, body_h_min_frac,
 
 def body_calder(bm, w, h, l, opt):
     """Fast-attack wedge. ONE loft with integrated sponson bulges,
-    rear wing, and optional centered barbette mesa. Flat underside,
+    rear wing, optional barbette and nose flare. Flat underside,
     no drop. Body narrows at the nose.
     """
     hl = l / 2.0
@@ -1045,27 +1122,33 @@ def body_calder(bm, w, h, l, opt):
     barbette_h = h * opt.get("barbette_h", 0.0)
     barbette_zc = hl * opt.get("barbette_zc", 0.0)
     barbette_zw = l * opt.get("barbette_zw", 0.05)
+    flare_frac = opt.get("flare", 0.10)
+    flare_zc = hl * opt.get("flare_zc", -0.58)
+    flare_zw = l * opt.get("flare_zw", 0.16)
 
     def sec(z):
         return _calder_section(
             z, hl, l, w, h, body_w_min_frac, body_h_min_frac, body_h_max_frac,
             cut, sponson_w, sponson_zc, sponson_zw, wing_h_frac,
             barbette_w, barbette_h, barbette_zc, barbette_zw,
+            flare_frac, flare_zc, flare_zw,
         )
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=8, cap_chamfer=cut)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=cut)
 
 
 # --- PILLAR IRONWORKS -------------------------------------------------------
 
 def _pillar_section(z, hl, l, w, h, transport_well, cut, barbette_w,
-                     barbette_h, barbette_zc, barbette_zw):
+                     barbette_h, barbette_zc, barbette_zw,
+                     ridge_frac, ridge_zc, ridge_zw):
     """Cross-section for Pillar at a given z.
 
     ONE loft. Combat variants are a single tall box (the modular cell
-    stack reads as chamfered ridges in the silhouette). Transport
-    variants are a U-shape (two side walls + a floor) - the cavity
-    is part of the cross-section.
+    stack reads as chamfered ridges in the silhouette) plus a wide
+    mid-hull ridge (broad flat bulge) for distinct Pillar read.
+    Transport variants are a U-shape (two side walls + a floor) - the
+    cavity is part of the cross-section.
 
     Cell-stack look: the cross-section has step bulges on the sides
     that grow out and back in, like a stack of cells. Implemented as
@@ -1078,6 +1161,10 @@ def _pillar_section(z, hl, l, w, h, transport_well, cut, barbette_w,
     """
     # Width modulation: stacked cells, each cell is l * 0.18 long
     cell_w_mod = 1.00 if (int((z + hl) / (l * 0.10)) % 2 == 0) else 0.96
+    # Wide ridge - broad flat width bulge at mid (combat only)
+    if not transport_well and ridge_frac > 1e-6:
+        ridge_t = HF.smooth_transition(z, ridge_zc, ridge_zw)
+        cell_w_mod *= 1.0 + ridge_frac * ridge_t
 
     if transport_well:
         # U-shape: two side walls + a thin floor at the underside
@@ -1159,9 +1246,10 @@ def body_pillar(bm, w, h, l, opt):
     """Modular boxy. ONE loft, flat underside, no drop.
 
     Combat variants are a single tall box (12-vertex cross-section with
-    optional centered barbette mesa, the cell-stack reads as chamfered
-    ridges in the silhouette). Transport variants are a U-shape (two
-    side walls + a floor), with the cavity as part of the cross-section.
+    optional centered barbette mesa and wide mid ridge, the cell-stack
+    reads as chamfered ridges in the silhouette). Transport variants are
+    a U-shape (two side walls + a floor), with the cavity as part of the
+    cross-section.
     """
     hl = l / 2.0
     cut = min(w, h) * 0.12
@@ -1170,13 +1258,16 @@ def body_pillar(bm, w, h, l, opt):
     barbette_h = h * opt.get("barbette_h", 0.0)
     barbette_zc = hl * opt.get("barbette_zc", 0.0)
     barbette_zw = l * opt.get("barbette_zw", 0.05)
+    ridge_frac = 0.0 if transport_well else opt.get("ridge", 0.10)
+    ridge_zc = hl * opt.get("ridge_zc", 0.08)
+    ridge_zw = l * opt.get("ridge_zw", 0.26)
 
     def sec(z):
         return _pillar_section(z, hl, l, w, h, transport_well, cut,
-                                barbette_w, barbette_h, barbette_zc,
-                                barbette_zw)
+                                 barbette_w, barbette_h, barbette_zc,
+                                 barbette_zw, ridge_frac, ridge_zc, ridge_zw)
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=8, cap_chamfer=cut)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=cut)
 
 
 # --- HARTMANN PANZERWERK ----------------------------------------------------
@@ -1188,23 +1279,24 @@ def _hartmann_section(z, hl, l, w, h, cut, nose_frac, tip_w, belly_frac,
 
     A proper tank tub: narrow flat belly at y = -h/2, lower sides sloping
     out to a hard sponson crease (the "chine" of the tub), near-vertical
-    sides up to the deck. The PLAN view is an arrowhead: width fraction
-    collapses toward a near-point over the front `nose_frac` of the length
-    (quadratic ease so the point stays sharp), holds full width through
-    mid-hull, then tapers slightly at the stern. Height rises out of the
-    bow tip as one long glacis ramp and drops one step for the rear engine
-    deck. An optional turret race is integrated as a 4-vertex mesa on the
-    deck (collapsed flat when inactive), same pattern as Orrin/Calder.
+    sides up to the deck. The PLAN view is a blunt glacis bow: width
+    fraction stays ~70% at the tip and widens with a STRAIGHT bevel to
+    full width over the front `nose_frac` of the length — no arrowhead
+    point — holds full width through mid-hull, then tapers slightly at the
+    stern. Height rises out of the bow tip as one long glacis ramp and
+    drops one step for the rear engine deck. An optional turret race is
+    integrated as a 4-vertex mesa on the deck (collapsed flat when
+    inactive), same pattern as Orrin/Calder.
 
     12 vertices always.
     """
-    # Plan-view width fraction - the arrowhead.
+    # Plan-view width fraction - blunt glacis, not a point.
     nose_len = l * nose_frac
     if z <= -hl:
         fw = tip_w
     elif z <= -hl + nose_len:
         t = (z + hl) / nose_len
-        fw = tip_w + (1.0 - tip_w) * (t * t)
+        fw = tip_w + (1.0 - tip_w) * t
     elif z >= hl - l * 0.10:
         t = (z - (hl - l * 0.10)) / (l * 0.10)
         fw = 1.0 - 0.06 * t
@@ -1271,18 +1363,18 @@ def _hartmann_section(z, hl, l, w, h, cut, nose_frac, tip_w, belly_frac,
 
 
 def body_hartmann(bm, w, h, l, opt):
-    """Real-tank hull. ONE loft: arrowhead plan bow, tank-tub section with
+    """Real-tank hull. ONE loft: blunt glacis bow, tank-tub section with
     hard sponson crease, long frontal glacis rise, stepped rear engine deck,
     optional turret race as an integrated deck mesa. Flat underside."""
     hl = l / 2.0
     cut = min(w, h) * 0.09
-    nose_frac = opt.get("nose_frac", 0.20)
-    tip_w = opt.get("tip_w", 0.06)
+    nose_frac = opt.get("nose_frac", 0.18)
+    tip_w = opt.get("tip_w", 0.68)
     belly_frac = opt.get("belly_frac", 0.46)
     sill_frac = opt.get("sill_frac", 0.40)
     engine_z = opt.get("engine_z", 0.64)
     engine_drop = opt.get("engine_drop", 0.16)
-    race_w = opt.get("race_w", 0.0)
+    race_w = opt.get("race_w", 0.54)
     race_h = opt.get("race_h", 0.11) if race_w > 0 else 0.0
     race_zc = hl * opt.get("race_zc", -0.04)
     race_zw = l * opt.get("race_zw", 0.17)
@@ -1300,13 +1392,15 @@ def body_hartmann(bm, w, h, l, opt):
 
 def _ballard_section(z, hl, l, w, h, cut, keel_frac, deck_frac, beam_frac,
                      sail_w, sail_h, sail_zc, sail_zw,
-                     bow_frac, stern_start, stern_w, stern_h):
-    """Cross-section for Ballard at a given z.
+                     bow_frac, stern_start, stern_w, stern_h,
+                     bulb_w, bulb_h, bulb_zc, bulb_zw):
+    """Cross-section for Ballard at a given z - now with bow sonar bulb.
 
     A faceted teardrop pressure hull. The bottom is a FLAT KEEL strip at
     y = -h/2 (locomotion mounts still anchor to the AABB underside). Bilge
     panels flare from the keel edges up to maximum beam BELOW mid-height,
     then slanted topsides run in to a narrower top deck - the teardrop
+    read. A bulbous bow bulb widens the forward hull for distinct Ballard
     read. The conning sail is a 4-vertex mesa on the deck, collapsed flat
     outside its z range. Width/height fractions give a blunt rounded bow
     growth, a long parallel midbody, and a stern that eases in to the
@@ -1331,6 +1425,11 @@ def _ballard_section(z, hl, l, w, h, cut, keel_frac, deck_frac, beam_frac,
 
     W = w * fw
     H = h * fh
+    # Bow sonar bulb - bulbous forward widening
+    if bulb_w > 1e-6 or bulb_h > 1e-6:
+        bulb_t = HF.smooth_transition(z, bulb_zc, bulb_zw)
+        W *= 1.0 + bulb_w * bulb_t
+        H *= 1.0 + bulb_h * bulb_t
     floor_y = -h / 2.0
     deck_y = floor_y + H
     hw = W / 2.0
@@ -1375,8 +1474,8 @@ def _ballard_section(z, hl, l, w, h, cut, keel_frac, deck_frac, beam_frac,
 
 def body_ballard(bm, w, h, l, opt):
     """Submarine hull. ONE loft: faceted teardrop with flat keel, blunt
-    bow growth, parallel midbody, eased stern taper, integrated conning
-    sail. Flat underside."""
+    bow growth, bulbous sonar bow, parallel midbody, eased stern taper,
+    integrated conning sail. Flat underside."""
     hl = l / 2.0
     cut = min(w, h) * 0.09
     keel_frac = opt.get("keel_frac", 0.36)
@@ -1390,15 +1489,20 @@ def body_ballard(bm, w, h, l, opt):
     stern_start = opt.get("stern_start", 0.46)
     stern_w = opt.get("stern_w", 0.30)
     stern_h = opt.get("stern_h", 0.50)
+    bulb_w = opt.get("bulb", 0.09)
+    bulb_h = opt.get("bulb_h", 0.06)
+    bulb_zc = hl * opt.get("bulb_zc", -0.78)
+    bulb_zw = l * opt.get("bulb_zw", 0.10)
 
     def sec(z):
         return _ballard_section(
             z, hl, l, w, h, cut, keel_frac, deck_frac, beam_frac,
             sail_w, sail_h, sail_zc, sail_zw,
             bow_frac, stern_start, stern_w, stern_h,
+            bulb_w, bulb_h, bulb_zc, bulb_zw,
         )
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=12, cap_chamfer=cut * 0.7)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=14, cap_chamfer=cut * 0.7)
 
 
 # --- MOREAU YARDS -----------------------------------------------------------
@@ -1436,7 +1540,7 @@ def _moreau_round_outline(w, h, n, cy=0.0):
 
 def _moreau_section(z, hl, l, w, h, facets, bow_style, bow_frac, tip_w, tip_h,
                     stern_style, stern_frac, stern_tip_w, stern_tip_h,
-                    waist, waist_zc, waist_zw):
+                    waist, waist_zc, waist_zw, blister_h, blister_zc, blister_zw):
     """Cross-section for Moreau at a given z.
 
     A rounded superellipse ring scaled by width/height fractions that NEVER
@@ -1444,6 +1548,7 @@ def _moreau_section(z, hl, l, w, h, facets, bow_style, bow_frac, tip_w, tip_h,
     or "arrow" quadratic - stern per stern_style), so the plan and profile
     are curves end to end. An optional waist multiplies the width by
     (1 - waist) around waist_zc, pinching the plan view in at midships.
+    A dorsal blister raises the deck at mid for distinct Moreau read.
 
     `facets` vertices always.
     """
@@ -1478,6 +1583,9 @@ def _moreau_section(z, hl, l, w, h, facets, bow_style, bow_frac, tip_w, tip_h,
     fw = fw_b * fw_s
     fh = fh_b * fh_s
     fw *= 1.0 - waist * HF.smooth_transition(z, waist_zc, waist_zw)
+    # Dorsal blister - broad height bump at mid
+    if blister_h > 1e-6:
+        fh *= 1.0 + blister_h * HF.smooth_transition(z, blister_zc, blister_zw)
 
     W = max(w * fw, w * 0.03)
     H = max(h * fh, h * 0.20)
@@ -1502,15 +1610,316 @@ def body_moreau(bm, w, h, l, opt):
     waist = opt.get("waist", 0.0)
     waist_zc = hl * opt.get("waist_zc", 0.0)
     waist_zw = l * opt.get("waist_zw", 0.15)
+    blister_h = opt.get("blister", 0.10)
+    blister_zc = hl * opt.get("blister_zc", 0.05)
+    blister_zw = l * opt.get("blister_zw", 0.20)
 
     def sec(z):
         return _moreau_section(
             z, hl, l, w, h, facets, bow_style, bow_frac, tip_w, tip_h,
             stern_style, stern_frac, stern_tip_w, stern_tip_h,
-            waist, waist_zc, waist_zw,
+            waist, waist_zc, waist_zw, blister_h, blister_zc, blister_zw,
         )
 
     HF.loft_evolution(bm, -hl, hl, sec, n_sections=18, cap_chamfer=min(w, h) * 0.05)
+
+
+# --- DURHAM MOTORS ----------------------------------------------------------
+
+def _durham_section(z, hl, l, w, h, cut, cab_frac, cab_h, cargo_h, wind_frac,
+                    nose_taper):
+    """Cross-section for Durham at a given z.
+
+    A regular-old-vehicle box: oct_outline throughout, constant width
+    (slight front taper only), height steps from bumper → windshield →
+    cab roof → cargo bed. Reads as a pickup / APC / HEMTT at 40 m with
+    no sci-fi vocabulary — just a boxy cab and a flat cargo volume.
+    Bottom is always at y = -h/2 (flat underside). 8 vertices always.
+    """
+    # Width fraction - almost constant, slight nose inset like a real bumper/grille.
+    if z <= -hl + l * nose_taper:
+        t = (z + hl) / max(l * nose_taper, 1e-6)
+        fw = 0.84 + 0.16 * t
+    elif z >= hl - l * 0.08:
+        t = (z - (hl - l * 0.08)) / max(l * 0.08, 1e-6)
+        fw = 1.00 - 0.04 * t
+    else:
+        fw = 1.00
+
+    # Height fraction - bumper low, rises to windshield, cab roof, then
+    # VERTICAL drop to cargo bed. The rear cab wall is a near 90-degree
+    # step, not a tapered slope, so the hull reads as a real truck cab
+    # with a separate cargo bed.
+    cab_z_end = -hl + l * cab_frac
+    wind_z = -hl + l * wind_frac
+    if z <= -hl:
+        fh = 0.52
+    elif z <= wind_z:
+        t = (z + hl) / max(wind_z + hl, 1e-6)
+        fh = 0.52 + (0.78 - 0.52) * t
+    elif z <= cab_z_end:
+        # Cab roof - flat from windshield top to rear wall.
+        fh = cab_h
+    else:
+        fh = cargo_h
+
+    W = w * fw
+    H = h * fh
+    # Bottom at -h/2: center the outline half-height above floor.
+    cy = -h / 2.0 + H / 2.0
+    # Scale cut with this section's size so narrow nose doesn't self-intersect.
+    c = min(cut, W * 0.20, H * 0.28)
+    cx_ = min(c, W * 0.40)
+    cy_ = min(c, H * 0.40)
+    return HF.oct_outline(W, H, cx_, cy_, cy=cy)
+
+
+def body_durham(bm, w, h, l, opt):
+    """Regular vehicle. ONE loft: boxy oct section with windshield step,
+    cab roof and flat cargo bed. Flat underside, no exotic taper.
+
+    The cab's rear wall is a near-vertical step, so the loft uses a
+    non-uniform section list with a tight pair straddling the cab/cargo
+    seam (eps = 1.2% of length). loft_evolution's uniform sampling
+    would smear that step over one whole interval (~0.8 units) into a
+    long slope."""
+    hl = l / 2.0
+    cut = min(w, h) * 0.10
+    cab_frac = opt.get("cab_frac", 0.32)
+    cab_h = opt.get("cab_h", 0.96)
+    cargo_h = opt.get("cargo_h", 0.72)
+    wind_frac = opt.get("wind_frac", 0.10)
+    nose_taper = opt.get("nose_taper", 0.10)
+
+    def sec(z):
+        return _durham_section(z, hl, l, w, h, cut, cab_frac, cab_h,
+                               cargo_h, wind_frac, nose_taper)
+
+    # Non-uniform sampling: cluster a pair around the cab rear wall.
+    cab_z_end = -hl + l * cab_frac
+    eps = l * 0.012
+    # Clamp eps pair inside the hull so cap inset doesn't swallow it.
+    z_low = max(cab_z_end - eps, -hl + 0.01)
+    z_high = min(cab_z_end + eps, hl - 0.01)
+    # Build a sorted unique list that still captures the nose taper and
+    # windshield slope, plus the vertical seam.
+    raw_zs = [
+        -hl,
+        -hl + l * nose_taper * 0.5,
+        -hl + l * nose_taper,
+        -hl + l * wind_frac,
+        ( -hl + l * wind_frac + cab_z_end) * 0.5,
+        z_low,
+        z_high,
+        (z_high + hl) * 0.5,
+        hl - l * 0.06,
+        hl,
+    ]
+    zs = sorted(set(raw_zs))
+    # Ensure the seam pair stays adjacent after dedup.
+    sections = [(z, sec(z)) for z in zs]
+    HF.add_solid(bm, sections, cap_chamfer=cut)
+
+
+# --- SPECTRE DYNAMICS -------------------------------------------------------
+
+def _spectre_section(z, hl, l, w, h, cut, nose_frac, tip_w, tip_h_frac,
+                     stern_frac, stern_tip_w, stern_tip_h_frac,
+                     canopy_w, canopy_h, canopy_zc, canopy_zw):
+    """Cross-section for Spectre at a given z.
+
+    Pure arrowhead / delta: plan view is a sharp triangle (tip_w ~0.03 at
+    the nose, LINEAR to full width over nose_frac), height is low
+    and flat (stealth bomber / arrowhead tank read). Sides are straight
+    bevels meeting at the tip — no tangential quadratic curve unlike
+    Hartmann/Calder/Moreau's eased bows. An optional centered canopy mesa
+    is integrated as a 4-vertex bump on the deck, collapsed flat outside
+    its z range — same pattern as Hartmann/Calder/Rackham.
+    Bottom is always at y = -h/2. 12 vertices always.
+    """
+    nose_len = l * nose_frac
+    if z <= -hl:
+        fw = tip_w
+        fh = tip_h_frac
+    elif z <= -hl + nose_len:
+        t = (z + hl) / max(nose_len, 1e-6)
+        g = t  # linear - straight arrowhead bevel
+        fw = tip_w + (1.0 - tip_w) * g
+        fh = tip_h_frac + (1.0 - tip_h_frac) * g
+    elif z >= hl - l * stern_frac:
+        t = (hl - z) / max(l * stern_frac, 1e-6)
+        g = t  # linear - straight stern bevel
+        fw = stern_tip_w + (1.0 - stern_tip_w) * g
+        fh = stern_tip_h_frac + (1.0 - stern_tip_h_frac) * g
+    else:
+        fw = 1.00
+        fh = 1.00
+
+    W = w * fw
+    H = h * fh
+    floor_y = -h / 2.0
+    deck_y = floor_y + H
+
+    # Chamfer scales with this section's size — narrow tip would self-intersect otherwise.
+    c = min(cut, W * 0.18, H * 0.26)
+    # Keep belly width safe for deck edge inset.
+    # Mesa / canopy on the deck — 4-vertex peak, right-to-left flat segment when inactive.
+    t_canopy = HF.smooth_transition(z, canopy_zc, canopy_zw) if canopy_w > 0 else 0.0
+    if canopy_w > 0 and canopy_h > 0 and t_canopy > 1e-6:
+        rw = min(W * canopy_w / 2.0, (W / 2.0 - c) * 0.88)
+        rht = rw * 0.70
+        RH = h * canopy_h * t_canopy
+        # Active: centered mesa straddling deck_y.
+        v5_x, v5_y = rw, deck_y
+        v6_x, v6_y = rht, deck_y + RH
+        v7_x, v7_y = -rht, deck_y + RH
+        v8_x, v8_y = -rw, deck_y
+    else:
+        v5_x, v5_y = W * 0.28, deck_y
+        v6_x, v6_y = W * 0.08, deck_y
+        v7_x, v7_y = -W * 0.08, deck_y
+        v8_x, v8_y = -W * 0.28, deck_y
+
+    # 12-vertex outline: bottom edge → sides → deck chamfer → canopy mesa → deck chamfer → sides.
+    return [
+        (-W / 2.0 + c, floor_y),       # 0: bottom-left
+        (W / 2.0 - c, floor_y),        # 1: bottom-right
+        (W / 2.0, floor_y + c),        # 2: right lower
+        (W / 2.0, deck_y - c),         # 3: right side top
+        (W / 2.0 - c, deck_y),         # 4: right deck edge
+        (v5_x, v5_y),                  # 5: canopy right base / flat
+        (v6_x, v6_y),                  # 6: canopy right top / flat
+        (v7_x, v7_y),                  # 7: canopy left top / flat
+        (v8_x, v8_y),                  # 8: canopy left base / flat
+        (-W / 2.0 + c, deck_y),        # 9: left deck edge
+        (-W / 2.0, deck_y - c),        # 10: left side top
+        (-W / 2.0, floor_y + c),       # 11: left lower
+    ]
+
+
+def body_spectre(bm, w, h, l, opt):
+    """Arrowhead stealth hull. ONE loft: sharp delta plan, low flat profile,
+    optional centered canopy mesa. Flat underside."""
+    hl = l / 2.0
+    cut = min(w, h) * 0.09
+    nose_frac = opt.get("nose_frac", 0.36)
+    tip_w = opt.get("tip_w", 0.04)
+    tip_h_frac = opt.get("tip_h", 0.38)
+    stern_frac = opt.get("stern_frac", 0.12)
+    stern_tip_w = opt.get("stern_tip_w", 0.72)
+    stern_tip_h_frac = opt.get("stern_tip_h", 0.88)
+    canopy_w = opt.get("canopy_w", 0.0)
+    canopy_h = opt.get("canopy_h", 0.0)
+    canopy_zc = hl * opt.get("canopy_zc", -0.08)
+    canopy_zw = l * opt.get("canopy_zw", 0.09)
+
+    def sec(z):
+        return _spectre_section(
+            z, hl, l, w, h, cut, nose_frac, tip_w, tip_h_frac,
+            stern_frac, stern_tip_w, stern_tip_h_frac,
+            canopy_w, canopy_h, canopy_zc, canopy_zw,
+        )
+
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=14, cap_chamfer=cut * 0.7)
+
+
+# --- HEXTON WORKS -----------------------------------------------------------
+
+def _hexton_fw_fh(z, hl, l, nose_frac, tail_frac):
+    """Width/height fractions for Hexton along z. Blunt nose/tail, longer than wide.
+
+    At the very tip the hex is ~75% width / 68% height, ramping quickly to
+    full over nose_frac / tail_frac. Mid-hull is full. This keeps the bow
+    flat-ish (a real glacis) not a Spectre point, and the section stays
+    hexagonal throughout."""
+    nose_len = l * nose_frac
+    tail_len = l * tail_frac
+    if z <= -hl:
+        return 0.76, 0.70
+    if z <= -hl + nose_len:
+        t = (z + hl) / max(nose_len, 1e-6)
+        fw = 0.76 + 0.24 * t
+        fh = 0.70 + 0.30 * t
+        return fw, fh
+    if z >= hl:
+        return 0.78, 0.72
+    if z >= hl - tail_len:
+        t = (hl - z) / max(tail_len, 1e-6)  # 1 at seam, 0 at tip
+        fw = 0.78 + 0.22 * t
+        fh = 0.72 + 0.28 * t
+        return fw, fh
+    return 1.0, 1.0
+
+
+def body_hexton(bm, w, h, l, opt):
+    """Hexagonal prism, longer than wide. Single hex by default; twin mode
+    builds two parallel hex cylinders with cross-members, high-aft-cab adds
+    an elevated box at the stern. Flat underside (y=-h/2) always."""
+    hl = l / 2.0
+    top_frac = opt.get("top_frac", 0.56)
+    bottom_frac = opt.get("bottom_frac", 0.58)
+    nose_frac = opt.get("nose_frac", 0.14)
+    tail_frac = opt.get("tail_frac", 0.10)
+    twin = opt.get("twin", False)
+    gap_frac = opt.get("gap_frac", 0.14)
+    aft_cab = opt.get("aft_cab", False)
+    aft_cab_h = opt.get("aft_cab_h", 0.38)
+    aft_cab_w = opt.get("aft_cab_w", 0.62)
+    aft_cab_len = opt.get("aft_cab_len", 0.26)
+    aft_cab_z = opt.get("aft_cab_z", 0.48)
+
+    if twin:
+        gap = w * gap_frac
+        # Two parallel hex tubes
+        for side in (-1, 1):
+            sections = []
+            for i in range(8):
+                t = i / 7.0
+                z = -hl + (2.0 * hl) * t
+                fw, fh = _hexton_fw_fh(z, hl, l, nose_frac, tail_frac)
+                W_each = max((w * fw - gap) / 2.0, w * 0.12)
+                H = h * fh
+                cy = -h / 2.0 + H / 2.0
+                cx = side * (w * fw + gap) / 4.0
+                outline = HF.hex_flat_outline(W_each, H, top_frac, bottom_frac, cy, cx)
+                sections.append((z, outline))
+            HF.add_solid(bm, sections, cap_chamfer=min(w, h) * 0.07)
+        # Cross-members spanning the gap
+        beam_zs = opt.get("beam_z", (-0.38, 0.0, 0.38))
+        for zf in beam_zs:
+            z = hl * zf
+            fw, fh = _hexton_fw_fh(z, hl, l, nose_frac, tail_frac)
+            H = h * fh
+            beam_y = -h / 2.0 + H * 0.52
+            beam_w = gap + w * 0.06
+            beam_h = h * 0.11
+            beam_len = l * 0.07
+            HF.add_chamfered_box(bm, (0.0, beam_y, z),
+                                 (beam_w, beam_h, beam_len),
+                                 cut=min(beam_w, beam_h) * 0.18)
+    else:
+        def sec(z):
+            fw, fh = _hexton_fw_fh(z, hl, l, nose_frac, tail_frac)
+            W = w * fw
+            H = h * fh
+            cy = -h / 2.0 + H / 2.0
+            return HF.hex_flat_outline(W, H, top_frac, bottom_frac, cy, 0.0)
+
+        HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=min(w, h) * 0.07)
+
+    if aft_cab:
+        # Elevated box at the stern, sitting on the hex deck
+        aft_z = hl * aft_cab_z
+        fw, fh = _hexton_fw_fh(aft_z, hl, l, nose_frac, tail_frac)
+        H = h * fh
+        deck_y = -h / 2.0 + H
+        cab_h_abs = h * aft_cab_h
+        cab_w_abs = w * aft_cab_w
+        cab_len_abs = l * aft_cab_len
+        cab_y = deck_y + cab_h_abs / 2.0
+        HF.add_chamfered_box(bm, (0.0, cab_y, aft_z),
+                             (cab_w_abs, cab_h_abs, cab_len_abs),
+                             cut=min(cab_w_abs, cab_h_abs) * 0.14)
 
 
 BODIES = {
@@ -1525,6 +1934,9 @@ BODIES = {
     "hartmann": body_hartmann,
     "ballard": body_ballard,
     "moreau": body_moreau,
+    "durham": body_durham,
+    "spectre": body_spectre,
+    "hexton": body_hexton,
 }
 
 
@@ -2179,7 +2591,7 @@ LINEUP = [
     # long glacis rise, stepped rear engine deck, optional turret race.
     H("hartmann_scout_a", "hartmann", "scout", "Hartmann Ferret",
       (2.5, 1.05, 4.2), [("mast", {"mh": 0.55, "z": 0.16})],
-      {"race_w": 0.0}),
+      {"race_w": 0.48, "race_h": 0.09, "tip_w": 0.70, "nose_frac": 0.16}),
     H("hartmann_light_a", "hartmann", "light", "Hartmann Lancer",
       (2.9, 1.10, 5.0), [],
       {"race_w": 0.52, "race_h": 0.10, "race_zw": 0.16}),
@@ -2195,14 +2607,16 @@ LINEUP = [
     H("hartmann_heavy_b", "hartmann", "heavy", "Hartmann Breaker",
       (4.6, 1.85, 7.6), [("barbette", {"z": -0.10, "r": 0.34, "bh": 0.20}),
                          ("glacis", {"front": 0.34})],
-      {"race_w": 0.0, "belly_frac": 0.54, "nose_frac": 0.26}),
+      {"race_w": 0.56, "race_h": 0.11, "belly_frac": 0.54, "nose_frac": 0.20,
+       "tip_w": 0.68}),
     H("hartmann_transport_a", "hartmann", "transport", "Hartmann Grenadier",
       (3.9, 1.55, 7.4), [("well", {"z0": -0.16, "z1": 0.88,
                                    "wall_h": 0.26, "w": 0.78})],
-      {"nose_frac": 0.16, "race_w": 0.0, "engine_drop": 0.06}),
+      {"nose_frac": 0.18, "tip_w": 0.70, "race_w": 0.54, "race_h": 0.10,
+       "engine_drop": 0.06}),
     H("hartmann_oddball_a", "hartmann", "oddball", "Hartmann Long Nose",
       (4.0, 1.25, 6.8), [("glacis", {"front": 0.22, "len": 0.44})],
-      {"nose_frac": 0.48, "tip_w": 0.03, "race_w": 0.0,
+      {"nose_frac": 0.28, "tip_w": 0.64, "race_w": 0.50, "race_h": 0.10,
        "engine_z": 0.98, "engine_drop": 0.0, "sill_frac": 0.34}),
 
     # -- BALLARD DEEPWORKS (7): submarines ------------------------------
@@ -2323,6 +2737,93 @@ LINEUP = [
       {"waist": 0.34, "waist_zw": 0.15, "bow_style": "arrow",
        "bow_frac": 0.28, "tip_w": 0.06, "tip_h": 0.38,
        "stern_frac": 0.24}),
+
+    # -- DURHAM MOTORS (8): regular-old-vehicles -------------------------
+    # Boxy utility trucks / APCs: flat sides, cab-over windshield step,
+    # cargo bed. Every silhouette reads as a real truck at 40 m.
+    H("durham_scout_a", "durham", "scout", "Durham Courier",
+      (2.5, 1.05, 4.2), [("mast", {"mh": 0.52, "z": 0.14})],
+      {"cab_frac": 0.34, "cab_h": 0.92, "cargo_h": 0.62}),
+    H("durham_light_a", "durham", "light", "Durham Mule",
+      (2.9, 1.10, 5.0), [],
+      {"cab_frac": 0.30, "cab_h": 0.96, "cargo_h": 0.70}),
+    H("durham_light_b", "durham", "light", "Durham Gun Mule",
+      (3.0, 1.15, 5.1), [("barbette", {"z": 0.22, "r": 0.26, "bh": 0.20})],
+      {"cab_frac": 0.28, "cab_h": 0.94, "cargo_h": 0.72}),
+    H("durham_medium_a", "durham", "medium", "Durham Boxer",
+      (3.5, 1.35, 6.0), [],
+      {"cab_frac": 0.32, "cab_h": 1.00, "cargo_h": 0.74}),
+    H("durham_medium_b", "durham", "medium", "Durham Stake Bed",
+      (3.6, 1.45, 6.1), [("flatbed", {"z0": 0.08, "z1": 0.88, "rail_h": 0.22})],
+      {"cab_frac": 0.26, "cab_h": 0.96, "cargo_h": 0.68, "nose_taper": 0.08}),
+    H("durham_heavy_a", "durham", "heavy", "Durham Hauler",
+      (4.4, 1.70, 7.4), [("well", {"z0": -0.10, "z1": 0.84, "wall_h": 0.28, "w": 0.80})],
+      {"cab_frac": 0.30, "cab_h": 1.00, "cargo_h": 0.78}),
+    H("durham_transport_a", "durham", "transport", "Durham Flatbed",
+      (3.9, 1.55, 8.2), [("flatbed", {"z0": -0.06, "z1": 0.92, "rail_h": 0.20})],
+      {"cab_frac": 0.22, "cab_h": 0.98, "cargo_h": 0.66}),
+    H("durham_oddball_a", "durham", "oddball", "Durham Longnose",
+      (4.0, 1.60, 6.4), [("trunk", {"th": 0.30, "w": 0.56, "z0": -0.10, "z1": 0.30})],
+      {"cab_frac": 0.44, "cab_h": 0.88, "cargo_h": 0.82, "nose_taper": 0.18}),
+
+    # -- SPECTRE DYNAMICS (8): arrowhead stealth --------------------------
+    # Sharp delta plan: tip_w 0.03-0.05, quadratic ease, low flat profile.
+    # The arrowhead IS the hull — no extra wings or sponsons needed.
+    H("spectre_scout_a", "spectre", "scout", "Spectre Needle",
+      (2.4, 0.95, 4.3), [],
+      {"nose_frac": 0.40, "tip_w": 0.03, "tip_h": 0.34, "stern_tip_w": 0.68}),
+    H("spectre_light_a", "spectre", "light", "Spectre Dart",
+      (2.9, 1.05, 5.0), [],
+      {"nose_frac": 0.36, "tip_w": 0.04, "tip_h": 0.36}),
+    H("spectre_light_b", "spectre", "light", "Spectre Kestrel",
+      (3.0, 1.10, 5.2), [],
+      {"nose_frac": 0.34, "tip_w": 0.05, "tip_h": 0.38,
+       "canopy_w": 0.28, "canopy_h": 0.22, "canopy_zc": -0.06}),
+    H("spectre_medium_a", "spectre", "medium", "Spectre Arrowhead",
+      (3.5, 1.25, 6.0), [],
+      {"nose_frac": 0.36, "tip_w": 0.04, "tip_h": 0.36}),
+    H("spectre_medium_b", "spectre", "medium", "Spectre Glaive",
+      (3.6, 1.35, 6.2), [("barbette", {"z": 0.08, "r": 0.24, "bh": 0.18})],
+      {"nose_frac": 0.38, "tip_w": 0.05, "tip_h": 0.38,
+       "canopy_w": 0.32, "canopy_h": 0.20}),
+    H("spectre_heavy_a", "spectre", "heavy", "Spectre Halberd",
+      (4.5, 1.65, 7.5), [("barbette", {"z": -0.04, "r": 0.30, "bh": 0.20})],
+      {"nose_frac": 0.36, "tip_w": 0.04, "tip_h": 0.38, "stern_tip_w": 0.62}),
+    H("spectre_transport_a", "spectre", "transport", "Spectre Haul",
+      (4.0, 1.55, 8.3), [("well", {"z0": 0.06, "z1": 0.82, "wall_h": 0.26, "w": 0.76})],
+      {"nose_frac": 0.30, "tip_w": 0.06, "tip_h": 0.40, "stern_frac": 0.08}),
+    H("spectre_oddball_a", "spectre", "oddball", "Spectre Lance",
+      (4.1, 1.30, 6.8), [],
+      {"nose_frac": 0.50, "tip_w": 0.02, "tip_h": 0.30, "stern_tip_w": 0.48}),
+
+    # -- HEXTON WORKS (8): hexagonal prism, longer than wide ---------------
+    # Flat-top hex section (6 facets), blunt glacis bow, not a point.
+    # Variants show twin-tube heavies and high aft cabs.
+    H("hexton_scout_a", "hexton", "scout", "Hexton Surveyor",
+      (2.4, 1.10, 4.4), [("mast", {"mh": 0.48, "z": 0.10})],
+      {"top_frac": 0.58, "bottom_frac": 0.60, "nose_frac": 0.12}),
+    H("hexton_light_a", "hexton", "light", "Hexton Runner",
+      (2.9, 1.15, 5.0), [],
+      {"top_frac": 0.55, "bottom_frac": 0.57, "nose_frac": 0.14}),
+    H("hexton_light_b", "hexton", "light", "Hexton Picket",
+      (3.0, 1.20, 5.1), [("barbette", {"z": 0.10, "r": 0.24, "bh": 0.18})],
+      {"top_frac": 0.52, "bottom_frac": 0.55}),
+    H("hexton_medium_a", "hexton", "medium", "Hexton Hauler",
+      (3.5, 1.35, 6.0), [],
+      {"top_frac": 0.56, "bottom_frac": 0.58}),
+    H("hexton_medium_b", "hexton", "medium", "Hexton Grid",
+      (3.6, 1.45, 6.2), [("flatbed", {"z0": 0.10, "z1": 0.88, "rail_h": 0.20})],
+      {"top_frac": 0.54, "bottom_frac": 0.56, "nose_frac": 0.16}),
+    H("hexton_heavy_a", "hexton", "heavy", "Hexton Twin",
+      (4.6, 1.80, 7.6), [],
+      {"twin": True, "gap_frac": 0.14, "top_frac": 0.58, "bottom_frac": 0.60}),
+    H("hexton_transport_a", "hexton", "transport", "Hexton Aft-Cab",
+      (4.0, 1.60, 8.3), [],
+      {"aft_cab": True, "aft_cab_h": 0.42, "aft_cab_w": 0.60, "aft_cab_len": 0.28,
+       "top_frac": 0.56, "bottom_frac": 0.58}),
+    H("hexton_oddball_a", "hexton", "oddball", "Hexton Longspan",
+      (4.2, 1.40, 6.6), [("well", {"z0": -0.06, "z1": 0.70, "wall_h": 0.24, "w": 0.72})],
+      {"top_frac": 0.48, "bottom_frac": 0.52, "nose_frac": 0.18, "tail_frac": 0.12}),
 ]
 
 

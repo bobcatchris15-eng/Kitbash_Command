@@ -1,0 +1,29 @@
+{
+  "name": "Durham Boxer",
+  "hp": 667.0,
+  "weight": 475.3,
+  "metal": 161,
+  "crystal": 33,
+  "size": [
+    3.5,
+    1.863,
+    6.0
+  ],
+  "color": [
+    0.523,
+    0.498,
+    0.412,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 72.5,
+  "base_power": 5.4,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Durham Motors",
+  "hull_class": "Medium"
+}

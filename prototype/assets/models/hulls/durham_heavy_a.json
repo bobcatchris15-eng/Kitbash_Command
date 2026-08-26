@@ -1,0 +1,29 @@
+{
+  "name": "Durham Hauler",
+  "hp": 1207.0,
+  "weight": 880.3,
+  "metal": 296,
+  "crystal": 60,
+  "size": [
+    4.4,
+    2.346,
+    7.4
+  ],
+  "color": [
+    0.523,
+    0.498,
+    0.412,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 113.0,
+  "base_power": 8.64,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Durham Motors",
+  "hull_class": "Heavy"
+}

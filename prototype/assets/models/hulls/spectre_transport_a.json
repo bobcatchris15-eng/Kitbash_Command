@@ -1,0 +1,29 @@
+{
+  "name": "Spectre Haul",
+  "hp": 1129.2,
+  "weight": 821.9,
+  "metal": 277,
+  "crystal": 56,
+  "size": [
+    4.0,
+    2.139,
+    8.3
+  ],
+  "color": [
+    0.388,
+    0.412,
+    0.435,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 107.2,
+  "base_power": 8.18,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Spectre Dynamics",
+  "hull_class": "Transport"
+}

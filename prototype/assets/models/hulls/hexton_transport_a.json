@@ -1,0 +1,29 @@
+{
+  "name": "Hexton Aft-Cab",
+  "hp": 1162.4,
+  "weight": 846.8,
+  "metal": 285,
+  "crystal": 58,
+  "size": [
+    4.0,
+    2.208,
+    8.3
+  ],
+  "color": [
+    0.415,
+    0.482,
+    0.498,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 109.7,
+  "base_power": 8.37,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Hexton Works",
+  "hull_class": "Transport"
+}

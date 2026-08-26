@@ -3,6 +3,8 @@ const MunitionPool = preload("res://scripts/munition_pool.gd")
 const SimRNG = preload("res://scripts/battle/sim_rng.gd")
 const Profiler = preload("res://scripts/battle/battle_profiler.gd")
 const MeshAssetLoader = preload("res://scripts/mesh_asset_loader.gd")
+const VFXEffects = preload("res://scripts/vfx_effects.gd")
+const VFXBurstScript = preload("res://scripts/vfx_burst.gd")
 # Real, interceptable weapon missile (FABLE_REVIEW.md 2.2). Fired by
 # guided_missile / dual_stage_missile / missile_pod instead of the old
 # cosmetic tweened meshes - those never registered in the "missiles" group,
@@ -46,6 +48,7 @@ var _weave_seed: float = 0.0
 # raycast along the flight path - a seeker cares whether it can still see
 # what it locked onto, not whether some unrelated cloud sits off to one side.
 const SmokeVolume = preload("res://scripts/smoke_volume.gd")
+const BattleLayers = preload("res://scripts/battle/battle_layers.gd")
 const LOCK_BREAK_GRACE: float = 0.35 # brief blindness is survivable; a real screen isn't
 const DUMB_FLIGHT_TIME: float = 1.6
 
@@ -53,6 +56,8 @@ var _obscured_for: float = 0.0
 var _lock_broken: bool = false
 var _dumb_time: float = 0.0
 var _dumb_heading: Vector3 = Vector3.ZERO
+var _trail: GPUParticles3D = null
+var _impact_pos: Vector3 = Vector3.ZERO
 
 func setup(missile_target: Node3D, weapon: Node3D, dmg: float, dclass: String, missile_team: int):
 	target = missile_target
@@ -109,24 +114,20 @@ func _ready():
 		nose.position = Vector3(0, 0, -0.23)
 		nose.rotate_x(-PI / 2)
 
-	# Smoke trail
-	var trail_timer = Timer.new()
-	trail_timer.wait_time = 0.05
-	trail_timer.autostart = true
-	add_child(trail_timer)
-	trail_timer.timeout.connect(_spawn_trail_puff)
+	# Engine glow: bright emissive sphere at the rear (+Z) end, visible at
+	# RTS zoom as a hot exhaust point during flight.
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_sphere()
+	glow.scale = Vector3(0.10, 0.10, 0.14)
+	glow.material_override = MunitionPool.emissive(Color(1.0, 0.6, 0.2), Color(1.0, 0.8, 0.3), 2.0)
+	add_child(glow)
+	glow.position = Vector3(0, 0, 0.20)
 
-func _spawn_trail_puff():
-	if is_destroyed or not is_inside_tree(): return
-	var smoke = MeshInstance3D.new()
-	smoke.mesh = MunitionPool.unit_sphere()
-	smoke.scale = Vector3(0.16, 0.16, 0.16)
-	smoke.material_override = MunitionPool.alpha(Color(0.6, 0.6, 0.6, 0.5))
-	(get_tree().current_scene if get_tree().current_scene != null else get_tree().root).add_child(smoke)
-	smoke.global_position = global_position - global_transform.basis.z * 0.2
-	var st = create_tween()
-	st.tween_property(smoke, "scale", Vector3.ZERO, 0.25)
-	st.finished.connect(func(): if is_instance_valid(smoke): smoke.queue_free())
+	# Smoke trail: one persistent GPUParticles3D emitter at the rear end.
+	# local_coords = true so it follows the missile; billboard quads with
+	# the smoke flipbook for a dense plume that dissipates in 0.25s.
+	_trail = VFXEffects.make_missile_trail(self)
+	_trail.position = Vector3(0, 0, 0.20)
 
 func _physics_process(delta):
 	if is_destroyed: return
@@ -152,6 +153,7 @@ func _missile_tick(delta: float) -> void:
 		_dumb_time += delta
 		global_position += _dumb_heading * speed * delta
 		if _dumb_time >= DUMB_FLIGHT_TIME:
+			_impact_pos = global_position
 			_spawn_impact_visual()
 			destroy_missile(false)
 		return
@@ -194,44 +196,114 @@ func _missile_tick(delta: float) -> void:
 	global_position += dir * eff_speed * delta
 
 	if _phase == 1 and global_position.distance_to(target.global_position + Vector3(0, 0.5, 0)) < 1.1:
+		# Raycast from behind the missile toward the target to find the hull
+		# skin contact point. By the time the distance check triggers the
+		# missile may have penetrated past the outer surface into the mesh
+		# volume, so using the missile's own position would place the
+		# explosion inside the target rather than on its armour.
+		_impact_pos = global_position
+		var target_center = target.global_position + Vector3(0, 0.5, 0)
+		var to_target = target_center - global_position
+		var dist = to_target.length()
+		if dist > 0.01 and is_inside_tree():
+			var space = get_world_3d().direct_space_state
+			var approach = to_target.normalized()
+			var query = PhysicsRayQueryParameters3D.create(
+				global_position - approach * 3.0, target_center)
+			query.collision_mask = BattleLayers.HULL_SURFACE | BattleLayers.TERRAIN
+			var hit = space.intersect_ray(query)
+			if not hit.is_empty():
+				var collider = hit.get("collider")
+				if collider != null:
+					var walker: Node = collider if collider is Node else null
+					while walker != null:
+						if walker == target:
+							_impact_pos = hit.get("position", global_position)
+							break
+						walker = walker.get_parent()
 		# Warhead payload effects (smoke/incendiary/illumination ammo) land
 		# at the impact point, same as a shell's would - the launcher owns
 		# the ammo profile, so this defers to it. Guarded on the launcher
 		# still existing; if it died mid-flight the warhead just does its
 		# damage, which is the same fallback the damage path below uses.
 		if is_instance_valid(owner_weapon) and owner_weapon.has_method("_apply_ammo_impact"):
-			owner_weapon._apply_ammo_impact(global_position)
+			owner_weapon._apply_ammo_impact(_impact_pos)
 		if is_instance_valid(owner_weapon) and owner_weapon.has_method("_deal_weapon_damage"):
 			owner_weapon._deal_weapon_damage(target, damage_amount)
 		elif target.has_method("take_damage"):
-			target.take_damage(damage_amount, damage_class, global_position)
+			target.take_damage(damage_amount, damage_class, _impact_pos)
 		_spawn_impact_visual()
 		destroy_missile(false)
 
 func _spawn_impact_visual():
 	if not is_inside_tree(): return
-	var exp = MeshInstance3D.new()
-	exp.mesh = MunitionPool.unit_sphere()
-	exp.scale = Vector3(1.4, 1.4, 1.4)
-	exp.material_override = MunitionPool.emissive(Color.ORANGE, Color.ORANGE)
-	(get_tree().current_scene if get_tree().current_scene != null else get_tree().root).add_child(exp)
-	exp.global_position = global_position
-	var tween = exp.create_tween()
-	tween.tween_property(exp, "scale", Vector3.ZERO, 0.15)
-	tween.finished.connect(func(): if is_instance_valid(exp): exp.queue_free())
+	var scene = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+	# Per-spawn entropy — every detonation looks slightly different.
+	var entropy := randf_range(0.82, 1.18)
+	var color_shift := Color(randf_range(0.90, 1.0), randf_range(0.85, 1.0), randf_range(0.80, 1.0))
+	var final_color: Color = Color.ORANGE * color_shift
+	var jitter := Vector3(randf_range(-0.1, 0.1), randf_range(-0.05, 0.1), randf_range(-0.1, 0.1))
+	var impact_pos := _impact_pos + jitter
+	# Spark shrapnel burst
+	var spark_count := int(14.0 * entropy)
+	VFXBurstScript.spawn(scene, impact_pos, final_color, spark_count, 0.25, 50.0,
+		3.0 * entropy, 8.0 * entropy)
+	# Smoke puff
+	VFXEffects.smoke_puff(scene, impact_pos, 1.2 * entropy, 8, Color(0.20, 0.19, 0.18, 0.60))
+	# Particle-driven fireball — additive flame quads
+	VFXEffects.fire_burst(scene, impact_pos, 1.4 * entropy, final_color)
+	# Impact light flash
+	var light = OmniLight3D.new()
+	light.light_color = Color(1.0, 0.7, 0.3)
+	light.light_energy = 6.0 * entropy
+	light.omni_range = 5.0 * entropy
+	light.omni_attenuation = 0.5
+	light.light_bake_mode = Light3D.BAKE_DISABLED
+	scene.add_child(light)
+	light.global_position = impact_pos
+	var lt = scene.create_tween()
+	lt.tween_property(light, "light_energy", 0.0, 0.15)
+	lt.finished.connect(func(): if is_instance_valid(light): light.queue_free())
 
 # Interception contract, same as incoming_missile.gd - PD calls this.
 func destroy_missile(intercepted: bool):
 	if is_destroyed: return
 	is_destroyed = true
+	# Detach the smoke trail so it can drain after the missile is freed.
+	# Reparent to scene root, stop emitting, then free once the last
+	# particles have aged out (lifetime 0.25s).
+	if is_instance_valid(_trail) and _trail.is_inside_tree():
+		var scene = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+		_trail.get_parent().remove_child(_trail)
+		scene.add_child(_trail)
+		_trail.global_position = global_position
+		_trail.emitting = false
+		var drain = _trail.create_tween()
+		drain.tween_interval(_trail.lifetime + 0.1)
+		drain.finished.connect(func(): if is_instance_valid(_trail): _trail.queue_free())
 	if is_inside_tree():
-		var exp = MeshInstance3D.new()
-		exp.mesh = MunitionPool.unit_sphere()
-		var exp_color = Color.CYAN if intercepted else Color.ORANGE
-		exp.material_override = MunitionPool.emissive(exp_color, exp_color)
-		(get_tree().current_scene if get_tree().current_scene != null else get_tree().root).add_child(exp)
-		exp.global_position = global_position
-		var tween = exp.create_tween()
-		tween.tween_property(exp, "scale", Vector3.ZERO, 0.15)
-		tween.finished.connect(func(): if is_instance_valid(exp): exp.queue_free())
+		var scene = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+		var exp_color: Color = Color.CYAN if intercepted else Color.ORANGE
+		var entropy := randf_range(0.85, 1.15)
+		var color_shift := Color(randf_range(0.92, 1.0), randf_range(0.88, 1.0), randf_range(0.85, 1.0))
+		var final_color: Color = exp_color * color_shift
+		# Spark burst
+		VFXBurstScript.spawn(scene, global_position, final_color, int(12.0 * entropy), 0.25, 50.0,
+			3.0 * entropy, 7.0 * entropy)
+		# Smoke puff
+		VFXEffects.smoke_puff(scene, global_position, 1.0 * entropy, 6, Color(0.22, 0.21, 0.20, 0.55))
+		# Fireball burst
+		VFXEffects.fire_burst(scene, global_position, 1.2 * entropy, final_color)
+		# Interception/impact flash
+		var light = OmniLight3D.new()
+		light.light_color = exp_color
+		light.light_energy = 5.0 * entropy
+		light.omni_range = 4.0 * entropy
+		light.omni_attenuation = 0.5
+		light.light_bake_mode = Light3D.BAKE_DISABLED
+		scene.add_child(light)
+		light.global_position = global_position
+		var lt = scene.create_tween()
+		lt.tween_property(light, "light_energy", 0.0, 0.15)
+		lt.finished.connect(func(): if is_instance_valid(light): light.queue_free())
 	queue_free()

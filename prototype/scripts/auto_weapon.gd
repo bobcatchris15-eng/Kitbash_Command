@@ -49,6 +49,8 @@ var base_dps: float = 10.0
 var heal_rate: float = 0.0
 var laser_color: Color = Color.RED
 var type_id: String = ""
+var muzzle_offset: Vector3 = Vector3(0.0, 0.3, -0.6)
+var _caliber: float = 1.0
 
 var damage_class: String = "kinetic"
 var bipod_deployed: bool = false
@@ -832,6 +834,7 @@ func _ready():
 		var fire_profile = ModuleCatalog.get_fire_profile(type_id)
 		fire_rate = fire_profile.fire_rate
 		laser_color = fire_profile.laser_color
+		muzzle_offset = ModuleCatalog.get_muzzle_offset(type_id)
 
 		# Range: the whole tweak chain lives in weapon_range.gd now, so the
 		# Design Lab can show the same reach combat uses instead of having to
@@ -871,6 +874,7 @@ func _ready():
 		traverse_speed = clamp(traverse_speed, TRAVERSE_SPEED_MIN, TRAVERSE_SPEED_MAX)
 
 		# Apply Fire Rate Tweak Modifiers (Shot Intervals)
+		_caliber = data.tweaks.get("caliber", 1.0)
 		if data.tweaks.has("caliber"):
 			fire_rate *= data.tweaks["caliber"]
 		if data.tweaks.has("multi_barrel") and data.tweaks["multi_barrel"] == true:
@@ -1448,9 +1452,18 @@ func _fire_at_target():
 		_fire_pd_at_missile()
 		return
 		
-	# Spawn a nice muzzle flash (except for silent lasers/beams/harvester/welder)
+	# Spawn a directional muzzle flash (except for silent lasers/beams/harvester/welder).
+	# Flash position is per-weapon from ModuleCatalog.MUZZLE_OFFSETS, scaled by caliber.
+	# Directional cone emission sprays particles forward along the barrel axis.
+	# OmniLight pop is sized by caliber for visibility at RTS zoom.
 	if not type_id in ["heavy_laser", "pd_laser", "resource_harvester", "repair_array"]:
-		VFXBurstScript.spawn(self, Vector3(0, 0.4, -0.6), laser_color, 8, 0.1, 25.0, 3.0, 6.0, Vector3.ZERO, 0.4, 0.9)
+		var flash_pos = muzzle_offset * Vector3(_caliber, _caliber, _caliber)
+		var particle_count = int(8.0 + _caliber * 6.0)
+		var flash_spread = 20.0 + _caliber * 8.0
+		var flash_speed_max = 5.0 + _caliber * 2.0
+		var light_r = 3.0 + _caliber * 3.0
+		var light_e = 4.0 + _caliber * 3.0
+		VFXBurstScript.spawn(self, flash_pos, laser_color, particle_count, 0.1, flash_spread, 2.0, flash_speed_max, Vector3.ZERO, 0.4, 0.9, null, -global_transform.basis.z, laser_color, light_r, light_e)
 
 	var sfx_name = "cannon"
 	match type_id:
@@ -3240,25 +3253,46 @@ func _spawn_illumination_flare(pos: Vector3):
 
 func _spawn_explosion_visual(pos: Vector3, custom_scale: float = 0.6, color: Color = Color.ORANGE):
 	var parent := _effects_parent()
-	# Concussive explosive burst with flying shrapnel sparks
-	VFXBurstScript.spawn(parent, pos, color, int(maxf(8.0, custom_scale * 16.0)), 0.25, 45.0, 3.0, 7.0)
-	VFXEffects.smoke_puff(parent, pos, custom_scale * 1.4, 8, Color(0.20, 0.19, 0.18, 0.65))
+	# Per-spawn entropy: every detonation looks slightly different so a
+	# barrage doesn't read as a stamp of identical copies.
+	var entropy := randf_range(0.82, 1.18)
+	var scale_e := custom_scale * entropy
+	var color_shift := Color(randf_range(0.90, 1.0), randf_range(0.85, 1.0), randf_range(0.80, 1.0))
+	var final_color: Color = color * color_shift
+	# Jitter the spawn position slightly so adjacent hits don't stack
+	# perfectly on top of each other.
+	var jitter := Vector3(randf_range(-0.15, 0.15), randf_range(-0.05, 0.15), randf_range(-0.15, 0.15))
+	var impact_pos := pos + jitter
+
+	# Spark shrapnel burst — particle count and speed scale with the
+	# detonation size, plus entropy.
+	var spark_count = int((12.0 + scale_e * 18.0) * entropy)
+	VFXBurstScript.spawn(parent, impact_pos, final_color, spark_count, 0.25, 50.0,
+		3.0 * entropy, 8.0 * entropy)
+	VFXEffects.smoke_puff(parent, impact_pos, scale_e * 1.4, 8, Color(0.20, 0.19, 0.18, 0.65))
+
+	# Particle-driven fireball — additive flame quads replace the old
+	# scaling MeshInstance3D sphere. Reads as a bright flash at RTS zoom
+	# and dissipates with the flipbook rather than popping to zero.
+	VFXEffects.fire_burst(parent, impact_pos, scale_e * 1.2, final_color)
+
+	# OmniLight impact flash — brief bright pop at the detonation point
+	var light = OmniLight3D.new()
+	light.light_color = final_color
+	light.light_energy = (3.0 + scale_e * 4.0) * entropy
+	light.omni_range = 3.0 + scale_e * 4.0
+	light.omni_attenuation = 0.5
+	light.light_bake_mode = Light3D.BAKE_DISABLED
+	parent.add_child(light)
+	light.position = impact_pos
+	var lt = create_tween()
+	lt.tween_property(light, "light_energy", 0.0, 0.15)
+	lt.finished.connect(func(): if is_instance_valid(light): light.queue_free())
 
 	# Heavy detonations leave persistent terrain craters and scorch
 	if custom_scale >= 1.0:
-		VFXEffects.crater(parent, pos, custom_scale * 1.2, 35.0)
-		VFXEffects.scorch(parent, pos, custom_scale * 1.4, 2.0, 15.0)
-
-	var exp = MeshInstance3D.new()
-	exp.mesh = MunitionPool.unit_sphere()
-	exp.scale = Vector3.ONE * (custom_scale * 2.0)
-	exp.material_override = MunitionPool.emissive(color, color)
-	parent.add_child(exp)
-	exp.global_position = pos
-	
-	var tween = create_tween()
-	tween.tween_property(exp, "scale", Vector3.ZERO, 0.12)
-	tween.finished.connect(func(): if is_instance_valid(exp): exp.queue_free())
+		VFXEffects.crater(parent, impact_pos, custom_scale * 1.2, 35.0)
+		VFXEffects.scorch(parent, impact_pos, custom_scale * 1.4, 2.0, 15.0)
 
 func _fire_standard_laser():
 	var laser = MeshInstance3D.new()

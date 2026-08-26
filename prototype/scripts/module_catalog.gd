@@ -201,6 +201,57 @@ const DEFAULT_FIRE_PROFILE = {"fire_rate": 1.0, "fire_range": 15.0, "laser_color
 static func get_fire_profile(type_id: String) -> Dictionary:
 	return WEAPON_FIRE_PROFILES.get(type_id, DEFAULT_FIRE_PROFILE)
 
+# --- Muzzle offsets --------------------------------------------------------
+# Per-weapon muzzle flash position in weapon-local space at default tweaks
+# (caliber=1.0, barrel_length=1.0). Derived from visual_builder.gd's cylinder
+# fallback geometry (muzzle_z = position.z - cylinder_height/2 after PI/2
+# rotation). Y is trunnion height; Z is forward distance to muzzle tip.
+# Weapons with elevation pivots have rotated Y/Z baked in at the pivot angle.
+const DEFAULT_MUZZLE_OFFSET := Vector3(0.0, 0.3, -0.6)
+const MUZZLE_OFFSETS: Dictionary = {
+	"basic_cannon":          Vector3(0.0, 0.26, -1.30),
+	"heavy_machine_gun":     Vector3(0.0, 0.22, -0.85),
+	"rotary_cannon":         Vector3(0.0, 0.24, -1.10),
+	"gauss_railgun":         Vector3(0.0, 0.24, -1.40),
+	"artillery":             Vector3(0.0, 1.29, -1.11),  # 35° elev pivot
+	"mortar_array":          Vector3(0.0, 1.11, -0.55),  # 60° elev pivot
+	"flamethrower":          Vector3(0.0, 0.20, -0.55),
+	"ion_cannon":            Vector3(0.0, 0.26, -0.80),
+	"heavy_laser":           Vector3(0.0, 0.25, -0.75),
+	"plasma_lobber":         Vector3(0.0, 0.67, -0.55),  # 35° elev pivot
+	"ciws":                  Vector3(0.0, 0.32, -0.85),
+	"flak_cannon":           Vector3(0.0, 0.86, -0.58),  # 45° elev pivot
+	"pd_laser":              Vector3(0.0, 0.20, -0.28),
+	"mk19_grenade_launcher": Vector3(0.0, 0.25, -0.56),
+	"autocannon":            Vector3(0.0, 0.24, -0.95),
+	"anti_materiel_rifle":   Vector3(0.0, 0.28, -1.12),
+	"recoilless_rifle":      Vector3(0.0, 0.27, -0.85),
+	"coil_gun":              Vector3(0.0, 0.27, -0.88),
+	"ballista":              Vector3(0.0, 0.36, -0.10),
+	"spigot_mortar":         Vector3(0.0, 0.45, -0.17),  # 50° elev pivot
+	"arc_projector":         Vector3(0.0, 0.35, -0.04),
+	"microwave_emitter":     Vector3(0.0, 0.26, -0.08),
+	"particle_lance":        Vector3(0.0, 0.32, -0.13),
+	"aa_autocannon":         Vector3(0.0, 0.43, -0.06),  # 38° elev pivot
+	"napalm_mortar":         Vector3(0.0, 0.90, -0.50),  # elevated
+	"rocket_artillery":      Vector3(0.0, 0.30, -0.60),
+	"hypervelocity_missile":  Vector3(0.0, 0.30, -0.60),
+	"sam_launcher":          Vector3(0.0, 0.30, -0.60),
+	"drone_carrier":         Vector3(0.0, 0.30, -0.60),
+	"cluster_dispenser":     Vector3(0.0, 0.30, -0.60),
+	"guided_missile":        Vector3(0.0, 0.30, -0.60),
+	"missile_pod":           Vector3(0.0, 0.30, -0.60),
+	"loitering_munition":    Vector3(0.0, 0.30, -0.60),
+	"anti_radiation_missile": Vector3(0.0, 0.30, -0.60),
+	"bunker_buster":         Vector3(0.0, 0.30, -0.60),
+	"cruise_missile":        Vector3(0.0, 0.30, -0.60),
+	"smoke_discharger":      Vector3(0.0, 0.30, -0.30),
+	"mine_layer":            Vector3(0.0, 0.30, -0.30),
+}
+
+static func get_muzzle_offset(type_id: String) -> Vector3:
+	return MUZZLE_OFFSETS.get(type_id, DEFAULT_MUZZLE_OFFSET)
+
 # --- Range tiers -----------------------------------------------------------
 # Chris, 2026-08-03: "even the high range weapons are engaging at about the
 # same distance as everything else. The longest ranged ones should absolutely
@@ -2623,9 +2674,9 @@ static func get_projectile_class(type_id: String) -> String:
 # fall back to weapon_missile.gd's procedural body.
 const GUN_TRACER_VISUALS := {
 	"basic_cannon":       {"radius": 0.05, "length": 0.50, "duration": 0.18, "explode_on_hit": true},
-	"heavy_machine_gun":  {"radius": 0.015, "length": 0.25, "duration": 0.08},
-	"rotary_cannon":      {"radius": 0.012, "length": 0.20, "duration": 0.06, "streak": true},
-	"ciws":               {"radius": 0.010, "length": 0.22, "duration": 0.06, "streak": true},
+	"heavy_machine_gun":  {"radius": 0.015, "length": 0.25, "duration": 0.08, "explode_on_hit": true},
+	"rotary_cannon":      {"radius": 0.012, "length": 0.20, "duration": 0.06, "streak": true, "explode_on_hit": true},
+	"ciws":               {"radius": 0.010, "length": 0.22, "duration": 0.06, "streak": true, "explode_on_hit": true},
 	"autocannon":         {"radius": 0.03, "length": 0.35, "duration": 0.12, "explode_on_hit": true},
 }
 

@@ -1,0 +1,29 @@
+{
+  "name": "Hexton Longspan",
+  "hp": 876.2,
+  "weight": 632.1,
+  "metal": 214,
+  "crystal": 43,
+  "size": [
+    4.2,
+    1.932,
+    6.6
+  ],
+  "color": [
+    0.415,
+    0.482,
+    0.498,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 88.2,
+  "base_power": 6.66,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Hexton Works",
+  "hull_class": "Oddball"
+}

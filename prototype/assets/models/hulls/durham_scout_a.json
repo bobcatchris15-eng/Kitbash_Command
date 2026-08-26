@@ -1,0 +1,29 @@
+{
+  "name": "Durham Courier",
+  "hp": 320.5,
+  "weight": 215.4,
+  "metal": 75,
+  "crystal": 16,
+  "size": [
+    2.5,
+    1.449,
+    4.2
+  ],
+  "color": [
+    0.523,
+    0.498,
+    0.412,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 46.5,
+  "base_power": 3.32,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Durham Motors",
+  "hull_class": "Scout"
+}

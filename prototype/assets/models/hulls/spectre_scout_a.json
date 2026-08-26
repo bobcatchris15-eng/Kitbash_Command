@@ -1,0 +1,29 @@
+{
+  "name": "Spectre Needle",
+  "hp": 296.1,
+  "weight": 197.1,
+  "metal": 69,
+  "crystal": 14,
+  "size": [
+    2.4,
+    1.311,
+    4.3
+  ],
+  "color": [
+    0.388,
+    0.412,
+    0.435,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 44.7,
+  "base_power": 3.18,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Spectre Dynamics",
+  "hull_class": "Scout"
+}

@@ -1,0 +1,29 @@
+{
+  "name": "Durham Gun Mule",
+  "hp": 451.9,
+  "weight": 313.9,
+  "metal": 107,
+  "crystal": 22,
+  "size": [
+    3.0,
+    1.587,
+    5.1
+  ],
+  "color": [
+    0.523,
+    0.498,
+    0.412,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 56.4,
+  "base_power": 4.11,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Durham Motors",
+  "hull_class": "Light"
+}

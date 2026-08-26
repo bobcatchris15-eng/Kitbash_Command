@@ -157,36 +157,32 @@ const ROLES := {
 	# The same argument in red - warning panels, pinch-point markings, the
 	# painted parts of a limb you are meant to stay clear of.
 	"warning": {"metallic": 0.20, "roughness": 0.58, "tint": 0.15, "base": Color(0.55, 0.13, 0.11), "wear": 0.90},
+
+	# Module accent: mount brackets, casings, housings that carry the
+	# player's livery accent colour (hull_stripe zone) while the rest of
+	# the module keeps its catalog colour.  Metallic painted finish so it
+	# reads as factory-applied paint on structural steel.
+	"accent": {"metallic": 0.45, "roughness": 0.50, "tint": 1.0, "zone_tint": 0.92, "base": Color(0.32, 0.33, 0.35), "wear": 0.60},
 }
 
 const DEFAULT_ROLE := "steel"
 
 # --- Livery zones -----------------------------------------------------------
-# Chris's spec is two zones per weapon: ACTION and BARREL. Roles are already
-# the right granularity for that - ROLE_HINTS classifies every part by name -
-# so the zone is a property of the role rather than a second parallel table
-# that would drift from it.
+# Modules keep their catalog colour for body, barrel, action, and substance
+# parts.  Only two roles are zoned:
+#   "accent"  -> hull_stripe  (mount brackets, casings, housings — the
+#                              player's livery accent appears here)
+#   "armor"   -> hull_upper   (bolt-on armor plates match the hull skin)
 #
-# Only these five roles are zoned. The rest are SUBSTANCE roles whose whole
-# job is to be colour-immune: rubber stays black, brass stays brass, optics
-# stay glass, hazard/warning stay their safety convention. Painting those with
-# the player's livery is what would make a unit read as a solid plastic toy
-# rather than as assembled hardware, which is the exact failure part_materials
-# was created to fix.
-#
-# Note this reaches beyond weapons: "steel" and "painted" also cover
-# locomotion frames and utility housings, so those take the action colour too.
-# That is deliberate and reads as one coherent paint scheme across the whole
-# machine - the alternative, colouring guns but not the mounts they sit on,
-# looks like a mistake.
+# Everything else (gunmetal, action, steel, painted, brass, rubber, optics,
+# etc.) is a SUBSTANCE role that keeps its authored colour regardless of
+# livery.  This is what keeps modules from reading as solid plastic toys:
+# a barrel is always gunmetal, a tyre is always black, and only the accent
+# bracket carries the player's team colour.
 const ZONE_BY_ROLE := {
-	"gunmetal": "weapon_barrel",
-	"scorched": "weapon_barrel",
-	"action": "weapon_action",
-	"steel": "weapon_action",
-	"painted": "weapon_action",
+	"accent": "hull_stripe",
 	# Bolt-on armor plates read as the hull's outer skin, so they take
-	# the upper hull's livery colour. hull_upper rather than hull_lower
+	# the upper hull's livery colour.  hull_upper rather than hull_lower
 	# because at RTS zoom what the player sees is the upper silhouette;
 	# the lower zone is mostly the track skirt / running gear, which the
 	# armor plates don't cover.

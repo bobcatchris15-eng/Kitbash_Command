@@ -1,0 +1,29 @@
+{
+  "name": "Spectre Arrowhead",
+  "hp": 625.0,
+  "weight": 443.8,
+  "metal": 151,
+  "crystal": 31,
+  "size": [
+    3.5,
+    1.725,
+    6.0
+  ],
+  "color": [
+    0.388,
+    0.412,
+    0.435,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 69.4,
+  "base_power": 5.15,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Spectre Dynamics",
+  "hull_class": "Medium"
+}

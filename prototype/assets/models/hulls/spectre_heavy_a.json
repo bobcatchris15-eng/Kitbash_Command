@@ -1,0 +1,29 @@
+{
+  "name": "Spectre Halberd",
+  "hp": 1213.7,
+  "weight": 885.3,
+  "metal": 298,
+  "crystal": 60,
+  "size": [
+    4.5,
+    2.277,
+    7.5
+  ],
+  "color": [
+    0.388,
+    0.412,
+    0.435,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 113.5,
+  "base_power": 8.68,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Spectre Dynamics",
+  "hull_class": "Heavy"
+}

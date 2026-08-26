@@ -29,6 +29,10 @@ const FILES := [
 	"res://scripts/ui_radial_menu.gd",
 	"res://scripts/modular_hull_builder.gd",
 	"res://scripts/tweak_callout_manager.gd",
+	"res://scripts/part_materials.gd",
+	"res://scripts/vfx_burst.gd",
+	"res://scripts/weapon_missile.gd",
+	"res://scripts/vfx_effects.gd",
 ]
 
 func _init():

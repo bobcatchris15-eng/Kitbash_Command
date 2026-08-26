@@ -227,6 +227,28 @@ static func make_flame_smoke_emitter(parent: Node3D, length: float = 8.0) -> GPU
 	return p
 
 
+# Dense grey smoke trail behind a missile in flight. Parent to the missile
+# node with local_coords on so it follows the body; position at the rear
+# end (+Z). Created once in _ready(), emitting toggled off on destruction
+# and the emitter freed once the last particle drains.
+static func make_missile_trail(parent: Node3D) -> GPUParticles3D:
+	var p = GPUParticles3D.new()
+	p.name = "MissileTrail"
+	p.amount = 10
+	p.lifetime = 0.25
+	p.emitting = false
+	p.local_coords = false
+	p.draw_pass_1 = _get_quad()
+	p.material_override = _billboard_material(SMOKE_TEX, false, Color(0.6, 0.6, 0.6, 0.5))
+	p.process_material = _process_material(
+		"missile_trail",
+		Vector3(0, 0, 1), 18.0, 1.2, 2.8,
+		Vector3(0, 1.0, 0), 0.12, 0.28, 3.5, 1.8, 1.0)
+	parent.add_child(p)
+	p.emitting = true
+	return p
+
+
 # Thin grey trickle off a module knocked below its damage threshold
 # (module_damage_fx.gd). Continuous like the flame jet, not a one-shot puff:
 # the wound keeps smoking until the module is stripped, so the emitter is
@@ -273,6 +295,34 @@ static func smoke_puff(parent: Node3D, world_pos: Vector3, radius: float = 1.5,
 		"puff|%.1f" % radius,
 		Vector3(0, 1, 0), 75.0, radius * 0.8, radius * 1.6,
 		Vector3(0, 0.8, 0), radius * 0.9, radius * 1.7, 1.6, 2.2, 0.8)
+	parent.add_child(p)
+	p.global_position = world_pos
+	p.emitting = true
+	p.finished.connect(func():
+		if is_instance_valid(p):
+			p.queue_free())
+	return p
+
+
+# One-shot fireball burst for weapon impacts — the particle-driven replacement
+# for the old MeshInstance3D scaling sphere. Additive flame quads read as a
+# bright flash at RTS zoom and dissipate with the flipbook rather than
+# popping to zero size.
+static func fire_burst(parent: Node3D, world_pos: Vector3, radius: float = 1.0,
+		tint: Color = Color(1, 0.8, 0.3, 1)) -> GPUParticles3D:
+	var p = GPUParticles3D.new()
+	p.name = "FireBurst"
+	p.amount = int(clampf(radius * 10.0, 6, 24))
+	p.lifetime = 0.35
+	p.one_shot = true
+	p.explosiveness = 0.9
+	p.emitting = false
+	p.draw_pass_1 = _get_quad()
+	p.material_override = _billboard_material(FLAME_TEX, true, tint)
+	p.process_material = _process_material(
+		"fireburst|%.1f" % radius,
+		Vector3(0, 1, 0), 65.0, radius * 1.5, radius * 3.5,
+		Vector3(0, 2.0, 0), radius * 0.5, radius * 1.2, 1.2, 2.2, 0.8)
 	parent.add_child(p)
 	p.global_position = world_pos
 	p.emitting = true

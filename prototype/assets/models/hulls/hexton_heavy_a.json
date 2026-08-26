@@ -1,0 +1,29 @@
+{
+  "name": "Hexton Twin",
+  "hp": 1358.6,
+  "weight": 993.9,
+  "metal": 334,
+  "crystal": 67,
+  "size": [
+    4.6,
+    2.484,
+    7.6
+  ],
+  "color": [
+    0.415,
+    0.482,
+    0.498,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 124.4,
+  "base_power": 9.55,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Hexton Works",
+  "hull_class": "Heavy"
+}

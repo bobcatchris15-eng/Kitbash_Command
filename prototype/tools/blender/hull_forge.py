@@ -180,6 +180,29 @@ def cant_outline(w, h, shear_top=0.0, shear_bot=0.0, cy=0.0, cx=0.0,
     ]
 
 
+def hex_flat_outline(w, h, top_frac=0.55, bottom_frac=0.55, cy=0.0, cx=0.0):
+    """HEXTON: flat-top hexagon - 6 flat facets, longer than wide extrusion.
+
+    Top and bottom edges are horizontal, mid-sides come to a point at
+    (±w/2, cy). top_frac/bottom_frac scale the top/bottom edge lengths
+    relative to w (0.55 ≈ regular flat-top hex). Irregular hex supported
+    for variant width without losing the 6-sided read."""
+    hh = h / 2.0
+    # Clamp fracs so top/bottom never exceed mid width.
+    tf = max(0.1, min(0.9, top_frac))
+    bf = max(0.1, min(0.9, bottom_frac))
+    tw = w * tf
+    bw = w * bf
+    return [
+        (cx - bw / 2.0, cy - hh),   # 0 bottom-left
+        (cx + bw / 2.0, cy - hh),   # 1 bottom-right
+        (cx + w / 2.0, cy),         # 2 mid-right point
+        (cx + tw / 2.0, cy + hh),   # 3 top-right
+        (cx - tw / 2.0, cy + hh),   # 4 top-left
+        (cx - w / 2.0, cy),         # 5 mid-left point
+    ]
+
+
 def flat_floor_oct_outline(w, h, cut, cy=0.0, cx=0.0):
     """KESTREL: faceted fuselage tube - eight facets, but with a FLAT wide
     floor (a cargo deck was cut into it) and heavier chamfers up top. Reads

@@ -1,0 +1,29 @@
+{
+  "name": "Hexton Picket",
+  "hp": 467.2,
+  "weight": 325.4,
+  "metal": 111,
+  "crystal": 23,
+  "size": [
+    3.0,
+    1.656,
+    5.1
+  ],
+  "color": [
+    0.415,
+    0.482,
+    0.498,
+    1.0
+  ],
+  "domain": "Ground",
+  "base_energy": 57.5,
+  "base_power": 4.2,
+  "base_vision": 20.0,
+  "is_foundation": false,
+  "category": "hull",
+  "visual_yaw_offset_deg": 0.0,
+  "visual_pitch_offset_deg": 0.0,
+  "visual_roll_offset_deg": 0.0,
+  "manufacturer": "Hexton Works",
+  "hull_class": "Light"
+}

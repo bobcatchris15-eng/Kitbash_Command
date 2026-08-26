@@ -750,7 +750,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var pintle: MeshInstance3D
 		var pintle_h = base_size.y * 0.45 * caliber
 		if pintle_mesh:
-			pintle = _mesh_inst(pintle_mesh, base_color.darkened(0.3))
+			pintle = _mesh_inst(pintle_mesh, base_color.darkened(0.3), Color(0, 0, 0, 0), 0.0, "accent")
 			pintle.scale = Vector3(base_w_scale, caliber, caliber)
 			pintle.position = Vector3(0, 0, 0)
 		else:
@@ -830,7 +830,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var pintle: MeshInstance3D
 		var base_w_scale = (1.4 if multi_b else 1.0) * caliber
 		if pintle_mesh:
-			pintle = _mesh_inst(pintle_mesh, base_color.darkened(0.2))
+			pintle = _mesh_inst(pintle_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			pintle.scale = Vector3(base_w_scale, caliber, caliber)
 			pintle.position = Vector3(0, 0, 0)
 		else:
@@ -929,7 +929,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			pintle_mesh = _part("pintle_mount")
 		var pintle: MeshInstance3D
 		if pintle_mesh:
-			pintle = _mesh_inst(pintle_mesh, base_color.darkened(0.2))
+			pintle = _mesh_inst(pintle_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			pintle.scale = Vector3(caliber, caliber, caliber)
 			pintle.position = Vector3(0, 0, 0)
 		else:
@@ -980,7 +980,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(caliber, caliber, caliber)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1047,7 +1047,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("railgun_casemate_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(base_w_scale, caliber, caliber)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1134,7 +1134,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.25))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(base_w_scale, caliber, base_w_scale)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1222,7 +1222,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			pod_mount_mesh = _part("pintle_mount")
 		var pod_mount: MeshInstance3D
 		if pod_mount_mesh:
-			pod_mount = _mesh_inst(pod_mount_mesh, base_color.darkened(0.25))
+			pod_mount = _mesh_inst(pod_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 			pod_mount.scale = Vector3(warhead, warhead, warhead)
 		else:
 			pod_mount = MeshInstance3D.new()
@@ -1310,7 +1310,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(base_w_scale, seeker, seeker)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1384,7 +1384,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var mount: MeshInstance3D
 		var mount_w = 0.8 + (hangar_size - 1) * 0.15
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(mount_w, 1.0, launch_catapult)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1450,7 +1450,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var mount: MeshInstance3D
 		var base_w_scale = (0.85 + (tube_count - 1) * 0.15) * dispersion
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(base_w_scale, payload_size, base_w_scale)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1527,7 +1527,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(1.0, 1.0, 1.0)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1592,7 +1592,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(beam_width, 1.0, beam_width)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1660,7 +1660,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(1.0, 1.0, 1.0)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1728,7 +1728,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(1.0, 1.0, 1.0)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1801,7 +1801,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(caliber, 1.0, caliber)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1867,7 +1867,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(1.0, 1.0, 1.0)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -1934,7 +1934,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var mount: MeshInstance3D
 		var mount_w = (1.0 + (barrel_count - 1) * 0.15) * caliber
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(mount_w, 1.0, caliber)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -2022,7 +2022,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount_mesh = _part("pintle_mount")
 		var mount: MeshInstance3D
 		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2))
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
 			mount.scale = Vector3(scale_mult, scale_mult, scale_mult)
 			mount.position = Vector3(0, 0, 0)
 		else:
@@ -2091,7 +2091,11 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var mount_mesh = _part("sensor_housing_rugged")
 		if not mount_mesh:
 			mount_mesh = _part("sensor_suite_mount")
-		var mount: MeshInstance3D = _mesh_inst(mount_mesh, base_color.darkened(0.2)) if mount_mesh else MeshInstance3D.new()
+		var mount: MeshInstance3D
+		if mount_mesh:
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
+		else:
+			mount = MeshInstance3D.new()
 		mount.position = Vector3(0, 0, 0)
 		parent_node.add_child(mount)
 
@@ -2131,7 +2135,11 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var mount_mesh = _part("sensor_housing_rugged")
 		if not mount_mesh:
 			mount_mesh = _part("sensor_suite_mount")
-		var mount: MeshInstance3D = _mesh_inst(mount_mesh, base_color.darkened(0.25)) if mount_mesh else MeshInstance3D.new()
+		var mount: MeshInstance3D
+		if mount_mesh:
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
+		else:
+			mount = MeshInstance3D.new()
 		mount.scale = Vector3(1.2, 1.0, 1.2)
 		parent_node.add_child(mount)
 
@@ -2183,7 +2191,11 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var mount_mesh = _part("sensor_housing_rugged")
 		if not mount_mesh:
 			mount_mesh = _part("fire_control_radar_mount")
-		var mount: MeshInstance3D = _mesh_inst(mount_mesh, base_color.darkened(0.2)) if mount_mesh else MeshInstance3D.new()
+		var mount: MeshInstance3D
+		if mount_mesh:
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
+		else:
+			mount = MeshInstance3D.new()
 		parent_node.add_child(mount)
 
 		# 2. GIMBAL MAST COLUMN (sensor_pylon_heavy.glb / fire_control_radar_mast.glb)
@@ -2215,7 +2227,11 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 	elif type_id == "energy_barrier_projector":
 		var mount_mesh = _part("energy_barrier_projector_mount")
-		var mount: MeshInstance3D = _mesh_inst(mount_mesh, base_color.darkened(0.2)) if mount_mesh else MeshInstance3D.new()
+		var mount: MeshInstance3D
+		if mount_mesh:
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
+		else:
+			mount = MeshInstance3D.new()
 		parent_node.add_child(mount)
 
 		var array_mesh = _part("energy_barrier_projector_array")
@@ -2233,7 +2249,11 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 	elif type_id == "heavy_barrier_projector":
 		var mount_mesh = _part("heavy_barrier_mount")
-		var mount: MeshInstance3D = _mesh_inst(mount_mesh, base_color.darkened(0.2)) if mount_mesh else MeshInstance3D.new()
+		var mount: MeshInstance3D
+		if mount_mesh:
+			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
+		else:
+			mount = MeshInstance3D.new()
 		parent_node.add_child(mount)
 
 		var turret_pivot = Node3D.new()
@@ -2572,7 +2592,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				if not mount_mesh:
 					mount_mesh = _part("hmg_pintle_mount")
 				if mount_mesh:
-					var mount = _mesh_inst(mount_mesh, base_color.darkened(0.25))
+					var mount = _mesh_inst(mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					mount.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(mount)
 				else:
@@ -2682,7 +2702,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				if not amr_mount_mesh:
 					amr_mount_mesh = _part("pintle_mount")
 				if amr_mount_mesh:
-					var amr_mount = _mesh_inst(amr_mount_mesh, base_color.darkened(0.25))
+					var amr_mount = _mesh_inst(amr_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					amr_mount.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(amr_mount)
 				else:
@@ -2793,7 +2813,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 				var arc_mount_mesh = _part("arc_projector_mount")
 				if arc_mount_mesh:
-					var am = _mesh_inst(arc_mount_mesh, base_color.darkened(0.25))
+					var am = _mesh_inst(arc_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					am.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(am)
 
@@ -2823,7 +2843,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 				var mw_mount_mesh = _part("microwave_mount")
 				if mw_mount_mesh:
-					var mm = _mesh_inst(mw_mount_mesh, base_color.darkened(0.25))
+					var mm = _mesh_inst(mw_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					mm.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(mm)
 
@@ -2854,7 +2874,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 				var pl_mount_mesh = _part("lance_mount")
 				if pl_mount_mesh:
-					var pm = _mesh_inst(pl_mount_mesh, base_color.darkened(0.25))
+					var pm = _mesh_inst(pl_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					pm.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(pm)
 
@@ -2899,7 +2919,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 				var sp_mount_mesh = _part("spigot_mount")
 				if sp_mount_mesh:
-					var spm = _mesh_inst(sp_mount_mesh, base_color.darkened(0.25))
+					var spm = _mesh_inst(sp_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					spm.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(spm)
 
@@ -2942,7 +2962,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 				var ra_mount_mesh = _part("rocket_arty_mount")
 				if ra_mount_mesh:
-					var ram = _mesh_inst(ra_mount_mesh, base_color.darkened(0.25))
+					var ram = _mesh_inst(ra_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					ram.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(ram)
 
@@ -2992,7 +3012,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 
 				var ml_ped_mesh = _part("missile_pedestal")
 				if ml_ped_mesh:
-					var mlp = _mesh_inst(ml_ped_mesh, base_color.darkened(0.25))
+					var mlp = _mesh_inst(ml_ped_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					mlp.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(mlp)
 
@@ -3027,7 +3047,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				var aa_len = tweaks.get("barrel_length", 1.0)
 				var aa_mount_mesh = _part("aa_mount")
 				if aa_mount_mesh:
-					var aam = _mesh_inst(aa_mount_mesh, base_color.darkened(0.25))
+					var aam = _mesh_inst(aa_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					aam.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(aam)
 				# High fixed elevation - it is looking up, which is the point.
@@ -3071,7 +3091,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				if not rr_mount_mesh:
 					rr_mount_mesh = _part("pintle_mount")
 				if rr_mount_mesh:
-					var mount = _mesh_inst(rr_mount_mesh, base_color.darkened(0.25))
+					var mount = _mesh_inst(rr_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					mount.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(mount)
 				else:
@@ -3140,7 +3160,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				if not cg_mount_mesh:
 					cg_mount_mesh = _part("railgun_pintle_mount")
 				if cg_mount_mesh:
-					var mount = _mesh_inst(cg_mount_mesh, base_color.darkened(0.25))
+					var mount = _mesh_inst(cg_mount_mesh, base_color.darkened(0.25), Color(0, 0, 0, 0), 0.0, "accent")
 					mount.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(mount)
 				else:
@@ -3231,7 +3251,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				if not np_mount_mesh:
 					np_mount_mesh = _part("mortar_swivel_mount")
 				if np_mount_mesh:
-					var mount = _mesh_inst(np_mount_mesh, base_color.darkened(0.3))
+					var mount = _mesh_inst(np_mount_mesh, base_color.darkened(0.3), Color(0, 0, 0, 0), 0.0, "accent")
 					mount.scale = Vector3(caliber, 1.0, caliber)
 					parent_node.add_child(mount)
 				else:

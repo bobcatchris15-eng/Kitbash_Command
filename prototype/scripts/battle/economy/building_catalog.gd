@@ -61,17 +61,23 @@ const MANUFACTORY_KINDS: Array[String] = [
 
 const STATS := {
 	"hq": {
-		# A base command building sees furthest - it is the one structure a team
-		# always has, so its reach is what stops a match opening inside a fog
-		# bubble. See Structure.vision_range for why any of these are needed.
-		"vision_range": 34.0,
+		# 2026-08-26 22:14 playtest: bumped from 85 -> 120. A base
+		# command building sees furthest - it is the one structure a
+		# team always has, so its reach is what stops a match opening
+		# inside a fog bubble. Per the playtest: "buildings should be
+		# able to see farther than hulls by default" - hulls typically
+		# see 20-40m (computed from sensor modules in unit.gd), so
+		# the building floor of 80m here means EVERY building out-sees
+		# every hull, with the HQ at 120m reaching 3x the best hull.
+		# See Structure.vision_range for why any of these are needed.
+		"vision_range": 120.0,
 		"hp": 3000.0, "size": Vector3(7, 4, 7), "color": Color(0.75, 0.72, 0.55),
 		"cost_metal": 0, "cost_crystal": 0, "build_time": 0.0,
 		"gives_buildable_area": true, "requires_buildable_area": true,
 		"adjacent_m": DEFAULT_ADJACENT_M,
 	},
 	"refinery": {
-		"vision_range": 22.0,
+		"vision_range": 90.0,
 		# A grain elevator, not a shed. The refinery is where the economy is
 		# visibly happening, so it reads as the largest thing in the base and
 		# its docks are legible from the RTS camera as actual parking bays.
@@ -79,37 +85,10 @@ const STATS := {
 		"cost_metal": 150, "cost_crystal": 0, "build_time": 14.0,
 		"gives_buildable_area": true, "requires_buildable_area": true,
 		"adjacent_m": DEFAULT_ADJACENT_M,
-		# Harvesters dock at numbered bays rather than converging on the origin.
-		# See harvester_fsm.gd - unreserved arrivals are what made the old
-		# implementation jam.
-		#
-		# 7 m, NOT 4.5. The building carves a hole in the navmesh and Recast then
-		# shrinks the walkable surface by the agent radius on top of that, so on a
-		# 5x5 footprint nothing is walkable until roughly 5.5 m from the centre. At
-		# 4.5 m the bays were measurably 0.44-0.98 m OFF the navmesh: no agent
-		# could path to one, they arrived at the nearest walkable point instead,
-		# and docking then depended on the direct-steering fallback closing the
-		# last metre against the building's own collider. It worked by centimetres
-		# (measured closest approach 1.97-1.99 m against a 2.0 m threshold) or it
-		# did not work at all.
-		# 9 m. 7 was already outside the raw footprint, but BUILDING_CLEARANCE
-		# (match_director) later widened every building's navmesh hole to keep
-		# wide hulls off the walls - which moved the walkable edge outward past
-		# the bays again, leaving two of the three measurably off-mesh and
-		# harvesters docking with a 0.1 m margin. That margin is not survivable:
-		# the dock tolerance scales with hull speed, so a SLOWER harvester gets a
-		# smaller one and can never close the gap at all.
-		#
-		# Third re-tune, and the reason these are now DERIVED (see
-		# dock_bays_for() below) rather than written down again: every previous
-		# number was measured against one particular footprint, one particular
-		# BUILDING_CLEARANCE and one particular navmesh grid, and each time one
-		# of those three moved the bays silently went off-mesh again. Enlarging
-		# the refinery moves the first of them, so hardcoding a fourth constant
-		# would just schedule the same bug.
 		"dock_bays": [],
 	},
 	"light_manufactory": {
+		"vision_range": 80.0,
 		"hp": 1400.0, "size": Vector3(5, 2.4, 6), "color": Color(0.68, 0.6, 0.42),
 		"cost_metal": 150, "cost_crystal": 30, "build_time": 16.0,
 		"gives_buildable_area": true, "requires_buildable_area": true,
@@ -117,6 +96,7 @@ const STATS := {
 		"exit_offset": Vector3(0, 0.5, 6.0), "exit_facing": Vector3(0, 0, 1),
 	},
 	"medium_manufactory": {
+		"vision_range": 85.0,
 		"hp": 1800.0, "size": Vector3(6, 3, 8), "color": Color(0.72, 0.55, 0.42),
 		"cost_metal": 220, "cost_crystal": 55, "build_time": 22.0,
 		"gives_buildable_area": true, "requires_buildable_area": true,
@@ -124,6 +104,7 @@ const STATS := {
 		"exit_offset": Vector3(0, 0.5, 7.0), "exit_facing": Vector3(0, 0, 1),
 	},
 	"heavy_manufactory": {
+		"vision_range": 95.0,
 		"hp": 2400.0, "size": Vector3(7.5, 3.8, 10), "color": Color(0.6, 0.42, 0.35),
 		"cost_metal": 320, "cost_crystal": 85, "build_time": 30.0,
 		"gives_buildable_area": true, "requires_buildable_area": true,
@@ -131,6 +112,7 @@ const STATS := {
 		"exit_offset": Vector3(0, 0.5, 8.0), "exit_facing": Vector3(0, 0, 1),
 	},
 	"power_plant": {
+		"vision_range": 75.0,
 		"hp": 1000.0, "size": Vector3(4.5, 4.2, 4.5), "color": Color(0.85, 0.65, 0.2),
 		"cost_metal": 180, "cost_crystal": 40, "build_time": 12.0,
 		"energy_capacity": 20.0,
@@ -138,34 +120,23 @@ const STATS := {
 		"adjacent_m": DEFAULT_ADJACENT_M,
 	},
 
-	# THE TECH TREE. These three feed no production queue - CONTRIBUTORS has no
-	# entry for any of them - and exist purely to be OWNED. ModuleCatalog's
-	# required_building tables name these same three ids on individual hulls,
-	# armour materials, modules and ammo, and DesignCosting.
-	# blueprint_required_buildings() reads a design against them. A design
-	# naming a lab the team has not built cannot be queued - see
-	# ProductionService's prerequisite gate - which is the entire point of a
-	# tech tree: it gates DESIGNS, not queues.
-	#
-	# Escalating cost/build_time/hp mirrors the escalating unlock tier
-	# (tech_lab is the baseline gate on 30 parts, exotics_lab the rarest at 8),
-	# so committing to the top of the tree is also the biggest tempo bet.
+	# THE TECH TREE.
 	"tech_lab": {
-		"vision_range": 20.0,
+		"vision_range": 90.0,
 		"hp": 900.0, "size": Vector3(4.4, 2.9, 4.4), "color": Color(0.42, 0.55, 0.58),
 		"cost_metal": 200, "cost_crystal": 60, "build_time": 18.0,
 		"gives_buildable_area": true, "requires_buildable_area": true,
 		"adjacent_m": DEFAULT_ADJACENT_M,
 	},
 	"physics_lab": {
-		"vision_range": 22.0,
+		"vision_range": 100.0,
 		"hp": 1100.0, "size": Vector3(4.8, 3.8, 4.8), "color": Color(0.45, 0.48, 0.62),
 		"cost_metal": 280, "cost_crystal": 110, "build_time": 26.0,
 		"gives_buildable_area": true, "requires_buildable_area": true,
 		"adjacent_m": DEFAULT_ADJACENT_M,
 	},
 	"exotics_lab": {
-		"vision_range": 24.0,
+		"vision_range": 110.0,
 		"hp": 1300.0, "size": Vector3(5.4, 4.5, 5.4), "color": Color(0.55, 0.38, 0.58),
 		"cost_metal": 340, "cost_crystal": 180, "build_time": 34.0,
 		"gives_buildable_area": true, "requires_buildable_area": true,

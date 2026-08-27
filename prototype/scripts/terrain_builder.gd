@@ -3059,7 +3059,15 @@ static func _spawn_cliff(cliff: Dictionary, parent: Node3D, map_def: Dictionary 
 		cliff_type = "straight"
 	var height_scale: float = WorldScaleScript.for_map(map_def)
 	var cliff_height: float = cliff.get("cliff_height", CLIFF_FALLBACK_HEIGHT) * height_scale
+	# base_y is the SURROUNDING ground level (0 for a plateau cliff
+	# that's INSIDE the plateau's heightmap, since the heightmap
+	# there already returns wall_height). y_offset from the cliff
+	# dict shifts the visual DOWN by that amount so a plateau cliff
+	# sits with its bottom at the surrounding ground (0m) and its
+	# top at wall_height (14m) - a proper wall, not the "opposite
+	# of a ramp" the 2026-08-26 22:14 playtest saw.
 	var base_y: float = _obstacle_ground_y(map_def, cliff.center.x, cliff.center.z)
+	base_y += cliff.get("y_offset", 0.0)
 
 	# Visual mesh: try the authored GLB pool first, fall back to a BoxMesh
 	# with the cliff material. The cliff.gdshader's triplanar projection
@@ -3118,9 +3126,22 @@ static func _spawn_cliff(cliff: Dictionary, parent: Node3D, map_def: Dictionary 
 	# tile-stretched rocks (the same world-space-driven scale that
 	# terrain_ground.gdshader's `map_half_extents` uniform already does
 	# for the heightmap ground).
+	#
+	# 2026-08-26 22:14 playtest fix: previously only `triplanar_scale`
+	# and `cliff_tint` were set; the shader's rock_albedo / rock_normal
+	# / rock_rough samplers were uninitialized so the texture() calls
+	# returned Godot's default white, and cliffs rendered as solid
+	# white blocks (the "what are these white obelisks" complaint).
+	# Load the same rocky_* textures build_ground_material() sets on
+	# the heightmap ground, so a cliff mesh and a steep heightmap face
+	# in the same map read as continuous rock instead of two materials.
 	var mat: ShaderMaterial = ShaderMaterial.new()
 	mat.shader = load("res://shaders/cliff.gdshader")
 	mat.set_shader_parameter("triplanar_scale", 0.2 * height_scale)
+	var cliff_rock_tex = _get_terrain_textures("rocky", "_v1")
+	mat.set_shader_parameter("rock_albedo", cliff_rock_tex.albedo)
+	mat.set_shader_parameter("rock_normal", cliff_rock_tex.normal)
+	mat.set_shader_parameter("rock_rough", cliff_rock_tex.roughness)
 	if cliff.has("cliff_tint"):
 		mat.set_shader_parameter("cliff_tint", cliff.cliff_tint)
 	mesh_inst.material_override = mat
@@ -3284,6 +3305,20 @@ static func _plateau_cliffs(feature: Dictionary) -> Array:
 				"type": "straight",
 				"cliff_height": wall_height,
 				"rotation": side.rotation,
+				# 2026-08-26 22:14 playtest fix: _spawn_cliff positions
+				# the visual at base_y = _obstacle_ground_y(x, z). For
+				# an auto-emitted plateau cliff that's INSIDE the
+				# plateau's heightmap contribution, the heightmap at
+				# the cliff line is already wall_height (e.g. 14m), so
+				# the visual sits at 14m and extends UP to 28m - "the
+				# opposite of a ramp" (per user). The wall has to sit
+				# at the SURROUNDING ground (0m) and extend UP to
+				# wall_height so the visual is a 14m wall from y=0 to
+				# y=14, not from y=14 to y=28. y_offset = -wall_height
+				# achieves that without breaking the rest of
+				# _spawn_cliff (obstacles, hand-authored cliffs, etc.
+				# all use base_y as-is).
+				"y_offset": -wall_height,
 			})
 	# 4 corner_out pieces at the convex corners. The corner cliff's own
 	# footprint is 2x2 so it sits exactly on the corner of the plateau.
@@ -3301,6 +3336,8 @@ static func _plateau_cliffs(feature: Dictionary) -> Array:
 			"type": "corner_out",
 			"cliff_height": wall_height,
 			"rotation": corner_rotations[k],
+			# Same y_offset as the straight pieces - see comment above.
+			"y_offset": -wall_height,
 		})
 	return cliffs
 

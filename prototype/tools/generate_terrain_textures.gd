@@ -287,22 +287,39 @@ static func _eval_shallow_water(x: int, y: int) -> Dictionary:
 	var height = ripple * 0.5
 	return {"color": color, "height": height, "roughness": 0.3}
 
-# Baseline grassland: warm desaturated ochre-green, matte, two-scale noise
-# (coarse mottling + fine grain "for tread-track readability") per
-# VISUAL_ART_DIRECTION.md section 4's "open ground: the neutral baseline"
-# spec - no seams/facets/gloss-pockets like the 5 special-case types, this
-# is meant to disappear into the background most of the time. Baked as
-# absolute color (not a faction-style neutral mask) since, unlike the 5
-# special types, terrain_builder.gd DOES apply a light per-map tint on top
-# of this one (each map's own ground_color) - see build_ground_material().
+# Baseline grassland: GREEN grass (2026-08-26 22:14 playtest fix).
+# The previous `Color(0.32, 0.34, 0.17)` base was olive-green with a
+# strong yellow tint that read as "scrubland" at RTS zoom - exactly
+# what the user said: "ground looks ridiculous, the texture is all
+# yellow-brown dead grass." The grassland_v1/v2/v3 photo variants
+# are still scrubland plates (assets we don't ship a green plate for
+# this pass), but the procedural bake - the texture that fills the
+# default ground where no surface_zone overrides it - now reads as
+# actual grass. The per-map `ground_color` multiplier (each map's own
+# `ground_color` field, multiplied with this baked texture) still
+# lets a map push warmer/cooler, but the base is no longer a
+# yellow-tinted olive.
+# Two-scale noise (coarse mottling + fine grain) for tread-track
+# readability, per VISUAL_ART_DIRECTION.md section 4's "open ground:
+# the neutral baseline" spec. No seams/facets/gloss-pockets - this
+# is meant to disappear into the background most of the time. Baked
+# as absolute color since terrain_builder.gd applies a light per-map
+# tint on top of this one (each map's own `ground_color`) - see
+# build_ground_material().
 static func _eval_grassland(x: int, y: int) -> Dictionary:
 	var seed = 9501
-	var base = Color(0.32, 0.34, 0.17)
+	# Green grass palette: deeper green base, brighter highlights
+	# (lightened mottling), darker shadow (darkened mottling). The
+	# `+grain * 0.05` clamp on the per-pixel variation prevents the
+	# 0.5-amplitude grain from reading as noise speckle at RTS zoom.
+	var base = Color(0.18, 0.32, 0.14)
+	var highlight = Color(0.30, 0.46, 0.20)
+	var shadow = Color(0.10, 0.20, 0.08)
 	var mottle = _periodic_noise2d(float(x) / 40.0, float(y) / 40.0, TEX_SIZE / 40, seed) - 0.5
-	var color = base.lightened(mottle * 0.22) if mottle >= 0.0 else base.darkened(-mottle * 0.22)
+	var color = base.lerp(highlight, mottle + 0.5) if mottle >= 0.0 else base.lerp(shadow, -mottle + 0.5)
 	var height = mottle * 0.5
 	var grain = _periodic_noise2d(float(x) / 4.0, float(y) / 4.0, TEX_SIZE / 4, seed + 1) - 0.5
-	color = color.lightened(grain * 0.07) if grain >= 0.0 else color.darkened(-grain * 0.07)
+	color = color.lerp(highlight, grain * 0.5 + 0.5) if grain >= 0.0 else color.lerp(shadow, -grain * 0.5 + 0.5)
 	height += grain * 0.2
 	return {"color": color, "height": height, "roughness": 0.95} # raised from 0.87 - the material Chris specifically called out as unnaturally shiny/smooth, see file header comment
 

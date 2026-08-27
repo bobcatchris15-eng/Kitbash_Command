@@ -131,6 +131,18 @@
   {"center": [-360.0, 0.0, -60.0], "half_extents": [22.0, 25.0], "surface_type": "gravel"},
   {"center": [180.0, 0.0, -90.0], "half_extents": [22.0, 25.0], "surface_type": "gravel"}
  ],
+ "environment": {
+  "sky_color": [0.45, 0.62, 0.78],
+  "horizon_color": [0.58, 0.70, 0.80],
+  "sun_color": [1.05, 0.95, 0.82],
+  "sun_energy": 1.2,
+  "ambient_light_energy": 0.45,
+  "fog_enabled": true,
+  "fog_density": 0.0008,
+  "fog_aerial_perspective": 0.5,
+  "dof_blur_far_enabled": true,
+  "dof_blur_far_distance": 80.0
+ },
  "resource_nodes": [
   {"amount": 1100, "position": [-400.0, 0.0, 100.0], "type": "metal"},
   {"amount": 1100, "position": [-200.0, 0.0, 0.0], "type": "metal"},

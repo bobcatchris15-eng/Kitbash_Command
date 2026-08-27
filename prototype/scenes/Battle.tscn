@@ -10,8 +10,8 @@
 ; VISUAL polish 2026-08-23: sky_horizon lifted to 0.62 and sky_curve widened
 ; 0.12 -> 0.20 so the horizon gradient sits softer and meets the volumetric
 ; fog without a hard seam. Reads as "thick air" instead of "shader on a box".
-sky_top_color = Color(0.36, 0.40, 0.44, 1)
-sky_horizon_color = Color(0.62, 0.64, 0.66, 1)
+sky_top_color = Color(0.40, 0.48, 0.55, 1)
+sky_horizon_color = Color(0.68, 0.66, 0.60, 1)
 sky_curve = 0.20
 ground_bottom_color = Color(0.16, 0.18, 0.17, 1)
 ground_horizon_color = Color(0.46, 0.48, 0.48, 1)
@@ -22,14 +22,10 @@ sun_angle_max = 30.0
 sky_material = SubResource("ProceduralSkyMaterial_bt")
 
 [sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_bt"]
-; VISUAL polish 2026-08-23: auto-exposure re-enabled. In Godot 4.7 the
-; auto-exposure knob is the *sensitivity* (ISO) form, not the old
-; *exposure_value* (EV) form - the latter is silently dropped at load.
-; Sensitivity 100..800 is Godot's default and gives ~3 stops of headroom
-; for the camera to compress bright sun-lit ground without lifting shadows.
-auto_exposure_enabled = true
-auto_exposure_min_sensitivity = 100.0
-auto_exposure_max_sensitivity = 800.0
+; TW camera: auto-exposure disabled — the wider zoom range (8-200m)
+; causes wild exposure swings that wash out the scene at distance.
+; Fixed exposure gives consistent reads at all zoom levels.
+auto_exposure_enabled = false
 ; VISUAL polish 2026-08-23 (later same day): DOF re-DISABLED. The
 ; re-enabled tilt-shift (distance 200, transition 80) and the follow-up
 ; lightened version (distance height+150, transition lerp 3..12) both
@@ -47,7 +43,7 @@ dof_blur_far_transition = 80.0
 background_mode = 2
 sky = SubResource("Sky_bt")
 tonemap_mode = 4
-tonemap_exposure = 1.0
+tonemap_exposure = 0.9
 ; VISUAL polish 2026-08-23: ambient reverted to sky-aware (source 2).
 ; Was a flat grey at (0.60, 0.61, 0.62) which over-lit shadowed areas
 ; and crushed dynamic range to ~0.4 stops. Sky-aware + the (0.45, 0.50,
@@ -55,9 +51,11 @@ tonemap_exposure = 1.0
 ; reads as "cool sky fill vs warm sun" instead of "bright grey vs
 ; slightly-dimmer bright grey". Decoupled sun_energy dropped 0.35 -> 0.20
 ; to keep the sun's directionality visible against the ambient fill.
+; Reduced ambient_sun_energy 0.20->0.15 and tonemap_exposure 1.0->0.9
+; on 2026-08-26 to reduce washout at TW camera distances.
 ambient_light_source = 2
 ambient_light_color = Color(0.45, 0.50, 0.55, 1)
-ambient_light_sun_energy = 0.20
+ambient_light_sun_energy = 0.15
 ; VISUAL polish 2026-08-23 (later same day): SSAO + bloom REVERTED to
 ; PR-1 / pre-session values. The widened SSAO (0.8/1.4) and the bumped
 ; bloom (0.8/0.05) were the env-stack changes that made the rocky and
@@ -90,24 +88,25 @@ ssil_enabled = false
 ; 1.18/1.06; this is a slightly more conservative grade tuned for a
 ; battlefield palette (less saturation lift, more contrast push). Free
 ; performance-wise (one final tonemap pass).
+; Reduced 1.15/1.08 -> 1.05/1.02 on 2026-08-26 — the old grade was
+; amplifying the already-wrong textures and making the scene harsh.
 adjustment_enabled = true
-adjustment_saturation = 1.15
-adjustment_contrast = 1.08
+adjustment_saturation = 1.05
+adjustment_contrast = 1.02
 ; VISUAL polish 2026-08-23: VOLUMETRIC FOG. The single biggest perceptual
 ; change in this pass - adds the "thick air" / atmospheric perspective
 ; that makes a scene read as photographed rather than viewport-previewed.
-; Density 0.0035 tuned against the 1200m ground box (so map edges around
-; 200-300m fade into sky-tinted haze, not a wall). Length 300 covers the
-; full fog depth without the 64m default cutting off behind the camera.
-; Albedo integration off (gi_inject=0, ambient_inject=0) because the
-; sky-aware ambient already does the read.
+; Reduced density 0.0035->0.0012 and length 300->250 on 2026-08-26 for
+; the TW-style camera (max_height=200). The old settings washed out the
+; entire scene at moderate zoom — fog should be a subtle horizon haze,
+; not a blanket.
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.0035
-volumetric_fog_length = 300.0
+volumetric_fog_density = 0.0012
+volumetric_fog_length = 250.0
 volumetric_fog_detail_spread = 2.0
 volumetric_fog_gi_inject = 0.0
 volumetric_fog_ambient_inject = 0.0
-volumetric_fog_sky_affect = 1.0
+volumetric_fog_sky_affect = 0.6
 volumetric_fog_height = 0.0
 volumetric_fog_height_density = 0.0
 ; VISUAL polish 2026-08-23: screen-space AA. In Godot 4.7, `screen_space_aa`
@@ -152,7 +151,7 @@ shadow_normal_bias = 0.8
 shadow_blur = 1.2
 light_3d_mode = 1
 light_color = Color(1, 0.97, 0.90, 1)
-light_energy = 0.8
+light_energy = 0.7
 light_angular_distance = 5.0
 
 [node name="Camera3D" type="Camera3D" parent="."]

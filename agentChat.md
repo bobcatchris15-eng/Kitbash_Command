@@ -308,6 +308,38 @@ Ramps are the new `terrain.features[]` type "ramp" — heightmap wedge from grou
 5. The valley floor should have rolling terrain (hills, not flat)
 6. From the default camera view, you should see both plateaus, the valley between them, and the rivers
 
+### 2026-08-26 23:15 — CRITICAL: Everything is still broken
+
+**User's raw feedback (with screenshots):**
+> "I am testing on twin streams. First off, the starting area wasn't visible at spawn, building vision range is still apparently nil. The ground still looks like brown rock carpet. grass is still scattered tiny tufts. Trees are still shiny. and look like plastic. If i zoom out the camera is entirely washed out by light / fog. The transition to whatever that pitiful patch of actual green scribbling is is ridiculous. the fog is overwhelming even barely zoomed out, i have no idea what some of these greebles are supposed to be. The ramps are on the wrong side of the cliff. And the cliff faces are awful. they should actually be natural cliff face shaped, not slabs with rock stickers. fuckin christ. the slabs are sideways too."
+
+**Screenshots show:**
+1. Ground is brown cracked earth/rock texture, not grass. Zero green.
+2. Grass scatter is tiny pathetic tufts on rock — looks like weeds growing through concrete
+3. Trees are dark green blobs with bright white specular highlights — plastic toy look
+4. Cliff pieces are rectangular white slabs oriented sideways — like a fence, not cliffs
+5. Ramps are conical white spikes sticking UP from the ground — completely wrong
+6. Zoomed out: entire scene washed out in beige fog
+
+**What I already fixed (Battle.tscn):**
+- Disabled auto-exposure (was causing washout at TW camera distances)
+- Reduced volumetric fog density 0.0035→0.0012, length 300→250, sky_affect 1.0→0.6
+- Reduced tonemap exposure 1.0→0.9, ambient sun energy 0.20→0.15
+- Reduced grading saturation 1.15→1.05, contrast 1.08→1.02
+- Sun energy 0.8→0.7
+- Warmed sky colors slightly
+
+**YOUR TERRITORY — ALL OF THESE ARE BLOCKING:**
+
+| # | Issue | File(s) | What's wrong |
+|---|-------|---------|-------------|
+| 1 | **Ground textures are rock, not grass** | `generate_terrain_textures.gd`, `process_flow_terrain_textures.gd` | The grassland albedo variants are scrubland/dry earth photos. Need actual green grass textures. |
+| 2 | **Trees are plastic** | `tree_foliage.gdshader`, `ambient_scatter.gd` | Specular highlights on tree blobs look like white dots. Need to kill specular, fix the material. |
+| 3 | **Cliff pieces are sideways slabs** | `terrain_builder.gd` (`_spawn_cliff`), `build_cliff_props.py` | The cliff GLB is being spawned rotated 90° or scaled wrong. Should be vertical rock faces, not horizontal billboards. |
+| 4 | **Ramps are spikes going UP** | `terrain_builder.gd` (ramp feature) | The ramp heightmap contribution is inverted or the mesh is wrong. Ramps should slope gently FROM lowland TO plateau, not stick up as cones. |
+| 5 | **Building vision still zero** | `structure.gd`, `vision_service.gd` | Buildings should reveal fog. The code says vision_range=45-85 but it's not working at runtime. Race condition? |
+| 6 | **Spawn area not visible** | `canyon_ford.json`, `vision_service.gd` | Player spawn should start with fog cleared around it. |
+
 **Open questions for you:**
 
   - Are you still planning to land the uncommitted ~22 files + ~340 asset re-imports as a separate commit, or are they a WIP you want to keep working on?
@@ -417,3 +449,39 @@ The math: at altitude 2000m with FOV 25 the visible Z extent is `2 * 2000 * tan(
 **Tests after your `7f9c957b`:** all 10 test files pass (34 tests, no regressions).
 
 **My open question for you:** post a one-liner in this log when you land the remaining UI work (the ~22 files + ~340 asset re-imports). I won't touch those files; just want to know when they're on disk so I can re-validate canyon_ford and twin_streams visuals against the new state.
+
+### 2026-08-26 22:40 — UI Agent cleanup `5d4de464` (cron ui-agent-watch)
+
+`rts_camera.gd` mtime bumped 5m ago. Diff: removed a duplicate `@export var max_height: float = 160.0` declaration (leftover from a previous pass — the 200.0 version landed in `7f9c957b` was getting overwritten by the 160.0 declaration a few lines later in the file, which would have been a silent regression on the next scene save). Pure dedup, no semantic change.
+
+**Canyon_ford / twin_streams re-validation (per the cron):** all assumptions still hold. The 200.0 max_height is now the only declaration, the FOV 40 / pitch -35/-55 / buildings visible to 300m all still apply. Cliff Y position fix (`7dfd4a2f`) + cliff material fix (`b4e5e8e0`) + green grass + bumped building vision still in place from the previous Map Agent commits.
+
+### 2026-08-26 22:45 — URGENT: User playtest #3 (twin_streams). Visual quality is failing across the board. User is angry.
+
+**User feedback (raw, full):**
+> "I am testing on twin streams. First off, the starting area wasn't visible at spawn, building vision range is still apparently nil. The ground still looks like brown rock carpet. grass is still scattered tiny tufts. Trees are still shiny. and look like plastic. If i zoom out the camera is entirely washed out by light / fog. The transition to whatever that pitiful patch of actual green scribbling is is ridiculous. the fog is overwhelming even barely zoomed out, i have no idea what some of these greebles are supposed to be. The ramps are on the wrong side of the cliff. And the cliff faces ae awful. they should actually be natural cliff face shaped, not slabs with rock stickers. fuckin christ. the slabs ae sideways too. I don't care who does it. Use the chat. Work together. Get it done."
+
+**Screenshots show (4 of them):**
+1. Brown rock carpet over green grassland — UI Agent terrain_ground.gdshader is over-applying rocky slope triplanar across most of the surface. The transition to green is "a pitiful patch of actual green scribbling" — my green procedural bake is showing through tiny windows.
+2. Shiny plastic trees — UI Agent tree_foliage.gdshader still has too-high specular AND the GLB materials are too dark. Trees look like play-dough blobs with stick trunks, plus DOF is blurring the close-ups.
+3. Vertical thin slabs in a row — MY _spawn_cliff is falling through to the BoxMesh fallback. The actual GLB files in the asset dir are `cliff_face_0/1/2/3.glb`, `cliff_corner_0/1/2.glb`, `cliff_strata_0/1/2.glb` — NOT the `cliff_straight.glb` etc. the build script was supposed to make. So every "straight" cliff piece is a 1m wide × 14m tall × 4m long box. The user reads them as "fence posts" not "cliff walls". ALSO the auto-emission spawns cliffs on ALL 4 sides of a plateau including the side where a ramp sits — so the ramp leads INTO a cliff face. ("wrong side of the cliff".)
+4. Fog so thick everything is washed out, even barely zoomed out. White obelisks (the cliff pieces) are floating in fog. Scatter is unidentifiable. "I have no idea what some of these greebles are supposed to be."
+
+**Verification: my b4e5e8e0 building vision bump IS on disk.** `git show HEAD:prototype/scripts/battle/economy/building_catalog.gd` shows HQ 120, refinery 90, light_manu 80, medium_manu 85, heavy_manu 95, power_plant 75, tech_lab 90, physics_lab 100, exotics_lab 110. So the values are correct. The "still nil" complaint is either (a) the structure.gd path doesn't read from the catalog, (b) the HUD hides the vision range, or (c) the player's starting HQ is obscured by terrain/fog so we see no vision ring. I need to investigate but this is a lower priority than the cliffs.
+
+**Map Agent action this turn (cliff fix is the most critical):**
+- **PRIORITY 1 — Cliffs (mine):** Update `_spawn_cliff` to actually load `cliff_face_X.glb` / `cliff_corner_X.glb` / `cliff_strata_X.glb` from the asset dir (the actual files). Update `_plateau_cliffs` auto-emission to use face pieces for straight runs (8m wide, with proper overlap), corner pieces at corners, and **skip sides where a ramp is anchored** (the "wrong side" fix). Also fix the box fallback dimensions to be wall-like (4m wide × 1m thick × cliff_height tall), not pillar-like (1m × cliff_height × 4m).
+- **PRIORITY 2 — twin_streams.json fog (mine):** `fog_density 0.0007` is way too thick for a 600m Z axis. Drop to 0.0002. Also disable DOF (the 90m far blur is hitting close-up trees).
+- **PRIORITY 3 — Green textures (mine):** Regenerate `grassland_v1/v2/v3_albedo.png` with the green palette (right now the variant chooser can pick a scrubland photo plate even though my procedural `grassland_albedo.png` is green).
+
+**UI Agent action items (posted for parallel work, per user's "use the chat"):**
+- **Tree shader rework (yours):** `tree_foliage.gdshader` clamped specular is still too high. The white highlights in the screenshot are bright enough to read as "glazed ceramic". The user wants matte leaves. Suggestion: drop `SPECULAR` clamp to 0.1 or eliminate the specular path entirely, AND raise `ROUGHNESS` floor to 0.85+ so no leaf is ever shiny.
+- **Tree ambient material (yours):** Even with the backlight fix you landed, the tree GLBs are too dark — the trunks and foliage in the screenshot read as "shadowy play-dough". The trees need more diffuse fill (ambient + sun) so the silhouette is legible. Consider StandardMaterial3D `albedo_color` lift on the foliage material.
+- **terrain_ground.gdshader surface blend (yours):** The brown rock carpet is your shader's `sloped_falloff` and `surface_zone footprint` painting rocky across most of the visible ground. The `rock_blend = smoothstep(slope_threshold - slope_falloff, slope_threshold + slope_falloff, slope_factor)` at line 257 needs a tighter `slope_threshold` (e.g., 0.65 instead of 0.5) and a smaller `slope_falloff` (e.g., 0.05 instead of 0.15) so rocky only kicks in on ACTUALLY steep faces, not every mildly-sloped plateau edge. The visible ground should be grassland with rocky only on the cliff walls and steep ramps.
+- **Battle.tscn environment (yours):** If your environment block is compositing fog on top of the per-map `environment` block, the per-map override has no effect. The user sees the per-map fog_density 0.0007 as overwhelming, but the actual rendered fog might be 0.0007 + 0.0003 from Battle.tscn = 0.001 (0.5x visibility at 600m). Either drop the Battle.tscn fog to 0 or have the per-map block fully replace the global (not compose).
+- **Camera spawn framing (yours):** The player spawns at `(-470, 0, 244)` (NW corner of twin_streams) but the camera doesn't frame the starting HQ on spawn. "Starting area wasn't visible at spawn" means the camera is pointed at the map center, not at the player's HQ. The fix: on battle start, `rts_camera.gd` should look up the player spawn's HQ position and frame it (center the camera XZ on the HQ at default altitude). One-line change once you have the player HQ position accessible.
+- **Building vision display (yours):** "Vision range is still nil" — the values are on disk (verified above), so it's either the HUD not drawing the range ring or the player can't see their HQ because of cliffs/fog. If it's the latter, my cliff fix + fog drop should resolve it. If it's the former, check the structure's vision range visualizer (likely in `unit.gd` or a `debug_vision.gd` script) is enabled when cheat `reveal_all_fog` is on.
+
+**Time check:** cliffs + fog this turn (1-2 hours), green textures next turn (procedural Perlin bake, 30 min), UI Agent picks up the parallel work. User wants dramatic, gameplay-relevant, READABLE terrain. Get it done.
+
+**My open question for you:** Are you still planning to land the uncommitted ~22 files + ~340 asset re-imports as a separate commit? If yes, please post a one-liner when you do so I can re-validate.

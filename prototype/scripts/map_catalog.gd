@@ -461,6 +461,32 @@ const FIELD_SPEC: Dictionary = {
 		"type": {"type": "string", "required": false, "enum": ["rock", "building", "fortification", "depot", "relay", "crater"]},
 		"building_height": {"type": "number", "required": false, "min": 0.01, "scale": true},
 	}},
+	# Cliff mesh pieces (canyon_ford PR1, 2026-08-26). Hybrid heightmap+mesh
+	# approach: heightmap handles ≤60° slopes, this array declares
+	# hand-placed vertical faces the heightmap can't represent. Each cliff is
+	# a StaticBody3D on BattleLayers.TERRAIN so the ground navmesh bake
+	# reads it as an impassable hole and the vision_service LOS raycast
+	# (TERRAIN | BUILDINGS) reads it as visual cover - same dual role
+	# `obstacles` play today. Deliberately Vector2 half_extents (not
+	# Vector3) - the footprint is a ground rect, Y is `cliff_height`, and
+	# a stray Y in half_extents would silently pass validation (Z would
+	# be checked, the Y component ignored), the same trap `base_zones`
+	# already addresses in its own comment.
+	#
+	# `type` controls which GLB piece the runtime loads. Today the
+	# authored pool is straight / corner_in / corner_out / end (PR1 ships
+	# with a primitive-box fallback for each so the schema validates and
+	# the spawn runs before the Blender regen produces the .glb files).
+	# `rotation` is in radians, around the Y axis, so a "straight" piece
+	# can face any cardinal direction.
+	"cliffs": {"type": "array", "required": false, "item": {
+		"center": {"type": "vector3", "required": true, "scale": true},
+		"half_extents": {"type": "vector2", "required": true, "scale": true},
+		"type": {"type": "string", "required": false, "enum": ["straight", "corner_in", "corner_out", "end"]},
+		"cliff_height": {"type": "number", "required": false, "min": 0.5, "scale": true},
+		"rotation": {"type": "number", "required": false},
+		"cliff_tint": {"type": "color", "required": false},
+	}},
 	# Never previously in FIELD_SPEC at all, despite terrain_builder.gd's
 	# _hill_contribution() reading it unconditionally on every non-heightmap
 	# map - a hill authored at radius=20 rendered at exactly radius=20
@@ -545,6 +571,15 @@ const FIELD_SPEC: Dictionary = {
 		"center": {"type": "vector3", "required": true, "scale": true},
 		"half_extents": {"type": "vector2", "required": true, "scale": true},
 	}},
+	# CORE_DESIGN_LANGUAGE.md §3.2: per-map environment-scale multiplier.
+	# Already read by _apply_world_scale() and WorldScaleScript.for_map();
+	# formally declared here so the schema validator stops flagging it
+	# as an "Unknown field" (canyon_ford PR1, 2026-08-26). Not
+	# "scale": true on purpose - it IS the scale, scaling itself would
+	# be circular. A min of 0.1 keeps the math sane; max is left open
+	# so 16x (the project's stated target) validates without bumping
+	# the cap every time world_scale.gd's DEFAULT moves.
+	"world_scale": {"type": "number", "required": false, "min": 0.1},
 	"schema_version": {"type": "number", "required": true, "min": 1},
 	# Reserved fields (B3): not authored by any of the 8 bundled maps yet,
 	# so deliberately shallow specs (no "item") - just type-checked, not
@@ -569,6 +604,18 @@ const FIELD_SPEC: Dictionary = {
 		"heightmap": {"type": "string", "required": false},
 		"surfacemap": {"type": "string", "required": false},
 		"height_scale": {"type": "number", "required": false, "min": 0.01, "scale": true},
+		# canyon_ford PR2 (2026-08-26): explicit pixels-per-world-unit
+		# for the heightmap PNG. Default in build_terrain.py is 1.0;
+		# canyon_ford will use 2.0 on its bluff/plateau segments so the
+		# navmesh bake reads a 60-degree slope as walkable-slow (not as
+		# the binary "blocked" the 1px/unit quantization would give at
+		# the same authored slope). Not "scale": true on purpose - the
+		# pixel count is in pixel-space, not world-space, and the
+		# world_scale multiplier is applied separately by build_terrain.py
+		# at bake time (the heightmap is a baked asset, scale-relative
+		# in its dim calculation, see _sample_heightmap_bilinear at
+		# terrain_builder.gd:436).
+		"pixels_per_unit": {"type": "number", "required": false, "min": 0.25, "max": 8.0},
 		"features": {"type": "array", "required": false},
 		"noise": {"type": "dictionary", "required": false},
 		"erosion": {"type": "dictionary", "required": false},

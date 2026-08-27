@@ -45,7 +45,6 @@ const MatchStatsScript = preload("res://scripts/battle/match_stats.gd")
 const AfterActionReportScript = preload("res://scripts/after_action_report.gd")
 const PerfHUDScript = preload("res://scripts/perf_hud.gd")
 const PerfToastScript = preload("res://scripts/battle/perf_toast.gd")
-const AdminMenuScript = preload("res://scripts/battle/hud/admin_menu.gd")
 const DebugOverlayScript = preload("res://scripts/battle/hud/debug_overlay.gd")
 const BattleFinishScript = preload("res://scripts/battle/battle_finish.gd")
 const Profiler = preload("res://scripts/battle/battle_profiler.gd")
@@ -153,7 +152,6 @@ var _render_frames: int = 0
 var _physics_frames: int = 0
 var _physics_frames_at_sample: int = 0
 var _perf_sample_accum: float = 0.0
-var admin_menu: Control = null
 var debug_overlay: Control = null
 
 # Emitted once the match is genuinely playable: terrain baked, units spawned, HUD
@@ -1082,6 +1080,26 @@ func terrain_height_at(pos: Vector3) -> float:
 
 func get_surface_type_at(pos: Vector3) -> String:
 	return TerrainBuilder.get_surface_type_at(current_map, pos)
+
+# canyon_ford PR3 (2026-08-26): the controller-level mirror of
+# TerrainBuilder.slope_class_at(). Unit composition logic calls
+# through the controller (not terrain_builder directly) so the unit
+# test fixtures that build a unit without a real match_director still
+# get the existing "no controller -> 1.0 fallback" behavior. The
+# returned string is one of "walkable" / "walkable_slow" / "impassable"
+# - keys that match SLOPE_SPEED_MULTIPLIERS in module_catalog.gd, so
+# _recalculate_terrain_speed_multiplier can compose the two tables
+# without any further translation. An empty string means "no
+# map_def" - same fallback contract as get_surface_type_at.
+func get_slope_class_at(pos: Vector3) -> String:
+	if current_map.is_empty():
+		return ""
+	# TerrainBuilder.slope_class_at() takes (map_def, x, z) - unwrap
+	# the Vector3 here so the controller API stays Vector3-friendly
+	# for unit.gd callers (which has a global_position, not two
+	# floats) without forcing terrain_builder to special-case the
+	# Vector3 shape.
+	return TerrainBuilder.slope_class_at(current_map, pos.x, pos.z)
 
 
 # --- Units ------------------------------------------------------------------
@@ -4252,19 +4270,47 @@ func _handle_key(event: InputEventKey) -> void:
 		_toggle_perf_hud()
 	elif event.is_action_pressed("sys_perf_dump"):
 		_dump_perf_now()
+	# ui_cancel used to call admin_menu.toggle() here. The OLD pause menu has
+	# been replaced by SystemLayer (scripts/ui/system_layer.gd, the autoload
+	# autoload list in project.godot) - that script's header documents it as
+	# "the one place Escape ends up". The new flow is: the system layer
+	# reaches into this scene via duck-typed handle_cancel() (see below), and
+	# only opens its own menu when handle_cancel returns false. placement
+	# and selection cleanup stay here because they are gameplay state, not
+	# menu state.
 	elif event.is_action_pressed("ui_cancel"):
-		if admin_menu != null and admin_menu.is_open():
-			admin_menu.toggle()
-			return
-		if is_placing():
-			cancel_placement()
-			return
-		if not selection.selected.is_empty() or _attack_move_armed:
-			_set_armed(false)
-			selection.clear()
-			return
-		if admin_menu != null:
-			admin_menu.toggle()
+		if _handle_cancel_in_game():
+			get_viewport().set_input_as_handled()
+
+
+# --- Escape contract ---------------------------------------------------------
+#
+# The autoloaded SystemLayer (scripts/ui/system_layer.gd) calls this when
+# ui_cancel fires and the current scene is a match. Returning true means
+# "I consumed it" - the system layer will NOT open its pause menu. Returning
+# false lets the system layer open.
+#
+# PRIORITY. Placement (a build ghost on the cursor) outranks selection
+# (army selected, awaiting orders) because the player who just clicked a
+# building to start placing almost never means to ALSO drop their selection;
+# clearing the army in that case would be two actions from one keypress.
+# The previous direct-call in _unhandled_input (admin_menu.toggle) used the
+# same priority, so the order of "did this consume Escape" matches the old
+# behaviour exactly - only the menu it falls through to has changed.
+func handle_cancel() -> bool:
+	return _handle_cancel_in_game()
+
+
+func _handle_cancel_in_game() -> bool:
+	if is_placing():
+		cancel_placement()
+		return true
+	if not selection.selected.is_empty() or _attack_move_armed:
+		_set_armed(false)
+		selection.clear()
+		return true
+	# Nothing in-game to cancel. Fall through to the system pause menu.
+	return false
 
 
 # F3, matching Skirmish. Built on demand rather than left always-on for the
@@ -4721,7 +4767,6 @@ func _build_hud() -> void:
 	var enable_production: bool = _match_rule_set.enable_production_hud if _match_rule_set != null else true
 	var enable_minimap: bool = _match_rule_set.enable_minimap if _match_rule_set != null else true
 	var is_debug := OS.has_feature("editor") or OS.is_debug_build() or "--cheats" in OS.get_cmdline_args()
-	var enable_admin_menu: bool = (_match_rule_set.enable_admin_menu if _match_rule_set != null else true) and is_debug
 
 	# The drag-select rectangle. Lives on the layer rather than inside the HUD
 	# because it is a cursor artefact, not chrome - it has to be able to draw
@@ -4749,29 +4794,26 @@ func _build_hud() -> void:
 		_hud_hint = hud.hint_label
 		hud.deck.visible = enable_production
 		hud.minimap.visible = enable_minimap
+		# Test Range dims the non-test-unit chrome so the player's attention
+		# stays on the unit under test. Set after setup() so the regions exist
+		# when the dim is applied.
+		if _match_rule_set != null and int(_match_rule_set.mode) == int(MatchRuleSetScript.Mode.TEST_RANGE):
+			hud.set_test_range_mode(true)
 
-	if enable_admin_menu:
-		admin_menu = AdminMenuScript.new()
-		admin_menu.name = "AdminMenu"
-		# Into the HUD's column when there is a HUD, so it shares the centred,
-		# ultrawide-capped layout and lands in the strip the alert log leaves for
-		# it. Onto the bare layer otherwise (Test Range, or a rule set with the
-		# HUD off), where it falls back to anchoring against the viewport.
-		if hud != null:
-			hud.attach_to_column(admin_menu)
-		else:
-			layer.add_child(admin_menu)
-		admin_menu.main_menu_requested.connect(func():
-			var router = get_node_or_null("/root/SceneRouter")
-			if router != null:
-				router.goto("res://scenes/MainMenu.tscn")
-			else:
-				get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
-		admin_menu.quit_requested.connect(func(): get_tree().quit())
+	# WHAT USED TO LIVE HERE. The old in-battle pause menu (admin_menu.gd) was
+	# a chamfered-bakelite plate spawned here and toggled by the ui_cancel
+	# branch in _unhandled_input. SystemLayer (autoloaded CanvasLayer at
+	# layer 120) replaces it: same one-menu-per-match contract, but rendered
+	# at a centred modal layout above every in-scene CanvasLayer. The
+	# autoload's _unhandled_input fires before this scene's (autoloads
+	# precede the current scene under /root), and its handle_cancel()
+	# delegation gives the placement/selection cleanup the old code did
+	# inline. The CHEAT panel from F2 lives on as the only debug overlay
+	# spawned here.
 
 	# Dev-only: the F2 Debug overlay (infinite resources / instant build /
-	# reveal all fog). Same is_debug gate the admin menu uses so a release
-	# build never ships with the cheats on screen. The toggles write to
+	# reveal all fog). The is_debug gate stops a release build from
+	# shipping with the cheats on screen. The toggles write to
 	# the DebugSettings autoload; gameplay services read it defensively
 	# (economy_service.gd:70, production_service.gd:114, vision_service.gd:258).
 	if is_debug:

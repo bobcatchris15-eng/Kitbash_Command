@@ -127,46 +127,10 @@ var _grid_obstacles: PackedFloat32Array = PackedFloat32Array()
 # _update_shroud scan. The shroud image is 120x120 -> 80x80 on lake_crossing;
 # the minimap re-samples it (its own texture, see hud_minimap.gd) so the
 # change is invisible to the player.
-const GRID_CELL := 6.0
-# Playtest: "the VISION needs to be brighter in comparison to the non-visible
-# parts of the explored map." Currently-visible ground is alpha 0 - fully clear,
-# and already as bright as the terrain itself gets - so the contrast has to come
-# from the other end: explored-but-not-currently-visible is dimmed harder.
-# Raised 0.55 -> 0.74, which keeps remembered terrain legible (that is the whole
-# point of explored state persisting) while making the lit, actively-seen area
-# read as unmistakably the live one.
-const EXPLORED_ALPHA := 0.74
+const GRID_CELL := 2.0
+const EXPLORED_ALPHA := 0.38
 const UNEXPLORED_ALPHA := 1.0
-# THE SHROUD IS SCREEN-SPACE, and this is its third design. The history is
-# worth keeping because each step failed for a reason the next one had to fix:
-#
-#   1. A flat plane. Had to sit above the HIGHEST ground anywhere on the map or
-#      hilltops rendered through it. Fine while maps were nearly flat.
-#   2. A mesh conforming to height_at() at a small local clearance, because (1)
-#      left the fog floating like a ceiling over every low-lying area once maps
-#      had real hills and ravines.
-#
-# (2) fixed the terrain, but a sheet lying ON the ground can only ever hide the
-# ground. Anything TALLER than its clearance punches straight through, and the
-# terrain layer is now full of exactly that: trees, boulders, rock spires,
-# cliff facades, buildings, resource nodes. The playtest report - fog "only
-# covers the base ground" - is that geometry, not a bug in the sheet.
-#
-# Raising the sheet cannot fix it. Any clearance high enough to cover the
-# tallest prop is a ceiling again, and the cure re-introduces (1).
-#
-# So the fog is no longer geometry in the world at all. It is a fullscreen pass
-# that reads the depth buffer, reconstructs each pixel's world position, and
-# looks that up in the same shroud texture as before. Whatever is nearest the
-# camera at that pixel gets fogged, at any height - ground, a tree's canopy, a
-# cliff face, a unit - because the test is "where is this pixel in the world",
-# not "is this pixel under the sheet".
-#
-# Two consequences worth knowing:
-#   - The conforming mesh, and with it the per-map shroud mesh build, is gone.
-#     One quad replaces a grid that spanned the entire map.
-#   - Sky pixels are skipped (nothing was drawn there to fog), so the horizon
-#     stays clear instead of the fog climbing up it.
+
 const SHROUD_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_mix, cull_disabled, depth_draw_never, depth_test_disabled, shadows_disabled, fog_disabled;
@@ -176,7 +140,7 @@ render_mode unshaded, blend_mix, cull_disabled, depth_draw_never, depth_test_dis
 uniform sampler2D shroud_tex : hint_default_black, filter_linear, repeat_disable;
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
 uniform float map_half = 80.0;
-uniform vec3 fog_color = vec3(0.015, 0.015, 0.02);
+uniform vec3 fog_color = vec3(0.02, 0.025, 0.035);
 
 void vertex() {
 	// Drive clip space directly so the quad covers the viewport wherever the
@@ -804,6 +768,14 @@ func _has_cell_los(from_eye: Vector3, to_target: Vector3, is_flying: bool = fals
 
 
 func _has_line_of_sight(from_pos: Vector3, to_pos: Vector3, ignore_smoke: bool = false) -> bool:
+	# Reveal-All-Fog cheat short-circuits LOS entirely. is_visible_to_team
+	# already returns true under the same flag, but the LOS raycast against
+	# terrain/buildings is a separate path (used by AI targeting and
+	# sensor-fog tests) and would otherwise still gate firing through walls.
+	# The user-visible contract for the cheat is "no vision restrictions",
+	# which means BOTH paths must open.
+	if _reveal_all_cheat():
+		return true
 	if _controller == null or not _controller.is_inside_tree():
 		return true
 	var space: PhysicsDirectSpaceState3D = _controller.get_world_3d().direct_space_state
@@ -897,6 +869,18 @@ func _world_to_cell(x: float, z: float) -> Vector2i:
 # probe pins it - pass a negative budget.
 func _update_shroud(local_constructs: Array, beacons: Array, budget_ms: float = -1.0) -> void:
 	if _texture == null:
+		return
+	# Reveal-All-Fog cheat also drops the visual shroud. is_visible_to_team
+	# already short-circuits to true under this flag, so units show in the
+	# spotted list and AI sees everything; without this, the world itself
+	# stays blacked-out wherever a viewer disc would not have reached, and
+	# the player sees their units as "still in fog" - the half-state the
+	# cheat was originally written to avoid (its 2026-08-26 contract is
+	# "shroud gone AND no vision restrictions").
+	if _reveal_all_cheat():
+		_image.fill(Color(0.0, 0.0, 0.0, 0.0))
+		_shroud_dirty = true
+		_flush_shroud_texture()
 		return
 	var geo := _los_geom_version
 	var seen_ids := {}

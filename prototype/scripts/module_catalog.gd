@@ -1227,13 +1227,35 @@ static func _build_catalog_literal() -> Dictionary:
 		"energy_barrier_projector": {
 			"name": "Energy Barrier Projector",
 			"category": "armor",
+			"description": "Directional facet barrier projector. Projects an energy arc forcefield across the mounted hull facet that absorbs incoming damage until depleted.",
 			"required_building": "exotics_lab",
 			"hp": 250.0,
 			"weight": 110.0,
 			"metal": 60,
 			"crystal": 50,
 			"dps": 0.0,
+			"default_tweaks": {
+				"barrier_capacity": 1.0,
+				"projector_diameter": 1.0
+			},
 			"size": Vector3(1.0, 0.4, 1.0),
+			"color": Color.DEEP_SKY_BLUE
+		},
+		"bubble_shield_projector": {
+			"name": "Bubble Shield Projector",
+			"category": "armor",
+			"description": "Self-contained omnidirectional forcefield emitter. Generates an elliptical protective energy balloon around the host vehicle maintaining 1m separation that absorbs damage from all angles until depleted.",
+			"required_building": "exotics_lab",
+			"hp": 300.0,
+			"weight": 140.0,
+			"metal": 75,
+			"crystal": 65,
+			"dps": 0.0,
+			"default_tweaks": {
+				"barrier_capacity": 1.0,
+				"bubble_standoff": 1.0
+			},
+			"size": Vector3(1.1, 0.6, 1.1),
 			"color": Color.DEEP_SKY_BLUE
 		},
 		"heavy_barrier_projector": {
@@ -2209,7 +2231,7 @@ const SUPPORT_CATEGORIES = ["generator"]
 const SUPPORT_TYPE_IDS = [
 	"repair_array", "drone_carrier", "resource_harvester", "sensor_suite",
 	"heavy_sensor_suite", "directional_radar", "energy_barrier_projector",
-	"heavy_barrier_projector", "booster_rack"
+	"heavy_barrier_projector", "bubble_shield_projector", "booster_rack"
 ]
 
 # --- Continuous power draw --------------------------------------------------
@@ -2240,6 +2262,7 @@ const POWER_DRAW := {
 	"directional_radar": 6.0,
 	"energy_barrier_projector": 5.0,
 	"heavy_barrier_projector": 12.0,
+	"bubble_shield_projector": 6.0,
 	"repair_array": 3.5,
 	"drone_carrier": 4.0,
 }
@@ -2328,6 +2351,7 @@ const MODULE_ROLES = {
 	"directional_radar": "Support",
 	"energy_barrier_projector": "Support",
 	"heavy_barrier_projector": "Support",
+	"bubble_shield_projector": "Support",
 	"booster_rack": "Support",
 }
 
@@ -3303,6 +3327,55 @@ const TERRAIN_INTENTIONALLY_FLAT := ["anti_grav_plate"]
 
 static func get_terrain_speed_multiplier(locomotion_type_id: String, surface_type: String) -> float:
 	return TERRAIN_SPEED_MULTIPLIERS.get(surface_type, {}).get(locomotion_type_id, 1.0)
+
+
+# canyon_ford PR3 (2026-08-26): per-locomotion speed penalty by slope class.
+# Mirrors TERRAIN_SPEED_MULTIPLIERS's shape (locomotion -> {class:
+# multiplier}) so unit.gd:_recalculate_terrain_speed_multiplier composes
+# the two via the same lookup pattern. Default for any (locomotion,
+# slope) pair not in the table is 1.0 (no penalty) - same fallback
+# contract as get_terrain_speed_multiplier above.
+#
+# Slope class strings are the same keys terrain_builder.gd's
+# slope_class_at() returns: "walkable" / "walkable_slow" / "impassable".
+# The "impassable" column is decorative for most rows - the navmesh
+# bake already excludes that terrain - but kept so every locomotion has
+# a complete row (a row with the same 0.0 in both penalty columns
+# double-documents the contract that "this locomotor doesn't go there").
+#
+# Design intent: a slope is a vertical-axis concern. Locomotors that
+# ignore it (hover_engine, air_cushion_skirt, anti_grav_plate) get
+# 1.0 in every column - matching the TERRAIN_INTENTIONALLY_FLAT
+# philosophy. The rest scale with what the locomotor can actually do
+# about a hill: wheels slip on a 30° climb (0.6), tracks find grip
+# (0.85), legs and bogies pick their way (0.80), screw_drive has a
+# real tradeoff because its auger is a slow-climb design (0.50).
+# Numbers are hand-tuned to keep the gameplay band wide enough that a
+# slope-aware locomotor (hover, anti-grav) is genuinely better on
+# canyon_ford than a slope-blind one (wheels), without making the
+# penalty a death sentence.
+const SLOPE_SPEED_MULTIPLIERS = {
+	"wheels":              {"walkable": 1.0, "walkable_slow": 0.60, "impassable": 0.0},
+	"tracked_treads":      {"walkable": 1.0, "walkable_slow": 0.85, "impassable": 0.0},
+	"half_track":          {"walkable": 1.0, "walkable_slow": 0.75, "impassable": 0.0},
+	"legs":                {"walkable": 1.0, "walkable_slow": 0.80, "impassable": 0.0},
+	"rocker_bogie":        {"walkable": 1.0, "walkable_slow": 0.80, "impassable": 0.0},
+	"screw_drive":         {"walkable": 1.0, "walkable_slow": 0.50, "impassable": 0.0},
+	"hover_engine":        {"walkable": 1.0, "walkable_slow": 1.0,  "impassable": 0.0},
+	"air_cushion_skirt":   {"walkable": 1.0, "walkable_slow": 1.0,  "impassable": 0.0},
+	"anti_grav_plate":     {"walkable": 1.0, "walkable_slow": 1.0,  "impassable": 0.0},
+}
+
+# Compose-friendly: takes the locomotion id and the slope class
+# string (the same string terrain_builder.gd's slope_class_at()
+# returns, or "" for "no map_def, default to walkable / 1.0x").
+# Default-to-walkable keeps the no-controller code path
+# (vision_service.gd and unit.gd both have one) from accidentally
+# penalising every unit on a map without a heightmap.
+static func get_slope_speed_multiplier(locomotion_type_id: String, slope_class: String) -> float:
+	if slope_class == "":
+		slope_class = "walkable"
+	return SLOPE_SPEED_MULTIPLIERS.get(locomotion_type_id, {}).get(slope_class, 1.0)
 
 # Hull draught (terrain variety task - "shallow water that doesn't allow
 # deep-draught hulls" is specifically a hull property, not a locomotor

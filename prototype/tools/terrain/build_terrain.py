@@ -181,8 +181,13 @@ def _escarpment(px, pz, start, end, height, falloff, side):
     return height * t
 
 
-def _cliff(px, pz, start, end, height, side):
-    return _escarpment(px, pz, start, end, height, 0.01, side)
+def _cliff(px, pz, start, end, height, side, falloff=0.01):
+    # canyon_ford PR2 (2026-08-26): `falloff` was hardcoded to 0.01 here.
+    # A cliff author needs to be able to soften it (a gentle 1m ramp
+    # reads as a "steep slope", a 0.01m ramp reads as a "vertical wall")
+    # without writing a custom feature type. The default preserves the
+    # pre-PR2 behavior so existing fixtures keep baking identically.
+    return _escarpment(px, pz, start, end, height, falloff, side)
 
 
 def _river(px, pz, f):
@@ -356,12 +361,20 @@ FEATURE_BUILDERS = {
     "ridge": lambda px, pz, f: _ridge(px, pz, f["start"], f["end"], f["width"], f["height"], f.get("falloff", 10.0)),
     "ravine": lambda px, pz, f: _ravine(px, pz, f["start"], f["end"], f["width"], f["depth"], f.get("falloff", 10.0)),
     "escarpment": lambda px, pz, f: _escarpment(px, pz, f["start"], f["end"], f["height"], f.get("falloff", 6.0), f.get("side", "left")),
-    "cliff": lambda px, pz, f: _cliff(px, pz, f["start"], f["end"], f["height"], f.get("side", "left")),
+    "cliff": lambda px, pz, f: _cliff(px, pz, f["start"], f["end"], f["height"], f.get("side", "left"), f.get("falloff", 0.01)),
     "river": _river,
     "terrace": _terrace,
     "crater": _crater,
     "berm": _berm,
     "road_cut": _road_cut,
+    # User-facing aliases for the dramatic feature types (2026-08-26 PR1).
+    # The heightmap shape is identical to the existing primitive; the
+    # aliases exist so the GDScript terrain_builder can use a more
+    # evocative name (canyon is the "long sheer-walled depression" the
+    # canyon_ford work calls for, lake is the "round water feature with
+    # a shoreline" the user asks for in the playtest feedback).
+    "canyon": lambda px, pz, f: _ravine(px, pz, f["start"], f["end"], f["width"], f["depth"], f.get("wall_falloff", f.get("falloff", 10.0))),
+    "lake": lambda px, pz, f: _basin(px, pz, f["center"], f["radius"], f["depth"], f.get("shoreline_falloff", f.get("falloff", 10.0))),
 }
 
 
@@ -482,6 +495,10 @@ def build_heightfield(half_extents, features, resolution=None, pixels_per_unit=D
         builder = FEATURE_BUILDERS.get(f.get("type"))
         if builder is None:
             raise ValueError(f"Unknown terrain feature type: {f.get('type')!r}")
+        # Pass the feature dict as-is. The cliff lambda (and any other
+        # builder that wants to read `falloff` from the dict) does so
+        # with its own default. We don't transform the dict here -
+        # the build_heightfield signature is pure data in, height out.
         height += builder(sample_px, sample_pz, f).astype(np.float32)
 
     if post_pass:

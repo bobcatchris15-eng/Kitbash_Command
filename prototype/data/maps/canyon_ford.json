@@ -1,0 +1,130 @@
+{
+ "description": "Canyon Ford: A deep north-south canyon bisects the field. The single bridge is the only dry crossing. The western plateau (height 14) overlooks the killing ground from the south, the eastern ridge (height 8) hides ambush forces in dense forest, and three marshy pockets bog down wheels. Anti-grav and screw-drive rule the slopes; the plateau top is the obvious base site.",
+ "ground_color": [0.32, 0.30, 0.24],
+ "map_half_extents": 400,
+ "name": "Canyon Ford",
+ "schema_version": 1,
+ "world_scale": 1.0,
+ "base_zones": [
+  {"id": "north", "center": [0.0, 0.0, 340.0], "half_extents": [22.0, 22.0]},
+  {"id": "south", "center": [0.0, 0.0, -340.0], "half_extents": [22.0, 22.0]}
+ ],
+ "spawns": [
+  {
+   "id": "player",
+   "hq": [0.0, 0.0, 355.0],
+   "factory": [-40.0, 0.0, 340.0],
+   "refinery": [40.0, 0.0, 340.0],
+   "harvester": [0.0, 1.5, 305.0]
+  },
+  {
+   "id": "enemy",
+   "hq": [0.0, 0.0, -355.0],
+   "factory": [40.0, 0.0, -340.0],
+   "refinery": [-40.0, 0.0, -340.0],
+   "harvester": [0.0, 1.5, -305.0]
+  }
+ ],
+ "obstacles": [
+  {"center": [-110, 0, 200], "half_extents": [6, 5], "type": "rock"},
+  {"center": [110, 0, -200], "half_extents": [6, 5], "type": "rock"},
+  {"center": [-220, 0, -100], "half_extents": [7, 5], "type": "rock"},
+  {"center": [220, 0, 100], "half_extents": [7, 5], "type": "rock"},
+  {"center": [-260, 0, 240], "half_extents": [6, 4], "type": "rock"},
+  {"center": [260, 0, -240], "half_extents": [6, 4], "type": "rock"}
+ ],
+ "terrain": {
+  "pixels_per_unit": 2.0,
+  "height_scale": 22.0,
+  "features": [
+   {
+    "type": "canyon",
+    "start": [0.0, 0.0, -180.0],
+    "end":   [0.0, 0.0,  180.0],
+    "width": 22,
+    "depth": 20,
+    "wall_falloff": 3.0,
+    "floor_surface": "water"
+   },
+   {
+    "type": "plateau",
+    "center": [-200.0, 0.0, 0.0],
+    "half_extents": [80.0, 90.0],
+    "height": 14,
+    "wall_height": 14,
+    "wall_falloff": 3.0
+   },
+   {
+    "type": "ridge",
+    "points": [[260.0, -120.0], [240.0, 0.0], [260.0, 120.0]],
+    "height": 8,
+    "width": 30,
+    "falloff": 4.0
+   },
+   {
+    "type": "lake",
+    "center": [-310.0, 0.0, 200.0],
+    "radius": 28.0,
+    "depth": 3.0,
+    "shoreline_falloff": 6.0
+   },
+   {
+    "type": "lake",
+    "center": [310.0, 0.0, -200.0],
+    "radius": 28.0,
+    "depth": 3.0,
+    "shoreline_falloff": 6.0
+   },
+   {
+    "type": "lake",
+    "center": [-130.0, 0.0, 250.0],
+    "radius": 18.0,
+    "depth": 2.5,
+    "shoreline_falloff": 5.0
+   }
+  ]
+ },
+ "water_areas": [
+  {"center": [0.0, 0.0, 0.0], "half_extents": [11.0, 180.0]}
+ ],
+ "shallow_water_areas": [
+  {"center": [0.0, 0.0, 60.0], "half_extents": [8.0, 25.0]},
+  {"center": [0.0, 0.0, -60.0], "half_extents": [8.0, 25.0]}
+ ],
+ "bridges": [
+  {"center": [0.0, 0.0, 0.0], "half_extents": [8.0, 14.0], "deck_height": 0.6}
+ ],
+ "hills": [
+  {"center": [-300.0, 0.0, -320.0], "radius": 14.0, "falloff": 12.0, "height": 3.5},
+  {"center": [300.0, 0.0, 320.0], "radius": 14.0, "falloff": 12.0, "height": 3.5},
+  {"center": [-90.0, 0.0, -100.0], "radius": 10.0, "falloff": 8.0, "height": 2.5},
+  {"center": [90.0, 0.0, 100.0], "radius": 10.0, "falloff": 8.0, "height": 2.5}
+ ],
+ "surface_zones": [
+  {"center": [250.0, 0.0, 0.0], "half_extents": [50.0, 80.0], "surface_type": "forest"},
+  {"center": [-310.0, 0.0, 200.0], "half_extents": [32.0, 32.0], "surface_type": "marsh"},
+  {"center": [310.0, 0.0, -200.0], "half_extents": [32.0, 32.0], "surface_type": "marsh"},
+  {"center": [-130.0, 0.0, 250.0], "half_extents": [22.0, 22.0], "surface_type": "marsh"},
+  {"center": [-80.0, 0.0, 0.0], "half_extents": [22.0, 18.0], "surface_type": "gravel"},
+  {"center": [80.0, 0.0, 0.0], "half_extents": [22.0, 18.0], "surface_type": "gravel"},
+  {"center": [0.0, 0.0, 130.0], "half_extents": [30.0, 22.0], "surface_type": "rocky"},
+  {"center": [0.0, 0.0, -130.0], "half_extents": [30.0, 22.0], "surface_type": "rocky"}
+ ],
+ "resource_nodes": [
+  {"amount": 1100, "position": [-60.0, 0.0, 320.0], "type": "metal"},
+  {"amount": 1100, "position": [60.0, 0.0, 320.0], "type": "metal"},
+  {"amount": 1100, "position": [-60.0, 0.0, -320.0], "type": "metal"},
+  {"amount": 1100, "position": [60.0, 0.0, -320.0], "type": "metal"},
+  {"amount": 1100, "position": [-80.0, 0.0, 100.0], "type": "metal"},
+  {"amount": 1100, "position": [80.0, 0.0, -100.0], "type": "metal"},
+  {"amount": 900, "position": [-100.0, 0.0, 40.0], "type": "metal"},
+  {"amount": 900, "position": [100.0, 0.0, -40.0], "type": "metal"},
+  {"amount": 700, "position": [-60.0, 0.0, -30.0], "type": "crystal"},
+  {"amount": 700, "position": [60.0, 0.0, 30.0], "type": "crystal"},
+  {"amount": 800, "position": [0.0, 0.0, 0.0], "type": "crystal"},
+  {"amount": 900, "position": [-150.0, 0.0, 50.0], "type": "lumber"},
+  {"amount": 900, "position": [150.0, 0.0, -50.0], "type": "lumber"},
+  {"amount": 1400, "position": [-120.0, 0.0, 120.0], "type": "oil"},
+  {"amount": 1400, "position": [120.0, 0.0, -120.0], "type": "oil"}
+ ]
+}

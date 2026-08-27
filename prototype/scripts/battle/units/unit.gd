@@ -39,6 +39,7 @@ const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
 const VFXBurstScript = preload("res://scripts/vfx_burst.gd")
 const VisualBuilderScript = preload("res://scripts/visual_builder.gd")
+const DebugSettingsScript = preload("res://scripts/debug_settings.gd")
 
 signal died(unit)
 signal order_completed(unit)
@@ -658,7 +659,21 @@ func _recalculate_terrain_speed_multiplier() -> void:
 	if surface_type == "":
 		terrain_speed_multiplier = 1.0
 		return
-	terrain_speed_multiplier = ModuleCatalog.get_terrain_speed_multiplier(locomotion_type, surface_type)
+	# canyon_ford PR3 (2026-08-26): surface-type penalty * slope-class
+	# penalty, composed multiplicatively. A unit on a 30° marsh gets
+	# the surface penalty (TERRAIN_SPEED_MULTIPLIERS for marsh) AND the
+	# slope penalty (SLOPE_SPEED_MULTIPLIERS for walkable_slow), so
+	# wheels-on-steep-marsh = 0.25 * 0.60 = 0.15, which is at the
+	# "barely moving" floor the tracked_treads clamp at line 670
+	# leaves room for. The composition is in this single function
+	# (not in the controller) so a unit test fixture can exercise
+	# the speed math without standing up a full match_director.
+	var surface_mult: float = ModuleCatalog.get_terrain_speed_multiplier(locomotion_type, surface_type)
+	var slope_mult: float = 1.0
+	if _controller.has_method("get_slope_class_at"):
+		var slope_class: String = _controller.get_slope_class_at(global_position)
+		slope_mult = ModuleCatalog.get_slope_speed_multiplier(locomotion_type, slope_class)
+	terrain_speed_multiplier = surface_mult * slope_mult
 	# Wider track spreads weight over more contact area (real flotation, less
 	# sinking), so it eats further into whatever penalty the base table
 	# already assigns; a narrower track digs in more and eats further into
@@ -697,6 +712,7 @@ func _physics_process(delta: float) -> void:
 	var _t := Profiler.start()
 	var _p := Profiler.start()
 	_tick_power(delta)
+	_tick_shields(delta)
 	Profiler.stop("unit.tick_power", _p)
 	_p = Profiler.start()
 	_recalculate_terrain_speed_multiplier()
@@ -761,7 +777,86 @@ func _physics_process(delta: float) -> void:
 		var _s := Profiler.start()
 		move_and_slide()
 		Profiler.stop("unit.move_and_slide", _s)
+		_animate_locomotion(delta)
 	Profiler.stop("units", _t)
+
+
+# Animate locomotion visuals (wheels, treads, propellers, legs, rotors, wings, turbines)
+func _animate_locomotion(delta: float) -> void:
+	if not is_instance_valid(hull_node):
+		return
+
+	var speed := Vector2(velocity.x, velocity.z).length()
+	var speed_ref: float = maxf(move_speed, 1.0)
+	var throttle: float = clampf(speed / speed_ref, 0.0, 1.5)
+	var ground_rate: float = throttle
+	var powered_rate: float = 0.35 + 0.65 * throttle
+	var dir := signf(velocity.dot(-global_transform.basis.z))
+	if is_zero_approx(dir):
+		dir = 1.0
+
+	var now_sec := Time.get_ticks_msec() / 1000.0
+
+	for child in hull_node.get_children():
+		if not child.has_meta("module_data"):
+			continue
+		var data = child.get_meta("module_data")
+		var child_type_id: String = data.type_id if data and "type_id" in data else ""
+		match child_type_id:
+			"wheels":
+				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_WHEEL + "*", "Node3D", true, false):
+					axle.rotate_x(9.0 * ground_rate * dir * delta)
+			"tracked_treads", "heavy_quad_tracks":
+				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_TREAD + "*", "Node3D", true, false):
+					axle.rotate_x(7.0 * ground_rate * dir * delta)
+			"half_track":
+				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_WHEEL + "*", "Node3D", true, false):
+					axle.rotate_x(9.0 * ground_rate * dir * delta)
+				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_TREAD + "*", "Node3D", true, false):
+					axle.rotate_x(7.0 * ground_rate * dir * delta)
+			"rocker_bogie":
+				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_WHEEL + "*", "Node3D", true, false):
+					axle.rotate_x(9.0 * ground_rate * dir * delta)
+			"fixed_wing_engine", "air_cushion_skirt", "anti_grav_plate":
+				for fan in child.find_children(VisualBuilderScript.SPIN_PIVOT_TURBINE + "*", "Node3D", true, false):
+					fan.rotate_z(24.0 * powered_rate * delta)
+			"helicopter_rotors":
+				var rotor = child.get_node_or_null("RotorBlades")
+				if rotor:
+					rotor.rotate_y(15.0 * powered_rate * delta)
+			"ornithopter_wing":
+				var t = now_sec * 16.0 * powered_rate
+				var fore = child.get_node_or_null("WingPivotFore")
+				if fore:
+					fore.rotation.x = sin(t) * 0.65
+					fore.rotation.z = sin(t) * 0.7
+				var hind = child.get_node_or_null("WingPivotHind")
+				if hind:
+					hind.rotation.x = -sin(t) * 0.65
+					hind.rotation.z = -sin(t) * 0.7
+			"hover_engine":
+				var mid_ring = child.get_node_or_null("HoverRingMid")
+				if mid_ring:
+					mid_ring.rotate_x(12.0 * powered_rate * delta)
+				var inner_ring = child.get_node_or_null("HoverRingInner")
+				if inner_ring:
+					inner_ring.rotate_y(18.0 * powered_rate * delta)
+			"legs":
+				var phase: float = child.get_meta("leg_phase") if child.has_meta("leg_phase") else 0.0
+				VisualBuilderScript.pose_leg(child, now_sec, phase, ground_rate, delta)
+			"screw_drive":
+				var spin = child.get_node_or_null("ScrewSpin")
+				if spin:
+					spin.rotate_z(6.0 * ground_rate * dir * delta)
+			"propeller_prop", "pusher_prop", "naval_propeller", "ship_screw", "paddle_wheel", "buoyant_envelope":
+				var prop = child.get_node_or_null("PropBlades")
+				if prop:
+					if child_type_id == "paddle_wheel":
+						prop.rotate_x(10.0 * powered_rate * delta)
+					elif child_type_id == "buoyant_envelope":
+						prop.rotate_z(3.0 * powered_rate * delta)
+					else:
+						prop.rotate_z(10.0 * powered_rate * delta)
 
 
 # The harvest loop runs when the unit has nothing else to do, or was explicitly
@@ -951,6 +1046,15 @@ func get_combat_target() -> Node3D:
 func _has_line_of_sight_to(candidate: Node3D) -> bool:
 	if not is_instance_valid(candidate):
 		return false
+	# Reveal-All-Fog cheat bypasses the firing-LOS raycast too. The
+	# vision_service._has_line_of_sight path already short-circuits, but
+	# unit.gd's own raycast is the one auto_weapon.gd consults before
+	# pulling the trigger, and a separate path here would still block
+	# shots through terrain while the cheat is on. Same autoload, same
+	# flag, same contract: "no vision restrictions, full stop."
+	var ds = DebugSettingsScript.get_active()
+	if ds != null and ds.reveal_all_fog:
+		return true
 	# Indirect fire weapons can arc over intervening terrain
 	if is_instance_valid(hull_node):
 		var main_data := AssemblyScript.compute_main_weapon(hull_node)
@@ -1605,12 +1709,18 @@ func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = nu
 	if amount <= 0.0:
 		return
 
-	# Energy Barrier Projector: a frontal shield that spends the capacitor to eat
-	# the hit. Checked before armour because it is in front of the armour.
-	if hit_origin != null and current_energy > 0.0 and not _brownout.get("shields_offline", false):
-		amount = _absorb_with_barrier(amount, modules, hit_origin)
-		if amount <= 0.0:
-			return
+	# Bubble Shield Projector: omnidirectional personal forcefield bubble enclosing this unit
+	amount = _absorb_with_bubble_shield(amount, modules, hit_origin)
+	if amount <= 0.0:
+		return
+
+	# Energy Barrier Projector: a directional/frontal shield
+	amount = _absorb_with_barrier(amount, modules, hit_origin)
+	if amount <= 0.0:
+		return
+
+	# Any remaining damage that hits the unit resets the shield recharge delay timer (3.0s clean of damage)
+	_reset_shield_recharge_timers(modules)
 
 	var resolved := DamageModelScript.resolve(hull_node, modules, damage_type, self, hit_origin)
 
@@ -1642,6 +1752,12 @@ func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = nu
 
 	var dealt := DamageModelScript.hull_damage(amount, resolved.x, resolved.y)
 	hp = maxf(0.0, hp - dealt)
+	if dealt > 0.0 and is_inside_tree() and hit_origin != null:
+		var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+		var h_pos: Vector3 = hit_origin if hit_origin is Vector3 else (hit_origin.global_position if is_instance_valid(hit_origin) and hit_origin is Node3D else global_position)
+		var contact_pt = global_position.lerp(h_pos, 0.15) + Vector3(0, 0.3, 0)
+		VFXBurstScript.spawn(parent, contact_pt, Color(1.0, 0.85, 0.35), 5, 0.12, 60.0, 2.0, 5.0)
+
 	if _controller != null and _controller.has_method("record_combat_damage"):
 		_controller.record_combat_damage(self, hit_origin, dealt, damage_type)
 
@@ -1721,6 +1837,7 @@ func _absorb_with_aegis_fields(amount: float, hit_origin) -> float:
 	if is_dead or amount <= 0.0:
 		return amount
 
+	var initial_amount := amount
 	var my_pos = global_position if is_inside_tree() else position
 
 	# Check own modules first
@@ -1735,6 +1852,9 @@ func _absorb_with_aegis_fields(amount: float, hit_origin) -> float:
 					if dist_sq <= radius * radius:
 						amount = m.absorb_aegis_damage(amount)
 						if amount <= 0.0:
+							if is_inside_tree():
+								var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+								VFXBurstScript.spawn(parent, my_pos + Vector3(0, 0.5, 0), Color(0.35, 0.85, 1.0), 10, 0.18, 90.0, 2.5, 6.0)
 							return 0.0
 
 	# Check ally units in the area
@@ -1760,30 +1880,185 @@ func _absorb_with_aegis_fields(amount: float, hit_origin) -> float:
 					if dist_sq <= radius * radius:
 						amount = m.absorb_aegis_damage(amount)
 						if amount <= 0.0:
+							if is_inside_tree():
+								var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+								VFXBurstScript.spawn(parent, my_pos + Vector3(0, 0.5, 0), Color(0.35, 0.85, 1.0), 10, 0.18, 90.0, 2.5, 6.0)
 							return 0.0
+
+	if amount < initial_amount and is_inside_tree():
+		var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+		VFXBurstScript.spawn(parent, my_pos + Vector3(0, 0.5, 0), Color(0.35, 0.85, 1.0), 8, 0.16, 90.0, 2.0, 5.0)
 	return amount
 
-# Spend the capacitor to absorb a frontal hit, returning what is left of it.
-#
-# Frontal only, and that is the whole balance of the module: it rewards facing
-# the threat, so a flanked unit gets nothing from it. `local.z < 0` is Godot's
-# -Z-forward convention, the same one classify_facet() uses.
-func _absorb_with_barrier(amount: float, modules: Array, hit_origin) -> float:
-	var has_barrier := false
+
+# --- Personal Energy Shields (Bubble Shield & Directional Barrier) ---
+
+func _absorb_with_bubble_shield(amount: float, modules: Array, hit_origin) -> float:
+	if amount <= 0.0 or _brownout.get("shields_offline", false) or (max_energy > 0.0 and current_energy <= 0.0):
+		return amount
+
 	for m in modules:
 		var data = m.get_meta("module_data")
-		if data != null and data.type_id == "energy_barrier_projector":
-			has_barrier = true
-			break
-	if not has_barrier:
+		if data == null or data.type_id != "bubble_shield_projector":
+			continue
+
+		var base_cap: float = 500.0
+		var cap_mult: float = float(data.tweaks.get("barrier_capacity", 1.0)) if data.tweaks else 1.0
+		var max_cap: float = base_cap * cap_mult
+		if not m.has_meta("shield_max_hp"):
+			m.set_meta("shield_max_hp", max_cap)
+			m.set_meta("current_shield_hp", max_cap)
+			m.set_meta("shield_recharge_timer", 0.0)
+			m.set_meta("is_shield_active", true)
+
+		var active: bool = bool(m.get_meta("is_shield_active", true))
+		var cur_hp: float = float(m.get_meta("current_shield_hp", max_cap))
+		if not active or cur_hp <= 0.0:
+			continue
+
+		var absorbed: float = minf(amount, cur_hp)
+		cur_hp -= absorbed
+		m.set_meta("current_shield_hp", cur_hp)
+		m.set_meta("shield_recharge_timer", 3.0) # Reset out-of-combat recharge timer
+
+		var shield_mesh = m.find_child("BubbleShield", true, false) as MeshInstance3D
+		if shield_mesh != null and shield_mesh.material_override is ShaderMaterial:
+			shield_mesh.material_override.set_shader_parameter("impact_flash", 0.8)
+
+		if absorbed > 0.0 and is_inside_tree():
+			var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+			var origin_pos = hit_origin if hit_origin is Vector3 else (hit_origin.global_position if is_instance_valid(hit_origin) and hit_origin is Node3D else global_position)
+			var hit_dir = (origin_pos - global_position).normalized() if origin_pos != global_position else Vector3.UP
+			var shield_pos = global_position + hit_dir * 1.5 + Vector3(0, 0.4, 0)
+			VFXBurstScript.spawn(parent, shield_pos, Color(0.35, 0.85, 1.0), 10, 0.18, 70.0, 2.5, 6.0)
+
+		if cur_hp <= 0.0:
+			m.set_meta("is_shield_active", false)
+			if shield_mesh != null:
+				shield_mesh.visible = false
+
+		amount -= absorbed
+		if amount <= 0.0:
+			return 0.0
+
+	return amount
+
+
+func _absorb_with_barrier(amount: float, modules: Array, hit_origin) -> float:
+	if amount <= 0.0 or _brownout.get("shields_offline", false) or (max_energy > 0.0 and current_energy <= 0.0) or hit_origin == null:
 		return amount
-	var origin: Vector3 = hit_origin if hit_origin is Vector3 else hit_origin.global_position
-	var local: Vector3 = global_transform.basis.inverse() * (origin - global_position)
-	if local.z >= 0.0:
+
+	var origin: Vector3 = hit_origin if hit_origin is Vector3 else (hit_origin.global_position if is_instance_valid(hit_origin) and hit_origin is Node3D else (global_position if is_inside_tree() else position))
+	var my_basis: Basis = global_transform.basis if is_inside_tree() else transform.basis
+	var my_pos: Vector3 = global_position if is_inside_tree() else position
+	var local: Vector3 = my_basis.inverse() * (origin - my_pos)
+	if local.z >= 0.0: # Frontal only (-Z forward)
 		return amount
-	var absorbed := minf(amount, current_energy)
-	current_energy -= absorbed
-	return amount - absorbed
+
+	for m in modules:
+		var data = m.get_meta("module_data")
+		if data == null or data.type_id != "energy_barrier_projector":
+			continue
+
+		var base_cap: float = 350.0
+		var cap_mult: float = float(data.tweaks.get("barrier_capacity", 1.0)) if data.tweaks else 1.0
+		var max_cap: float = base_cap * cap_mult
+		if not m.has_meta("shield_max_hp"):
+			m.set_meta("shield_max_hp", max_cap)
+			m.set_meta("current_shield_hp", max_cap)
+			m.set_meta("shield_recharge_timer", 0.0)
+			m.set_meta("is_shield_active", true)
+
+		var active: bool = bool(m.get_meta("is_shield_active", true))
+		var cur_hp: float = float(m.get_meta("current_shield_hp", max_cap))
+		if not active or cur_hp <= 0.0:
+			continue
+
+		var absorbed: float = minf(amount, cur_hp)
+		cur_hp -= absorbed
+		m.set_meta("current_shield_hp", cur_hp)
+		m.set_meta("shield_recharge_timer", 3.0) # Reset out-of-combat recharge timer
+
+		var shield_mesh = m.find_child("BarrierShield", true, false) as MeshInstance3D
+		if shield_mesh != null and shield_mesh.material_override is ShaderMaterial:
+			shield_mesh.material_override.set_shader_parameter("impact_flash", 0.8)
+
+		if absorbed > 0.0 and is_inside_tree():
+			var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+			var hit_dir = (origin - global_position).normalized() if origin != global_position else -my_basis.z
+			var shield_pos = global_position + hit_dir * 1.2 + Vector3(0, 0.4, 0)
+			VFXBurstScript.spawn(parent, shield_pos, Color(0.3, 0.75, 1.0), 8, 0.15, 60.0, 2.0, 5.0)
+
+		if cur_hp <= 0.0:
+			m.set_meta("is_shield_active", false)
+			if shield_mesh != null:
+				shield_mesh.visible = false
+
+		amount -= absorbed
+		if amount <= 0.0:
+			return 0.0
+
+	return amount
+
+
+func _reset_shield_recharge_timers(modules: Array) -> void:
+	for m in modules:
+		var data = m.get_meta("module_data")
+		if data != null and (data.type_id == "bubble_shield_projector" or data.type_id == "energy_barrier_projector"):
+			m.set_meta("shield_recharge_timer", 3.0)
+
+
+func _tick_shields(delta: float) -> void:
+	if not is_instance_valid(hull_node):
+		return
+	var offline: bool = bool(_brownout.get("shields_offline", false)) or (max_energy > 0.0 and current_energy <= 0.0)
+
+	for m in hull_node.get_children():
+		if not is_instance_valid(m) or not m.has_meta("module_data") or m.is_queued_for_deletion():
+			continue
+		var data = m.get_meta("module_data")
+		if data == null:
+			continue
+		var type_id: String = data.type_id
+		if type_id != "bubble_shield_projector" and type_id != "energy_barrier_projector":
+			continue
+
+		var mesh_name := "BubbleShield" if type_id == "bubble_shield_projector" else "BarrierShield"
+		var shield_mesh = m.find_child(mesh_name, true, false) as MeshInstance3D
+
+		var base_cap: float = 500.0 if type_id == "bubble_shield_projector" else 350.0
+		var cap_mult: float = float(data.tweaks.get("barrier_capacity", 1.0)) if data.tweaks else 1.0
+		var max_cap: float = base_cap * cap_mult
+
+		if not m.has_meta("shield_max_hp"):
+			m.set_meta("shield_max_hp", max_cap)
+			m.set_meta("current_shield_hp", max_cap)
+			m.set_meta("shield_recharge_timer", 0.0)
+			m.set_meta("is_shield_active", true)
+
+		var cur_hp: float = float(m.get_meta("current_shield_hp", max_cap))
+		var rech_timer: float = float(m.get_meta("shield_recharge_timer", 0.0))
+		var active: bool = bool(m.get_meta("is_shield_active", true))
+
+		if rech_timer > 0.0:
+			rech_timer -= delta
+			m.set_meta("shield_recharge_timer", rech_timer)
+			if rech_timer <= 0.0:
+				# 3 seconds without taking damage -> recharge back to full
+				cur_hp = max_cap
+				active = true
+				m.set_meta("current_shield_hp", cur_hp)
+				m.set_meta("is_shield_active", active)
+				if shield_mesh != null and shield_mesh.material_override is ShaderMaterial:
+					shield_mesh.material_override.set_shader_parameter("impact_flash", 0.35)
+
+		if shield_mesh != null:
+			shield_mesh.visible = active and not offline
+			if shield_mesh.material_override is ShaderMaterial:
+				var mat = shield_mesh.material_override as ShaderMaterial
+				var cur_flash: float = float(mat.get_shader_parameter("impact_flash")) if mat.get_shader_parameter("impact_flash") != null else 0.0
+				if cur_flash > 0.005:
+					mat.set_shader_parameter("impact_flash", maxf(0.0, cur_flash - delta * 2.5))
 
 
 # Take a module off the unit and deal with what its loss means.

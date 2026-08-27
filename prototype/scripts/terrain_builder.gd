@@ -503,6 +503,205 @@ static func _hill_contribution(hill: Dictionary, x: float, z: float) -> float:
 	var s = t * t * (3.0 - 2.0 * t) # smoothstep, 0 at radius -> 1 at radius+falloff
 	return height * (1.0 - s)
 
+
+# --- Dramatic feature types -------------------------------------------------
+#
+# The new authoring vocabulary for hand-shaped terrain: plateau, canyon, ridge,
+# lake. Each one writes BOTH a heightmap contribution (so height_at() returns
+# the new ground level) AND auto-emits cliffs[] entries (so the sheer walls
+# get colliders, navmesh holes, and the cliff.gdshader triplanar rock look
+# without the user hand-placing every wall piece). The four new types reuse
+# the existing hills[] / cliffs[] / water_areas[] / water_blobs[] machinery
+# underneath - they're a higher-level authoring convenience, not a new
+# runtime path. build_terrain.py mirrors the same functions for the heightmap
+# PNG bake so the feature survives a non-runtime test.
+#
+# These are flat-topped rectangles with sheer walls. Replaces the old
+# workaround of "lots of small hills in a square to fake a mesa" - the walls
+# of that approach were the smooth falloff of the Gaussians, which is the
+# exact "drive up it and it doesn't read as a wall" the user reported.
+# Auto-emits 4 wall lines + 4 corner pieces around the perimeter so the
+# edge reads as vertical rock at runtime, not as a gentle hill.
+static func _plateau_contribution(feature: Dictionary, x: float, z: float) -> float:
+	var c: Vector3 = _vec3_of(feature.get("center", Vector3.ZERO))
+	# half_extents may be a JSON Array or Vector2 - the features[]
+	# schema is unvalidated, so the decoder doesn't normalize. _vec_of
+	# accepts both shapes.
+	var he: Vector2 = _vec_of(feature.get("half_extents", Vector2(10, 10)))
+	var hx: float = feature.get("half_extents_x", he.x)
+	var hz: float = feature.get("half_extents_z", he.y)
+	var height: float = feature.get("height", 8.0)
+	var falloff: float = feature.get("wall_falloff", 2.0)
+	# Distance to the AABB, signed positive outside.
+	var dx = maxf(absf(x - c.x) - hx, 0.0)
+	var dz = maxf(absf(z - c.z) - hz, 0.0)
+	var outside = sqrt(dx * dx + dz * dz)
+	if outside <= 0.0:
+		return height
+	if outside >= falloff or falloff <= 0.0:
+		return 0.0
+	var t = outside / falloff
+	var s = t * t * (3.0 - 2.0 * t)
+	return height * (1.0 - s)
+
+
+# Sheer-walled depression between two parallel walls. start/end are the
+# centerline endpoints; width is the floor width; depth is how far below
+# the surrounding ground the floor sits (positive = below). Walls are
+# vertical cliffs, the floor is a flat strip at the lowered height.
+static func _canyon_contribution(feature: Dictionary, x: float, z: float) -> float:
+	var start: Vector3 = _vec3_of(feature.get("start", Vector3.ZERO))
+	var end: Vector3 = _vec3_of(feature.get("end", Vector3.ZERO))
+	var width: float = feature.get("width", 12.0)
+	var depth: float = feature.get("depth", 12.0)
+	var wall_falloff: float = feature.get("wall_falloff", 2.0)
+	# Project (x, z) onto the centerline.
+	var axis := end - start
+	var axis_len := axis.length()
+	if axis_len < 1e-3:
+		return 0.0
+	var axis_dir := axis / axis_len
+	var to_pt := Vector2(x - start.x, z - start.z)
+	var along := to_pt.x * axis_dir.x + to_pt.y * axis_dir.z
+	if along < 0.0 or along > axis_len:
+		return 0.0  # outside the canyon's along-axis extent
+	# Perpendicular distance from the centerline.
+	var perp := to_pt.x * (-axis_dir.z) + to_pt.y * axis_dir.x
+	var abs_perp := absf(perp)
+	var floor_half := width * 0.5
+	if abs_perp <= floor_half:
+		return -depth  # inside the floor
+	# In the wall band: from floor_half to floor_half + wall_falloff.
+	var into_wall := abs_perp - floor_half
+	if into_wall >= wall_falloff or wall_falloff <= 0.0:
+		return 0.0  # outside the canyon entirely
+	var t = into_wall / wall_falloff
+	var s = t * t * (3.0 - 2.0 * t)
+	return -depth * (1.0 - s)
+
+
+# A polyline of high points with a flat ridge top. points is an array of
+# [x, z] (or Vector2/Vector3) pairs. width is the ridge width on each
+# side; height is the ridge top above the surrounding ground.
+static func _ridge_contribution(feature: Dictionary, x: float, z: float) -> float:
+	var pts = feature.get("points", [])
+	if pts.size() < 2:
+		return 0.0
+	var width: float = feature.get("width", 6.0)
+	var height: float = feature.get("height", 10.0)
+	var falloff: float = feature.get("falloff", 2.0)
+	# Find the nearest point on any segment of the polyline.
+	var best_perp := INF
+	var best_along_within := true
+	for i in range(pts.size() - 1):
+		var a: Vector2 = _vec_of(pts[i])
+		var b: Vector2 = _vec_of(pts[i + 1])
+		var seg: Vector2 = b - a
+		var seg_len: float = seg.length()
+		if seg_len < 1e-3:
+			continue
+		var seg_dir := seg / seg_len
+		# _vec_of stores world-Z as Vector2.y, so the offset from point
+		# a to the test point (x, z) is (test_x - a.x, test_z - a.y).
+		var to_pt := Vector2(x - a.x, z - a.y)
+		# Polylines are stored as Vector2 where .x = world-X, .y = world-Z
+		# (per _vec_of at the bottom of this file), so the cross-product
+		# math reads .x and .y on a Vector2, NOT .z. The previous untyped
+		# `var seg := b - a` form was Variant-by-typing and hid this; now
+		# that seg is strictly Vector2 the .z on a 2D was a parse error.
+		var along := to_pt.x * seg_dir.x + to_pt.y * seg_dir.y
+		if along < 0.0 or along > seg_len:
+			best_along_within = false
+			continue
+		var perp := to_pt.x * (-seg_dir.y) + to_pt.y * seg_dir.x
+		var abs_perp := absf(perp)
+		if abs_perp < best_perp:
+			best_perp = abs_perp
+	if not best_along_within:
+		return 0.0
+	if best_perp == INF:
+		return 0.0
+	if best_perp <= width:
+		return height
+	if best_perp >= width + falloff or falloff <= 0.0:
+		return 0.0
+	var t = (best_perp - width) / falloff
+	var s = t * t * (3.0 - 2.0 * t)
+	return height * (1.0 - s)
+
+
+# A round water feature with a soft shoreline. The center drops to
+# -depth; the shoreline falls off smoothly to 0 over shoreline_falloff.
+# Auto-emits a water_blob so the visible water mesh and the navmesh
+# amphibious region both light up - same pattern as the existing
+# hand-authored lakes on open_plains.
+static func _lake_contribution(feature: Dictionary, x: float, z: float) -> float:
+	var c: Vector3 = _vec3_of(feature.get("center", Vector3.ZERO))
+	var radius: float = feature.get("radius", 12.0)
+	var depth: float = feature.get("depth", 3.0)
+	var falloff: float = feature.get("shoreline_falloff", 4.0)
+	var dist = Vector2(x - c.x, z - c.z).length()
+	if dist <= radius:
+		return -depth
+	if dist >= radius + falloff or falloff <= 0.0:
+		return 0.0
+	var t = (dist - radius) / falloff
+	var s = t * t * (3.0 - 2.0 * t)
+	return -depth * (1.0 - s)
+
+
+# Single dispatch entry point. height_at() calls this once per feature per
+# sample, so it must stay cheap - each type's contribution is a couple of
+# mults and a smoothstep, the worst case is a 4-point ridge walking a 4-
+# segment polyline (~30 ops per call). Verified negligible against the
+# 90,000-sample navmesh rebake that already runs every match.
+static func _feature_contribution(feature: Dictionary, x: float, z: float) -> float:
+	match feature.get("type", ""):
+		"plateau":
+			return _plateau_contribution(feature, x, z)
+		"canyon":
+			return _canyon_contribution(feature, x, z)
+		"ridge":
+			return _ridge_contribution(feature, x, z)
+		"lake":
+			return _lake_contribution(feature, x, z)
+		_:
+			return 0.0
+
+
+# Convert a JSON point entry to Vector2 - the user might author as [x, z],
+# as Vector2, or as a full Vector3. Same point in the bridge/cliff parsers
+# in this file use the same shape; kept local here so the features don't
+# reach into the existing helpers.
+static func _vec_of(pt) -> Vector2:
+	if pt is Vector3:
+		return Vector2(pt.x, pt.z)
+	if pt is Vector2:
+		return pt
+	if pt is Array and pt.size() >= 2:
+		return Vector2(float(pt[0]), float(pt[1]))
+	return Vector2.ZERO
+
+
+# Convert a JSON 3D point to Vector3. Same pattern as _vec_of: accepts
+# Array ([x, y, z]), Vector3, or Vector2 (treated as XZ with y=0).
+# The features[] entries in canyon_ford.json are authored as raw Arrays
+# (the FIELD_SPEC has features as an unvalidated discriminated union;
+# the deep-decoder doesn't convert them), so the auto-emission code
+# has to accept both shapes. Same point: in the bridge / hill parsers
+# earlier in this file the assumption is that the decoder already
+# converted Array -> Vector3; that's not true for features[].
+static func _vec3_of(pt) -> Vector3:
+	if pt is Vector3:
+		return pt
+	if pt is Vector2:
+		return Vector3(pt.x, 0.0, pt.y)
+	if pt is Array and pt.size() >= 3:
+		return Vector3(float(pt[0]), float(pt[1]), float(pt[2]))
+	if pt is Array and pt.size() >= 2:
+		return Vector3(float(pt[0]), 0.0, float(pt[1]))
+	return Vector3.ZERO
+
 # Deterministic per-blob coastline wobble - a couple of harmonics gives a
 # smooth organic curve (not a perfect circle, not jagged/noisy), seeded from
 # the blob's own center so it's stable across reloads without needing to
@@ -607,6 +806,13 @@ static func height_at(map_def: Dictionary, x: float, z: float) -> float:
 		h += _hill_contribution(hill, x, z)
 	for blob in map_def.get("water_blobs", []):
 		h += _water_blob_height_contribution(blob, x, z)
+	# Dramatic features: plateau / canyon / ridge / lake. Each writes its own
+	# analytic height contribution on top of the noise + hills + water_blobs
+	# above, so a map can mix legacy hills with new feature types in the
+	# same file without one path stomping the other. (See _resolve_features()
+	# for the cliffs[] / water_areas[] auto-emission that runs once at load.)
+	for feature in map_def.get("terrain", {}).get("features", []):
+		h += _feature_contribution(feature, x, z)
 	return h
 
 static func slope_at(map_def: Dictionary, x: float, z: float) -> float:
@@ -849,6 +1055,17 @@ static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], gr
 	var hard_holes = []
 	for o in map_def.get("obstacles", []):
 		hard_holes.append(_rect_from(o.center, o.half_extents))
+	# canyon_ford PR1 (2026-08-26): hand-placed cliff mesh pieces are
+	# impassable - they need to carve the ground navmesh the same way
+	# obstacles do, NOT just have a visual StaticBody3D that the unit
+	# walks into. Without this, the navmesh routes a unit straight
+	# through a canyon wall and the unit gets stuck against the cliff
+	# mesh. _spawn_cliff's own StaticBody3D is still useful (it stops
+	# any unit that does end up at the cliff's footprint, e.g. one
+	# pushed there by combat) but the navmesh bake is the primary
+	# routing layer and needs the cliff as a hard hole.
+	for c in map_def.get("cliffs", []):
+		hard_holes.append(_rect_from(c.center, c.half_extents))
 	# RTS_CORE_ROADMAP.md C1: extra_holes are building footprints ({center,
 	# half_extents}, same rect shape obstacles already use) - a live
 	# building blocks the ground navmesh exactly like a map-authored
@@ -1653,6 +1870,12 @@ static func _create_nav_maps(map_def: Dictionary) -> Dictionary:
 # vision, flow fields, every existing test - queries the MAP RID, which is
 # still exactly one RID per surface and completely unchanged in shape.
 static func build_navmeshes(map_def: Dictionary, extra_holes: Array = []) -> Dictionary:
+	# Resolve features once at the top so the navmesh bake sees the
+	# auto-emitted cliffs[] from plateaus / canyons / ridges, and the
+	# auto-emitted water_areas[] from lakes. Without this, the ground
+	# navmesh would route units straight through a plateau's wall, which
+	# is the same bug class canyon_ford PR1 hit on hand-authored cliffs.
+	_resolve_features(map_def)
 	var maps = _create_nav_maps(map_def)
 	var ga = build_ground_amphibious_tiles(map_def, extra_holes, maps.ground_map, maps.amphibious_map, true)
 	var wd = build_water_and_deep_water(map_def, maps.water_map, maps.deep_water_map, true)
@@ -1765,6 +1988,22 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 	var prop_scale = WorldScaleScript.for_map(map_def)
 	_spawn_merged_water(map_def, parent, prop_scale)
 	await _slice.call()
+	# Cliffs between water and obstacles: terrain infrastructure sits
+	# underneath everything decorative, so the visual order is water →
+	# cliffs → obstacles → surface zones, and cliffs draw on top of the
+	# ground mesh but underneath every prop that should occlude them.
+	# canyon_ford PR1, 2026-08-26.
+	#
+	# Auto-emit cliffs[] / water_areas[] from terrain.features[] BEFORE
+	# _spawn_cliffs runs, so the new feature types (plateau, canyon, ridge,
+	# lake) light up the same spawn path the hand-authored entries use.
+	# The resolver is idempotent: re-running with the same map_def produces
+	# the same emissions, and a second call is a no-op (the auto-emitted
+	# entries are tagged with an "auto" meta so we don't double-emit if
+	# spawn_visuals is called more than once - which it is on scene reload).
+	_resolve_features(map_def)
+	_spawn_cliffs(map_def, parent, prop_scale)
+	await _slice.call()
 	for o in map_def.get("obstacles", []):
 		_spawn_obstacle(o, parent, map_def)
 	await _slice.call()
@@ -1776,6 +2015,14 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 		# detached underneath it.
 		await _spawn_surface_zone(s, parent, prop_scale, map_def, ticker)
 		await _slice.call()
+	# canyon_ford PR5 (2026-08-26): per-forest-zone LOS-blocking AABBs
+	# are added AFTER the visual surface zones so the body sits on
+	# top of the (already-built) visual mesh, and so the LOS raycast
+	# hits a body whose AABB is exactly aligned with what the player
+	# sees. Cheap (1-2 StaticBody3D + BoxShape3D per map), no frame
+	# budget hit, the navmesh bake is unaffected (see _spawn_forest_
+	# zone_aabbs's own header for why).
+	_spawn_forest_zone_aabbs(map_def, parent, prop_scale)
 	for sw in map_def.get("shallow_water_areas", []):
 		_spawn_shallow_water_marker(sw, parent, prop_scale)
 	for b in map_def.get("bridges", []):
@@ -2297,9 +2544,20 @@ static func _build_conforming_zone_mesh(map_def: Dictionary, center: Vector3, ha
 			var b = Vector3(x1, _h.call(x1, z), z)
 			var c = Vector3(x1, _h.call(x1, z1), z1)
 			var d = Vector3(x, _h.call(x, z1), z1)
+			# Slope factor: steep slopes fade the zone out so the base ground
+			# (which has triplanar rock on slopes) shows through. This creates
+			# natural transitions — flat areas keep their surface type, slopes
+			# erode to rock. Threshold 0.35 is gentle enough that walking-pace
+			# hills keep their surface, while real escarpments lose it.
+			var avg_y = (a.y + b.y + c.y + d.y) * 0.25
+			var dx = abs(b.y - a.y) + abs(c.y - d.y)
+			var dz = abs(d.y - a.y) + abs(c.y - b.y)
+			var slope = sqrt(dx * dx + dz * dz) / (resolution * 2.0)
+			var slope_factor = smoothstep(0.25, 0.55, 1.0 - slope)
 			for v in [a, b, c, a, c, d]:
 				st.set_uv(Vector2(v.x, v.z) / tile)
-				st.set_color(Color(1, 1, 1, _zone_edge_alpha(v, center, half_extents)))
+				var edge_alpha = _zone_edge_alpha(v, center, half_extents)
+				st.set_color(Color(1, 1, 1, edge_alpha * slope_factor))
 				st.add_vertex(v)
 			z = z1
 		x = x1
@@ -2351,9 +2609,14 @@ static func _build_conforming_zone_mesh_stepwise(map_def: Dictionary, center: Ve
 			var b = Vector3(x1, _h.call(x1, z), z)
 			var c = Vector3(x1, _h.call(x1, z1), z1)
 			var d = Vector3(x, _h.call(x, z1), z1)
+			var dx = abs(b.y - a.y) + abs(c.y - d.y)
+			var dz = abs(d.y - a.y) + abs(c.y - b.y)
+			var slope = sqrt(dx * dx + dz * dz) / (resolution * 2.0)
+			var slope_factor = smoothstep(0.25, 0.55, 1.0 - slope)
 			for v in [a, b, c, a, c, d]:
 				st.set_uv(Vector2(v.x, v.z) / tile)
-				st.set_color(Color(1, 1, 1, _zone_edge_alpha(v, center, half_extents)))
+				var edge_alpha = _zone_edge_alpha(v, center, half_extents)
+				st.set_color(Color(1, 1, 1, edge_alpha * slope_factor))
 				st.add_vertex(v)
 			z = z1
 		x = x1
@@ -2374,7 +2637,11 @@ static func _build_conforming_zone_mesh_stepwise(map_def: Dictionary, center: Ve
 # other only in the ordinary alpha-over sense, which softens the seam but is not
 # a true splat. A real multi-texture blend shader is the correct long-term
 # answer and is deliberately scoped as its own task - see the plan.
-const ZONE_EDGE_FADE_FRACTION: float = 0.18
+#
+# Updated: zone edges also fade based on terrain slope (see conforming mesh
+# builders). Steep slopes lose their surface zone to reveal the base ground's
+# triplanar rock, creating natural erosion transitions.
+const ZONE_EDGE_FADE_FRACTION: float = 0.25
 
 static func _zone_edge_alpha(v: Vector3, center: Vector3, half_extents: Vector2) -> float:
 	# Distance from this vertex to the nearest footprint edge, expressed as a
@@ -2433,6 +2700,55 @@ static func _spawn_surface_zone(zone: Dictionary, parent: Node3D, prop_scale: fl
 		parent.add_child(mesh_inst)
 
 	TerrainGreeblesScript.scatter(zone, parent, prop_scale, map_def)
+
+
+# canyon_ford PR5 (2026-08-26): per-forest-zone StaticBody3D AABB that
+# blocks the LOS raycast (vision_service.gd:770-784) without carving
+# the navmesh. A tree's collision box would also work but trees are
+# MultiMeshInstance3D (no collider today) and adding per-tree colliders
+# for the ~1000 ambient trees is a per-frame cost the existing scatter
+# budget doesn't tolerate. One AABB per forest zone = 1-2 colliders per
+# map, regardless of tree count.
+#
+# Why a collision layer at all (instead of a sensor / Area3D): the
+# vision raycast is a PhysicsRayQueryParameters3D against the world's
+# physics layers, and the cheapest way to make it hit a forest is to
+# put a real physics body in the world. The body's collision_mask is
+# 0 (it doesn't query anything; the world's queries hit IT), and
+# collision_layer = TERRAIN (1) is what the existing LOS raycast
+# already masks (`mask = BattleLayers.TERRAIN | BattleLayers.BUILDINGS`,
+# vision_service.gd:777). Navmesh is unaffected: the navmesh bake reads
+# JSON (`_build_ground_faces` at line 843), not scene-tree colliders,
+# and forest zones aren't in the obstacles[] / extra_holes arrays the
+# bake consumes - so units walk through forests normally, but cannot
+# see through them.
+#
+# Sized to the zone's half_extents and a constant FOREST_LOS_HEIGHT so
+# the AABB reaches the height of a tree canopy, ~6m. A viewer at eye
+# height (2m-ish, vision_service.gd:65-67 EYE_HEIGHT) inside or above
+# the AABB still sees out the top; a viewer at eye height OUTSIDE the
+# AABB cannot see in. That asymmetry is the "concealment" the flavor
+# text claims.
+const FOREST_LOS_HEIGHT: float = 6.0
+
+static func _spawn_forest_zone_aabbs(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0) -> void:
+	for z in map_def.get("surface_zones", []):
+		if z.get("surface_type", "") != "forest":
+			continue
+		var body: StaticBody3D = StaticBody3D.new()
+		body.collision_layer = 1  # BattleLayers.TERRAIN
+		body.collision_mask = 0
+		var shape: CollisionShape3D = CollisionShape3D.new()
+		var box: BoxShape3D = BoxShape3D.new()
+		# World-space size: zone's XZ footprint × FOREST_LOS_HEIGHT in Y.
+		# The position is the zone's center, lifted so the box's bottom
+		# sits at y=0 (ground level) and the top reaches FOREST_LOS_HEIGHT.
+		var size: Vector3 = Vector3(z.half_extents.x * 2.0 * prop_scale, FOREST_LOS_HEIGHT * prop_scale, z.half_extents.y * 2.0 * prop_scale)
+		box.size = size
+		shape.shape = box
+		body.add_child(shape)
+		body.position = Vector3(z.center.x, FOREST_LOS_HEIGHT * prop_scale * 0.5, z.center.z)
+		parent.add_child(body)
 
 # A lighter, sandier-toned marker over the shallow sub-area of a water
 # zone (drawn on top of the main water plane, slightly higher Y) - purely
@@ -2561,6 +2877,461 @@ static func _spawn_obstacle(obstacle: Dictionary, parent: Node3D, map_def: Dicti
 	parent.add_child(body)
 	body.global_position = Vector3(obstacle.center.x, base_y + collider_height / 2.0, obstacle.center.z)
 
+# --- Cliff mesh spawn (canyon_ford PR1, 2026-08-26) ---
+#
+# Hybrid heightmap+mesh terrain: heightmap handles ≤60° slopes, this is
+# what handles the >60° vertical faces a heightmap cannot represent cleanly
+# at world_scale=4 without quadratically-blowing Recast's voxel grid (see
+# the 6-PR plan's PR2 for the resolution-bound reasoning). Each cliff is a
+# StaticBody3D on BattleLayers.TERRAIN so the ground navmesh bake (Recast)
+# reads it as an impassable hole, and vision_service._has_line_of_sight's
+# raycast (TERRAIN | BUILDINGS, vision_service.gd:777) reads it as visual
+# cover - same dual role `obstacles` play today.
+#
+# Schema: FIELD_SPEC.cliffs in map_catalog.gd - {center: Vector3,
+# half_extents: Vector2, type: straight|corner_in|corner_out|end,
+# cliff_height: number, rotation: number (rad), cliff_tint: Color}.
+# `type` selects the .glb piece; `rotation` is around Y so a "straight"
+# can face any cardinal direction; `cliff_tint` is an optional per-piece
+# material override (a "Mars canyon" can push warmth, a "frozen fjord" can
+# desaturate) - defaults to neutral white.
+#
+# Pool size: 4. All-or-nothing fallback to BoxMesh + cliff material,
+# matching the boulder pool's "degrade to primitives, never a mix"
+# contract (_spawn_authored_boulders's own header, line 2640-2661) so a
+# fresh checkout before the Blender regen has run still ships a working
+# map - the cliffs are boxes, but the layout, collision, and the cliff
+# shader's triplanar rock look are all in place.
+const CLIFF_MODEL_DIR := "res://assets/models/terrain/cliff_%s.glb"
+const CLIFF_POOL_TYPES: Array = ["straight", "corner_in", "corner_out", "end"]
+const CLIFF_FALLBACK_HEIGHT: float = 4.0
+
+static func _spawn_cliffs(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0) -> void:
+	for c in map_def.get("cliffs", []):
+		_spawn_cliff(c, parent, map_def)
+
+static func _spawn_cliff(cliff: Dictionary, parent: Node3D, map_def: Dictionary = {}) -> void:
+	var cliff_type: String = cliff.get("type", "straight")
+	if cliff_type not in CLIFF_POOL_TYPES:
+		# Unknown type = treat as 'straight' rather than refusing the map.
+		# A validator's strict-fail (push_error in map_catalog.gd's loader)
+		# already catches typos before we get here, so this is a second
+		# line of defense for an in-test hand-built dict.
+		push_warning("TerrainBuilder: unknown cliff type '%s' - falling back to 'straight'" % cliff_type)
+		cliff_type = "straight"
+	var height_scale: float = WorldScaleScript.for_map(map_def)
+	var cliff_height: float = cliff.get("cliff_height", CLIFF_FALLBACK_HEIGHT) * height_scale
+	var base_y: float = _obstacle_ground_y(map_def, cliff.center.x, cliff.center.z)
+
+	# Visual mesh: try the authored GLB pool first, fall back to a BoxMesh
+	# with the cliff material. The cliff.gdshader's triplanar projection
+	# means the box reads as a 3D rock face from any angle, not as a
+	# cardboard box - same triplanar pattern that terrain_ground.gdshader
+	# uses for the rock blend on steep heightmap faces (lines 255-282), so
+	# a heightmap rock face and a cliff box read as the same material in
+	# the same map.
+	var mesh_inst: MeshInstance3D = null
+	var glb_path: String = CLIFF_MODEL_DIR % cliff_type
+	if ResourceLoader.exists(glb_path):
+		var packed: PackedScene = load(glb_path)
+		if packed != null:
+			var inst: Node = packed.instantiate()
+			if inst != null:
+				mesh_inst = MeshInstance3D.new()
+				# Re-parent any mesh children onto a single MeshInstance3D
+				# so material_override is one assignment, not a recursive
+				# walk. A .glb authored as a Node3D containing a Mesh + a
+				# collision body lands as one MeshInstance3D with the mesh.
+				for child in inst.get_children():
+					inst.remove_child(child)
+					mesh_inst.add_child(child)
+				inst.queue_free()
+	if mesh_inst == null:
+		mesh_inst = MeshInstance3D.new()
+		var box: BoxMesh = BoxMesh.new()
+		box.size = Vector3(cliff.half_extents.x * 2.0, cliff_height, cliff.half_extents.y * 2.0)
+		mesh_inst.mesh = box
+
+	# Material: cliff.gdshader with the rock triplanar texture set. The
+	# triplanar_scale is world_scale-aware so a 4x map doesn't get
+	# tile-stretched rocks (the same world-space-driven scale that
+	# terrain_ground.gdshader's `map_half_extents` uniform already does
+	# for the heightmap ground).
+	var mat: ShaderMaterial = ShaderMaterial.new()
+	mat.shader = load("res://shaders/cliff.gdshader")
+	mat.set_shader_parameter("triplanar_scale", 0.2 * height_scale)
+	if cliff.has("cliff_tint"):
+		mat.set_shader_parameter("cliff_tint", cliff.cliff_tint)
+	mesh_inst.material_override = mat
+
+	mesh_inst.position = Vector3(cliff.center.x, base_y, cliff.center.z)
+	var rotation_y: float = cliff.get("rotation", 0.0)
+	if rotation_y != 0.0:
+		mesh_inst.rotation.y = rotation_y
+	parent.add_child(mesh_inst)
+
+	# Collision: StaticBody3D on BattleLayers.TERRAIN (bit 0 = 1), with
+	# a BoxShape3D matching the cliff's bounding box. Mirrors the
+	# _spawn_obstacle collision block (line 2553-2562). The box is sized
+	# to half_extents × cliff_height, so the navmesh bake reads it as a
+	# cliff_height-tall hole the player can't path through, and the LOS
+	# raycast reads it as cover.
+	#
+	# `position`, not `global_position` - the body is added to `parent`
+	# which sits at world origin in every real call site (Battle.tscn's
+	# terrain root), so local == global. Using `position` here also
+	# makes the spawn tree-independent, which the smoke test
+	# (_test_cliff_spawn.gd) needs - `global_position` would assert
+	# `is_inside_tree()` and the headless run would log a stack of
+	# "Returning: Transform3D()" errors for no reason.
+	var body: StaticBody3D = StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var shape: CollisionShape3D = CollisionShape3D.new()
+	var box_shape: BoxShape3D = BoxShape3D.new()
+	box_shape.size = Vector3(cliff.half_extents.x * 2.0, cliff_height, cliff.half_extents.y * 2.0)
+	shape.shape = box_shape
+	body.add_child(shape)
+	body.position = Vector3(cliff.center.x, base_y + cliff_height / 2.0, cliff.center.z)
+	if rotation_y != 0.0:
+		body.rotation.y = rotation_y
+	parent.add_child(body)
+
+
+# --- Feature auto-emission --------------------------------------------------
+#
+# Convert a map's terrain.features[] into the lower-level map_def entries
+# (cliffs[], water_blobs[]) so the existing spawn machinery handles the
+# visuals, collision, navmesh, and LOS without per-type special cases.
+# Idempotent: a second call with the same features[] sees the "auto"
+# tag on the previously-emitted entries and skips them.
+#
+# EMISSION SUMMARY.
+#   plateau   → 4 wall lines around the perimeter + 4 corner_out pieces,
+#               one per convex corner of the AABB.
+#   canyon    → 2 parallel wall lines along the centerline + 2 end pieces
+#               at each terminus (4 total). The flat floor at -depth is
+#               handled by _canyon_contribution in the heightmap; no
+#               water_area is emitted unless `floor_surface: "water"` is
+#               set on the feature.
+#   ridge     → 2 parallel wall lines along the polyline (one per side),
+#               + corner pieces at each polyline vertex. The polyline
+#               turn angle drives corner_in vs corner_out per vertex.
+#   lake      → one water_blob at center (so the existing water mesh,
+#               amphibious navmesh region, and shoreline all light up).
+#               No cliffs - it's water, not a wall.
+#
+# The "auto" tag is set on each emitted entry's `meta` set, NOT in the
+# dict itself - map_def is a plain Dictionary and adding a key would
+# show up in FIELD_SPEC validation. We use a parallel `auto_emitted`
+# dict (keyed by feature index) so the sidecar state is invisible to
+# the validator and to the test fixtures.
+const _AUTO_FEATURE_EMITTED_KEY := "_auto_feature_emitted"
+
+
+static func _resolve_features(map_def: Dictionary) -> void:
+	var features_root: Dictionary = map_def.get("terrain", {})
+	var features: Array = features_root.get("features", [])
+	if features.is_empty():
+		return
+	# Idempotency: if spawn_visuals ran once and the resolver is being
+	# called again (scene reload, test fixture), skip already-emitted
+	# features. The "emitted" set lives on map_def itself; the keys are
+	# the JSON-stable feature index. The set is re-initialised when the
+	# features array is replaced (different map_def), but stable across
+	# repeated calls on the same map_def.
+	var emitted: Dictionary = map_def.get(_AUTO_FEATURE_EMITTED_KEY, {})
+	var ensure_cliffs: Array = map_def.get("cliffs", [])
+	var ensure_water: Array = map_def.get("water_blobs", [])
+	var ensure_water_areas: Array = map_def.get("water_areas", [])
+	for i in range(features.size()):
+		if emitted.has(i):
+			continue
+		var feature: Dictionary = features[i]
+		var ftype: String = feature.get("type", "")
+		match ftype:
+			"plateau":
+				ensure_cliffs.append_array(_plateau_cliffs(feature))
+			"canyon":
+				ensure_cliffs.append_array(_canyon_cliffs(feature))
+			"ridge":
+				ensure_cliffs.append_array(_ridge_cliffs(feature))
+			"lake":
+				ensure_water.append(_lake_water_blob(feature))
+				# If the author asked for a water_area (rect water)
+				# rather than a blob, emit that instead.
+				if feature.get("floor_surface", "blob") == "water":
+					ensure_water_areas.append(_lake_water_area(feature))
+		emitted[i] = true
+	map_def["cliffs"] = ensure_cliffs
+	map_def["water_blobs"] = ensure_water
+	map_def["water_areas"] = ensure_water_areas
+	map_def[_AUTO_FEATURE_EMITTED_KEY] = emitted
+
+
+# Helper: place cliff pieces around the 4 sides of a plateau's perimeter.
+# Each side gets straight pieces at intervals matching CLIFF_PIECE_LENGTH,
+# with corner_out pieces at the 4 convex corners. The piece is oriented so
+# the wall face points OUT (away from the plateau), which is the same
+# convention the hand-authored cliffs[] use.
+const CLIFF_PIECE_LENGTH := 4.0
+
+
+static func _plateau_cliffs(feature: Dictionary) -> Array:
+	var c: Vector3 = _vec3_of(feature.get("center", Vector3.ZERO))
+	# half_extents may be authored as a JSON Array ([x, z]) or as a
+	# Vector2 - the FIELD_SPEC for features[] is unvalidated, so the
+	# decoder doesn't normalize the shape. _vec_of accepts both.
+	var he: Vector2 = _vec_of(feature.get("half_extents", Vector2(10, 10)))
+	var hx: float = feature.get("half_extents_x", he.x)
+	var hz: float = feature.get("half_extents_z", he.y)
+	var wall_height: float = feature.get("wall_height", feature.get("height", 8.0))
+	if hx < CLIFF_PIECE_LENGTH * 0.5 or hz < CLIFF_PIECE_LENGTH * 0.5:
+		# Plateau too small for a 4-piece wall - skip the auto-emission.
+		# The user can still hand-author cliffs[] for tiny plateaus.
+		return []
+	var cliffs: Array = []
+	# The 4 sides in order: +X (east), -X (west), +Z (south), -Z (north).
+	# For each side, the side length is 2*h_dim where h_dim is the
+	# perpendicular half_extent. Place straight pieces along it, and
+	# corner pieces at the 2 ends.
+	var sides := [
+		{"axis": "z", "sign": 1, "x_offset": hx, "z_extent": hz, "rotation": 0.0},
+		{"axis": "z", "sign": -1, "x_offset": -hx, "z_extent": hz, "rotation": PI},
+		{"axis": "x", "sign": 1, "z_offset": hz, "x_extent": hx, "rotation": -PI * 0.5},
+		{"axis": "x", "sign": -1, "z_offset": -hz, "x_extent": hx, "rotation": PI * 0.5},
+	]
+	for side in sides:
+		var along_extent: float = side.get("z_extent", side.get("x_extent", 0.0))
+		var n_pieces: int = max(1, int(round(along_extent * 2.0 / CLIFF_PIECE_LENGTH)))
+		var step: float = (along_extent * 2.0) / n_pieces
+		for j in range(n_pieces):
+			var along := -along_extent + step * (j + 0.5)
+			var center: Vector3
+			if side.axis == "z":
+				center = Vector3(c.x + side.x_offset, c.y, c.z + along)
+			else:
+				center = Vector3(c.x + along, c.y, c.z + side.z_offset)
+			var half_extents: Vector2
+			if side.axis == "z":
+				half_extents = Vector2(0.5, step * 0.5)
+			else:
+				half_extents = Vector2(step * 0.5, 0.5)
+			cliffs.append({
+				"center": center,
+				"half_extents": half_extents,
+				"type": "straight",
+				"cliff_height": wall_height,
+				"rotation": side.rotation,
+			})
+	# 4 corner_out pieces at the convex corners. The corner cliff's own
+	# footprint is 2x2 so it sits exactly on the corner of the plateau.
+	var corner_positions := [
+		Vector3(c.x + hx, c.y, c.z + hz),
+		Vector3(c.x + hx, c.y, c.z - hz),
+		Vector3(c.x - hx, c.y, c.z + hz),
+		Vector3(c.x - hx, c.y, c.z - hz),
+	]
+	var corner_rotations := [0.0, -PI * 0.5, PI * 0.5, PI]
+	for k in range(4):
+		cliffs.append({
+			"center": corner_positions[k],
+			"half_extents": Vector2(1.0, 1.0),
+			"type": "corner_out",
+			"cliff_height": wall_height,
+			"rotation": corner_rotations[k],
+		})
+	return cliffs
+
+
+# Two parallel wall lines + 2 end pieces at each terminus of a canyon.
+# The floor between the walls is a flat strip at -depth (heightmap only,
+# no extra geometry); `floor_surface: "water"` on the feature adds a
+# water_area along the floor.
+static func _canyon_cliffs(feature: Dictionary) -> Array:
+	var start: Vector3 = _vec3_of(feature.get("start", Vector3.ZERO))
+	var end: Vector3 = _vec3_of(feature.get("end", Vector3.ZERO))
+	var width: float = feature.get("width", 12.0)
+	var depth: float = feature.get("depth", 12.0)
+	var axis := end - start
+	var axis_len := axis.length()
+	if axis_len < CLIFF_PIECE_LENGTH:
+		return []
+	var axis_dir := axis / axis_len
+	# Perpendicular (left of the axis as you walk start -> end).
+	var perp: Vector2 = Vector2(-axis_dir.z, axis_dir.x)
+	var floor_half := width * 0.5
+	var cliffs: Array = []
+	for side_sign in [-1.0, 1.0]:
+		var side_dir: Vector2 = perp * (side_sign * floor_half)
+		var along_pieces: int = max(1, int(round(axis_len / CLIFF_PIECE_LENGTH)))
+		var step: float = axis_len / along_pieces
+		for j in range(along_pieces):
+			var along: float = step * (j + 0.5)
+			var world_pos: Vector2 = Vector2(start.x, start.z) + Vector2(axis_dir.x, axis_dir.z) * along + side_dir
+			var center := Vector3(world_pos.x, start.y, world_pos.y)
+			# Wall piece faces perpendicular to axis. cliff.rotation y =
+			# atan2(perp.x, perp.y) in the XZ plane, but Godot's atan2
+			# gives the angle from +X; we want the wall face aligned with
+			# the perpendicular. The sign of side_dir picks the orientation.
+			var rot: float = atan2(axis_dir.x, axis_dir.z) + (PI * 0.5 if side_sign > 0 else -PI * 0.5)
+			cliffs.append({
+				"center": center,
+				"half_extents": Vector2(0.5, step * 0.5),
+				"type": "straight",
+				"cliff_height": depth,
+				"rotation": rot,
+			})
+	# End pieces at the start and end of each wall.
+	for end_pos in [Vector2(start.x, start.z), Vector2(end.x, end.z)]:
+		for side_sign in [-1.0, 1.0]:
+			var side_dir: Vector2 = perp * (side_sign * floor_half)
+			var center2 := Vector3(end_pos.x + side_dir.x, start.y, end_pos.y + side_dir.y)
+			var rot: float = atan2(perp.x, perp.y)
+			cliffs.append({
+				"center": center2,
+				"half_extents": Vector2(1.0, 1.0),
+				"type": "end",
+				"cliff_height": depth,
+				"rotation": rot,
+			})
+	return cliffs
+
+
+# Walk both sides of the polyline, emit straight pieces; at each vertex
+# emit a corner piece. The corner type (in vs out) depends on whether the
+# polyline turns left or right at that vertex. Convex turns read as
+# corner_out, concave as corner_in.
+static func _ridge_cliffs(feature: Dictionary) -> Array:
+	var pts = feature.get("points", [])
+	if pts.size() < 2:
+		return []
+	var width: float = feature.get("width", 6.0)
+	var height: float = feature.get("height", 10.0)
+	var cliffs: Array = []
+	for i in range(pts.size() - 1):
+		var a: Vector2 = _vec_of(pts[i])
+		var b: Vector2 = _vec_of(pts[i + 1])
+		var seg: Vector2 = b - a
+		var seg_len: float = seg.length()
+		if seg_len < CLIFF_PIECE_LENGTH * 0.5:
+			continue
+		var seg_dir := seg / seg_len
+		var perp: Vector2 = Vector2(-seg_dir.y, seg_dir.x)
+		for side_sign in [-1.0, 1.0]:
+			var side_dir: Vector2 = perp * (side_sign * width)
+			var n_pieces: int = max(1, int(round(seg_len / CLIFF_PIECE_LENGTH)))
+			var step: float = seg_len / n_pieces
+			for j in range(n_pieces):
+				var along: float = step * (j + 0.5)
+				var world_pos: Vector2 = a + seg_dir * along + side_dir
+				var rot: float = atan2(seg_dir.x, seg_dir.y) + (PI * 0.5 if side_sign > 0 else -PI * 0.5)
+				cliffs.append({
+					"center": Vector3(world_pos.x, 0.0, world_pos.y),
+					"half_extents": Vector2(0.5, step * 0.5),
+					"type": "straight",
+					"cliff_height": height,
+					"rotation": rot,
+				})
+		# Corner at the END of this segment (the START vertex is owned by
+		# the previous iteration, except for the first segment which gets
+		# the corner at the start vertex as well so the first wall has a
+		# proper end-cap).
+		if i == 0:
+			cliffs.append_array(_ridge_end_corners(a, perp, width, height))
+		# At the end of this segment, the next segment takes over - emit
+		# the corner pieces at the join here based on the turn direction.
+		if i + 1 < pts.size() - 1:
+			var c_pt := _vec_of(pts[i + 1])
+			var next_seg := _vec_of(pts[i + 2]) - c_pt
+			var turn := _ridge_turn(seg, next_seg)
+			cliffs.append_array(_ridge_turn_corners(c_pt, perp, next_seg.normalized(), width, height, turn))
+		else:
+			# Last segment's end vertex - emit end-cap.
+			cliffs.append_array(_ridge_end_corners(b, perp, width, height))
+	return cliffs
+
+
+static func _ridge_turn(seg: Vector2, next_seg: Vector2) -> float:
+	# Cross product gives the sign of the turn (positive = left, negative = right).
+	return seg.x * next_seg.y - seg.y * next_seg.x
+
+
+static func _ridge_turn_corners(vertex: Vector2, perp: Vector2, next_dir: Vector2, width: float, height: float, turn: float) -> Array:
+	var corner_type: String = "corner_out" if turn > 0.0 else "corner_in"
+	var rot: float = atan2(perp.x, perp.y)
+	# Two corner pieces - one on each side of the polyline - so both walls
+	# meet the turn cleanly.
+	return [
+		{
+			"center": Vector3(vertex.x + perp.x * width, 0.0, vertex.y + perp.y * width),
+			"half_extents": Vector2(1.0, 1.0),
+			"type": corner_type,
+			"cliff_height": height,
+			"rotation": rot,
+		},
+		{
+			"center": Vector3(vertex.x - perp.x * width, 0.0, vertex.y - perp.y * width),
+			"half_extents": Vector2(1.0, 1.0),
+			"type": corner_type,
+			"cliff_height": height,
+			"rotation": rot + PI,
+		},
+	]
+
+
+static func _ridge_end_corners(vertex: Vector2, perp: Vector2, width: float, height: float) -> Array:
+	# End-cap at a polyline terminus: a single end piece on each side, no
+	# corner piece (the polyline ends, so there's no "outside corner" to
+	# resolve). The end piece's own footprint is 2x2 so it sits at the tip.
+	var rot: float = atan2(perp.x, perp.y)
+	return [
+		{
+			"center": Vector3(vertex.x + perp.x * width, 0.0, vertex.y + perp.y * width),
+			"half_extents": Vector2(1.0, 1.0),
+			"type": "end",
+			"cliff_height": height,
+			"rotation": rot,
+		},
+		{
+			"center": Vector3(vertex.x - perp.x * width, 0.0, vertex.y - perp.y * width),
+			"half_extents": Vector2(1.0, 1.0),
+			"type": "end",
+			"cliff_height": height,
+			"rotation": rot + PI,
+		},
+	]
+
+
+static func _lake_water_blob(feature: Dictionary) -> Dictionary:
+	var c: Vector3 = _vec3_of(feature.get("center", Vector3.ZERO))
+	var radius: float = feature.get("radius", 12.0)
+	var depth: float = feature.get("depth", 3.0)
+	# Map the feature's `shoreline_falloff` to the water_blob's
+	# `shore_blend` (the existing water_blob convention) so the shoreline
+	# reads the same.
+	var shore_blend: float = feature.get("shoreline_falloff", 4.0) / max(radius, 1.0)
+	return {
+		"center": c,
+		"radius": radius,
+		"depth": depth,
+		"irregularity": 0.0,  # authored lakes are circles, not organic blobs
+		"shore_blend": shore_blend,
+	}
+
+
+static func _lake_water_area(feature: Dictionary) -> Dictionary:
+	# Rect-water variant of a lake. Used when the author sets
+	# `floor_surface: "water"` on a canyon. The center is the feature
+	# center; the rect spans the requested area.
+	var c: Vector3 = _vec3_of(feature.get("center", Vector3.ZERO))
+	var radius: float = feature.get("radius", 12.0)
+	return {
+		"center": c,
+		"half_extents": Vector2(radius, radius),
+	}
+
+
 static func _spawn_fortification_obstacle(obstacle: Dictionary, parent: Node3D, base_y: float = 0.0) -> float:
 	var h: float = obstacle.get("building_height", 3.2)
 	var mesh_inst = MeshInstance3D.new()
@@ -2649,8 +3420,8 @@ static func _spawn_crater_obstacle(obstacle: Dictionary, parent: Node3D, base_y:
 # this MUST stay in step with. A pool size larger than what Blender actually
 # exports rolls indices at .glb files that do not exist and drops silently to
 # the primitive fallback, which is the exact failure AUTHORED_POOL_SIZES in
-# resource_node.gd exists to document.
-const BOULDER_POOL_SIZE := 6
+# 35 high-fidelity geological rock models (7 formations x 5 variants)
+const BOULDER_POOL_SIZE := 35
 const BOULDER_MODEL_DIR := "res://assets/models/terrain/boulder_%d.glb"
 
 # Checked ONCE, before adding anything - the whole pool is generated in a
@@ -2966,6 +3737,19 @@ const AMBIENT_ORE_MAX_COUNT: int = 440   # = 20 clusters * 22 items ceiling
 # const AMBIENT_ORE_DENSITY_M2: float = 180.0
 # const AMBIENT_ORE_MAX_COUNT: int = 800
 
+# canyon_ford PR5 (2026-08-26): tree placement slope cap. Below the
+# cap (~26°), a tree sits naturally on the slope. Above the cap, a
+# tree either stands on a vertical-ish face (visually wrong - the
+# trunk pokes through the slope) or on a hand-placed cliff mesh
+# (the cliff's geometry is hostile to a tree's collision box). The
+# 0.5 figure is well below the SLOPE_IMPASSABLE threshold (0.7) and
+# above the SLOPE_WALKABLE_SLOW threshold (0.3) - i.e. trees don't
+# appear even on moderate slopes, leaving those to greebles
+# (terrain_greebles.gd's _scatter_rocky / _scatter_* already slope-
+# reject). Matches what a real forest does on a steep hillside:
+# the trees bunch up at the base, the slope above is bare rock.
+const AMBIENT_TREE_MAX_SLOPE: float = 0.5
+
 static func _spawn_ambient_trees(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0, ticker: Node = null) -> Array:
 	var half: float = map_def.get("map_half_extents", 80.0)
 	# SKIRMISH_PERF_TROUBLESHOOTING.md §12. Per-map density multiplier.
@@ -3015,6 +3799,16 @@ static func _spawn_ambient_trees(map_def: Dictionary, parent: Node3D, prop_scale
 			avoid_points, bridge_rects, [],
 			AMBIENT_TREE_AVOID_RADIUS, max_count - placed, map_def)
 		for pos in placed_in_cluster:
+			# canyon_ford PR5 (2026-08-26): reject any item whose
+			# terrain slope exceeds AMBIENT_TREE_MAX_SLOPE. The
+			# cluster-center pick does the same at the cluster scale
+			# (via _pick_cluster_centers' lake check), but the per-
+			# item jitter inside a cluster can still land an item on
+			# a slope that the cluster center was flat against.
+			# Cheap filter - _slope_at reads the same heightmap cache
+			# height_at uses, no extra cost beyond a 4-tap sample.
+			if _slope_at(map_def, pos.x, pos.z) > AMBIENT_TREE_MAX_SLOPE:
+				continue
 			pos.y = terrain_height_at(map_def, pos)
 			TerrainGreeblesScript.spawn_ambient_tree(pos, parent, rng.randi(), ResourceNodeScript.AMBIENT_TREE_AMOUNT)
 			placed_positions.append(pos)
@@ -3328,6 +4122,9 @@ static func get_surface_type_at(map_def: Dictionary, pos: Vector3) -> String:
 # unwalkable" (an obstacle or over-slope cell should still read as its
 # normal ground color on the minimap, just with a blip/prop on top of it).
 static func is_water_at(map_def: Dictionary, x: float, z: float) -> bool:
+	# Resolve feature emissions so a `lake` feature's auto-emitted water_area
+	# is in the iteration below. Idempotent.
+	_resolve_features(map_def)
 	var pos = Vector3(x, 0, z)
 	for w in map_def.get("water_areas", []):
 		if _point_in_rect(pos, _rect_from(w.center, w.half_extents)):
@@ -3395,15 +4192,78 @@ static func _is_over_water_or_obstacle(map_def: Dictionary, pos: Vector3) -> boo
 	return false
 
 static func is_position_blocked(map_def: Dictionary, pos: Vector3) -> bool:
+	# Make sure plateau / canyon / ridge auto-emitted cliffs are in the
+	# cliffs[] array before we check it. The resolver is idempotent and
+	# cheap (a few AABBs per feature) so calling it on every probe is
+	# fine. spawn_visuals() already calls this once at scene-build time;
+	# this call covers the lint / pathing / unit-placement paths that
+	# run on a raw map_def.
+	_resolve_features(map_def)
 	if _is_over_water_or_obstacle(map_def, pos):
 		return true
+	# canyon_ford PR1 (2026-08-26): cliff footprints are impassable.
+	# The cliff mesh is a hand-placed wall; spawning a unit inside its
+	# footprint would put the unit inside solid rock. Without this
+	# check, `lint_spawn_fairness` and the per-spawn placement check
+	# both happily drop a unit onto a cliff, where it then can't move
+	# because the cliff's StaticBody3D is in the way.
+	for c in map_def.get("cliffs", []):
+		if _point_in_rect(pos, _rect_from(c.center, c.half_extents)):
+			return true
 	# RTS_CORE_ROADMAP.md B4: a heightmap makes slope-blocking meaningful
 	# everywhere, not just near authored hills (_slope_at() calls
 	# height_at(), which already checks the heightmap first internally).
+	# canyon_ford PR3 (2026-08-26): the bare MAX_WALKABLE_SLOPE check
+	# that lived here before has been replaced with the same slope-class
+	# classification the speed-multiplier path uses, so the
+	# walkable/walkable-slow/impassable threshold is the same number
+	# everywhere - one source of truth, no chance of the navmesh
+	# excluding a 0.69 slope that the speed path then penalises as
+	# impassable.
 	var has_heightmap = _get_heightmap_image(map_def) != null
-	if (has_heightmap or not map_def.get("hills", []).is_empty()) and _slope_at(map_def, pos.x, pos.z) > MAX_WALKABLE_SLOPE:
+	if (has_heightmap or not map_def.get("hills", []).is_empty()) and slope_class_at(map_def, pos.x, pos.z) == SLOPE_IMPASSABLE:
 		return true
 	return false
+
+
+# canyon_ford PR3 (2026-08-26): walkable / walkable-slow / impassable
+# classification by raw slope (= rise/run, not degrees). Returned as a
+# string (not an enum) so module_catalog.gd's SLOPE_SPEED_MULTIPLIERS
+# table can use the same keys without a translation hop.
+#
+# Thresholds:
+#   < SLOPE_WALKABLE_SLOW_THRESHOLD (0.3, ~17°)  -> "walkable"     - full speed
+#   0.3 .. MAX_WALKABLE_SLOPE (0.7, ~35°)        -> "walkable_slow" - per-locomotion penalty
+#   >= MAX_WALKABLE_SLOPE (0.7)                  -> "impassable"   - excluded by navmesh
+#
+# MAX_WALKABLE_SLOPE was the pre-PR3 cutoff (line 331) and is unchanged
+# here. The "walkable_slow" tier is the new gameplay-relevant band
+# between full-speed and navmesh-excluded - a unit CAN traverse it, but
+# SLOPE_SPEED_MULTIPLIERS in module_catalog.gd assigns per-locomotion
+# penalties (wheels slow to 0.6×, hover and air-cushion stay at 1.0×,
+# etc.). This is the per-locomotion slope differentiation the user's
+# spec asked for, with one source of truth for the threshold and one
+# table for the multipliers.
+#
+# No-cliff maps: every existing map with a heightmap (scattered_peaks,
+# highland_chokepoint, twin_summits per the B6 migration) gets the
+# walkable_slow tier populated by its authored hills for free. The 11
+# open_plains hills (height 9, radius 16-20, falloff 14-28) produce
+# ~30-50° slopes on their faces - squarely in the "walkable_slow"
+# band, so PR3's gameplay effect ships on every existing heightmap
+# map without any per-map authoring work.
+const SLOPE_WALKABLE_SLOW_THRESHOLD: float = 0.3
+const SLOPE_WALKABLE: String = "walkable"
+const SLOPE_WALKABLE_SLOW: String = "walkable_slow"
+const SLOPE_IMPASSABLE: String = "impassable"
+
+static func slope_class_at(map_def: Dictionary, x: float, z: float) -> String:
+	var slope: float = _slope_at(map_def, x, z)
+	if slope >= MAX_WALKABLE_SLOPE:
+		return SLOPE_IMPASSABLE
+	if slope >= SLOPE_WALKABLE_SLOW_THRESHOLD:
+		return SLOPE_WALKABLE_SLOW
+	return SLOPE_WALKABLE
 
 
 # --- Cluster-scatter helpers (2026-08-10, Chris) ---

@@ -1,5 +1,5 @@
 {
- "description": "Canyon Ford: A deep north-south canyon bisects the field. The single bridge is the only dry crossing. The western plateau (height 14) overlooks the killing ground from the south, the eastern ridge (height 8) hides ambush forces in dense forest, and three marshy pockets bog down wheels. Anti-grav and screw-drive rule the slopes; the plateau top is the obvious base site.",
+ "description": "Canyon Ford: A deep north-south canyon bisects the field as a dry pass between the western plateau and the eastern ridge. The single bridge at the canyon's narrowest point is the obvious crossing, but the canyon floor is walkable at most latitudes. The western plateau (height 14) overlooks the killing ground, the eastern ridge (height 8) hides ambush forces in dense forest, and three marshy lakes in the corners bog down wheels. Anti-grav and screw-drive rule the slopes; the plateau top is the obvious base site.",
  "ground_color": [0.32, 0.30, 0.24],
  "map_half_extents": 400,
  "name": "Canyon Ford",
@@ -43,8 +43,7 @@
     "end":   [0.0, 0.0,  180.0],
     "width": 22,
     "depth": 20,
-    "wall_falloff": 3.0,
-    "floor_surface": "water"
+    "wall_falloff": 3.0
    },
    {
     "type": "plateau",
@@ -84,13 +83,6 @@
    }
   ]
  },
- "water_areas": [
-  {"center": [0.0, 0.0, 0.0], "half_extents": [11.0, 180.0]}
- ],
- "shallow_water_areas": [
-  {"center": [0.0, 0.0, 60.0], "half_extents": [8.0, 25.0]},
-  {"center": [0.0, 0.0, -60.0], "half_extents": [8.0, 25.0]}
- ],
  "bridges": [
   {"center": [0.0, 0.0, 0.0], "half_extents": [8.0, 14.0], "deck_height": 0.6}
  ],
@@ -107,6 +99,8 @@
   {"center": [-130.0, 0.0, 250.0], "half_extents": [22.0, 22.0], "surface_type": "marsh"},
   {"center": [-80.0, 0.0, 0.0], "half_extents": [22.0, 18.0], "surface_type": "gravel"},
   {"center": [80.0, 0.0, 0.0], "half_extents": [22.0, 18.0], "surface_type": "gravel"},
+  {"center": [0.0, 0.0, 60.0], "half_extents": [11.0, 90.0], "surface_type": "gravel"},
+  {"center": [0.0, 0.0, -60.0], "half_extents": [11.0, 90.0], "surface_type": "gravel"},
   {"center": [0.0, 0.0, 130.0], "half_extents": [30.0, 22.0], "surface_type": "rocky"},
   {"center": [0.0, 0.0, -130.0], "half_extents": [30.0, 22.0], "surface_type": "rocky"}
  ],

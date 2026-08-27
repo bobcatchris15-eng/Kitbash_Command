@@ -50,11 +50,11 @@ func _init():
 		print("[FAIL] cliffs are reported as blocked by is_position_blocked")
 	else:
 		print("[PASS] cliffs are reported as blocked by is_position_blocked")
-	if not _test_bridge_carves_water():
+	if not _test_bridge_spans_canyon():
 		failed += 1
-		print("[FAIL] bridge overlaps water (carves a walkable strip)")
+		print("[FAIL] bridge spans the dry canyon (no water_areas; bridge near x=0)")
 	else:
-		print("[PASS] bridge overlaps water (carves a walkable strip)")
+		print("[PASS] bridge spans the dry canyon (no water_areas; bridge near x=0)")
 	if not _test_forest_aabb_exists():
 		failed += 1
 		print("[FAIL] forest zone AABB exists for LOS")
@@ -130,35 +130,34 @@ func _test_cliffs_are_blocked() -> bool:
 	return true
 
 
-# (4) Each bridge's footprint overlaps at least one water_areas
-# rect. The navmesh bake's _cell_on_bridge check returns true only
-# for cells inside BOTH a water rect AND a bridge rect, so a bridge
-# with no overlapping water just doesn't carve anything and the
-# player is stuck on one side of the canyon.
-func _test_bridge_carves_water() -> bool:
+# (4) canyon_ford.json is a DRY pass - the original "ford" concept had
+# a river running through the canyon that the bridge carved, but the
+# user playtest 2026-08-21 said "a canyon doesn't have to be filled with
+# water, wouldn't it be a pass between two plateaus?" - so the water_areas
+# entry was removed and the canyon floor is now gravel. The bridge is
+# still there as the obvious crossing point at the canyon's narrowest
+# waist. This test pins the new shape: the bridge must span the canyon
+# floor (which is bounded by the plateau west and ridge east) so the
+# player can cross on the bridge without driving through the canyon
+# walls.
+func _test_bridge_spans_canyon() -> bool:
 	var map_def: Dictionary = _load_decoded()
+	# Canyon_ford has no water_areas - if a future iteration adds one
+	# back, fail this test so the new shape gets its own validation.
+	if not map_def.get("water_areas", []).is_empty():
+		print("    canyon_ford has water_areas; this test pins a DRY canyon. Update the test if intentional.")
+		return false
 	var bridges: Array = TerrainBuilderScript._collect_bridges(map_def)
 	if bridges.is_empty():
-		print("    no bridges collected")
+		print("    no bridges collected (canyon_ford should have a bridge crossing the dry canyon)")
 		return false
-	# Convert water_areas to the same rect format _collect_bridges
-	# returns (a {x0, x1, z0, z1} dict) so _rect_overlaps can match
-	# the two. The raw decoded water_areas entries are still
-	# {center, half_extents} - same shape the bridge JSON has.
-	var water_rects: Array = []
-	for w in map_def.get("water_areas", []):
-		water_rects.append(TerrainBuilderScript._rect_from(w.center, w.half_extents))
-	if water_rects.is_empty():
-		print("    no water_areas (bridge needs water to carve through)")
-		return false
+	# The bridge must be near the canyon centerline (x=0) since the
+	# canyon runs N-S along x=0. A bridge at x=300 wouldn't be a
+	# canyon crossing, it'd be a separate fortification.
 	for b in bridges:
-		var overlap: bool = false
-		for w in water_rects:
-			if TerrainBuilderScript._rect_overlaps(b["x0"], b["x1"], b["z0"], b["z1"], w):
-				overlap = true
-				break
-		if not overlap:
-			print("    bridge %s doesn't overlap any water area" % b)
+		var bx: float = (b["x0"] + b["x1"]) * 0.5
+		if absf(bx) > 30.0:
+			print("    bridge center at x=%.1f, expected near 0 (canyon centerline)" % bx)
 			return false
 	return true
 

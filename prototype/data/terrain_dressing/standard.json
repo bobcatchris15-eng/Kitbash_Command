@@ -1,0 +1,434 @@
+{
+  "name": "standard",
+  "description": "Default temperate dressing. GROUND VEGETATION CARRIES THE MAP; trees are accents on top of it. Previously every green thing was a 6-9 m tree over a bare floor, which at the battle camera is a field of lollipops over nothing - and the grass tufts meant to cover that floor were 1.1 m across, did not resolve at that distance, and were dropped rather than fixed. brush_mat replaces them at 3-4 m across, so one instance does the work of a dozen tufts. Layer order is also the order the global ceiling is spent, so the ground layers come FIRST and the trees take what is left.",
+  "_conditions": [
+    "Every layer's `where` block is a set of ranges. Omit a key, or set it to",
+    "null, and that condition does not apply.",
+    "  slope           0 = flat, 0.70 = the walkable limit (MAX_WALKABLE_SLOPE)",
+    "  height          world units; the map's own vertical range",
+    "  aspect          [centre_degrees, tolerance] - 0 N, 90 E, 180 S, 270 W.",
+    "                  CIRCULAR, so [0, 60] means 300..60 through north.",
+    "                  Flat ground has no aspect and matches no aspect rule.",
+    "  water_distance  world units to the nearest water edge; huge when dry",
+    "  curvature       -1 hollow, 0 planar, +1 convex ridge or rim",
+    "Layer order is draw order and ceiling order; conditions decide placement."
+  ],
+  "avoid_radius": 16.0,
+  "prop_sets": {
+    "boulder": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "boulder_",
+      "count": 35
+    },
+    "tree": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "ambient_tree_",
+      "count": 36
+    },
+    "bush": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "bush_",
+      "count": 10
+    },
+    "fern": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "fern_",
+      "count": 6
+    },
+    "brush_mat": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "brush_mat_",
+      "count": 8
+    },
+    "thicket": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "thicket_",
+      "count": 6
+    },
+    "shrub": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "shrub_",
+      "count": 4
+    },
+    "reed": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "reed_",
+      "count": 3
+    },
+    "wildflower": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "wildflower_",
+      "count": 3
+    },
+    "spire": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "rock_spire_",
+      "count": 4
+    },
+    "pebble": {
+      "dir": "res://assets/models/terrain/",
+      "prefix": "pebble_cluster_",
+      "count": 4
+    },
+    "tree_conifer": {
+      "paths": [
+        "res://assets/models/terrain/ambient_tree_0.glb",
+        "res://assets/models/terrain/ambient_tree_1.glb",
+        "res://assets/models/terrain/ambient_tree_2.glb",
+        "res://assets/models/terrain/ambient_tree_3.glb",
+        "res://assets/models/terrain/ambient_tree_4.glb",
+        "res://assets/models/terrain/ambient_tree_5.glb",
+        "res://assets/models/terrain/ambient_tree_6.glb",
+        "res://assets/models/terrain/ambient_tree_7.glb",
+        "res://assets/models/terrain/ambient_tree_8.glb",
+        "res://assets/models/terrain/ambient_tree_27.glb",
+        "res://assets/models/terrain/ambient_tree_28.glb",
+        "res://assets/models/terrain/ambient_tree_29.glb",
+        "res://assets/models/terrain/ambient_tree_33.glb",
+        "res://assets/models/terrain/ambient_tree_34.glb",
+        "res://assets/models/terrain/ambient_tree_35.glb"
+      ]
+    },
+    "tree_broadleaf": {
+      "paths": [
+        "res://assets/models/terrain/ambient_tree_9.glb",
+        "res://assets/models/terrain/ambient_tree_10.glb",
+        "res://assets/models/terrain/ambient_tree_11.glb",
+        "res://assets/models/terrain/ambient_tree_12.glb",
+        "res://assets/models/terrain/ambient_tree_13.glb",
+        "res://assets/models/terrain/ambient_tree_14.glb",
+        "res://assets/models/terrain/ambient_tree_15.glb",
+        "res://assets/models/terrain/ambient_tree_16.glb",
+        "res://assets/models/terrain/ambient_tree_17.glb",
+        "res://assets/models/terrain/ambient_tree_30.glb",
+        "res://assets/models/terrain/ambient_tree_31.glb",
+        "res://assets/models/terrain/ambient_tree_32.glb"
+      ]
+    },
+    "tree_riparian": {
+      "paths": [
+        "res://assets/models/terrain/ambient_tree_18.glb",
+        "res://assets/models/terrain/ambient_tree_19.glb",
+        "res://assets/models/terrain/ambient_tree_20.glb",
+        "res://assets/models/terrain/ambient_tree_9.glb",
+        "res://assets/models/terrain/ambient_tree_10.glb",
+        "res://assets/models/terrain/ambient_tree_11.glb"
+      ]
+    }
+  },
+  "layers": [
+    {
+      "id": "ground_cover",
+      "props": "brush_mat",
+      "spacing": 18.0,
+      "density": 0.55,
+      "max_count": 3000,
+      "scale": [
+        0.75,
+        1.35
+      ],
+      "sink": [
+        0.0,
+        0.1
+      ],
+      "align_to_slope": true,
+      "where": {
+        "slope": [
+          null,
+          0.34
+        ],
+        "curvature": [
+          null,
+          0.008
+        ]
+      }
+    },
+    {
+      "id": "hillside_scrub",
+      "props": "bush",
+      "spacing": 22.0,
+      "density": 0.5,
+      "max_count": 2600,
+      "scale": [
+        0.75,
+        1.4
+      ],
+      "sink": [
+        0.0,
+        0.18
+      ],
+      "align_to_slope": true,
+      "lean": 0.1,
+      "where": {
+        "slope": [
+          0.02,
+          0.4
+        ],
+        "curvature": [
+          -0.004,
+          null
+        ]
+      }
+    },
+    {
+      "id": "cliff_rock",
+      "props": "boulder",
+      "spacing": 18.0,
+      "density": 0.6,
+      "max_count": 700,
+      "scale": [
+        0.7,
+        1.7
+      ],
+      "sink": [
+        0.05,
+        0.5
+      ],
+      "align_to_slope": true,
+      "lean": 0.2,
+      "where": {
+        "slope": [
+          0.45,
+          null
+        ]
+      }
+    },
+    {
+      "id": "talus",
+      "props": "pebble",
+      "spacing": 16.0,
+      "density": 0.5,
+      "max_count": 900,
+      "scale": [
+        0.6,
+        1.4
+      ],
+      "sink": [
+        0.0,
+        0.3
+      ],
+      "align_to_slope": true,
+      "where": {
+        "slope": [
+          0.06,
+          0.4
+        ],
+        "curvature": [
+          null,
+          -0.003
+        ]
+      }
+    },
+    {
+      "id": "thicket_edge",
+      "props": "thicket",
+      "spacing": 30.0,
+      "density": 0.45,
+      "max_count": 900,
+      "scale": [
+        0.8,
+        1.3
+      ],
+      "sink": [
+        0.0,
+        0.2
+      ],
+      "where": {
+        "slope": [
+          0.05,
+          0.3
+        ],
+        "curvature": [
+          null,
+          -0.004
+        ]
+      }
+    },
+    {
+      "id": "shade_fern",
+      "props": "fern",
+      "spacing": 20.0,
+      "density": 0.5,
+      "max_count": 900,
+      "scale": [
+        0.75,
+        1.35
+      ],
+      "sink": [
+        0.0,
+        0.12
+      ],
+      "align_to_slope": true,
+      "where": {
+        "slope": [
+          0.02,
+          0.35
+        ],
+        "aspect": [
+          0,
+          70
+        ]
+      }
+    },
+    {
+      "id": "scrub_south",
+      "props": "shrub",
+      "spacing": 26.0,
+      "density": 0.45,
+      "max_count": 1200,
+      "scale": [
+        0.8,
+        1.5
+      ],
+      "sink": [
+        0.0,
+        0.2
+      ],
+      "where": {
+        "slope": [
+          0.01,
+          0.35
+        ],
+        "aspect": [
+          180,
+          84
+        ]
+      }
+    },
+    {
+      "id": "conifer_north",
+      "props": "tree_conifer",
+      "spacing": 34.0,
+      "density": 0.42,
+      "max_count": 1000,
+      "scale": [
+        0.85,
+        1.45
+      ],
+      "sink": [
+        0.0,
+        0.25
+      ],
+      "where": {
+        "slope": [
+          0.012,
+          0.3
+        ],
+        "aspect": [
+          0,
+          78
+        ],
+        "water_distance": [
+          16.0,
+          null
+        ]
+      }
+    },
+    {
+      "id": "valley_wood",
+      "props": "tree_broadleaf",
+      "spacing": 38.0,
+      "density": 0.36,
+      "max_count": 500,
+      "scale": [
+        0.9,
+        1.5
+      ],
+      "sink": [
+        0.0,
+        0.25
+      ],
+      "where": {
+        "slope": [
+          null,
+          0.05
+        ],
+        "curvature": [
+          null,
+          -0.005
+        ],
+        "water_distance": [
+          14.0,
+          null
+        ]
+      }
+    },
+    {
+      "id": "rim_spire",
+      "props": "spire",
+      "spacing": 40.0,
+      "density": 0.35,
+      "max_count": 160,
+      "scale": [
+        0.8,
+        1.5
+      ],
+      "sink": [
+        0.1,
+        0.6
+      ],
+      "align_to_slope": true,
+      "where": {
+        "slope": [
+          0.2,
+          null
+        ],
+        "curvature": [
+          0.005,
+          null
+        ]
+      }
+    },
+    {
+      "id": "shore_reed",
+      "props": "reed",
+      "spacing": 11.0,
+      "density": 0.65,
+      "max_count": 500,
+      "scale": [
+        0.8,
+        1.4
+      ],
+      "sink": [
+        0.0,
+        0.15
+      ],
+      "where": {
+        "slope": [
+          0.0,
+          0.22
+        ],
+        "water_distance": [
+          0.0,
+          13.0
+        ]
+      }
+    },
+    {
+      "id": "meadow_flowers",
+      "props": "wildflower",
+      "spacing": 44.0,
+      "density": 0.3,
+      "max_count": 300,
+      "scale": [
+        0.8,
+        1.3
+      ],
+      "sink": [
+        0.0,
+        0.05
+      ],
+      "where": {
+        "slope": [
+          null,
+          0.2
+        ],
+        "curvature": [
+          -0.01,
+          0.004
+        ]
+      }
+    }
+  ],
+  "_species_note": "The `tree` set is all 36 models, which includes date palms (24-26) and savanna acacias (21-23). Dressing a temperate map from it put palms on north-facing slopes. Layers now draw from species-filtered sets; `tree` is kept for rule files that genuinely want the whole roster."
+}

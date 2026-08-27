@@ -2992,6 +2992,37 @@ static func blueprint_has_repair(data: Dictionary) -> bool:
 	return false
 
 
+static func blueprint_has_locomotion(data: Dictionary) -> bool:
+	for mod in data.get("modules", []):
+		var type_id := str(mod.get("type_id", ""))
+		if type_id == "":
+			continue
+		if str(get_module_data(type_id).get("category", "")) == "locomotion":
+			return true
+	return false
+
+
+# "Is this design a defensive structure rather than a unit?"
+#
+# TWO conditions, OR'd, and the pairing is deliberate. The match runtime
+# already answers this question via match_director.is_defence_design(), which
+# tests `is_foundation(hull_type)` ALONE - so that is the authority, and any
+# classifier the setup screen uses has to agree with it or a design sorted
+# into the defence library would be handed to a manufactory queue in the match
+# (or a turret would be produced as a vehicle).
+#
+# The no-locomotion arm is included because that is how a player describes the
+# category, and because validate_blueprint() already refuses a design that has
+# neither locomotion nor a foundation hull ("this design can't move"). So the
+# two conditions coincide on every design that can actually be saved, and the
+# OR only widens the net to catch a malformed one rather than silently
+# offering it as a unit.
+static func blueprint_is_static(data: Dictionary) -> bool:
+	if is_foundation(str(data.get("hull_type", ""))):
+		return true
+	return not blueprint_has_locomotion(data)
+
+
 static func blueprint_bay_capacity(data: Dictionary) -> float:
 	var total := 0.0
 	for mod in data.get("modules", []):

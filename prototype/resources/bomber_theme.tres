@@ -20,6 +20,7 @@
 [ext_resource type="Texture2D" path="res://assets/textures/ui/plate_carbon_pressed.png" id="16_2uonq"]
 [ext_resource type="Texture2D" path="res://assets/textures/ui/plate_canvas_disabled.png" id="18_eco6o"]
 [ext_resource type="Texture2D" path="res://assets/textures/ui/plate_wood_normal.png" id="20_pk0m3"]
+[ext_resource type="Texture2D" path="res://assets/icons/icon_chevron_down.svg" id="30_chevdn"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5mlwx"]
 content_margin_left = 20.0
@@ -1080,6 +1081,7 @@ OptionButton/colors/icon_hover_color = Color(1, 1, 1, 1)
 OptionButton/colors/icon_normal_color = Color(1, 1, 1, 1)
 OptionButton/colors/icon_pressed_color = Color(1, 1, 1, 1)
 OptionButton/constants/h_separation = 8
+OptionButton/icons/arrow = ExtResource("30_chevdn")
 OptionButton/constants/outline_size = 3
 OptionButton/styles/disabled = SubResource("StyleBoxTexture_ot2vf")
 OptionButton/styles/focus = SubResource("StyleBoxFlat_87twu")

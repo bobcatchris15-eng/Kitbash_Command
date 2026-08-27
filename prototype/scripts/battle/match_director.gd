@@ -316,7 +316,18 @@ var enemy_roster: Array = []
 const STARTING_CREDITS := 1200
 
 # The player's build bar tops out here, matching the old runtime's loadout limit.
+# Counts UNITS ONLY - see DEFENCE_LIMIT and _trim_roster().
 const ROSTER_LIMIT := 12
+# Defence designs are capped separately, matching the four wells the match
+# setup screen offers.
+#
+# They have to be counted separately or they are not counted at all. The roster
+# arrives as one flat array with defences at the TAIL (roster_picker's
+# ordered_paths lists units first), so a single `slice(0, 12)` across the whole
+# list silently discarded every defence the player picked the moment they
+# fielded a full slate of units - the designs were chosen, carried through the
+# rule set, loaded, and then dropped one line before they would have been used.
+const DEFENCE_LIMIT := 4
 # How many of the player's own saved designs get auto-drafted when they did not
 # hand-pick a roster. Deliberately short of ROSTER_LIMIT so bundled defaults
 # still fill the remainder - a roster of eight half-finished experiments with no
@@ -845,6 +856,12 @@ func _scale_lighting_to_world() -> void:
 			light.light_color = env_data["sun_color"]
 		if env_data.has("sun_energy"):
 			light.light_energy = float(env_data["sun_energy"])
+		# Per-map time of day. Default matches the ~39 deg elevation baked into
+		# Battle.tscn's own transform, so a map that says nothing is unchanged.
+		if env_data.has("sun_elevation_deg") or env_data.has("sun_azimuth_deg"):
+			light.rotation_degrees = Vector3(
+				-float(env_data.get("sun_elevation_deg", 39.0)),
+				float(env_data.get("sun_azimuth_deg", 35.0)), 0.0)
 
 	var world_env := get_node_or_null("WorldEnvironment") as WorldEnvironment
 	if world_env and world_env.environment:
@@ -852,6 +869,13 @@ func _scale_lighting_to_world() -> void:
 		env.ssao_radius = WorldScaleScript.scaled_f(SSAO_RADIUS_BASE, current_map)
 		if env_data.has("ambient_light_energy"):
 			env.ambient_light_energy = float(env_data["ambient_light_energy"])
+		# See map_catalog.gd's FIELD_SPEC entry: the scene's blue fill was
+		# colouring every map the same regardless of its own palette.
+		if env_data.has("ambient_light_color"):
+			env.ambient_light_color = env_data["ambient_light_color"]
+		# See map_catalog.gd's FIELD_SPEC entry for why exposure is per-map.
+		if env_data.has("tonemap_exposure"):
+			env.tonemap_exposure = float(env_data["tonemap_exposure"])
 		if env_data.has("fog_enabled"):
 			env.fog_enabled = bool(env_data["fog_enabled"])
 			if env_data.has("fog_density"):
@@ -869,10 +893,18 @@ func _scale_lighting_to_world() -> void:
 			env.volumetric_fog_density = float(env_data["volumetric_fog_density"])
 		if env_data.has("volumetric_fog_enabled"):
 			env.volumetric_fog_enabled = bool(env_data["volumetric_fog_enabled"])
-		if env_data.has("dof_blur_far_enabled"):
-			env.dof_blur_far_enabled = bool(env_data["dof_blur_far_enabled"])
-		if env_data.has("dof_blur_far_distance"):
-			env.dof_blur_far_distance = float(env_data["dof_blur_far_distance"])
+		# dof_blur_far_* are CameraAttributes properties, not Environment
+		# ones (see rts_camera.gd _apply_dof_distances). Apply them to the
+		# live CameraAttributes so a per-map disable survives - rts_camera
+		# only writes distance/transition each frame, never re-enables.
+		if env_data.has("dof_blur_far_enabled") or env_data.has("dof_blur_far_distance"):
+			var dof_cam := get_node_or_null("Camera3D") as Camera3D
+			var cam_attrs = dof_cam.attributes if (dof_cam and dof_cam.attributes) else null
+			if cam_attrs:
+				if env_data.has("dof_blur_far_enabled"):
+					cam_attrs.dof_blur_far_enabled = bool(env_data["dof_blur_far_enabled"])
+				if env_data.has("dof_blur_far_distance"):
+					cam_attrs.dof_blur_far_distance = float(env_data["dof_blur_far_distance"])
 		if env_data.has("sky_color") and env.sky and env.sky.sky_material is ProceduralSkyMaterial:
 			var sky_mat := env.sky.sky_material as ProceduralSkyMaterial
 			sky_mat.sky_top_color = env_data["sky_color"]
@@ -919,8 +951,11 @@ func _setup_terrain() -> void:
 		if mesh_inst:
 			mesh_inst.mesh = generated.mesh
 			var _t_mat := Time.get_ticks_usec()
-			mesh_inst.material_override = TerrainBuilder.build_ground_material_heightmap(
-				current_map.get("ground_color", Color(0.2, 0.26, 0.21)), current_map)
+			# Dispatches on the map's `terrain.generator`. Every map that does
+			# not declare one takes the v1 path unchanged; only a map opting
+			# into "v2" reaches the splat-driven shader.
+			mesh_inst.material_override = TerrainBuilder.build_ground_material_for(
+				current_map.get("ground_color", Color(0.2, 0.26, 0.21)), current_map, map_id)
 			BattleLogger.log_build_step("terrain.ground_material",
 				float(Time.get_ticks_usec() - _t_mat) / 1000.0)
 		var col: CollisionShape3D = ground.get_node_or_null("CollisionShape3D")
@@ -1189,8 +1224,7 @@ func _load_roster() -> void:
 		if not (rs != null and rs.has_meta("tutorial_phase")):
 			for path in _bundled_loadout_paths():
 				_append_design(roster, bp_manager.load_blueprint(path))
-			if roster.size() > ROSTER_LIMIT:
-				roster = roster.slice(0, ROSTER_LIMIT)
+			roster = _trim_roster(roster)
 
 			if _harvester_in(roster).is_empty():
 				_append_design(roster, bp_manager.load_blueprint(FALLBACK_HARVESTER))
@@ -1248,8 +1282,10 @@ func _load_roster() -> void:
 			enemy_roster.clear()
 			for path in _bundled_loadout_paths():
 				_append_design(enemy_roster, bp_manager.load_blueprint(path))
-			if enemy_roster.size() > ROSTER_LIMIT:
-				enemy_roster = enemy_roster.slice(0, ROSTER_LIMIT)
+			# Same category-aware cap as the player's. The AI places defences
+			# too (commander.gd's defence_target), so trimming them out of its
+			# roster leaves it with nothing to build when it wants to fortify.
+			enemy_roster = _trim_roster(enemy_roster)
 			if _harvester_in(enemy_roster).is_empty():
 				_append_design(enemy_roster, bp_manager.load_blueprint(FALLBACK_HARVESTER))
 
@@ -3669,6 +3705,25 @@ const AI_MAX_QUEUE_DEPTH := 2
 # A design on a foundation hull is a static defence, not a vehicle.
 static func is_defence_design(blueprint: Dictionary) -> bool:
 	return ModuleCatalog.is_foundation(blueprint.get("hull_type", ""))
+
+
+# Cap units and defences INDEPENDENTLY, preserving order within each group.
+#
+# The two categories do not compete for the same wells on the setup screen -
+# twelve unit slots and four defence slots - so they must not compete for one
+# budget here either. A flat slice also punished exactly the player who filled
+# their roster: pick twelve units and four turrets, and the turrets (which sort
+# last) were the four things thrown away.
+static func _trim_roster(roster: Array) -> Array:
+	var units: Array = []
+	var defences: Array = []
+	for design in roster:
+		if is_defence_design(design):
+			if defences.size() < DEFENCE_LIMIT:
+				defences.append(design)
+		elif units.size() < ROSTER_LIMIT:
+			units.append(design)
+	return units + defences
 
 
 func ai_design_for_role(for_team: int, role: String) -> Dictionary:

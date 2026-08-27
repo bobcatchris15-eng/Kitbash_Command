@@ -632,6 +632,12 @@ const FIELD_SPEC: Dictionary = {
 	# track world_scale or be left to author intent is a heightmap-specific
 	# call, not decided by this flag alone.
 	"terrain": {"type": "dictionary", "required": false, "item": {
+		# Which surfacing system builds this map's ground. Absent or "v1" is
+		# the shipped path (shaders/terrain_ground.gdshader); "v2" selects the
+		# splat-driven rebuild (shaders/terrain_ground_v2.gdshader). Chosen
+		# per map so both systems can run side by side and be compared in the
+		# same build - see TerrainBuilder.build_ground_material_for().
+		"generator": {"type": "string", "required": false},
 		"heightmap": {"type": "string", "required": false},
 		"surfacemap": {"type": "string", "required": false},
 		"height_scale": {"type": "number", "required": false, "min": 0.01, "scale": true},
@@ -650,6 +656,23 @@ const FIELD_SPEC: Dictionary = {
 		"features": {"type": "array", "required": false},
 		"noise": {"type": "dictionary", "required": false},
 		"erosion": {"type": "dictionary", "required": false},
+		# What build_terrain.py's apply_terrain_post_pass() actually reads:
+		# {noise: {frequency, amplitude, octaves}, thermal_erosion, hydraulic_
+		# erosion, domain_warp}. The `noise`/`erosion` keys above sit at the
+		# wrong level for it and were therefore never consumed by anything -
+		# the baker looks for terrain.post_pass and nothing else.
+		"post_pass": {"type": "dictionary", "required": false},
+		# Multiplier for scattered prop SIZE, independent of world_scale.
+		#
+		# They are normally the same thing, but a v2 map has to declare
+		# world_scale 1.0 - terrain.features is not in the scale table, so any
+		# other value multiplies every field EXCEPT the features and scatters
+		# the map. That correctly stops the geometry moving, and incorrectly
+		# tells the prop scatter it is on a small map: a tree authored for a
+		# 4x world came out 6 m tall on a 1920 m map and was invisible at
+		# gameplay range. Defaults to world_scale when unset, so no existing
+		# map changes.
+		"prop_scale": {"type": "number", "required": false, "min": 0.05, "max": 32.0},
 	}},
 	"environment": {"type": "dictionary", "required": false, "item": {
 		"sky_color": {"type": "color", "required": false},
@@ -657,6 +680,27 @@ const FIELD_SPEC: Dictionary = {
 		"sun_color": {"type": "color", "required": false},
 		"sun_energy": {"type": "number", "required": false, "min": 0.0},
 		"ambient_light_energy": {"type": "number", "required": false, "min": 0.0},
+		# Battle.tscn's ambient is a cool blue-grey (0.45, 0.50, 0.55). With a
+		# low sun most ground faces away from the key, so that fill dominates
+		# and every map ends up the same blue-teal regardless of its sky or
+		# sun colour - a grass map cannot read as green. Per-map so a v1 map
+		# keeps the blue it was authored against.
+		"ambient_light_color": {"type": "color", "required": false},
+		# Per-map exposure. Battle.tscn pins tonemap_exposure at 0.9 for every
+		# map, and measured on sentinel_divide that puts a pure white surface
+		# at 0.54 sRGB - the whole scene about two stops under, so ground with
+		# a legitimately dark albedo (grassland is 0.115 linear) lands at 0.17
+		# and reads as black. Raising the map's lights instead would only blow
+		# out anything pale; this is an exposure problem and wants an exposure
+		# control. Per-map so v1 maps keep the 0.9 they were authored against.
+		"tonemap_exposure": {"type": "number", "required": false, "min": 0.05, "max": 8.0},
+		# Sun angle, in degrees. Elevation 0 = on the horizon, 90 = overhead.
+		# Battle.tscn bakes ~39 deg into the DirectionalLight3D's transform and
+		# nothing overrides it, so every map in the game shares one time of day
+		# - and a low sun is most of why flat ground reads dark, since NdotL on
+		# level terrain is just sin(elevation).
+		"sun_elevation_deg": {"type": "number", "required": false, "min": 1.0, "max": 89.0},
+		"sun_azimuth_deg": {"type": "number", "required": false, "min": -360.0, "max": 360.0},
 		"fog_enabled": {"type": "bool", "required": false},
 		"fog_density": {"type": "number", "required": false, "min": 0.0},
 		"fog_aerial_perspective": {"type": "number", "required": false, "min": 0.0},

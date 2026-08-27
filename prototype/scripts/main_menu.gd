@@ -111,6 +111,12 @@ const GROUPS := [
 				"scene": "res://scenes/ModularHullBuilder.tscn",
 				"badge": "CAD // BLOCKS (NEW)"
 			},
+			{
+				"title": "TERRAIN SCULPT",
+				"desc": "Place canyons, plateaus, ridges and ramps on a live map preview.",
+				"scene": "res://scenes/TerrainSculpt.tscn",
+				"badge": "CAD // TERRAIN (NEW)"
+			},
 		],
 	},
 	{

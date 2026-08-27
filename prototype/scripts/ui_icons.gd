@@ -27,6 +27,11 @@ const ICON_PATHS: Dictionary = {
 	"close": "res://assets/icons/icon_close.svg",
 	"chevron_left": "res://assets/icons/icon_chevron_left.svg",
 	"chevron_right": "res://assets/icons/icon_chevron_right.svg",
+	# Dropdown arrow. bomber_theme.tres styles OptionButton's box but sets no
+	# `icons/arrow`, so every dropdown in the game was drawing Godot's stock
+	# triangle next to house-styled everything else - the single detail that
+	# made the match setup dropdowns read as unthemed default controls.
+	"chevron_down": "res://assets/icons/icon_chevron_down.svg",
 	"rotate_left": "res://assets/icons/icon_rotate_left.svg",
 	"rotate_right": "res://assets/icons/icon_rotate_right.svg",
 	"play": "res://assets/icons/icon_play.svg",

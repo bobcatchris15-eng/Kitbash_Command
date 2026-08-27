@@ -5,6 +5,7 @@ const WorldScaleScript = preload("res://scripts/world_scale.gd")
 const ResourceNodeScript = preload("res://scripts/resource_node.gd")
 const AmbientScatterScript = preload("res://scripts/ambient_scatter.gd")
 const TerrainVisualScatterScript = preload("res://scripts/terrain_visual_scatter.gd")
+const TerrainDressingScript = preload("res://scripts/terrain_dressing.gd")
 # 2026-08-26: half_extents() lives on MapCatalog for the non-square map
 # support (map_half_extents_z). Loading it here so the nav-tile and
 # ground-mesh code can read both axes without a circular import.
@@ -208,6 +209,27 @@ const NAV_TILE_VOXELS_PER_AXIS: float = 110.0
 # rect regardless of where the tile sits on any absolute grid).
 const NAV_TILE_BORDER_CELLS: float = 6.0
 
+# SINGLE-REGION BAKE (v2). The tiled bake's seams are the problem: give the
+# ground any relief and each tile bakes 30-70 polygons instead of 2, the two
+# sides of a seam stop coinciding, and the map fragments into unreachable
+# islands (see POST_PASS_NAVMESH_LIMIT). A map with no seams cannot have that
+# failure.
+#
+# It is also not more expensive, which is the surprising part. 144 tiles at
+# ~122 voxels a side is ~2.1M voxels because every tile re-bakes a 6-cell
+# border its neighbours already covered; one region at _nav_cell_size (2.23 m
+# on a 960-half map) is 861 x 861 = ~0.74M. The tiling was introduced to bound
+# per-tile cost on very large maps, not because one region was unaffordable at
+# this scale.
+#
+# The trade is mid-match rebaking: buildings currently re-bake only the tiles
+# they touch, and with one region that becomes the whole surface. Gated to v2
+# so no shipped map changes, and revisit if a v2 map ever shows a hitch on
+# placement.
+static func _nav_single_region(map_def: Dictionary) -> bool:
+	return terrain_generator(map_def) == "v2"
+
+
 static func _nav_tile_size(map_def: Dictionary) -> float:
 	# 2026-08-26: non-square map support - max of the two half extents
 	# so a 1200x520 map (half_x=600) gets the same 200-unit tile size
@@ -227,12 +249,18 @@ static func _nav_tile_size(map_def: Dictionary) -> float:
 # test_b5_heightmap_navmesh_rejects_steep_slope's flat-ground control path
 # landing 18 units short of its target.
 static func _nav_tile_cell_size(map_def: Dictionary) -> float:
+	# One region is not a tile, so the per-tile voxel budget does not apply -
+	# it would give a 1920 m span a 17 m cell. Use the pre-tiling formula.
+	if _nav_single_region(map_def):
+		return _nav_cell_size(map_def)
 	return minf(_nav_tile_size(map_def) / NAV_TILE_VOXELS_PER_AXIS, _nav_cell_size(map_def))
 
 static func _nav_tile_rects(map_def: Dictionary) -> Array:
 	var he: Vector2 = MapCatalogScript.half_extents(map_def)
 	var half_x: float = he.x
 	var half_z: float = he.y
+	if _nav_single_region(map_def):
+		return [{"x0": -half_x, "x1": half_x, "z0": -half_z, "z1": half_z}]
 	var tile_size := _nav_tile_size(map_def)
 	var rects: Array = []
 	var x := -half_x
@@ -275,6 +303,14 @@ static func _bucket_verts_by_tile(verts: PackedVector3Array, map_def: Dictionary
 	for i in range(buckets.size()):
 		buckets[i] = PackedVector3Array()
 	if rects.is_empty():
+		return buckets
+	# ONE rect means one region covering the whole map, so every triangle
+	# belongs to it and there is nothing to sort. The grid walk below derives
+	# its col/row count from _nav_tile_size() rather than from `rects`, so on
+	# a single-region map it would still compute a 12x12 index space and write
+	# past the end of a one-element bucket list.
+	if rects.size() == 1:
+		buckets[0] = verts.duplicate()
 		return buckets
 	var he: Vector2 = MapCatalogScript.half_extents(map_def)
 	var tile_size := _nav_tile_size(map_def)
@@ -895,12 +931,99 @@ static func height_at(map_def: Dictionary, x: float, z: float) -> float:
 	# above, so a map can mix legacy hills with new feature types in the
 	# same file without one path stomping the other. (See _resolve_features()
 	# for the cliffs[] / water_areas[] auto-emission that runs once at load.)
-	for feature in map_def.get("terrain", {}).get("features", []):
-		h += _feature_contribution(feature, x, z)
+	var terr = map_def.get("terrain", {})
+	var features: Array = terr.get("features", []) if typeof(terr) == TYPE_DICTIONARY else []
+	if not features.is_empty() and str(terr.get("generator", "")) == "v2":
+		h += _v2_feature_height(features, x, z)
+	else:
+		for feature in features:
+			h += _feature_contribution(feature, x, z)
 	return h
+
+# v2 feature composition: raised features take the TALLEST, carved features the
+# DEEPEST, instead of every feature summing.
+#
+# Summation is wrong for the one thing plateaus exist to support - a ramp.
+# A ramp's anchor sits ON the plateau edge and carries top_height, and the
+# plateau's own contribution is still full `height` there (it decays only
+# OUTSIDE its AABB), so the two add: a 15 m plateau with a 15 m ramp builds a
+# 30 m spike at the lip, decaying back to 15 m across the wall_falloff band.
+# That is a ~15 m rise over ~3.5 m, slope ~4.3 - far past MAX_WALKABLE_SLOPE
+# of 0.7. The ramp ends in a wall, and the plateau it was meant to open up is
+# unreachable. Anchoring outside the falloff instead trades the spike for a
+# notch, because the ramp contributes nothing behind its anchor.
+#
+# max/min composes the way the author means it: where a ramp and a plateau
+# overlap, the ground is whichever is higher, so the ramp runs cleanly from
+# the plateau top down to grade with no lip at all. Two overlapping plateaus
+# give the taller; two overlapping canyons give the deeper.
+#
+# Gated to generator "v2" and applied only when a map actually declares
+# features, so every v1 map takes the summing path unchanged.
+static func _v2_feature_height(features: Array, x: float, z: float) -> float:
+	var raised: float = 0.0
+	var carved: float = 0.0
+	for feature in features:
+		var c: float = _feature_contribution(feature, x, z)
+		if c > 0.0:
+			raised = maxf(raised, c)
+		elif c < 0.0:
+			carved = minf(carved, c)
+	return raised + carved
 
 static func slope_at(map_def: Dictionary, x: float, z: float) -> float:
 	return _slope_at(map_def, x, z)
+
+
+# --- Dressing inputs --------------------------------------------------------
+#
+# Which compass direction a slope FACES, in degrees: 0 = north (downhill runs
+# toward -Z), 90 = east, 180 = south, 270 = west. Returns -1.0 on ground flat
+# enough to have no meaningful aspect, which callers must treat as "matches no
+# aspect rule" rather than as north.
+#
+# Needed because sun exposure is what actually sorts vegetation in the real
+# world - conifers and moss hold the shaded north face, dry scrub takes the
+# sunny south - and the scatter had no way to ask. Every rule was slope-only,
+# so a hillside looked identical whichever way it pointed.
+static func aspect_at(map_def: Dictionary, x: float, z: float) -> float:
+	const D := 1.0
+	var h0 := height_at(map_def, x, z)
+	var dh_dx := (height_at(map_def, x + D, z) - h0) / D
+	var dh_dz := (height_at(map_def, x, z + D) - h0) / D
+	if absf(dh_dx) < 1e-5 and absf(dh_dz) < 1e-5:
+		return -1.0
+	# Downhill is the NEGATIVE gradient; atan2(down.x, -down.z) puts 0 at -Z.
+	return fposmod(rad_to_deg(atan2(-dh_dx, dh_dz)), 360.0)
+
+
+# Distance in world units to the nearest water, or INF when the map has none.
+# Reeds belong at the shoreline and pines do not; without this the scatter
+# could only express "inside water" or "not", which is not the same question.
+static func water_distance_at(map_def: Dictionary, x: float, z: float) -> float:
+	_resolve_features(map_def)
+	var best := INF
+	for w in map_def.get("water_areas", []):
+		var c: Vector3 = _vec3_of(w.get("center", Vector3.ZERO))
+		var he: Vector2 = _vec_of(w.get("half_extents", Vector2(1, 1)))
+		var dx: float = maxf(absf(x - c.x) - he.x, 0.0)
+		var dz: float = maxf(absf(z - c.z) - he.y, 0.0)
+		best = minf(best, sqrt(dx * dx + dz * dz))
+	for b in map_def.get("water_blobs", []):
+		var cb: Vector3 = _vec3_of(b.get("center", Vector3.ZERO))
+		var r: float = float(b.get("radius", 10.0))
+		best = minf(best, maxf(Vector2(x - cb.x, z - cb.z).length() - r, 0.0))
+	return best
+
+
+# Local convexity: positive on ridges and rims, negative in hollows and gullies.
+# Normalised roughly to -1..1 over `d`. Scree collects in hollows; exposed rock
+# sits on the convex edges.
+static func curvature_at(map_def: Dictionary, x: float, z: float, d: float = 4.0) -> float:
+	var h := height_at(map_def, x, z)
+	var sum := height_at(map_def, x + d, z) + height_at(map_def, x - d, z) \
+		+ height_at(map_def, x, z + d) + height_at(map_def, x, z - d)
+	return clampf((h - sum * 0.25) / maxf(d * 0.5, 0.001), -1.0, 1.0)
 
 static func _slope_at(map_def: Dictionary, x: float, z: float) -> float:
 	const D = 0.5
@@ -1729,7 +1852,9 @@ static func _rebuild_thread(map_def: Dictionary, extra_holes: Array,
 	var amphibious_verts = _build_amphibious_faces(map_def, extra_holes, grid_cell)
 	# Buckets padded by the bake border, so every tile's bake sees the far
 	# side of its own seams (see NAV_TILE_BORDER_CELLS).
-	var pad: float = tile_cell_size * NAV_TILE_BORDER_CELLS
+	var single_region: bool = _nav_single_region(map_def)
+	# No border to bucket into when there is only one region.
+	var pad: float = 0.0 if single_region else tile_cell_size * NAV_TILE_BORDER_CELLS
 	var ground_buckets = _bucket_verts_by_tile(ground_verts, map_def, tile_rects, pad)
 	var amphibious_buckets = _bucket_verts_by_tile(amphibious_verts, map_def, tile_rects, pad)
 	# Empty list = "rebuild all" - the path a full-rebake caller (boot,
@@ -1795,7 +1920,9 @@ static func rebake_ground_amphibious_tiles_sync(map_def: Dictionary, extra_holes
 	var tile_cell_size = _nav_tile_cell_size(map_def)
 	var ground_verts = _build_ground_faces(map_def, extra_holes)
 	var amphibious_verts = _build_amphibious_faces(map_def, extra_holes)
-	var pad: float = tile_cell_size * NAV_TILE_BORDER_CELLS
+	var single_region: bool = _nav_single_region(map_def)
+	# No border to bucket into when there is only one region.
+	var pad: float = 0.0 if single_region else tile_cell_size * NAV_TILE_BORDER_CELLS
 	var ground_buckets = _bucket_verts_by_tile(ground_verts, map_def, tile_rects, pad)
 	var amphibious_buckets = _bucket_verts_by_tile(amphibious_verts, map_def, tile_rects, pad)
 	# Empty list means "rebuild all tiles" - the path a full-rebake
@@ -1870,7 +1997,9 @@ static func build_ground_amphibious_tiles(map_def: Dictionary, extra_holes: Arra
 	# NAV_TILE_BORDER_CELLS. `rect` rides each pending entry so the deferred
 	# bake paths (bake_pending_entry / _async) can apply the same config the
 	# sync branch applies inline here.
-	var pad: float = tile_cell_size * NAV_TILE_BORDER_CELLS
+	var single_region: bool = _nav_single_region(map_def)
+	# No border to bucket into when there is only one region.
+	var pad: float = 0.0 if single_region else tile_cell_size * NAV_TILE_BORDER_CELLS
 	var ground_buckets = _bucket_verts_by_tile(ground_verts, map_def, tile_rects, pad)
 	var amphibious_buckets = _bucket_verts_by_tile(amphibious_verts, map_def, tile_rects, pad)
 
@@ -1884,12 +2013,17 @@ static func build_ground_amphibious_tiles(map_def: Dictionary, extra_holes: Arra
 		var a_region = NavigationServer3D.region_create()
 		NavigationServer3D.region_set_map(a_region, amphibious_map)
 		amphibious_regions.append(a_region)
+		# null rect on the single-region path: filter_baking_aabb + border_size
+		# exist to trim a TILE back to the edge it shares with a neighbour.
+		# With one region there is no neighbour, and the border would clip the
+		# map's own outer perimeter off the navmesh.
+		var bake_rect = null if single_region else tile_rects[i]
 		if sync:
-			NavigationServer3D.region_set_navigation_mesh(g_region, _bake_nav_mesh(ground_buckets[i], tile_cell_size, tile_rects[i]))
-			NavigationServer3D.region_set_navigation_mesh(a_region, _bake_nav_mesh(amphibious_buckets[i], tile_cell_size, tile_rects[i]))
+			NavigationServer3D.region_set_navigation_mesh(g_region, _bake_nav_mesh(ground_buckets[i], tile_cell_size, bake_rect))
+			NavigationServer3D.region_set_navigation_mesh(a_region, _bake_nav_mesh(amphibious_buckets[i], tile_cell_size, bake_rect))
 		else:
-			pending.append({"region": g_region, "verts": ground_buckets[i], "label": "Surveying ground", "cell_size": tile_cell_size, "rect": tile_rects[i]})
-			pending.append({"region": a_region, "verts": amphibious_buckets[i], "label": "Marking fording points", "cell_size": tile_cell_size, "rect": tile_rects[i]})
+			pending.append({"region": g_region, "verts": ground_buckets[i], "label": "Surveying ground", "cell_size": tile_cell_size, "rect": bake_rect})
+			pending.append({"region": a_region, "verts": amphibious_buckets[i], "label": "Marking fording points", "cell_size": tile_cell_size, "rect": bake_rect})
 
 	return {"ground_regions": ground_regions, "amphibious_regions": amphibious_regions,
 		"tile_rects": tile_rects, "pending": pending, "cell_size": tile_cell_size}
@@ -1961,6 +2095,12 @@ static func _create_nav_maps(map_def: Dictionary) -> Dictionary:
 		# wide plus agent-radius erosion on each side), which the 4x value
 		# could do at large map scales - bridging a lake shore at a tile
 		# boundary is the same class of wrong as not connecting the seam.
+		# NOTE (2026-08-27): raising this to 4x cell was tried as a fix for the
+		# islanding described in terrain_dressing.gd's header - terrain relief
+		# makes tiles bake 30-70 polygons instead of 2, and the seams then stop
+		# connecting. It did NOT help, so the margin is not the mechanism and
+		# the value is left where it was rather than carrying a speculative
+		# change. The real constraint is recorded on POST_PASS_NAVMESH_LIMIT.
 		NavigationServer3D.map_set_edge_connection_margin(m, entry[1] * 1.5)
 		maps[entry[0]] = m
 	return maps
@@ -2099,7 +2239,11 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 	var _pre_ids: Dictionary = {}
 	for _c in parent.get_children():
 		_pre_ids[_c.get_instance_id()] = true
-	var prop_scale = WorldScaleScript.for_map(map_def)
+	# terrain.prop_scale overrides the world_scale-derived size for scattered
+	# props - see map_catalog.gd's FIELD_SPEC entry for why the two have to be
+	# separable on a v2 map.
+	var prop_scale = float(map_def.get("terrain", {}).get("prop_scale",
+		WorldScaleScript.for_map(map_def)))
 	_spawn_merged_water(map_def, parent, prop_scale)
 	await _slice.call()
 	# Cliffs between water and obstacles: terrain infrastructure sits
@@ -2116,18 +2260,46 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 	# entries are tagged with an "auto" meta so we don't double-emit if
 	# spawn_visuals is called more than once - which it is on scene reload).
 	_resolve_features(map_def)
-	_spawn_cliffs(map_def, parent, prop_scale)
+	# CLIFF PROPS ARE A v1 COMPENSATION AND v2 MUST NOT SPAWN THEM.
+	#
+	# They exist because v1's ground mesh cannot draw a wall: at (span / 280)
+	# a 6-8 m wall is about one quad across, so the mesh renders a ramp and
+	# discrete 8 m cliff GLBs get stamped along the wall line to stand in for
+	# it. On sentinel_divide that is 1472 props at 4 m spacing, and at this
+	# scale a line of small repeated pieces reads as a picket fence rather
+	# than as rock - which is exactly how it looked in play.
+	#
+	# v2 subdivides the mesh where the ground is steep (DETAIL_TRIGGER_RISE),
+	# so the wall is real geometry and the props are redundant.
+	#
+	# NOTE the split: _resolve_features() still runs, so the cliffs[] entries
+	# are still emitted into map_def. The NAVMESH bake consumes those, and
+	# skipping the emission would route units straight through a plateau wall.
+	# Only the visual/collider spawn is skipped.
+	if terrain_generator(map_def) != "v2":
+		_spawn_cliffs(map_def, parent, prop_scale)
 	await _slice.call()
 	for o in map_def.get("obstacles", []):
 		_spawn_obstacle(o, parent, map_def)
 	await _slice.call()
+	# v2 paints surface types into the GROUND ITSELF from the splat raster,
+	# with a real height blend and a noise-warped boundary. Laying the v1
+	# overlay meshes on top of that would stamp the exact hard-edged
+	# rectangles the splat exists to replace - and it did: the first capture
+	# of a v2 map showed sharp green/grey/brown rectangles sitting on
+	# correctly-blended ground. The zones still drive their greeble scatter
+	# and their forest LOS volumes; only the overlay QUAD is skipped.
+	var v2_ground := terrain_generator(map_def) == "v2"
 	for s in map_def.get("surface_zones", []):
-		# Each zone builds its own conforming mesh (one height sample per
-		# vertex), so zones are chunked individually AND internally - the
-		# zone mesh builder carries the same budget gate. A zone is itself a
-		# coroutine now, so it must be awaited or the next phases would run
-		# detached underneath it.
-		await _spawn_surface_zone(s, parent, prop_scale, map_def, ticker)
+		if v2_ground:
+			TerrainGreeblesScript.scatter(s, parent, prop_scale, map_def)
+		else:
+			# Each zone builds its own conforming mesh (one height sample per
+			# vertex), so zones are chunked individually AND internally - the
+			# zone mesh builder carries the same budget gate. A zone is itself a
+			# coroutine now, so it must be awaited or the next phases would run
+			# detached underneath it.
+			await _spawn_surface_zone(s, parent, prop_scale, map_def, ticker)
 		await _slice.call()
 	# canyon_ford PR5 (2026-08-26): per-forest-zone LOS-blocking AABBs
 	# are added AFTER the visual surface zones so the body sits on
@@ -2142,6 +2314,34 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 	for b in map_def.get("bridges", []):
 		_spawn_bridge(b, parent)
 	await _slice.call()
+	# --- DRESSING -----------------------------------------------------------
+	#
+	# v2 replaces the four hardcoded visual passes below with one rule-driven
+	# pass (scripts/terrain_dressing.gd + data/terrain_dressing/*.json). The
+	# old passes could only ask about SLOPE, so a hillside looked identical
+	# whichever way it faced and nothing could be placed relative to water.
+	#
+	# AMBIENT ORE IS NOT DRESSING and still runs on both paths - those are
+	# harvestable deposits, i.e. economy, and moving them into a cosmetic rule
+	# file would put gameplay balance in an art asset.
+	if v2_ground:
+		# ORE FIRST. The dressing commits the shared MultiMesh batcher itself
+		# (it has to - see its own note on global_transform), and registering
+		# after a commit is refused. Ore is economy, not dressing, so it keeps
+		# its own pass either way.
+		if not bool(map_def.get("disable_ambient_scatter", false)):
+			await _spawn_ambient_ores(map_def, parent, prop_scale, [], ticker)
+			await _slice.call()
+		var dressed: Dictionary = await TerrainDressingScript.scatter(
+			map_def, parent, prop_scale, ticker, str(map_def.get("id", "")))
+		var total := 0
+		for k in dressed:
+			total += int(dressed[k])
+		BattleLogger.log_build_step("terrain.dressing_v2", 0.0, {"placed": total})
+		await _slice.call()
+		_tag_terrain_debris(parent, _pre_ids)
+		return
+
 	_spawn_grassland_clutter(map_def, parent, prop_scale)
 	await _slice.call()
 	# Ambient forest + ambient ore (2026-08-10, paired passes).
@@ -2177,10 +2377,16 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 		await visual_scatter.scatter_all(map_def, prop_scale, ticker)
 	await _spawn_slope_rocks(map_def, parent, ticker)
 	await _slice.call()
-	# Tag all new MeshInstance3D children (greebles, grass, slope rocks)
-	# so buildings can displace them on placement.
+	_tag_terrain_debris(parent, _pre_ids)
+
+
+# Tag every MeshInstance3D added by this pass so buildings can displace it on
+# placement. Extracted because the v2 dressing path returns early and would
+# otherwise skip it - leaving props that a factory could be dropped straight
+# on top of.
+static func _tag_terrain_debris(parent: Node3D, pre_ids: Dictionary) -> void:
 	for c in parent.get_children():
-		if _pre_ids.has(c.get_instance_id()):
+		if pre_ids.has(c.get_instance_id()):
 			continue
 		if c is MeshInstance3D and not c.is_in_group("terrain_debris"):
 			c.add_to_group("terrain_debris")
@@ -2358,6 +2564,111 @@ static func build_ground_material_heightmap(ground_color: Color, map_def: Dictio
 				mat.set_shader_parameter("use_curvature", true)
 	return mat
 
+# --- Terrain v2 ------------------------------------------------------------
+#
+# A map opts in with `"terrain": { "generator": "v2" }`. Anything else - which
+# is every map shipping today - takes the v1 path above, byte for byte. The
+# split is deliberate: v1's surfacing has known defects (see
+# shaders/terrain_ground_v2.gdshader's header for the list) but it is also what
+# every existing map was authored against, so it is frozen rather than fixed.
+const GROUND_BLEND_SHADER_V2 = preload("res://shaders/terrain_ground_v2.gdshader")
+
+# Splat channel -> surface type. Must match build_terrain.py's build_splatmap()
+# channel order (R grass, G rock, B dirt, A sand); they are two halves of one
+# contract and there is no runtime check that they agree.
+# The `ground_*` plates are 2048 px and built for a ~28 m tile
+# (tools/generate_ground_plates.py). The v1 plates they replace are 256-512 px
+# and were tiling every 6 m - 320 repeats across a 1920 m map.
+#
+# NOT named `<surface>_v<n>`: that suffix is what v1's variant discovery probes
+# for, so calling one `grassland_v2` would silently pull it into every v1 map's
+# blend and restyle terrain that is meant to be frozen.
+const V2_LAYERS: Array = ["ground_grass", "ground_rock", "ground_dirt", "ground_sand"]
+const V2_LAYER_VARIANTS: Array = ["", "", "", ""]
+# Falls back to the v1 plates if the wide ones have not been generated yet, so
+# a fresh checkout that has not run the generator still renders something.
+const V2_LAYERS_FALLBACK: Array = ["grassland", "rocky", "dirt", "sand"]
+const V2_LAYER_VARIANTS_FALLBACK: Array = ["", "_v1", "_v1", "_v1"]
+const V2_DETAIL_NORMAL := "res://assets/textures/terrain/detail_normal.png"
+
+static func terrain_generator(map_def: Dictionary) -> String:
+	var t = map_def.get("terrain", {})
+	if typeof(t) != TYPE_DICTIONARY:
+		return "v1"
+	var g := str(t.get("generator", "")).strip_edges().to_lower()
+	return g if g != "" else "v1"
+
+# The one entry point callers should use. Dispatches on the map's declared
+# generator so the call site does not need to know which system it is on.
+#
+# `map_id` is passed EXPLICITLY rather than read off map_def. MapCatalog keys
+# its cache by filename and never injects an "id" key into the dictionary it
+# returns, so `map_def.get("id", "")` is empty for every map in the game. v1's
+# build_ground_material_heightmap() gates its wetness/macro/curvature loads on
+# exactly that value, which means none of those three rasters has ever been
+# bound at runtime on any map - they are baked, and then not used. That is a
+# v1 defect, and per the freeze it stays as it is; v2 simply must not inherit
+# it, so it takes the id from the caller who actually knows it.
+static func build_ground_material_for(ground_color: Color, map_def: Dictionary = {}, map_id: String = "") -> Material:
+	if terrain_generator(map_def) == "v2":
+		return build_ground_material_v2(ground_color, map_def, map_id)
+	return build_ground_material_heightmap(ground_color, map_def)
+
+# Per-map identity WITHOUT the brightness penalty. v1 multiplied albedo by
+# ground_color.lightened(0.55) through a `source_color` uniform, which is a
+# 0.39 LINEAR multiply - it read as "a light grey" to whoever authored it and
+# behaved as a 2.5x darkening. Here the map's colour is reduced to hue and a
+# little saturation at FULL value, so it shifts the ground's cast without
+# spending any of its range.
+static func v2_ground_tint(ground_color: Color) -> Color:
+	var v: float = maxf(ground_color.r, maxf(ground_color.g, ground_color.b))
+	if v <= 0.001:
+		return Color.WHITE
+	return Color.from_hsv(ground_color.h, ground_color.s * 0.45, 1.0)
+
+static func build_ground_material_v2(ground_color: Color, map_def: Dictionary, map_id: String = "") -> Material:
+	var mat := ShaderMaterial.new()
+	mat.shader = GROUND_BLEND_SHADER_V2
+	var layers: Array = V2_LAYERS
+	var variants: Array = V2_LAYER_VARIANTS
+	if not ResourceLoader.exists(TERRAIN_TEXTURE_DIR + str(V2_LAYERS[0]) + "_albedo.png"):
+		push_warning("TerrainBuilder v2: wide ground plates missing - falling back to the v1 plates, which tile every few metres. Run: python tools/generate_ground_plates.py")
+		layers = V2_LAYERS_FALLBACK
+		variants = V2_LAYER_VARIANTS_FALLBACK
+	for i in range(layers.size()):
+		var tex: Dictionary = _get_terrain_textures(layers[i], variants[i])
+		mat.set_shader_parameter("albedo_%d" % i, tex.albedo)
+		mat.set_shader_parameter("normal_%d" % i, tex.normal)
+		mat.set_shader_parameter("rough_%d" % i, tex.roughness)
+	if ResourceLoader.exists(V2_DETAIL_NORMAL):
+		mat.set_shader_parameter("detail_normal_tex", load(V2_DETAIL_NORMAL))
+	mat.set_shader_parameter("ground_tint", v2_ground_tint(ground_color))
+
+	var half: float = float(map_def.get("map_half_extents", 100.0))
+	mat.set_shader_parameter("map_half_extents", half)
+
+	var mid := map_id if map_id != "" else str(map_def.get("id", ""))
+	if mid == "":
+		push_warning("TerrainBuilder v2: no map id supplied - per-map rasters (splat/macro/curvature/wetness) cannot be located and the ground will render as base layer + slope rock only.")
+	else:
+		var splat_path := "res://data/maps/%s_splat.png" % mid
+		if ResourceLoader.exists(splat_path):
+			mat.set_shader_parameter("splat_tex", load(splat_path))
+			mat.set_shader_parameter("use_splat", true)
+		else:
+			# Without a splat the shader falls back to layer 0 everywhere plus
+			# the slope-driven rock channel, which is still a valid (if plain)
+			# surface - not an error. Say so, because a map that MEANT to have
+			# one and silently renders as flat grass is hard to diagnose.
+			push_warning("TerrainBuilder v2: no splat raster for map '%s' (%s) - ground will be base layer + slope rock only. Run tools/terrain/build_terrain.py on it." % [mid, splat_path])
+		for entry in [["macro", "macro_tex", "use_macro"], ["curvature", "curvature_tex", "use_curvature"], ["wetness", "wetness_tex", "use_wetness"]]:
+			var p := "res://data/maps/%s_%s.png" % [mid, entry[0]]
+			if ResourceLoader.exists(p):
+				mat.set_shader_parameter(entry[1], load(p))
+				mat.set_shader_parameter(entry[2], true)
+	return mat
+
+
 # Builds a variant-blending material for any surface type. Falls back to
 # whatever variants actually exist - a surface with only its procedural bake
 # gets variant_count 1 and behaves exactly as before, so this is safe to point
@@ -2394,6 +2705,61 @@ static func build_blended_surface_material(surface_type: String, tint: Color = C
 # grid (fewer triangles to render/light). Both sample the exact same
 # height_at() function, so the difference between them is sub-unit smoothing
 # imperceptible at gameplay camera distances, not a real mismatch.
+# KNOWN LIMIT: v2 MAPS CANNOT YET HAVE ROLLING GROUND BETWEEN THEIR FEATURES.
+#
+# Adding terrain relief via build_terrain.py's post_pass noise - even a single
+# 91 m wavelength at 3 m amplitude, which is gentle enough that every point on
+# it measures walkable - makes each navmesh tile bake 30-70 polygons where
+# smooth ground bakes 2. At that complexity the tiled navmesh's seam
+# connection stops bridging reliably, and whole regions become unreachable
+# islands: on sentinel_divide it stranded the entire south-east corner and its
+# HQ, while tools/probe_terrain_ascii.gd showed every square metre of the
+# corridor to it as walkable. tools/probe_terrain_reach.gd is what makes it
+# visible, because it asks a different question - not "is this ground
+# walkable" but "can a unit get there".
+#
+# Measured, removing the noise takes tiles back to 2 polygons and the map back
+# to fully connected. Widening map_set_edge_connection_margin to 4x cell was
+# tried and did not help, so the margin is not the mechanism.
+#
+# This matters beyond looks: aspect-conditioned dressing rules (north-facing
+# conifers, south-facing scrub) need gentle slopes to sort on, and a map of
+# dead-flat plains and vertical walls gives them almost nothing. Fixing it
+# means addressing the tiled bake - larger tiles, a stitched bake, or a single
+# region - which is its own piece of work.
+const POST_PASS_NAVMESH_LIMIT := true
+
+# --- Adaptive relief detail (v2 generator) ---------------------------------
+#
+# A quad whose corners differ in height by more than this is a wall, not
+# ground, and gets re-emitted at DETAIL_SUBDIV x DETAIL_SUBDIV. 2.0 m is
+# comfortably above the noise on rolling terrain and far below any authored
+# wall (the shallowest here is a 22 m plateau over a 6 m falloff).
+const DETAIL_TRIGGER_RISE: float = 2.0
+# 5x5 sub-quads takes a 6.86 m quad to ~1.4 m - enough for a wall to read as a
+# vertical face with a lit top edge rather than a smooth ramp.
+const DETAIL_SUBDIV: int = 5
+
+# Re-emits one coarse quad as an n x n grid, sampling real heights at every
+# sub-corner. Takes the emit and height callables rather than closing over them
+# so it can stay a plain static function next to the rest of the mesh builder.
+static func _emit_detailed_quad(emit: Callable, h: Callable,
+		x0: float, x1: float, z0: float, z1: float, n: int) -> void:
+	var dx: float = (x1 - x0) / float(n)
+	var dz: float = (z1 - z0) / float(n)
+	for i in range(n):
+		var sx0: float = x0 + dx * float(i)
+		var sx1: float = x0 + dx * float(i + 1)
+		for j in range(n):
+			var sz0: float = z0 + dz * float(j)
+			var sz1: float = z0 + dz * float(j + 1)
+			emit.call(
+				Vector3(sx0, h.call(sx0, sz0), sz0),
+				Vector3(sx1, h.call(sx1, sz0), sz0),
+				Vector3(sx1, h.call(sx1, sz1), sz1),
+				Vector3(sx0, h.call(sx0, sz1), sz1))
+
+
 const GROUND_MESH_RESOLUTION: float = 3.0
 # Collision heightmap sample spacing, in world units. Kept coarser than the
 # visual mesh on purpose: HeightMapShape3D always spaces samples exactly 1
@@ -2448,6 +2814,9 @@ const BUILD_FRAME_BUDGET_MS: float = 8.0
 # floating-point noise.
 static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -> Dictionary:
 	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	# v2 only: every shipped map was authored against the uniform grid, and
+	# subdividing their terrain would change silhouettes they were balanced on.
+	var adaptive_detail: bool = terrain_generator(map_def) == "v2"
 
 	# Scale resolution dynamically with extent so large maps don't explode into millions of quads
 	# 2026-08-26: per-axis step so a wide non-square map (1200x520) gets
@@ -2528,7 +2897,29 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 			var b = Vector3(x1, _h.call(x1, z), z)
 			var c = Vector3(x1, _h.call(x1, z1), z1)
 			var d = Vector3(x, _h.call(x, z1), z1)
-			_emit_quad.call(a, b, c, d)
+			# ADAPTIVE SUBDIVISION. A quad whose corners disagree in height by
+			# more than DETAIL_TRIGGER_RISE is re-emitted at finer resolution.
+			#
+			# Why this exists: mesh_step is (span / 280) - 6.86 m on a 1920 m
+			# map - while a cliff wall is the feature's wall_falloff wide, 6-8 m.
+			# That is ONE QUAD ACROSS, so a 22 m plateau wall had a vertex on
+			# top and the next at the bottom and rendered as a smooth ramp. The
+			# relief was correct in the heightmap and correct to pathfinding
+			# (the navmesh samples corner deltas and marked it impassable) and
+			# simply absent from the picture. That gap is also why the old
+			# system stamped 1472 discrete cliff GLBs along the wall lines to
+			# fake what the mesh could not draw.
+			#
+			# Cost is bounded by geometry: walls are LINES through the grid, so
+			# only a few hundred of ~78k quads trigger, and each becomes
+			# DETAIL_SUBDIV^2. Measured on sentinel_divide this is a low
+			# single-digit percentage of extra triangles.
+			var rise: float = maxf(maxf(absf(b.y - a.y), absf(d.y - a.y)),
+				maxf(absf(c.y - b.y), absf(c.y - d.y)))
+			if adaptive_detail and rise > DETAIL_TRIGGER_RISE:
+				_emit_detailed_quad(_emit_quad, _h, x, x1, z, z1, DETAIL_SUBDIV)
+			else:
+				_emit_quad.call(a, b, c, d)
 			z = z1
 		x = x1
 

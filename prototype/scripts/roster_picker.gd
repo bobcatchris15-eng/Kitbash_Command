@@ -28,11 +28,65 @@ const DRAG_TYPE = "roster_blueprint"
 
 const HARVESTER_SLOT_INDEX = 11  # 0-indexed: slot 12 of 12
 
-# Card tint colors. Harvesters get green, repair units get blue. These are
-# light washes applied to the card background so the card reads as a
-# CATEGORY at a glance without obscuring the thumbnail or stat text.
+# Defence loadout. Separate from the unit roster because these are placed on
+# the map during the match rather than produced from a manufactory queue, so
+# spending unit slots on them would price two unrelated things against each
+# other.
+const BUILDING_CAPACITY = 4
+
+# Slot kinds. Replaces the old `index == HARVESTER_SLOT_INDEX` special case:
+# with a third category that test does not generalise, and a slot that knows
+# what it accepts can say so in its own tooltip and reject a bad drop without
+# the picker having to special-case indices.
+enum SlotKind { UNIT, HARVESTER, BUILDING }
+
+# Card tint colors. Harvesters get green, repair units get blue, defences
+# amber. These are light washes applied to the card background so the card
+# reads as a CATEGORY at a glance without obscuring the thumbnail or stat text.
 const HARVESTER_TINT := Color(0.15, 0.30, 0.12, 0.45)
 const REPAIR_TINT := Color(0.12, 0.18, 0.30, 0.45)
+const BUILDING_TINT := Color(0.30, 0.24, 0.10, 0.45)
+
+# --- Surfaces -------------------------------------------------------------
+#
+# Playtest: "it feels too dark without enough lightness or contrast in here."
+# The screen was three values of near-black - page, tray and card sat within
+# about 0.07 of each other in linear terms - so nothing read as raised and the
+# whole tray looked like one flat sheet with text on it.
+#
+# These are a deliberate LADDER with real gaps between the rungs: the tray
+# recedes, the card sits on it, the card's edge catches light. Local constants
+# rather than new tokens because this is one screen's surface treatment, and
+# ui_tokens.gd's BASE_ ramp is shared with the Design Lab and the HUD-adjacent
+# chrome that both want to stay darker than this.
+const SURFACE_TRAY := Color(0.128, 0.126, 0.117, 1.0)
+const SURFACE_CARD := Color(0.212, 0.206, 0.190, 1.0)
+const SURFACE_EDGE := Color(0.365, 0.354, 0.325, 1.0)
+const SURFACE_RADIUS := 3
+# How far a category tint pulls the card off SURFACE_CARD. Low on purpose: the
+# tint is a category cue, and at full strength it swamped the value ladder
+# above - a tinted card stopped reading as the same KIND of object as an
+# untinted one, which is what made the harvester strip look like a different
+# widget.
+const TINT_STRENGTH := 0.55
+
+# Category ICONS, from the out-of-match registry (scripts/ui_icons.gd ->
+# assets/icons/). Deliberately NOT scripts/hud/hud_icons.gd: that set is the
+# in-match HUD's own vocabulary and CLAUDE.md keeps the two languages apart.
+#
+# A tint alone was not enough. It tells you two cards differ, but not what the
+# difference IS, and it disappears entirely on the empty reserved slot where
+# the player most needs to know what belongs there. The icon carries the
+# meaning; the tint stays as reinforcement.
+const ICON_HARVESTER := "extractor"
+const ICON_REPAIR := "repair"
+const ICON_BUILDING := "defense"
+const CARD_BADGE_SIZE := Vector2(22, 22)
+const SLOT_GHOST_SIZE := Vector2(30, 30)
+# The empty-slot ghost is the same glyph as the card badge at low alpha - the
+# slot is showing you what it is waiting for, so it must be recognisably the
+# same mark, just not competing with a filled slot's thumbnail.
+const SLOT_GHOST_ALPHA := 0.32
 
 	# A FLOOR, not a fixed size. The slots expand to share the full width of the
 	# tray (see _build_slot_grid), so this only sets how small one is allowed to get
@@ -78,15 +132,20 @@ signal roster_changed()
 # Plain Array, not Array[RosterSlot]: GDScript will not accept an inner class as
 # a typed array's element type, and the parse error it raises names the line
 # rather than the reason.
-var _slots: Array = []
+var _slots: Array = []            # unit roster slots (kind UNIT / HARVESTER)
+var _building_slots: Array = []   # defence loadout slots (kind BUILDING)
 var _baker: BlueprintThumbnail = null
 var _slot_grid: GridContainer = null
+var _building_grid: GridContainer = null
 var _library_row: HBoxContainer = null
 var _harvester_row: HBoxContainer = null
+var _building_row: HBoxContainer = null
 var _counter: Label = null
 var _capacity: int = 12
 var _data_by_path: Dictionary = {}
 var _harvester_paths: Dictionary = {}  # path -> entry, for slot validation
+var _building_paths: Dictionary = {}   # path -> entry, for slot validation
+var _repair_paths: Dictionary = {}     # path -> true, for the support badge
 
 
 # `entries` is blueprint_manager.list_blueprints(true) output.
@@ -99,109 +158,153 @@ func setup(entries: Array, capacity: int) -> void:
 
 	for entry in entries:
 		var path := str(entry.get("path", ""))
-		if path != "":
-			_data_by_path[path] = _load_blueprint(path)
+		if path == "":
+			continue
+		_data_by_path[path] = _load_blueprint(path)
+		# Classification is read off the ENTRY, not recomputed from blueprint
+		# data here: blueprint_manager.list_blueprints() already resolved it
+		# through ModuleCatalog, and a second, independently-derived answer in
+		# the UI is exactly how a design ends up in one library and a different
+		# category in the match.
+		if entry.get("is_defensive", false):
+			_building_paths[path] = entry
+		elif entry.get("is_harvester", false):
+			_harvester_paths[path] = entry
+		if entry.get("has_repair", false):
+			_repair_paths[path] = true
 
-	# --- Top row: two library strips side by side ---
+	# --- Top row: three library strips side by side ---
 	var lib_row := HBoxContainer.new()
 	lib_row.add_theme_constant_override("separation", Tokens.SPACE_MD)
 	lib_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(lib_row)
 
-	lib_row.add_child(_build_combat_scroll(entries))
+	lib_row.add_child(_build_units_scroll(entries))
 	lib_row.add_child(_build_harvester_scroll(entries))
+	lib_row.add_child(_build_building_scroll(entries))
 
-	# --- Bottom: slot grid (6×2) ---
-	add_child(_build_slot_section())
+	# --- Bottom: unit roster and defence loadout SIDE BY SIDE ---
+	#
+	# Stacked, the two grids added ~160px to a screen whose own comments record
+	# that the libraries plus one grid "all fit on a 900px viewport without
+	# scrolling". Side by side both are two rows tall, so the defence loadout
+	# costs width - which the tray has - instead of height, which it does not.
+	var trays := HBoxContainer.new()
+	trays.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	trays.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(trays)
+
+	var roster_section := _build_slot_section()
+	roster_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	roster_section.size_flags_stretch_ratio = 3.0
+	trays.add_child(roster_section)
+
+	var defence_section := _build_building_section()
+	defence_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	defence_section.size_flags_stretch_ratio = 1.0
+	trays.add_child(defence_section)
 	_update_counter()
 
 	_bake_thumbnails(entries)
 
 
-func _build_combat_scroll(entries: Array) -> VBoxContainer:
+# One library column. The three categories differ only in which entries they
+# take, what they are called and how wide they sit, so they share a builder -
+# three near-identical 40-line functions was how the second one drifted from
+# the first (the combat strip animated its entrance, the harvester strip did
+# not, for no stated reason).
+#
+# `category` is one of "unit" / "harvester" / "building" and is matched against
+# the entry flags the blueprint manager resolved.
+func _build_library_column(entries: Array, category: String, heading_text: String,
+		empty_hint: String, stretch: float) -> VBoxContainer:
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.size_flags_stretch_ratio = 3.0
+	col.size_flags_stretch_ratio = stretch
 	col.add_theme_constant_override("separation", Tokens.SPACE_XS)
 
 	var heading := Label.new()
-	heading.text = "BLUEPRINT LIBRARY"
+	heading.text = heading_text
 	heading.theme_type_variation = "HeadingLabel"
 	col.add_child(heading)
 
-	var combat_entries := []
+	var picked := []
 	for entry in entries:
-		if not entry.get("is_harvester", false):
-			combat_entries.append(entry)
+		if _category_of(entry) == category:
+			picked.append(entry)
 
-	if combat_entries.is_empty():
+	if picked.is_empty():
 		var hint := Label.new()
-		hint.text = "No saved designs yet — save a design in the Lab to field it."
+		hint.text = empty_hint
 		hint.theme_type_variation = "HintLabel"
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		col.add_child(hint)
 		return col
 
+	# Tray surface behind the strip. Without it the cards float on the page
+	# background and the column has no readable extent - which is half of why
+	# the screen read as one flat dark sheet.
+	var tray := PanelContainer.new()
+	tray.add_theme_stylebox_override("panel", surface_style(
+		Color(0, 0, 0, 0), SURFACE_TRAY, SURFACE_EDGE.darkened(0.45), 6))
+	tray.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(tray)
+
 	var scroll := ScrollContainer.new()
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_SM)
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(scroll)
+	tray.add_child(scroll)
 
-	_library_row = HBoxContainer.new()
-	_library_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
-	scroll.add_child(_library_row)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	scroll.add_child(row)
 
-	for entry in combat_entries:
+	for entry in picked:
 		var card := RosterCard.new()
 		card.configure(entry, _data_by_path.get(str(entry.get("path", "")), {}))
-		_library_row.add_child(card)
+		# EXPAND_FILL, so every card in the row takes the row's full height
+		# rather than each shrinking to its own content. Without this a design
+		# whose spec block has an extra line (harvesters carry a HARVESTER
+		# rating, unarmed ones lose the DPS/Range pair) makes a card of a
+		# different height, and the strip reads as ragged - which is exactly
+		# how the units and harvesters columns came out.
+		card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		row.add_child(card)
 
-	call_deferred("_animate_library_entrance")
+	match category:
+		"harvester": _harvester_row = row
+		"building": _building_row = row
+		_: _library_row = row
 	return col
+
+
+# THE one place an entry's library is decided. Defensive is tested FIRST: a
+# foundation-hull design carrying a harvester module is a static extractor, and
+# it must not be offered as something a manufactory can build.
+func _category_of(entry: Dictionary) -> String:
+	if entry.get("is_defensive", false):
+		return "building"
+	if entry.get("is_harvester", false):
+		return "harvester"
+	return "unit"
+
+
+func _build_units_scroll(entries: Array) -> VBoxContainer:
+	var c := _build_library_column(entries, "unit", "UNITS",
+		"No saved unit designs yet — save a design in the Lab to field it.", 3.0)
+	call_deferred("_animate_library_entrance")
+	return c
 
 
 func _build_harvester_scroll(entries: Array) -> VBoxContainer:
-	var col := VBoxContainer.new()
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.size_flags_stretch_ratio = 2.0
-	col.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	return _build_library_column(entries, "harvester", "HARVESTERS",
+		"No harvesters saved yet — add a Resource Harvester in the Lab.", 2.0)
 
-	var heading := Label.new()
-	heading.text = "HARVESTER BAY"
-	heading.theme_type_variation = "HeadingLabel"
-	col.add_child(heading)
 
-	var harv_entries := []
-	for entry in entries:
-		if entry.get("is_harvester", false):
-			harv_entries.append(entry)
-			_harvester_paths[str(entry.get("path", ""))] = entry
-
-	if harv_entries.is_empty():
-		var hint := Label.new()
-		hint.text = "No harvesters saved yet — add a Resource Harvester in the Lab."
-		hint.theme_type_variation = "HintLabel"
-		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		col.add_child(hint)
-		return col
-
-	var scroll := ScrollContainer.new()
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_SM)
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(scroll)
-
-	_harvester_row = HBoxContainer.new()
-	_harvester_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
-	scroll.add_child(_harvester_row)
-
-	for entry in harv_entries:
-		var card := RosterCard.new()
-		card.configure(entry, _data_by_path.get(str(entry.get("path", "")), {}))
-		_harvester_row.add_child(card)
-
-	return col
+func _build_building_scroll(entries: Array) -> VBoxContainer:
+	return _build_library_column(entries, "building", "DEFENSIVE BUILDINGS",
+		"No defence designs yet — build one on a foundation hull in the Lab.", 2.0)
 
 
 func _build_slot_section() -> VBoxContainer:
@@ -220,6 +323,10 @@ func _build_slot_section() -> VBoxContainer:
 
 	var well := PanelContainer.new()
 	well.theme_type_variation = "InsetPanel"
+	# Same tray surface as the library strips, so the two halves of the screen
+	# sit on one value ladder instead of each inventing its own.
+	well.add_theme_stylebox_override("panel", surface_style(
+		Color(0, 0, 0, 0), SURFACE_TRAY, SURFACE_EDGE.darkened(0.45), 6))
 	well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	section.add_child(well)
 
@@ -232,10 +339,54 @@ func _build_slot_section() -> VBoxContainer:
 
 	for i in range(_capacity):
 		var slot := RosterSlot.new()
-		slot.configure(i, self)
+		var kind: int = SlotKind.HARVESTER if i == HARVESTER_SLOT_INDEX else SlotKind.UNIT
+		slot.configure(i, self, kind)
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_slot_grid.add_child(slot)
 		_slots.append(slot)
+
+	return section
+
+
+func _build_building_section() -> VBoxContainer:
+	var section := VBoxContainer.new()
+	section.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var heading := Label.new()
+	heading.text = "DEFENCE LOADOUT"
+	heading.theme_type_variation = "HeadingLabel"
+	section.add_child(heading)
+
+	var sub := Label.new()
+	sub.text = "placed during the match"
+	sub.theme_type_variation = "StatLabel"
+	sub.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
+	section.add_child(sub)
+
+	var well := PanelContainer.new()
+	well.theme_type_variation = "InsetPanel"
+	# Same tray surface as the library strips, so the two halves of the screen
+	# sit on one value ladder instead of each inventing its own.
+	well.add_theme_stylebox_override("panel", surface_style(
+		Color(0, 0, 0, 0), SURFACE_TRAY, SURFACE_EDGE.darkened(0.45), 6))
+	well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	section.add_child(well)
+
+	_building_grid = GridContainer.new()
+	# 2x2, matching the roster grid's two rows so the trays sit level.
+	_building_grid.columns = 2
+	_building_grid.add_theme_constant_override("h_separation", Tokens.SPACE_SM)
+	_building_grid.add_theme_constant_override("v_separation", Tokens.SPACE_SM)
+	_building_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	well.add_child(_building_grid)
+
+	for i in range(BUILDING_CAPACITY):
+		var slot := RosterSlot.new()
+		slot.configure(i, self, SlotKind.BUILDING)
+		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_building_grid.add_child(slot)
+		_building_slots.append(slot)
 
 	return section
 
@@ -247,6 +398,8 @@ func _animate_library_entrance() -> void:
 		UIAnimScript.stagger_in(_library_row, Vector2(-16, 0))
 	if is_instance_valid(_harvester_row):
 		UIAnimScript.stagger_in(_harvester_row, Vector2(-16, 0))
+	if is_instance_valid(_building_row):
+		UIAnimScript.stagger_in(_building_row, Vector2(-16, 0))
 
 
 func _bake_thumbnails(entries: Array) -> void:
@@ -274,7 +427,9 @@ func _bake_thumbnails(entries: Array) -> void:
 					card.set_thumbnail(tex)
 				card.set_stats(stats)
 		if tex != null:
-			for slot in _slots:
+			# Both grids: a defence pre-filled by fill_from() sits in the
+			# building grid and would otherwise keep a blank thumbnail forever.
+			for slot in _all_slots():
 				if slot.entry_path == path:
 					slot.refresh_thumbnail(tex)
 
@@ -292,13 +447,19 @@ func _load_blueprint(path: String) -> Dictionary:
 
 func _cards() -> Array:
 	var out := []
-	for row in [_library_row, _harvester_row]:
+	for row in [_library_row, _harvester_row, _building_row]:
 		if row == null:
 			continue
 		for c in row.get_children():
 			if c is RosterCard:
 				out.append(c)
 	return out
+
+
+# Every slot in both grids. Used wherever "is this design already placed"
+# has to be answered across the whole screen rather than one grid.
+func _all_slots() -> Array:
+	return _slots + _building_slots
 
 
 # Called by a slot once it has accepted or released a payload.
@@ -310,24 +471,32 @@ func notify_slot_changed(_slot: RosterSlot) -> void:
 func _update_counter() -> void:
 	if _counter == null:
 		return
-	var n := ordered_paths().size()
+	var units := 0
 	var harv_slot_filled := false
 	for slot in _slots:
-		if slot.index == HARVESTER_SLOT_INDEX and slot.entry_path != "":
+		if slot.entry_path == "":
+			continue
+		units += 1
+		if slot.kind == SlotKind.HARVESTER:
 			harv_slot_filled = true
-			break
+	var defences := 0
+	for slot in _building_slots:
+		if slot.entry_path != "":
+			defences += 1
 	var harv_text := "  (harvester slot: %s)" % ("filled" if harv_slot_filled else "empty")
-	_counter.text = "%d / %d slots filled%s" % [n, _capacity, harv_text]
-	if n == 0:
+	_counter.text = "%d / %d unit slots  ·  %d / %d defences%s" % [
+		units, _capacity, defences, BUILDING_CAPACITY, harv_text]
+	if units == 0:
 		_counter.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
 	else:
 		_counter.add_theme_color_override("font_color", Tokens.SIGNAL_GO)
 
 
 # Finds the slot currently holding a path, or null. Used to enforce that a design
-# occupies at most one slot.
+# occupies at most one slot ACROSS BOTH GRIDS - a design dragged from the units
+# grid into the defence grid must leave the first, not appear twice.
 func slot_holding(path: String) -> RosterSlot:
-	for slot in _slots:
+	for slot in _all_slots():
 		if slot.entry_path == path:
 			return slot
 	return null
@@ -339,6 +508,67 @@ func is_harvester_slot(index: int) -> bool:
 
 func is_harvester_path(path: String) -> bool:
 	return _harvester_paths.has(path)
+
+
+# A small capability glyph. Returns null when the icon is missing rather than
+# substituting a placeholder - the same degrade-to-nothing contract
+# hud_icons.gd uses, so a renamed asset costs a badge rather than a broken
+# texture rect on every card.
+# One surface builder for every card and filled slot, so a tinted card and an
+# untinted one differ only in HUE. Previously the tint path replaced the whole
+# stylebox with a flat fill and the untinted path kept the themed CardPanel
+# texture, so the two had different borders, different corner radii and
+# different padding - visible in the setup screen as the harvester column
+# sitting at a different height and weight from the units column.
+static func surface_style(tint: Color = Color(0, 0, 0, 0), fill: Color = SURFACE_CARD,
+		edge: Color = SURFACE_EDGE, margin: int = 8) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = fill if tint.a <= 0.0 else fill.lerp(Color(tint.r, tint.g, tint.b, 1.0), TINT_STRENGTH * tint.a / 0.45)
+	sb.border_color = edge if tint.a <= 0.0 else edge.lerp(Color(tint.r, tint.g, tint.b, 1.0), 0.45)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(SURFACE_RADIUS)
+	sb.set_content_margin_all(margin)
+	return sb
+
+
+static func make_badge(icon_name: String, tip: String, size: Vector2 = CARD_BADGE_SIZE,
+		alpha: float = 1.0) -> TextureRect:
+	if not UIIcons.has_icon(icon_name):
+		push_warning("RosterPicker: no icon '%s' in UIIcons registry - badge omitted." % icon_name)
+		return null
+	var tr := TextureRect.new()
+	tr.texture = UIIcons.get_icon(icon_name)
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.custom_minimum_size = size
+	tr.size = size
+	tr.modulate = Color(1, 1, 1, alpha)
+	tr.tooltip_text = tip
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return tr
+
+
+func is_building_path(path: String) -> bool:
+	return _building_paths.has(path)
+
+
+func is_repair_path(path: String) -> bool:
+	return _repair_paths.has(path)
+
+
+# Does `path` belong in a slot of `kind`?
+#
+# The unit grid takes harvesters in ANY slot, not just the reserved one - the
+# reservation exists to guarantee you field at least one, not to cap you at
+# one. What it will not take is a defence, and vice versa.
+func path_fits_kind(path: String, kind: int) -> bool:
+	match kind:
+		SlotKind.BUILDING:
+			return is_building_path(path)
+		SlotKind.HARVESTER:
+			return is_harvester_path(path)
+		_:
+			return not is_building_path(path)
 
 
 # Fills the slots from an ordered list of paths, as the inverse of
@@ -354,25 +584,54 @@ func fill_from(paths: Array) -> int:
 	var filled := 0
 	for path in paths:
 		var path_str := str(path)
-		if filled >= _slots.size():
-			break
 		if not _data_by_path.has(path_str):
 			continue
 		if slot_holding(path_str) != null:
 			continue
+		# ROUTED BY CATEGORY, not packed in order. The incoming list is a flat
+		# array (that is what ordered_paths returns and what the rule set
+		# carries), so a defence in it has to find its way to the defence grid
+		# rather than eating a unit slot - which is what a naive "fill slot N"
+		# loop did once buildings joined the screen.
+		var slot: RosterSlot = _first_free_slot_for(path_str)
+		if slot == null:
+			continue
 		var data: Dictionary = _data_by_path[path_str]
 		# null thumbnail: _bake_thumbnails() is still in flight from setup() and
 		# fills every slot holding this path when its render lands.
-		_slots[filled].assign(path_str, str(data.get("name", path_str.get_file())), null)
+		slot.assign(path_str, str(data.get("name", path_str.get_file())), null)
 		filled += 1
 	_update_counter()
 	return filled
 
 
-# THE OUTPUT CONTRACT. Left-to-right, top-to-bottom, gaps skipped.
+func _first_free_slot_for(path: String) -> RosterSlot:
+	var pool: Array = _building_slots if is_building_path(path) else _slots
+	# Prefer a general slot so the reserved harvester well stays open for a
+	# harvester that has not been placed yet.
+	for slot in pool:
+		if slot.entry_path == "" and slot.kind != SlotKind.HARVESTER \
+				and path_fits_kind(path, slot.kind):
+			return slot
+	for slot in pool:
+		if slot.entry_path == "" and path_fits_kind(path, slot.kind):
+			return slot
+	return null
+
+
+# THE OUTPUT CONTRACT. Left-to-right, top-to-bottom, gaps skipped; units first,
+# then defences.
+#
+# Still ONE flat array. The match runtime sorts units from defences itself via
+# match_director.is_defence_design(), and hud_production_deck already routes
+# each into its own queue, so splitting them here would mean inventing a second
+# rule-set field for information the runtime re-derives anyway.
 func ordered_paths() -> Array:
 	var out := []
 	for slot in _slots:
+		if slot.entry_path != "":
+			out.append(slot.entry_path)
+	for slot in _building_slots:
 		if slot.entry_path != "":
 			out.append(slot.entry_path)
 	return out
@@ -396,23 +655,61 @@ class RosterCard extends PanelContainer:
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		tooltip_text = "%s\nDrag into a roster slot." % entry_name
 
-		# Category tint: harvesters get green, repair units get blue.
+		# Category tint: harvesters green, defences amber, repair units blue.
 		# Applied as a StyleBoxFlat background override so the tint is visible
 		# behind the thumbnail and stat text without obscuring them.
-		if entry.get("is_harvester", false):
-			_apply_tint(RosterPicker.HARVESTER_TINT)
-		elif entry.get("has_repair", false):
-			_apply_tint(RosterPicker.REPAIR_TINT)
+		var is_harv: bool = entry.get("is_harvester", false)
+		var is_def: bool = entry.get("is_defensive", false)
+		var has_rep: bool = entry.get("has_repair", false)
+		var tint := Color(0, 0, 0, 0)
+		if is_def:
+			tint = RosterPicker.BUILDING_TINT
+		elif is_harv:
+			tint = RosterPicker.HARVESTER_TINT
+		elif has_rep:
+			tint = RosterPicker.REPAIR_TINT
+		# EVERY card gets the same built surface, tinted or not. See
+		# surface_style()'s header for why sharing the builder matters.
+		add_theme_stylebox_override("panel", RosterPicker.surface_style(tint))
 
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", Tokens.SPACE_XS)
 		add_child(box)
 
+		# The thumbnail sits in a wrapper so capability badges can overlay its
+		# top corners. A badge in the VBox flow would cost a row of card height
+		# that the spec block already needs, and would read as another stat
+		# line rather than as a property of the design pictured above it.
+		var thumb_wrap := Control.new()
+		thumb_wrap.custom_minimum_size = Vector2(0, RosterPicker.CARD_THUMB_H)
+		thumb_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(thumb_wrap)
+
 		_thumb = TextureRect.new()
 		_thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		_thumb.custom_minimum_size = Vector2(0, RosterPicker.CARD_THUMB_H)
-		box.add_child(_thumb)
+		_thumb.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		thumb_wrap.add_child(_thumb)
+
+		# Harvester on the left, support on the right, so a design that is both
+		# shows both without them stacking. Both are drawn on every card that
+		# qualifies - the reserved slot's ghost uses the same glyph, and the
+		# pairing is what makes "this belongs there" legible.
+		var badges: Array = []
+		if is_harv:
+			badges.append([RosterPicker.ICON_HARVESTER, "Harvester — can gather resources"])
+		if is_def:
+			badges.append([RosterPicker.ICON_BUILDING, "Defensive building — placed on the map"])
+		if has_rep:
+			badges.append([RosterPicker.ICON_REPAIR, "Support — carries a repair array"])
+		for i in range(badges.size()):
+			var badge := RosterPicker.make_badge(badges[i][0], badges[i][1])
+			if badge == null:
+				continue
+			badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
+			badge.position = Vector2(2 + i * (RosterPicker.CARD_BADGE_SIZE.x + 3), 2)
+			thumb_wrap.add_child(badge)
 
 		var name_label := Label.new()
 		name_label.text = entry_name
@@ -453,16 +750,6 @@ class RosterCard extends PanelContainer:
 			# stutter.
 			UIAnimScript.fade(_thumb, 1.0, UIAnimScript.DURATION_NORMAL)
 
-	func _apply_tint(tint: Color) -> void:
-		# Create a tinted StyleBoxFlat as the card background. The tint sits
-		# behind the thumbnail and text so the card reads as category-coloured
-		# at a glance without obscuring content.
-		var style := StyleBoxFlat.new()
-		style.bg_color = tint
-		style.set_corner_radius_all(4)
-		style.set_content_margin_all(8)
-		add_theme_stylebox_override("panel", style)
-
 	func _get_drag_data(_at_position: Vector2) -> Variant:
 		if entry_path == "":
 			return null
@@ -485,15 +772,18 @@ class RosterSlot extends PanelContainer:
 	var entry_path: String = ""
 	var entry_name: String = ""
 	var index: int = 0
+	var kind: int = RosterPicker.SlotKind.UNIT
 
 	var _picker: RosterPicker = null
 	var _thumb: TextureRect = null
 	var _label: Label = null
 	var _tex: Texture2D = null
+	var _ghost: TextureRect = null
 
-	func configure(i: int, picker: RosterPicker) -> void:
+	func configure(i: int, picker: RosterPicker, slot_kind: int = RosterPicker.SlotKind.UNIT) -> void:
 		index = i
 		_picker = picker
+		kind = slot_kind
 		custom_minimum_size = RosterPicker.SLOT_SIZE
 		mouse_filter = Control.MOUSE_FILTER_PASS
 
@@ -501,11 +791,36 @@ class RosterSlot extends PanelContainer:
 		box.add_theme_constant_override("separation", 0)
 		add_child(box)
 
+		# Same wrapper trick as the card: the empty-slot ghost has to sit ON the
+		# thumbnail area, not above or below it, or an empty slot is a different
+		# height from a filled one and the grid jumps as you fill it.
+		var thumb_wrap := Control.new()
+		thumb_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		thumb_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(thumb_wrap)
+
 		_thumb = TextureRect.new()
 		_thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		_thumb.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		box.add_child(_thumb)
+		_thumb.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		thumb_wrap.add_child(_thumb)
+
+		# The ghost says what this well is FOR while it is empty. Only the two
+		# reserved kinds get one; a general unit slot takes almost anything and
+		# a glyph there would be noise.
+		var ghost_icon := ""
+		match kind:
+			RosterPicker.SlotKind.HARVESTER: ghost_icon = RosterPicker.ICON_HARVESTER
+			RosterPicker.SlotKind.BUILDING: ghost_icon = RosterPicker.ICON_BUILDING
+		if ghost_icon != "":
+			_ghost = RosterPicker.make_badge(ghost_icon, "", RosterPicker.SLOT_GHOST_SIZE,
+				RosterPicker.SLOT_GHOST_ALPHA)
+			if _ghost != null:
+				_ghost.set_anchors_preset(Control.PRESET_CENTER)
+				_ghost.grow_horizontal = Control.GROW_DIRECTION_BOTH
+				_ghost.grow_vertical = Control.GROW_DIRECTION_BOTH
+				thumb_wrap.add_child(_ghost)
 
 		_label = Label.new()
 		_label.theme_type_variation = "HintLabel"
@@ -520,18 +835,30 @@ class RosterSlot extends PanelContainer:
 		entry_path = ""
 		entry_name = ""
 		_tex = null
-		# InsetPanel: an empty slot is a recess. That is what makes the grid read
-		# as something to drop into rather than as a row of blank buttons.
+		# An empty slot is a RECESS - darker than the tray it sits in, with a
+		# lit edge. That is what makes the grid read as something to drop into
+		# rather than as a row of blank buttons, and it needs to be built
+		# explicitly here so the empty and filled states sit on the same value
+		# ladder as the cards (see SURFACE_TRAY's header).
 		theme_type_variation = "InsetPanel"
+		add_theme_stylebox_override("panel", RosterPicker.surface_style(
+			Color(0, 0, 0, 0), RosterPicker.SURFACE_TRAY.darkened(0.28),
+			RosterPicker.SURFACE_EDGE.darkened(0.35), 4))
 		if _thumb:
 			_thumb.texture = null
+		if _ghost:
+			_ghost.visible = true
 		if _label:
-			if _picker and _picker.is_harvester_slot(index):
-				_label.text = "HRV"
-				_label.add_theme_color_override("font_color", RosterPicker.HARVESTER_TINT.lightened(0.4))
-			else:
-				_label.text = str(index + 1)
-				_label.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
+			match kind:
+				RosterPicker.SlotKind.HARVESTER:
+					_label.text = "HARVESTER"
+					_label.add_theme_color_override("font_color", RosterPicker.HARVESTER_TINT.lightened(0.4))
+				RosterPicker.SlotKind.BUILDING:
+					_label.text = "DEFENCE %d" % (index + 1)
+					_label.add_theme_color_override("font_color", RosterPicker.BUILDING_TINT.lightened(0.4))
+				_:
+					_label.text = str(index + 1)
+					_label.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
 		# Persistent drag hint — discoverable without mousing over
 		var drag_hint = get_node_or_null("DragHint")
 		if drag_hint:
@@ -545,7 +872,10 @@ class RosterSlot extends PanelContainer:
 			drag_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			drag_hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			add_child(drag_hint)
-		var slot_type := "any design" if not (_picker and _picker.is_harvester_slot(index)) else "harvester only"
+		var slot_type := "any unit"
+		match kind:
+			RosterPicker.SlotKind.HARVESTER: slot_type = "harvester only"
+			RosterPicker.SlotKind.BUILDING: slot_type = "defensive buildings only"
 		tooltip_text = "Empty slot %d (%s). Drag a design here." % [index + 1, slot_type]
 
 	func _render_filled() -> void:
@@ -553,21 +883,20 @@ class RosterSlot extends PanelContainer:
 		# switches from the recessed variation to the raised one. The elevation
 		# change is doing the work here, not a colour change.
 		theme_type_variation = "CardPanel"
-		# Apply category tint to the filled slot background.
-		if _picker and _picker.is_harvester_path(entry_path):
-			var style := StyleBoxFlat.new()
-			style.bg_color = RosterPicker.HARVESTER_TINT
-			style.set_corner_radius_all(4)
-			style.set_content_margin_all(4)
-			add_theme_stylebox_override("panel", style)
+		# Same surface builder the library cards use, so a design looks like the
+		# same object in the slot it was dragged into.
+		var tint := Color(0, 0, 0, 0)
+		if _picker and _picker.is_building_path(entry_path):
+			tint = RosterPicker.BUILDING_TINT
+		elif _picker and _picker.is_harvester_path(entry_path):
+			tint = RosterPicker.HARVESTER_TINT
 		elif _has_repair_in_data():
-			var style := StyleBoxFlat.new()
-			style.bg_color = RosterPicker.REPAIR_TINT
-			style.set_corner_radius_all(4)
-			style.set_content_margin_all(4)
-			add_theme_stylebox_override("panel", style)
-		else:
-			remove_theme_stylebox_override("panel")
+			tint = RosterPicker.REPAIR_TINT
+		add_theme_stylebox_override("panel", RosterPicker.surface_style(tint, RosterPicker.SURFACE_CARD, RosterPicker.SURFACE_EDGE, 4))
+		# The ghost is a "what goes here" prompt, so it goes away the moment
+		# something does.
+		if _ghost:
+			_ghost.visible = false
 		if _thumb:
 			_thumb.texture = _tex
 		if _label:
@@ -604,11 +933,13 @@ class RosterSlot extends PanelContainer:
 	func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 		if not (data is Dictionary and data.get("type", "") == RosterPicker.DRAG_TYPE):
 			return false
-		# Slot 12 (HARVESTER_SLOT_INDEX) only accepts harvesters.
-		if _picker and _picker.is_harvester_slot(index):
-			var path := str(data.get("path", ""))
-			return _picker.is_harvester_path(path)
-		return true
+		if _picker == null:
+			return true
+		# Each slot asks the picker whether the design belongs in a slot of
+		# THIS kind. Rejecting here (rather than accepting and sorting it out
+		# in _drop_data) is what makes Godot show the no-drop cursor, so the
+		# rule is visible during the drag instead of after it.
+		return _picker.path_fits_kind(str(data.get("path", "")), kind)
 
 	func _drop_data(_at_position: Vector2, data: Variant) -> void:
 		var path := str(data.get("path", ""))
@@ -625,8 +956,15 @@ class RosterSlot extends PanelContainer:
 
 		# Swap rather than overwrite when dragging slot-to-slot onto an occupied
 		# slot, so reordering never destroys a pick.
+		#
+		# The swap only happens if the displaced design is legal in the source
+		# slot. Dragging a defence onto an occupied UNIT slot would otherwise
+		# push that unit into the defence grid - a slot that rejects units on
+		# drop, but has no say when something is assigned to it directly.
 		if from != null and from != self:
-			if entry_path != "":
+			var can_swap: bool = entry_path != "" and _picker != null \
+				and _picker.path_fits_kind(entry_path, from.kind)
+			if can_swap:
 				from.assign(entry_path, entry_name, _tex)
 			else:
 				from.clear_slot()

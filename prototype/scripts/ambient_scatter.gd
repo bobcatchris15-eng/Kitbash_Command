@@ -95,7 +95,7 @@ func commit() -> void:
 			continue
 		var xforms: Array = []
 		for n in nodes:
-			xforms.append((n as Node3D).global_transform if is_instance_valid(n) else Transform3D().scaled(Vector3.ZERO))
+			xforms.append(_world_xform(n))
 		var parts: Array = _templates[path]
 		var made: Array[MultiMeshInstance3D] = []
 		for part in parts:
@@ -136,6 +136,47 @@ func set_node_transform(handle, xform: Transform3D) -> void:
 			mm.set_instance_transform(slot, xform * (parts[i]["xform"] as Transform3D))
 
 
+# global_transform is only valid once the tree has PROPAGATED one, and a world
+# built in a single call has not stepped a frame yet - so a whole scatter pass
+# committed as identity and stacked every prop at the origin, invisibly, while
+# pushing one "!is_inside_tree()" error per prop. Composing the local chain by
+# hand gives the same answer with no dependency on frame timing.
+static func _world_xform(n) -> Transform3D:
+	if not is_instance_valid(n):
+		return Transform3D().scaled(Vector3.ZERO)
+	var node := n as Node3D
+	if node == null:
+		return Transform3D()
+	if node.is_inside_tree():
+		return node.global_transform
+	var x := Transform3D.IDENTITY
+	var cur: Node = node
+	while cur is Node3D:
+		x = (cur as Node3D).transform * x
+		cur = cur.get_parent()
+	return x
+
+
+# One surface out of a multi-surface mesh, as its own single-surface mesh.
+#
+# MultiMeshInstance3D carries ONE material_override for the whole MultiMesh and
+# does NOT implement per-surface overrides (GeometryInstance3D's
+# surface_override_material_count is overridden by MeshInstance3D, not by
+# MultiMeshInstance3D, so it reports 0). Batching a 2-surface mesh whole
+# therefore paints the canopy with the TRUNK's material - which is precisely
+# why every scattered tree rendered as a solid bark-coloured lollipop: white
+# for the birches (bark albedo 0.72), orange for the pines (0.34, 0.22, 0.12).
+# The canopy geometry and its leaf material were both there and neither was
+# ever drawn. Splitting per surface is what lets each keep its own material.
+static func _surface_mesh(src: Mesh, index: int) -> Mesh:
+	if src.get_surface_count() <= 1:
+		return src
+	var out := ArrayMesh.new()
+	out.add_surface_from_arrays(src.surface_get_primitive_type(index),
+		src.surface_get_arrays(index))
+	return out
+
+
 func _build_template(scene_path: String) -> Array:
 	if not ResourceLoader.exists(scene_path):
 		return []
@@ -164,38 +205,53 @@ func _build_template(scene_path: String) -> Array:
 		for c in node.get_children():
 			stack.append({"node": c, "xform": xform})
 		if node is MeshInstance3D and node.mesh != null:
-			var mat: Material = node.material_override
-			if mat == null and node.get_surface_override_material_count() > 0:
-				mat = node.get_surface_override_material(0)
-			if mat == null and node.mesh.get_surface_count() > 0:
-				mat = node.mesh.surface_get_material(0)
+			# ONE PART PER SURFACE. See _surface_mesh() - batching a multi-
+			# surface mesh as a unit silently repaints every surface with the
+			# first one's material.
+			var src_mesh: Mesh = node.mesh
+			for si in range(maxi(src_mesh.get_surface_count(), 1)):
+				var mat: Material = node.material_override
+				if mat == null and si < node.get_surface_override_material_count():
+					mat = node.get_surface_override_material(si)
+				if mat == null and si < src_mesh.get_surface_count():
+					mat = src_mesh.surface_get_material(si)
 
-			# Key by source material's resource path so two parts that share
-			# the same glTF material resolve to the same cached StandardMaterial3D.
-			var mat_key: String = str(mat.resource_path) if mat != null else "default"
-			if not scene_materials.has(mat_key):
-				var matte_mat := StandardMaterial3D.new()
-				if mat is StandardMaterial3D or mat is ORMMaterial3D or mat is BaseMaterial3D:
-					matte_mat.albedo_color = mat.albedo_color
-					matte_mat.albedo_texture = mat.albedo_texture
-					if mat.normal_enabled or mat.normal_texture != null:
-						matte_mat.normal_enabled = true
-						matte_mat.normal_texture = mat.normal_texture
-					if mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or (mat.albedo_texture != null and mat.albedo_texture.has_alpha()):
-						matte_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-						matte_mat.alpha_scissor_threshold = 0.45
-						matte_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-						# Backlight REMOVED: StandardMaterial3D backlight adds a
-						# translucent rim glow that makes foliage look like shiny
-						# plastic at RTS zoom. Leaves should be matte.
-				else:
-					matte_mat.albedo_color = Color(0.22, 0.28, 0.18)
-				matte_mat.roughness = 1.0
-				matte_mat.metallic = 0.0
-				matte_mat.metallic_specular = 0.0
-				matte_mat.specular = 0.0
-				scene_materials[mat_key] = matte_mat
+				# Key by source material's resource path so two parts that share
+				# the same glTF material resolve to the same cached StandardMaterial3D.
+				# Falls back to the instance id: the glTF importer leaves
+				# embedded materials with an EMPTY resource_path, so keying on
+				# path alone collapsed bark and foliage onto one key and undid
+				# the split above.
+				var mat_key: String = "default"
+				if mat != null:
+					mat_key = str(mat.resource_path) if str(mat.resource_path) != "" else "id:%d" % mat.get_instance_id()
+				if not scene_materials.has(mat_key):
+					var matte_mat := StandardMaterial3D.new()
+					if mat is StandardMaterial3D or mat is ORMMaterial3D or mat is BaseMaterial3D:
+						matte_mat.albedo_color = mat.albedo_color
+						matte_mat.albedo_texture = mat.albedo_texture
+						if mat.normal_enabled or mat.normal_texture != null:
+							matte_mat.normal_enabled = true
+							matte_mat.normal_texture = mat.normal_texture
+						if mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or (mat.albedo_texture != null and mat.albedo_texture.has_alpha()):
+							matte_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+							matte_mat.alpha_scissor_threshold = 0.45
+							matte_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+							# Backlight REMOVED: StandardMaterial3D backlight adds a
+							# translucent rim glow that makes foliage look like shiny
+							# plastic at RTS zoom. Leaves should be matte.
+					else:
+						matte_mat.albedo_color = Color(0.22, 0.28, 0.18)
+					matte_mat.roughness = 1.0
+					matte_mat.metallic = 0.0
+					matte_mat.metallic_specular = 0.0
+					matte_mat.specular = 0.0
+					scene_materials[mat_key] = matte_mat
 
-			parts.append({"mesh": node.mesh, "xform": xform, "material": scene_materials[mat_key]})
+				parts.append({
+					"mesh": _surface_mesh(src_mesh, si),
+					"xform": xform,
+					"material": scene_materials[mat_key],
+				})
 	probe.free()
 	return parts

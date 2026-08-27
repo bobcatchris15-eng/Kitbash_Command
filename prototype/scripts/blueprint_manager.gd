@@ -654,6 +654,11 @@ func list_blueprints(named_only: bool = false) -> Array:
 						"faction": data.get("faction", "industrialists"),
 						"is_harvester": ModuleCatalogScript.blueprint_is_harvester(data),
 						"has_repair": ModuleCatalogScript.blueprint_has_repair(data),
+						# Which of the roster picker's three libraries this
+						# design belongs to. Must agree with
+						# match_director.is_defence_design() - see
+						# ModuleCatalog.blueprint_is_static()'s header.
+						"is_defensive": ModuleCatalogScript.blueprint_is_static(data),
 						"cargo_capacity": HarvesterFSMScript.capacity_for(
 							ModuleCatalogScript.blueprint_harvester_modules(data),
 							str(data.get("hull_type", "brenntal_medium_a")),
@@ -682,6 +687,11 @@ func list_blueprints(named_only: bool = false) -> Array:
 						"faction": data.get("faction", "industrialists"),
 						"is_harvester": ModuleCatalogScript.blueprint_is_harvester(data),
 						"has_repair": ModuleCatalogScript.blueprint_has_repair(data),
+						# Which of the roster picker's three libraries this
+						# design belongs to. Must agree with
+						# match_director.is_defence_design() - see
+						# ModuleCatalog.blueprint_is_static()'s header.
+						"is_defensive": ModuleCatalogScript.blueprint_is_static(data),
 						"cargo_capacity": HarvesterFSMScript.capacity_for(
 							ModuleCatalogScript.blueprint_harvester_modules(data),
 							str(data.get("hull_type", "brenntal_medium_a")),

@@ -185,7 +185,7 @@ func _ready():
 	root_vbox.add_child(HSeparator.new())
 
 	var library_label = Label.new()
-	library_label.text = "Drag combat designs into slots 1-11. Drag harvesters into any slot, or into slot 12 (harvester-only). Leave the roster empty to auto-include your newest designs."
+	library_label.text = "Drag units into slots 1-11 and a harvester into slot 12 (harvester-only; harvesters also fit any other slot). Defensive buildings go in their own four wells and are placed during the match. Leave the roster empty to auto-include your newest designs."
 	library_label.theme_type_variation = "HintLabel"
 	library_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_vbox.add_child(library_label)

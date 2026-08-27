@@ -171,6 +171,72 @@ def _ravine(px, pz, start, end, width, depth, falloff):
     return -_ridge(px, pz, start, end, width, depth, falloff)
 
 
+def _pt2(p):
+    """[x, z] or [x, y, z] -> (x, z).
+
+    Mirrors terrain_builder.gd's _vec3_of/_vec_of, which accept both shapes.
+    The two halves of this pipeline had drifted: maps baked here author feature
+    points as 2-element [x, z], while maps taking the GDScript analytic path
+    (canyon_ford) author 3-element [x, y, z]. Reading index [1] as z on a
+    3-element point silently gives 0 - the feature lands on the map's centre
+    line instead of where it was authored, and nothing errors.
+    """
+    if len(p) >= 3:
+        return (float(p[0]), float(p[2]))
+    return (float(p[0]), float(p[1]))
+
+
+def _ramp(px, pz, anchor, direction_deg, width, length, top_height):
+    """Mirrors terrain_builder.gd's _ramp_contribution().
+
+    Anchor carries top_height and the ramp descends to 0 over `length` in the
+    `direction_deg` heading: 0 deg = +X, 90 deg = -Z (north), 180 deg = -X,
+    270 deg = +Z. There was no ramp builder here at all, so any map with a
+    ramp baked a heightmap - and therefore a curvature and splat raster - that
+    did not contain its own access routes.
+    """
+    rad = math.radians(direction_deg)
+    dir_x = math.cos(rad)
+    dir_z = -math.sin(rad)
+    dx = px - anchor[0]
+    dz = pz - anchor[1]
+    along = dx * dir_x + dz * dir_z
+    perp = dx * (-dir_z) + dz * dir_x
+    inside = (along >= 0.0) & (along <= length) & (np.abs(perp) <= width * 0.5)
+    t = np.clip(along / max(length, 1e-6), 0.0, 1.0)
+    return np.where(inside, top_height * (1.0 - t), 0.0)
+
+
+def _ridge_polyline(px, pz, points, width, height, falloff):
+    """Ridge along a multi-segment polyline.
+
+    terrain_builder.gd's _ridge_contribution takes `points`; this module's
+    _ridge took `start`/`end`. A map authored against the GDScript schema
+    raised KeyError here, so ridges could not be baked at all.
+    """
+    best = None
+    for i in range(len(points) - 1):
+        a, b = points[i], points[i + 1]
+        d, _t = _point_to_segment_dist_and_t(px, pz, a[0], a[1], b[0], b[1])
+        best = d if best is None else np.minimum(best, d)
+    if best is None:
+        return np.zeros_like(px, dtype=np.float64)
+    half_w = width / 2.0
+    if falloff > 0.0:
+        t = _smoothstep((best - half_w) / falloff)
+    else:
+        t = np.where(best > half_w, 1.0, 0.0)
+    return height * (1.0 - t)
+
+
+def _ridge_feature(px, pz, f):
+    falloff = f.get("falloff", 10.0)
+    if "points" in f:
+        pts = [_pt2(p) for p in f["points"]]
+        return _ridge_polyline(px, pz, pts, f["width"], f["height"], falloff)
+    return _ridge(px, pz, _pt2(f["start"]), _pt2(f["end"]), f["width"], f["height"], falloff)
+
+
 def _escarpment(px, pz, start, end, height, falloff, side):
     signed = _signed_dist_to_line(px, pz, start[0], start[1], end[0], end[1])
     if side == "right":
@@ -357,8 +423,13 @@ def _road_cut(px, pz, f):
 FEATURE_BUILDERS = {
     "hill": lambda px, pz, f: _hill(px, pz, f["center"], f["radius"], f["height"], f.get("falloff", 10.0)),
     "basin": lambda px, pz, f: _basin(px, pz, f["center"], f["radius"], f["depth"], f.get("falloff", 10.0)),
-    "plateau": lambda px, pz, f: _plateau(px, pz, f["center"], f["half_extents"], f["height"], f.get("falloff", 10.0)),
-    "ridge": lambda px, pz, f: _ridge(px, pz, f["start"], f["end"], f["width"], f["height"], f.get("falloff", 10.0)),
+    # wall_falloff is the name terrain_builder.gd reads; `falloff` stays as the
+    # older alias. A map setting wall_falloff=3.5 was silently baked at the
+    # 10.0 default here, so the raster's plateau walls were three times gentler
+    # than the ones the runtime actually builds.
+    "plateau": lambda px, pz, f: _plateau(px, pz, _pt2(f["center"]), f["half_extents"], f["height"], f.get("wall_falloff", f.get("falloff", 10.0))),
+    "ridge": _ridge_feature,
+    "ramp": lambda px, pz, f: _ramp(px, pz, _pt2(f["anchor"]), f.get("direction_deg", 0.0), f.get("width", 12.0), f.get("length", 30.0), f.get("top_height", 8.0)),
     "ravine": lambda px, pz, f: _ravine(px, pz, f["start"], f["end"], f["width"], f["depth"], f.get("falloff", 10.0)),
     "escarpment": lambda px, pz, f: _escarpment(px, pz, f["start"], f["end"], f["height"], f.get("falloff", 6.0), f.get("side", "left")),
     "cliff": lambda px, pz, f: _cliff(px, pz, f["start"], f["end"], f["height"], f.get("side", "left"), f.get("falloff", 0.01)),
@@ -373,8 +444,8 @@ FEATURE_BUILDERS = {
     # evocative name (canyon is the "long sheer-walled depression" the
     # canyon_ford work calls for, lake is the "round water feature with
     # a shoreline" the user asks for in the playtest feedback).
-    "canyon": lambda px, pz, f: _ravine(px, pz, f["start"], f["end"], f["width"], f["depth"], f.get("wall_falloff", f.get("falloff", 10.0))),
-    "lake": lambda px, pz, f: _basin(px, pz, f["center"], f["radius"], f["depth"], f.get("shoreline_falloff", f.get("falloff", 10.0))),
+    "canyon": lambda px, pz, f: _ravine(px, pz, _pt2(f["start"]), _pt2(f["end"]), f["width"], f["depth"], f.get("wall_falloff", f.get("falloff", 10.0))),
+    "lake": lambda px, pz, f: _basin(px, pz, _pt2(f["center"]), f["radius"], f["depth"], f.get("shoreline_falloff", f.get("falloff", 10.0))),
 }
 
 
@@ -454,6 +525,14 @@ def apply_terrain_post_pass(height, px, pz, post_pass_config, seed=0):
         amp = float(noise_cfg.get("amplitude", 1.2))
         octaves = int(noise_cfg.get("octaves", 3))
         noise_val = _fbm_2d(px, pz, octaves=octaves, frequency=freq, amplitude=amp, seed=seed + 101)
+        # CENTRED. _value_noise_2d returns 0..1 and _fbm_2d sums octaves
+        # without normalising, so the raw result is a strictly POSITIVE offset
+        # of up to amplitude * (1 + gain + gain^2 + ...). Added directly it
+        # does not undulate the surface, it LIFTS it: at amplitude 9 the whole
+        # map rose about 8 m, which put a ramp's foot 9.6 m above grade and
+        # broke pathfinding on a map that had been fine. Subtracting the mean
+        # makes it relief rather than a pedestal.
+        noise_val = noise_val - float(np.mean(noise_val))
         h += noise_val.astype(np.float32)
 
     # 2. Thermal talus erosion
@@ -476,7 +555,7 @@ def apply_terrain_post_pass(height, px, pz, post_pass_config, seed=0):
 # Heightfield Builder
 # ---------------------------------------------------------------------------
 
-def build_heightfield(half_extents, features, resolution=None, pixels_per_unit=DEFAULT_PIXELS_PER_UNIT, post_pass=None, seed=0):
+def build_heightfield(half_extents, features, resolution=None, pixels_per_unit=DEFAULT_PIXELS_PER_UNIT, post_pass=None, seed=0, compose="sum"):
     """Returns (heightfield: np.ndarray[H,W] float32 world-unit heights, dim: int)."""
     dim = resolution or (int(round(half_extents * 2 * pixels_per_unit)) + 1)
     coords = np.linspace(-half_extents, half_extents, dim, dtype=np.float64)
@@ -491,6 +570,14 @@ def build_heightfield(half_extents, features, resolution=None, pixels_per_unit=D
         sample_px, sample_pz = _domain_warp_2d(px, pz, strength=w_strength, frequency=w_freq, seed=seed + 55)
 
     height = np.zeros_like(px, dtype=np.float32)
+    # compose="max_min" mirrors terrain_builder.gd's _v2_feature_height: raised
+    # features take the tallest, carved features the deepest, instead of every
+    # feature adding. It must match, or this raster's slope - which is what
+    # drives the splat's rock channel and the curvature AO - describes terrain
+    # the runtime never builds. See _v2_feature_height for why summing breaks
+    # a ramp meeting a plateau.
+    raised = np.zeros_like(px, dtype=np.float32)
+    carved = np.zeros_like(px, dtype=np.float32)
     for f in features:
         builder = FEATURE_BUILDERS.get(f.get("type"))
         if builder is None:
@@ -499,7 +586,14 @@ def build_heightfield(half_extents, features, resolution=None, pixels_per_unit=D
         # builder that wants to read `falloff` from the dict) does so
         # with its own default. We don't transform the dict here -
         # the build_heightfield signature is pure data in, height out.
-        height += builder(sample_px, sample_pz, f).astype(np.float32)
+        c = builder(sample_px, sample_pz, f).astype(np.float32)
+        if compose == "max_min":
+            raised = np.maximum(raised, np.clip(c, 0.0, None))
+            carved = np.minimum(carved, np.clip(c, None, 0.0))
+        else:
+            height += c
+    if compose == "max_min":
+        height = raised + carved
 
     if post_pass:
         height = apply_terrain_post_pass(height, px, pz, post_pass, seed=seed)
@@ -630,6 +724,24 @@ def build_curvaturemap(height, cell_size=1.0):
     return curv
 
 
+# Fraction of a surface zone's half-extents, measured inward from each edge,
+# over which its splat weight ramps from 0 to full. 0.30 is wide enough that at
+# a normal RTS camera height the transition covers tens of pixels rather than
+# one - which is the difference between "two materials meeting" and "a line".
+ZONE_SPLAT_FALLOFF = 0.30
+
+
+def _zone_falloff(px, pz, cx, cz, hx, hz, falloff):
+    """Soft axis-aligned rectangle mask: 1 in the core, ramping to 0 at the edge."""
+    fx = max(hx * falloff, 1e-6)
+    fz = max(hz * falloff, 1e-6)
+    tx = np.clip((hx - np.abs(px - cx)) / fx, 0.0, 1.0)
+    tz = np.clip((hz - np.abs(pz - cz)) / fz, 0.0, 1.0)
+    # smoothstep on the nearer axis, so the corner rounds instead of forming a
+    # right angle - a right-angled gradient still reads as a corner.
+    return _smoothstep(np.minimum(tx, tz))
+
+
 def build_splatmap(half_extents, surface_zones, height, wetness, dim, cell_size=1.0):
     """Outputs an (H, W, 4) uint8 RGBA splat weight map.
     R: Grass/Base, G: Rock/Steep, B: Dirt/Highland/Snow, A: Sand/Wetland.
@@ -657,14 +769,25 @@ def build_splatmap(half_extents, surface_zones, height, wetness, dim, cell_size=
     for z in reversed(surface_zones):
         cx, cz = z["center"][0], z["center"][2]
         hx, hz = z["half_extents"][0], z["half_extents"][1]
-        mask = (np.abs(px - cx) <= hx) & (np.abs(pz - cz) <= hz)
+        # SOFT rectangle, not a binary mask. The previous version wrote
+        # `w_rock[mask] = 0.85` over an exact axis-aligned rectangle, so every
+        # surface zone put a hard straight edge into the splat - and a hard
+        # edge in the source raster is a hard edge on screen no matter how
+        # well the shader blends the layers on either side of it. The shader
+        # can soften a transition; it cannot invent one that the data does not
+        # contain.
+        #
+        # `falloff` is expressed as a fraction of the zone's own half-extents
+        # so a long thin zone fades over a proportionate band on each axis
+        # rather than one absolute distance that would swallow its short axis.
+        m = _zone_falloff(px, pz, cx, cz, hx, hz, ZONE_SPLAT_FALLOFF)
         stype = z.get("surface_type", "")
         if stype in ["rocky", "gravel"]:
-            w_rock[mask] = np.maximum(w_rock[mask], 0.85)
+            w_rock = np.maximum(w_rock, m * 0.85)
         elif stype in ["snow_mud", "forest"]:
-            w_dirt[mask] = 0.85
+            w_dirt = np.maximum(w_dirt, m * 0.85)
         elif stype in ["sand", "marsh"]:
-            w_sand[mask] = np.maximum(w_sand[mask], 0.9)
+            w_sand = np.maximum(w_sand, m * 0.9)
 
     w_grass = np.maximum(0.0, 1.0 - w_rock - w_dirt - w_sand)
 
@@ -717,6 +840,7 @@ def generate(map_json_path, resolution=None, pixels_per_unit=None):
             pixels_per_unit=ppu,
             post_pass=post_pass,
             seed=seed,
+            compose=("max_min" if str(terrain.get("generator", "")) == "v2" else "sum"),
         )
         pixels = encode_heightmap(height, height_scale)
         height_path = os.path.join(out_dir, f"{map_id}_height.png")

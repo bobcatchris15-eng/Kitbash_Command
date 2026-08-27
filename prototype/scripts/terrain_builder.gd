@@ -3040,8 +3040,33 @@ static func _spawn_obstacle(obstacle: Dictionary, parent: Node3D, map_def: Dicti
 # fresh checkout before the Blender regen has run still ships a working
 # map - the cliffs are boxes, but the layout, collision, and the cliff
 # shader's triplanar rock look are all in place.
+# GLB pool. The 4 face pieces are 8m long × 4m tall × 2m thick (origin at
+# the bottom-center, same convention as the old `build_cliff_props.py`
+# straight piece). The 3 corner pieces are L-shapes for convex corners
+# (4m on each face). The 3 strata pieces are layered-look variants
+# that read as a taller cliff with horizontal bedding. All authored in
+# the same units, all share the same `cliff_rock_*` matte material.
+#
+# 2026-08-26 22:45 playtest: the prior pool `["straight", "corner_in",
+# "corner_out", "end"]` referred to file names that the rebuild never
+# produced on disk (the actual files are `cliff_face_X.glb` etc., as
+# listed below). _spawn_cliff silently fell through to BoxMesh, so every
+# cliff rendered as a 1m × 4m × 14m vertical pillar - "the slabs with
+# rock stickers" the user saw. This pool matches the on-disk assets.
 const CLIFF_MODEL_DIR := "res://assets/models/terrain/cliff_%s.glb"
-const CLIFF_POOL_TYPES: Array = ["straight", "corner_in", "corner_out", "end"]
+const CLIFF_POOL_TYPES: Array = [
+	"face_0", "face_1", "face_2", "face_3",
+	"corner_0", "corner_1", "corner_2",
+	"strata_0", "strata_1", "strata_2",
+]
+const CLIFF_FACE_TYPES: Array = ["face_0", "face_1", "face_2", "face_3"]
+const CLIFF_CORNER_TYPES: Array = ["corner_0", "corner_1", "corner_2"]
+const CLIFF_STRATA_TYPES: Array = ["strata_0", "strata_1", "strata_2"]
+# Natural face-piece length. With CLIFF_PIECE_LENGTH = 4.0 the
+# auto-emission packs two face pieces per "step", which gives a wall of
+# 16m per step (overlapping into a continuous strip). For corners the
+# natural footprint is a 4m × 4m L-shape, so a 4m step is correct.
+const CLIFF_FACE_LENGTH: float = 8.0
 const CLIFF_FALLBACK_HEIGHT: float = 4.0
 
 static func _spawn_cliffs(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0) -> void:
@@ -3049,14 +3074,14 @@ static func _spawn_cliffs(map_def: Dictionary, parent: Node3D, prop_scale: float
 		_spawn_cliff(c, parent, map_def)
 
 static func _spawn_cliff(cliff: Dictionary, parent: Node3D, map_def: Dictionary = {}) -> void:
-	var cliff_type: String = cliff.get("type", "straight")
+	var cliff_type: String = cliff.get("type", "face_0")
 	if cliff_type not in CLIFF_POOL_TYPES:
-		# Unknown type = treat as 'straight' rather than refusing the map.
+		# Unknown type = treat as 'face_0' rather than refusing the map.
 		# A validator's strict-fail (push_error in map_catalog.gd's loader)
 		# already catches typos before we get here, so this is a second
 		# line of defense for an in-test hand-built dict.
-		push_warning("TerrainBuilder: unknown cliff type '%s' - falling back to 'straight'" % cliff_type)
-		cliff_type = "straight"
+		push_warning("TerrainBuilder: unknown cliff type '%s' - falling back to 'face_0'" % cliff_type)
+		cliff_type = "face_0"
 	var height_scale: float = WorldScaleScript.for_map(map_def)
 	var cliff_height: float = cliff.get("cliff_height", CLIFF_FALLBACK_HEIGHT) * height_scale
 	# base_y is the SURROUNDING ground level (0 for a plateau cliff
@@ -3069,25 +3094,28 @@ static func _spawn_cliff(cliff: Dictionary, parent: Node3D, map_def: Dictionary 
 	var base_y: float = _obstacle_ground_y(map_def, cliff.center.x, cliff.center.z)
 	base_y += cliff.get("y_offset", 0.0)
 
-	# Visual mesh: try the authored GLB pool first, fall back to a BoxMesh
-	# with the cliff material. The cliff.gdshader's triplanar projection
-	# means the box reads as a 3D rock face from any angle, not as a
-	# cardboard box - same triplanar pattern that terrain_ground.gdshader
-	# uses for the rock blend on steep heightmap faces (lines 255-282), so
-	# a heightmap rock face and a cliff box read as the same material in
-	# the same map.
+	# 2026-08-26 22:45 playtest (cliff rework): the old code only loaded
+	# the "straight" type from the pool, and "straight" was a file name
+	# the rebuild never produced on disk, so EVERY cliff silently fell
+	# through to a BoxMesh with a 1m × 4m × 14m footprint - a vertical
+	# pillar. "Slabs with rock stickers" per the user.
 	#
-	# 2026-08-26: scale the GLB-loaded mesh in Y so the visual matches
-	# the requested cliff_height. The straight piece GLB is CLIFF_MODEL_HEIGHT
-	# (4m) tall with origin at the BOTTOM (build_cliff_props.py:135), so a
-	# Y scale of cliff_height / CLIFF_MODEL_HEIGHT makes a 14m plateau
-	# wall read as 14m visually. Corner/end GLBs are hand-authored to fit
-	# a specific footprint - scaling them uniformly distorts the shape -
-	# so those types fall through to the BoxMesh fallback (which IS sized
-	# to the piece's actual half_extents × cliff_height, no scale needed).
+	# The new pool (`face_X`, `corner_X`, `strata_X`) all live on disk.
+	# The visual logic per type:
+	#   - face_X (4 variants): 8m long × 4m tall × 2m thick, Y-scaled to
+	#     match the requested cliff_height (so a 14m plateau wall reads
+	#     as 14m visually).
+	#   - strata_X (3 variants): same 8m × 4m × 2m box but with layered
+	#     silhouette detail. Y-scaled the same way.
+	#   - corner_X (3 variants): 4m L-shape, no Y-scale (scaling would
+	#     distort the L into a non-cornered box).
+	#   - unknown: BoxMesh fallback with WALL-LIKE dimensions (4m wide
+	#     along the cliff line, 1m thick, cliff_height tall) instead of
+	#     the prior pillar dimensions. Reads as a continuous wall even
+	#     without GLB geometry.
 	var mesh_inst: MeshInstance3D = null
 	var glb_path: String = CLIFF_MODEL_DIR % cliff_type
-	if cliff_type == "straight" and ResourceLoader.exists(glb_path):
+	if ResourceLoader.exists(glb_path):
 		var packed: PackedScene = load(glb_path)
 		if packed != null:
 			var inst: Node = packed.instantiate()
@@ -3104,22 +3132,26 @@ static func _spawn_cliff(cliff: Dictionary, parent: Node3D, map_def: Dictionary 
 	if mesh_inst == null:
 		mesh_inst = MeshInstance3D.new()
 		var box: BoxMesh = BoxMesh.new()
+		# Wall-like dimensions: the FIRST axis (X for "axis=z" sides,
+		# Z for "axis=x" sides) is the wall's thickness (1m), the SECOND
+		# axis is the wall's length along the cliff line (step). This
+		# reads as a continuous wall instead of a row of pillars. The
+		# cliff_height comes through as the box's Y (vertical).
 		box.size = Vector3(cliff.half_extents.x * 2.0, cliff_height, cliff.half_extents.y * 2.0)
 		mesh_inst.mesh = box
 
-	# Y-scale the straight-piece GLB so a 14m plateau wall reads as 14m.
-	# The X/Z scales stay at 1.0 - the auto-emission authors straight
-	# pieces at half_extents (0.5, step/2) which is a different XZ
+	# Y-scale the face/strata GLBs so a 14m plateau wall reads as 14m.
+	# The X/Z scales stay at 1.0: the auto-emission authors straight
+	# pieces at half_extents (step*0.5, 0.5) which is a different XZ
 	# footprint than the GLB's canonical 8m × 2m, so rescaling XZ would
 	# either oversize the collision or undersize the visual; leaving the
 	# GLB at its authored 8m × 2m and accepting the slight XZ mismatch is
 	# the trade-off for v1 (the cliff visual is wider than the collider,
 	# but the slope-based navmesh carve at the cliff line keeps units
-	# off the wall either way). A future pass should re-author the
-	# straight GLB as a 1m × 1m unit cube and scale per-piece; out of
-	# scope for this turn.
-	if cliff_type == "straight" and mesh_inst.mesh != null and not (mesh_inst.mesh is BoxMesh):
-		mesh_inst.scale = Vector3(1.0, cliff_height / CLIFF_FALLBACK_HEIGHT, 1.0)
+	# off the wall either way).
+	if mesh_inst.mesh != null and not (mesh_inst.mesh is BoxMesh):
+		if cliff_type in CLIFF_FACE_TYPES or cliff_type in CLIFF_STRATA_TYPES:
+			mesh_inst.scale = Vector3(1.0, cliff_height / CLIFF_FALLBACK_HEIGHT, 1.0)
 
 	# Material: cliff.gdshader with the rock triplanar texture set. The
 	# triplanar_scale is world_scale-aware so a 4x map doesn't get
@@ -3233,7 +3265,13 @@ static func _resolve_features(map_def: Dictionary) -> void:
 		var ftype: String = feature.get("type", "")
 		match ftype:
 			"plateau":
-				ensure_cliffs.append_array(_plateau_cliffs(feature))
+				# Pass the whole features array so _plateau_cliffs can
+				# skip cliff emission on sides where a ramp is anchored
+				# (the "wrong side of the cliff" bug from the 2026-08-26
+				# 22:45 playtest). The "open" sides are decided here at
+				# feature-resolution time, not at spawn time, so the
+				# cliffs[] entry is never even generated.
+				ensure_cliffs.append_array(_plateau_cliffs(feature, features))
 			"canyon":
 				ensure_cliffs.append_array(_canyon_cliffs(feature))
 			"ridge":
@@ -3259,7 +3297,7 @@ static func _resolve_features(map_def: Dictionary) -> void:
 const CLIFF_PIECE_LENGTH := 4.0
 
 
-static func _plateau_cliffs(feature: Dictionary) -> Array:
+static func _plateau_cliffs(feature: Dictionary, features_array: Array = []) -> Array:
 	var c: Vector3 = _vec3_of(feature.get("center", Vector3.ZERO))
 	# half_extents may be authored as a JSON Array ([x, z]) or as a
 	# Vector2 - the FIELD_SPEC for features[] is unvalidated, so the
@@ -3273,20 +3311,77 @@ static func _plateau_cliffs(feature: Dictionary) -> Array:
 		# The user can still hand-author cliffs[] for tiny plateaus.
 		return []
 	var cliffs: Array = []
+	# 2026-08-26 22:45 playtest: a ramp's anchor sits at the plateau
+	# edge, with direction_deg pointing OUTWARD (into the surrounding
+	# ground). For a ramp to be a legal ascent, the cliff emission on
+	# that edge must be skipped - otherwise the player walks up the
+	# ramp and hits a cliff face ("the ramps are on the wrong side of
+	# the cliff"). For each ramp in the same map, compute which side
+	# of THIS plateau it sits on and mark that side as "open".
+	#
+	# Geometry: a ramp anchor is at the plateau edge. If its X coord is
+	# within (cx-hx, cx+hx) and its Z coord is within (cz-hz, cz+hz),
+	# the ramp's anchor is on the plateau's perimeter. Then we decide
+	# which side by checking how close the anchor is to each edge.
+	# A 2-metre slack is enough to absorb heightmap falloff at the
+	# plateau's wall_falloff band.
+	var open_sides := {"east": false, "west": false, "south": false, "north": false}
+	var open_corners := {}  # corner index -> true if a ramp is at that corner
+	for f in features_array:
+		if f.get("type", "") != "ramp":
+			continue
+		var ramp_anchor: Vector3 = _vec3_of(f.get("anchor", Vector3.ZERO))
+		var ramp_width: float = float(f.get("width", 16.0))
+		# The anchor is the inner end of the ramp - it sits ON the
+		# plateau edge. Allow some slack because the heightmap falloff
+		# zone smooths the edge.
+		var slack: float = max(2.0, ramp_width * 0.5)
+		var dx: float = ramp_anchor.x - c.x
+		var dz: float = ramp_anchor.z - c.z
+		var on_east: bool = abs(dx - hx) < slack and abs(dz) <= hz
+		var on_west: bool = abs(dx + hx) < slack and abs(dz) <= hz
+		var on_south: bool = abs(dz - hz) < slack and abs(dx) <= hx
+		var on_north: bool = abs(dz + hz) < slack and abs(dx) <= hx
+		if on_east: open_sides["east"] = true
+		if on_west: open_sides["west"] = true
+		if on_south: open_sides["south"] = true
+		if on_north: open_sides["north"] = true
+		# Corner: the anchor is on two adjacent edges at once.
+		if on_east and on_south: open_corners[0] = true
+		if on_east and on_north: open_corners[1] = true
+		if on_west and on_south: open_corners[2] = true
+		if on_west and on_north: open_corners[3] = true
 	# The 4 sides in order: +X (east), -X (west), +Z (south), -Z (north).
 	# For each side, the side length is 2*h_dim where h_dim is the
 	# perpendicular half_extent. Place straight pieces along it, and
 	# corner pieces at the 2 ends.
 	var sides := [
-		{"axis": "z", "sign": 1, "x_offset": hx, "z_extent": hz, "rotation": 0.0},
-		{"axis": "z", "sign": -1, "x_offset": -hx, "z_extent": hz, "rotation": PI},
-		{"axis": "x", "sign": 1, "z_offset": hz, "x_extent": hx, "rotation": -PI * 0.5},
-		{"axis": "x", "sign": -1, "z_offset": -hz, "x_extent": hx, "rotation": PI * 0.5},
+		{"axis": "z", "sign": 1, "x_offset": hx, "z_extent": hz, "rotation": 0.0, "open_key": "east"},
+		{"axis": "z", "sign": -1, "x_offset": -hx, "z_extent": hz, "rotation": PI, "open_key": "west"},
+		{"axis": "x", "sign": 1, "z_offset": hz, "x_extent": hx, "rotation": -PI * 0.5, "open_key": "south"},
+		{"axis": "x", "sign": -1, "z_offset": -hz, "x_extent": hx, "rotation": PI * 0.5, "open_key": "north"},
 	]
-	for side in sides:
+	# Deterministic per-side face variant. Same plateau, same map load
+	# -> same face variant per side. Different plateaus in the same map
+	# still vary (each side uses the side index as the offset, so all
+	# east sides are the same face but east and west differ).
+	var side_seed: int = int(c.x * 0.1) + int(c.z * 0.07) & 0xFFFF
+	for side_idx in range(sides.size()):
+		var side: Dictionary = sides[side_idx]
+		if open_sides.get(side.get("open_key", ""), false):
+			# A ramp opens this side - skip the wall emission.
+			# The ramp is the transition from ground to plateau top.
+			continue
 		var along_extent: float = side.get("z_extent", side.get("x_extent", 0.0))
-		var n_pieces: int = max(1, int(round(along_extent * 2.0 / CLIFF_PIECE_LENGTH)))
+		# Face pieces are 8m long; pack them along the side at 8m
+		# spacing. End-pieces overlap into the corner zone which the
+		# corner emission covers.
+		var n_pieces: int = max(1, int(round(along_extent * 2.0 / CLIFF_FACE_LENGTH)))
 		var step: float = (along_extent * 2.0) / n_pieces
+		# Pick a face variant for this side. Use side index as offset
+		# so adjacent sides pick different variants.
+		var face_variant: int = (side_seed + side_idx) % CLIFF_FACE_TYPES.size()
+		var face_type: String = CLIFF_FACE_TYPES[face_variant]
 		for j in range(n_pieces):
 			var along := -along_extent + step * (j + 0.5)
 			var center: Vector3
@@ -3294,15 +3389,20 @@ static func _plateau_cliffs(feature: Dictionary) -> Array:
 				center = Vector3(c.x + side.x_offset, c.y, c.z + along)
 			else:
 				center = Vector3(c.x + along, c.y, c.z + side.z_offset)
+			# Box fallback dimensions (only used if the GLB fails to
+			# load) are wall-like: 1m thick × step long × cliff_height.
+			# When the face_X GLB DOES load, it has its own 8m × 2m
+			# footprint and these half_extents are ignored (the
+			# collision uses them, the visual uses the GLB).
 			var half_extents: Vector2
 			if side.axis == "z":
-				half_extents = Vector2(0.5, step * 0.5)
+				half_extents = Vector2(1.0, step * 0.5)
 			else:
-				half_extents = Vector2(step * 0.5, 0.5)
+				half_extents = Vector2(step * 0.5, 1.0)
 			cliffs.append({
 				"center": center,
 				"half_extents": half_extents,
-				"type": "straight",
+				"type": face_type,
 				"cliff_height": wall_height,
 				"rotation": side.rotation,
 				# 2026-08-26 22:14 playtest fix: _spawn_cliff positions
@@ -3320,8 +3420,9 @@ static func _plateau_cliffs(feature: Dictionary) -> Array:
 				# all use base_y as-is).
 				"y_offset": -wall_height,
 			})
-	# 4 corner_out pieces at the convex corners. The corner cliff's own
-	# footprint is 2x2 so it sits exactly on the corner of the plateau.
+	# 4 corner pieces at the convex corners. Use a corner_X variant
+	# (L-shape, 4m on each face). Skip the corner if a ramp is
+	# anchored there - the ramp IS the corner transition.
 	var corner_positions := [
 		Vector3(c.x + hx, c.y, c.z + hz),
 		Vector3(c.x + hx, c.y, c.z - hz),
@@ -3330,10 +3431,14 @@ static func _plateau_cliffs(feature: Dictionary) -> Array:
 	]
 	var corner_rotations := [0.0, -PI * 0.5, PI * 0.5, PI]
 	for k in range(4):
+		if open_corners.get(k, false):
+			# Ramp at this corner - no need for a corner cliff.
+			continue
+		var corner_variant: int = (side_seed + k) % CLIFF_CORNER_TYPES.size()
 		cliffs.append({
 			"center": corner_positions[k],
-			"half_extents": Vector2(1.0, 1.0),
-			"type": "corner_out",
+			"half_extents": Vector2(2.0, 2.0),
+			"type": CLIFF_CORNER_TYPES[corner_variant],
 			"cliff_height": wall_height,
 			"rotation": corner_rotations[k],
 			# Same y_offset as the straight pieces - see comment above.

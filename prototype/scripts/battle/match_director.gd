@@ -858,6 +858,21 @@ func _scale_lighting_to_world() -> void:
 				env.fog_density = float(env_data["fog_density"])
 			if env_data.has("fog_aerial_perspective"):
 				env.fog_aerial_perspective = float(env_data["fog_aerial_perspective"])
+		# 2026-08-26 22:45 playtest fix: Battle.tscn's
+		# `volumetric_fog_density = 0.0012` was the actual culprit behind
+		# "the fog is overwhelming even barely zoomed out" - the per-map
+		# fog_density override was being COMPOSITED with Battle.tscn's
+		# volumetric fog, not replacing it. Per-map env block now also
+		# overrides the volumetric fog so a map can dial it down to
+		# something subtle (0.0003 or 0.0) without editing Battle.tscn.
+		if env_data.has("volumetric_fog_density"):
+			env.volumetric_fog_density = float(env_data["volumetric_fog_density"])
+		if env_data.has("volumetric_fog_enabled"):
+			env.volumetric_fog_enabled = bool(env_data["volumetric_fog_enabled"])
+		if env_data.has("dof_blur_far_enabled"):
+			env.dof_blur_far_enabled = bool(env_data["dof_blur_far_enabled"])
+		if env_data.has("dof_blur_far_distance"):
+			env.dof_blur_far_distance = float(env_data["dof_blur_far_distance"])
 		if env_data.has("sky_color") and env.sky and env.sky.sky_material is ProceduralSkyMaterial:
 			var sky_mat := env.sky.sky_material as ProceduralSkyMaterial
 			sky_mat.sky_top_color = env_data["sky_color"]

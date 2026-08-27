@@ -149,10 +149,12 @@
   "sun_energy": 1.25,
   "ambient_light_energy": 0.5,
   "fog_enabled": true,
-  "fog_density": 0.0007,
-  "fog_aerial_perspective": 0.55,
-  "dof_blur_far_enabled": true,
-  "dof_blur_far_distance": 90.0
+  "fog_density": 0.0002,
+  "fog_aerial_perspective": 0.2,
+  "volumetric_fog_enabled": true,
+  "volumetric_fog_density": 0.0003,
+  "dof_blur_far_enabled": false,
+  "dof_blur_far_distance": 250.0
  },
  "resource_nodes": [
   {"amount": 1100, "position": [-450.0, 0.0, 100.0], "type": "metal"},

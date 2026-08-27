@@ -502,7 +502,18 @@ const FIELD_SPEC: Dictionary = {
 	"cliffs": {"type": "array", "required": false, "item": {
 		"center": {"type": "vector3", "required": true, "scale": true},
 		"half_extents": {"type": "vector2", "required": true, "scale": true},
-		"type": {"type": "string", "required": false, "enum": ["straight", "corner_in", "corner_out", "end"]},
+		# 2026-08-26 22:45 playtest: the prior pool
+		# `["straight", "corner_in", "corner_out", "end"]` referred to
+		# GLB file names the rebuild never produced on disk. The actual
+		# pool is now face_X (4 straight variants, Y-scaled to the
+		# requested cliff_height), corner_X (3 corner L-shapes, no
+		# scale), and strata_X (3 layered-look variants, Y-scaled).
+		# terrain_builder.gd has the matching CLIFF_POOL_TYPES constant.
+		"type": {"type": "string", "required": false, "enum": [
+			"face_0", "face_1", "face_2", "face_3",
+			"corner_0", "corner_1", "corner_2",
+			"strata_0", "strata_1", "strata_2",
+		]},
 		"cliff_height": {"type": "number", "required": false, "min": 0.5, "scale": true},
 		"rotation": {"type": "number", "required": false},
 		"cliff_tint": {"type": "color", "required": false},
@@ -649,6 +660,14 @@ const FIELD_SPEC: Dictionary = {
 		"fog_enabled": {"type": "bool", "required": false},
 		"fog_density": {"type": "number", "required": false, "min": 0.0},
 		"fog_aerial_perspective": {"type": "number", "required": false, "min": 0.0},
+		# 2026-08-26 22:45 playtest fix: Battle.tscn's
+		# volumetric_fog_density = 0.0012 was the actual cause of "the
+		# fog is overwhelming even barely zoomed out" - the per-map
+		# fog_density override was being COMPOSITED with Battle.tscn's
+		# volumetric fog. Per-map env block now also overrides
+		# volumetric_fog_* so a map can dial it down (0.0003) or off.
+		"volumetric_fog_enabled": {"type": "bool", "required": false},
+		"volumetric_fog_density": {"type": "number", "required": false, "min": 0.0},
 		"dof_blur_far_enabled": {"type": "bool", "required": false},
 		"dof_blur_far_distance": {"type": "number", "required": false, "min": 0.0},
 	}},

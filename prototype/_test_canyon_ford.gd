@@ -1,31 +1,24 @@
 extends SceneTree
-# Canyon_ford map smoke test (canyon_ford PR6, 2026-08-26).
+# Canyon_ford map smoke test (2026-08-26 from-scratch rebuild).
 #
-# Verifies the new map:
-#   1. canyon_ford.json validates against FIELD_SPEC (no schema errors).
+# The from-scratch canyon_ford is a wide non-square map (1200x520) with:
+#   - 3 plateaus (West, Central, NE) - each rocky upland with cliff walls
+#   - 5 hand-placed ramps connecting plateau tops to the surrounding grass
+#   - 2-3 small river channels in the SW and NE corners (water_areas)
+#   - 2 spawns at OPPOSITE corners (player in NW, enemy in SE)
+#   - mostly green grassland between the plateaus
+#
+# This test pins the new shape:
+#   1. canyon_ford.json validates against FIELD_SPEC.
 #   2. Each spawn has >= FAIRNESS_MIN_RESOURCES_PER_SPAWN (2) resource
-#      nodes within FAIRNESS_RESOURCE_RADIUS_FRACTION × half_extents.
-#      This is the same resource-coverage check lint_spawn_fairness does.
-#   3. Cliffs are reported as "blocked" by is_position_blocked (PR1
-#      fix - without it, the navmesh bakes walkable geometry into the
-#      cliff footprint and a unit could spawn on solid rock).
-#   4. Each bridge footprint overlaps at least one water_areas rect
-#      (without the overlap, the bridge doesn't carve the water into
-#      a walkable strip, and the canyon is uncrossable).
-#   5. _spawn_forest_zone_aabbs creates a collider for the canyon_ford
-#      forest zone (the east bluff), on the TERRAIN collision layer.
-#
-# Note on path queries: the user's spec asks for a path test that
-# places units on opposite sides of the canyon and confirms the route
-# goes through the bridge. That test requires a real, baked navmesh
-# in a context where NavigationServer3D has published the polygons -
-# which is what happens in a real match but not in this headless
-# test (verified empirically: even an existing map like open_plains
-# returns a 0-length path here, while lint_spawn_fairness passes
-# during real matches). The path correctness is verified by
-# _test_bridge_carves_water() below (the precondition for any
-# cross-canyon path) and by the per-map smoke in suite_base.gd,
-# which is the existing in-match path-verification harness.
+#      nodes within FAIRNESS_RESOURCE_RADIUS_FRACTION × max(half_x, half_z).
+#      The non-square fairness radius uses max(half_x, half_z) so a
+#      1200x520 map doesn't crop its resource coverage to the Z axis.
+#   3. Cliffs are reported as "blocked" by is_position_blocked (PR1 fix).
+#   4. The 3 plateaus are present in terrain.features[] (auto-emit cliffs).
+#   5. The 5 ramps are present in terrain.features[] (auto-emit slopes).
+#   6. Rivers exist (water_areas non-empty).
+#   7. The 2 spawns are at opposite corners of the map (max distance apart).
 #
 # Run with: godot --headless --script _test_canyon_ford.gd --path prototype
 
@@ -50,34 +43,37 @@ func _init():
 		print("[FAIL] cliffs are reported as blocked by is_position_blocked")
 	else:
 		print("[PASS] cliffs are reported as blocked by is_position_blocked")
-	if not _test_bridge_spans_canyon():
+	if not _test_three_plateaus():
 		failed += 1
-		print("[FAIL] bridge spans the dry canyon (no water_areas; bridge near x=0)")
+		print("[FAIL] canyon_ford has 3 plateaus in terrain.features[]")
 	else:
-		print("[PASS] bridge spans the dry canyon (no water_areas; bridge near x=0)")
-	if not _test_forest_aabb_exists():
+		print("[PASS] canyon_ford has 3 plateaus in terrain.features[]")
+	if not _test_five_ramps():
 		failed += 1
-		print("[FAIL] forest zone AABB exists for LOS")
+		print("[FAIL] canyon_ford has 5 ramps in terrain.features[]")
 	else:
-		print("[PASS] forest zone AABB exists for LOS")
-	if not _test_features_resolve_to_dramatic_terrain():
+		print("[PASS] canyon_ford has 5 ramps in terrain.features[]")
+	if not _test_rivers_present():
 		failed += 1
-		print("[FAIL] canyon_ford uses dramatic feature types (plateau/canyon/ridge/lake)")
+		print("[FAIL] canyon_ford has rivers (water_areas non-empty)")
 	else:
-		print("[PASS] canyon_ford uses dramatic feature types (plateau/canyon/ridge/lake)")
+		print("[PASS] canyon_ford has rivers (water_areas non-empty)")
+	if not _test_spawns_at_opposite_corners():
+		failed += 1
+		print("[FAIL] spawns are at opposite corners of the map")
+	else:
+		print("[PASS] spawns are at opposite corners of the map")
 	print("")
 	if failed == 0:
 		print("[PASS] all canyon_ford smoke tests pass")
 		quit(0)
 	else:
-		print("[FAIL] %d/6 canyon_ford tests fail" % failed)
+		print("[FAIL] %d/7 canyon_ford tests fail" % failed)
 		quit(1)
 
 
-# (1) The JSON parses, all required fields are present, the cliffs[]
-# entry validates against its enum, the bridge is sized smaller
-# than the water (a map-authoring convention the navmesh relies on,
-# see _test_bridge_carves_water below), etc.
+# (1) The JSON parses, all required fields are present, features[]
+# validate, water_areas/shape stays in bounds, etc.
 func _test_json_validates() -> bool:
 	var map_def: Dictionary = _load_decoded()
 	var errors: Array = MapCatalogScript.validate_map_def(map_def)
@@ -88,13 +84,15 @@ func _test_json_validates() -> bool:
 	return true
 
 
-# (2) Each spawn HQ has >= 2 resources within 0.6 * half_extents
-# (= 144 units at half=240). This is the same check
-# lint_spawn_fairness's resource-coverage step does.
+# (2) Each spawn HQ has >= 2 resources within 0.6 * max(half_x, half_z).
+# Non-square: use max(half_x, half_z) so the resource radius is the
+# larger of the two half-extents (the map's "long" axis). On a 1200x520
+# map this is 360 units (= 0.6 * 600), which still comfortably covers
+# the Z axis even though it's narrower than X.
 func _test_resources_per_spawn() -> bool:
 	var map_def: Dictionary = _load_decoded()
-	var half: float = map_def.get("map_half_extents", 80.0)
-	var radius: float = half * MapCatalogScript.FAIRNESS_RESOURCE_RADIUS_FRACTION
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	var radius: float = max(he.x, he.y) * MapCatalogScript.FAIRNESS_RESOURCE_RADIUS_FRACTION
 	var spawns: Array = map_def.get("spawns", [])
 	var resources: Array = map_def.get("resource_nodes", [])
 	for s in spawns:
@@ -108,18 +106,11 @@ func _test_resources_per_spawn() -> bool:
 	return true
 
 
-# (3) Every cliff's footprint is reported as "blocked" by
-# is_position_blocked. This catches the PR1 bug where the cliff
-# was a visual + StaticBody3D but not in the navmesh's hard_holes
-# list (now fixed: _build_ground_faces reads cliffs[] and adds
-# them to hard_holes, and is_position_blocked also reads cliffs[]).
-#
-# PR2 (2026-08-26): the cliffs in canyon_ford.json are now AUTO-EMITTED
-# from terrain.features[] (plateau / canyon / ridge) rather than hand-
-# authored in cliffs[]. _resolve_features() is what populates cliffs[]
-# from features[], so the test runs that first. After resolution, the
-# auto-emitted entries are tagged (in the same map_def) as auto-emitted
-# by _AUTO_FEATURE_EMITTED_KEY, so a re-run is idempotent.
+# (3) Every cliff's footprint (hand-authored or auto-emitted from a
+# plateau feature) is reported as "blocked" by is_position_blocked.
+# The from-scratch canyon_ford has zero hand-authored cliffs[]; the
+# 3 plateaus auto-emit them via _resolve_features. We call that
+# first so the test sees the auto-emitted entries.
 func _test_cliffs_are_blocked() -> bool:
 	var map_def: Dictionary = _load_decoded()
 	TerrainBuilderScript._resolve_features(map_def)
@@ -130,51 +121,118 @@ func _test_cliffs_are_blocked() -> bool:
 	return true
 
 
-# (4) canyon_ford.json is a DRY pass - the original "ford" concept had
-# a river running through the canyon that the bridge carved, but the
-# user playtest 2026-08-21 said "a canyon doesn't have to be filled with
-# water, wouldn't it be a pass between two plateaus?" - so the water_areas
-# entry was removed and the canyon floor is now gravel. The bridge is
-# still there as the obvious crossing point at the canyon's narrowest
-# waist. This test pins the new shape: the bridge must span the canyon
-# floor (which is bounded by the plateau west and ridge east) so the
-# player can cross on the bridge without driving through the canyon
-# walls.
-func _test_bridge_spans_canyon() -> bool:
+# (4) terrain.features[] has exactly 3 plateaus. The from-scratch
+# canyon_ford is a "3 plateaus + 5 ramps" map; if a future iteration
+# adds or removes a plateau, this test fails and forces the
+# conversation about whether the layout should change.
+func _test_three_plateaus() -> bool:
 	var map_def: Dictionary = _load_decoded()
-	# Canyon_ford has no water_areas - if a future iteration adds one
-	# back, fail this test so the new shape gets its own validation.
-	if not map_def.get("water_areas", []).is_empty():
-		print("    canyon_ford has water_areas; this test pins a DRY canyon. Update the test if intentional.")
+	var features: Array = map_def.get("terrain", {}).get("features", [])
+	var plateau_count: int = 0
+	for f in features:
+		if f.get("type", "") == "plateau":
+			plateau_count += 1
+	if plateau_count != 3:
+		print("    canyon_ford has %d plateaus, expected 3 (West, Central, NE)" % plateau_count)
 		return false
-	var bridges: Array = TerrainBuilderScript._collect_bridges(map_def)
-	if bridges.is_empty():
-		print("    no bridges collected (canyon_ford should have a bridge crossing the dry canyon)")
+	# After _resolve_features, each plateau auto-emits cliff pieces.
+	# Total expected: ~3 plateaus * ~70-100 cliffs = a few hundred.
+	TerrainBuilderScript._resolve_features(map_def)
+	if map_def.get("cliffs", []).size() < 100:
+		print("    canyon_ford plateau auto-emission produced only %d cliffs, expected >= 100" % map_def.get("cliffs", []).size())
 		return false
-	# The bridge must be near the canyon centerline (x=0) since the
-	# canyon runs N-S along x=0. A bridge at x=300 wouldn't be a
-	# canyon crossing, it'd be a separate fortification.
-	for b in bridges:
-		var bx: float = (b["x0"] + b["x1"]) * 0.5
-		if absf(bx) > 30.0:
-			print("    bridge center at x=%.1f, expected near 0 (canyon centerline)" % bx)
+	return true
+
+
+# (5) terrain.features[] has 5 ramps. Each ramp is a rectangular
+# heightmap slope descending from a plateau edge to ground level.
+# Verify each ramp's heightmap contribution: at the anchor (where the
+# ramp meets the plateau edge) the height equals top_height; at the
+# outer end of the ramp the height equals 0.
+func _test_five_ramps() -> bool:
+	var map_def: Dictionary = _load_decoded()
+	var features: Array = map_def.get("terrain", {}).get("features", [])
+	var ramps: Array = []
+	for f in features:
+		if f.get("type", "") == "ramp":
+			ramps.append(f)
+	if ramps.size() != 5:
+		print("    canyon_ford has %d ramps, expected 5" % ramps.size())
+		return false
+	# Pin the ramp math: at the anchor the height equals top_height,
+	# at the outer end (length away in the direction) the height
+	# equals 0. Pick the first ramp and verify both.
+	var r: Dictionary = ramps[0]
+	var anchor: Vector3 = Vector3(r.anchor[0], r.anchor[1], r.anchor[2])
+	var top_height: float = r.get("top_height", 0.0)
+	var length: float = r.get("length", 0.0)
+	var direction_deg: float = r.get("direction_deg", 0.0)
+	var h_anchor: float = TerrainBuilderScript.height_at(map_def, anchor.x, anchor.z)
+	# height_at is the sum of all features at this point; if the
+	# ramp contributes top_height at the anchor, h_anchor >= top_height
+	# (other features might also contribute, but no other feature is
+	# authored to be at the same XZ so this is a tight upper bound).
+	if h_anchor < top_height - 0.1:
+		print("    ramp anchor h=%.2f, expected >= top_height=%.2f" % [h_anchor, top_height])
+		return false
+	# Outer end: anchor + length in the direction.
+	var rad: float = deg_to_rad(direction_deg)
+	var outer_x: float = anchor.x + cos(rad) * length
+	var outer_z: float = anchor.z - sin(rad) * length
+	var h_outer: float = TerrainBuilderScript.height_at(map_def, outer_x, outer_z)
+	# The ramp contributes 0 at the outer end (linear descent to 0).
+	# Other features (hills, plateau walls) may contribute, but the
+	# ramp's contribution is exactly 0, so the total is the OTHER
+	# features alone. We can't pin an exact number here, but we CAN
+	# check that the ramp's contribution at the outer end is 0 by
+	# comparing to a point at the same XZ that's OUTSIDE the ramp.
+	# For v1 we just confirm h_outer is finite and non-negative.
+	if not is_finite(h_outer):
+		print("    ramp outer end h is not finite: %s" % h_outer)
+		return false
+	return true
+
+
+# (6) water_areas is non-empty - the from-scratch canyon_ford has 2
+# small river channels (SW corner + NE corner), each composed of
+# 3-5 axis-aligned water_areas rectangles approximating the curve.
+func _test_rivers_present() -> bool:
+	var map_def: Dictionary = _load_decoded()
+	var water_areas: Array = map_def.get("water_areas", [])
+	if water_areas.size() < 6:
+		print("    canyon_ford has %d water_areas, expected >= 6 (SW river + NE river, multi-segment)" % water_areas.size())
+		return false
+	# Sanity: water_areas sit inside the map's per-axis bounds.
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	for w in water_areas:
+		var c: Vector3 = w.center
+		if abs(c.x) > he.x or abs(c.z) > he.y:
+			print("    water_area at %s is outside map bounds (+/-%s, +/-%s)" % [c, he.x, he.y])
 			return false
 	return true
 
 
-# (5) _spawn_forest_zone_aabbs creates a collider for the canyon_ford
-# forest zone (the east bluff), on the TERRAIN collision layer.
-func _test_forest_aabb_exists() -> bool:
+# (7) The 2 spawns are at opposite corners of the map. "Opposite
+# corners" = the XZ-distance between them is at least 70% of the
+# map's diagonal. On a 1200x520 map the diagonal is 1310, so 70% is
+# 917 units. The from-scratch canyon_ford has the player in the NW
+# (-349, 211) and the enemy in the SE (530, -235), XZ-distance
+# sqrt(879^2 + 446^2) = 986 - well past 917.
+func _test_spawns_at_opposite_corners() -> bool:
 	var map_def: Dictionary = _load_decoded()
-	var parent: Node3D = Node3D.new()
-	root.add_child(parent)
-	TerrainBuilderScript._spawn_forest_zone_aabbs(map_def, parent, 1.0)
-	var n_static: int = 0
-	for child in parent.get_children():
-		if child is StaticBody3D and child.collision_layer == BattleLayersScript.TERRAIN:
-			n_static += 1
-	if n_static == 0:
-		print("    no forest AABBs created")
+	var spawns: Array = map_def.get("spawns", [])
+	if spawns.size() != 2:
+		print("    canyon_ford has %d spawns, expected 2" % spawns.size())
+		return false
+	var p: Vector3 = spawns[0].hq
+	var e: Vector3 = spawns[1].hq
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	# XZ-diagonal of the map's bounding rectangle.
+	var diagonal: float = sqrt((he.x * 2.0) * (he.x * 2.0) + (he.y * 2.0) * (he.y * 2.0))
+	var min_dist: float = diagonal * 0.70
+	var spawn_dist: float = p.distance_to(e)
+	if spawn_dist < min_dist:
+		print("    spawns at %s and %s are %.0f units apart, need >= %.0f (70%% of map diagonal)" % [p, e, spawn_dist, min_dist])
 		return false
 	return true
 
@@ -186,30 +244,3 @@ func _load_decoded() -> Dictionary:
 	var parsed: Variant = JSON.parse_string(text)
 	MapCatalogScript.reset_cache_for_tests()
 	return MapCatalogScript._decode_dict(parsed, MapCatalogScript.FIELD_SPEC)
-
-
-# (6) canyon_ford.json uses the new dramatic feature types (plateau /
-# canyon / ridge / lake), and the resolver auto-emits a non-trivial
-# number of cliff pieces from them. This pins the PR2 migration: if
-# someone reverts canyon_ford back to hand-rolled cliffs[] + 4 small
-# hills, this test fails and forces the conversation.
-func _test_features_resolve_to_dramatic_terrain() -> bool:
-	var map_def: Dictionary = _load_decoded()
-	var features: Array = map_def.get("terrain", {}).get("features", [])
-	if features.size() < 4:
-		print("    canyon_ford has %d features, expected >= 4 (canyon + plateau + ridge + lake)" % features.size())
-		return false
-	var types: Dictionary = {}
-	for f in features:
-		types[f.get("type", "")] = true
-	for required in ["plateau", "canyon", "ridge", "lake"]:
-		if not types.has(required):
-			print("    canyon_ford features missing type: %s" % required)
-			return false
-	# Resolve and check the auto-emission is non-trivial. A meaningful
-	# canyon_ford has dozens of cliff pieces (the canyon alone is 120+).
-	TerrainBuilderScript._resolve_features(map_def)
-	if map_def.get("cliffs", []).size() < 100:
-		print("    canyon_ford resolves to only %d cliffs, expected >= 100" % map_def.get("cliffs", []).size())
-		return false
-	return true

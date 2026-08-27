@@ -271,6 +271,46 @@ func _test_unknown_type_is_silent_noop() -> void:
 	print("[PASS] unknown feature type is silent no-op")
 
 
+func _test_ramp_descends_from_anchor() -> void:
+	# 2026-08-26: a "ramp" feature descends from a plateau edge to ground
+	# level. Authored as anchor + direction_deg + width + length + top_height.
+	# At the anchor: height == top_height. At the outer end (length away in
+	# the direction): height == 0. Outside the rectangular footprint: 0.
+	# No auto-emission (the ramp is heightmap-only; the cliff piece at the
+	# plateau edge stays in place).
+	var map_def := _make_blank_map_def()
+	map_def.terrain.features = [
+		{"type": "ramp", "anchor": [0, 0, 0], "direction_deg": 90.0, "width": 10.0, "length": 20.0, "top_height": 8.0},
+	]
+	TerrainBuilderScript._resolve_features(map_def)
+	# _resolve_features does NOT add cliffs or water_blobs for a ramp.
+	if not map_def.get("cliffs", []).is_empty():
+		print("FAIL: ramp emitted cliffs, expected 0")
+		quit(1); return
+	# At the anchor (0, 0), height = top_height = 8.
+	var h_anchor: float = TerrainBuilderScript.height_at(map_def, 0, 0)
+	if absf(h_anchor - 8.0) > 0.5:
+		print("FAIL: ramp anchor height %.2f, expected 8.0" % h_anchor)
+		quit(1); return
+	# At the outer end: anchor + length in the direction (90 deg = -Z).
+	var h_outer: float = TerrainBuilderScript.height_at(map_def, 0, -20)
+	# Outer end contributes 0 from the ramp; the height there is just
+	# noise (~0). Confirm it's near 0.
+	if absf(h_outer) > 1.5:
+		print("FAIL: ramp outer end height %.2f, expected ~0.0" % h_outer)
+		quit(1); return
+	# Outside the ramp's width (perpendicular to direction): 0.
+	# Perpendicular to 90 deg (north) is east-west; the ramp is 10 wide,
+	# so half_w = 5. Position (6, 0) is 6m east of the centerline, just
+	# outside the ramp's width. The ramp contributes 0; total height is
+	# noise (~0).
+	var h_outside: float = TerrainBuilderScript.height_at(map_def, 6, 0)
+	if absf(h_outside) > 1.5:
+		print("FAIL: ramp outside-width height %.2f, expected ~0.0" % h_outside)
+		quit(1); return
+	print("[PASS] ramp descends from anchor to 0 at outer end, 0 outside width")
+
+
 func _init() -> void:
 	_test_plateau_emits_perimeter_cliffs()
 	_test_canyon_emits_two_walls()
@@ -279,5 +319,6 @@ func _init() -> void:
 	_test_lake_with_water_area_floor()
 	_test_idempotent_resolve()
 	_test_unknown_type_is_silent_noop()
+	_test_ramp_descends_from_anchor()
 	print("[ALL PASS] dramatic feature types PR1 tests pass")
 	quit(0)

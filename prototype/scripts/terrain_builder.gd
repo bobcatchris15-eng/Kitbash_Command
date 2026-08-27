@@ -5,6 +5,10 @@ const WorldScaleScript = preload("res://scripts/world_scale.gd")
 const ResourceNodeScript = preload("res://scripts/resource_node.gd")
 const AmbientScatterScript = preload("res://scripts/ambient_scatter.gd")
 const TerrainVisualScatterScript = preload("res://scripts/terrain_visual_scatter.gd")
+# 2026-08-26: half_extents() lives on MapCatalog for the non-square map
+# support (map_half_extents_z). Loading it here so the nav-tile and
+# ground-mesh code can read both axes without a circular import.
+const MapCatalogScript = preload("res://scripts/map_catalog.gd")
 # Turns a MapCatalog map Dictionary into: baked NavigationServer3D ground/
 # water maps, decorative terrain meshes (water planes, rock-cluster
 # obstacles), and pure query functions (terrain_height_at / is_position_
@@ -42,7 +46,12 @@ const GRID_CELL: float = 4.0
 # that's 16x bigger because someone authored it that size by hand - the
 # formula can't tell the difference, which is exactly the point.
 static func _nav_grid_cell(map_def: Dictionary) -> float:
-	var half: float = map_def.get("map_half_extents", 80.0)
+	# 2026-08-26: non-square map support - use the larger half-extent so
+	# the cell is wide enough to cover whichever axis is the long one.
+	# The cell is square, so a single value must work for both axes; the
+	# shorter axis just gets a finer-than-needed resolution (harmless).
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	var half: float = max(he.x, he.y)
 	return max(GRID_CELL, half / 75.0)
 
 # RTS_CORE_ROADMAP.md B8: even AFTER _nav_grid_cell() brought scattered_peaks'
@@ -104,7 +113,10 @@ static func _nav_grid_cell(map_def: Dictionary) -> float:
 # scattered_peaks is the map that originally segfaulted the baker at its
 # native 550 half-extent, and it still bakes cleanly at 4x that.
 static func _nav_cell_size(map_def: Dictionary) -> float:
-	var half: float = map_def.get("map_half_extents", 80.0)
+	# 2026-08-26: non-square map support - max of the two half extents
+	# drives the cell_size formula, same logic as _nav_grid_cell above.
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	var half: float = max(he.x, he.y)
 	if half <= 300.0:
 		return 0.25
 	return 0.25 + (half - 300.0) * 0.003
@@ -197,7 +209,12 @@ const NAV_TILE_VOXELS_PER_AXIS: float = 110.0
 const NAV_TILE_BORDER_CELLS: float = 6.0
 
 static func _nav_tile_size(map_def: Dictionary) -> float:
-	var half: float = map_def.get("map_half_extents", 80.0)
+	# 2026-08-26: non-square map support - max of the two half extents
+	# so a 1200x520 map (half_x=600) gets the same 200-unit tile size
+	# the 1200x1200 square map would have. The Z axis (520) then fits
+	# in 3 tiles; the X axis (1200) in 6 tiles.
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	var half: float = max(he.x, he.y)
 	return maxf(NAV_TILE_SIZE_BASE, (half * 2.0) / NAV_TILES_PER_AXIS)
 
 # Never coarser than the pre-tiling formula, even though the tile budget
@@ -213,15 +230,17 @@ static func _nav_tile_cell_size(map_def: Dictionary) -> float:
 	return minf(_nav_tile_size(map_def) / NAV_TILE_VOXELS_PER_AXIS, _nav_cell_size(map_def))
 
 static func _nav_tile_rects(map_def: Dictionary) -> Array:
-	var half: float = map_def.get("map_half_extents", 80.0)
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	var half_x: float = he.x
+	var half_z: float = he.y
 	var tile_size := _nav_tile_size(map_def)
 	var rects: Array = []
-	var x := -half
-	while x < half:
-		var x1 := minf(x + tile_size, half)
-		var z := -half
-		while z < half:
-			var z1 := minf(z + tile_size, half)
+	var x := -half_x
+	while x < half_x:
+		var x1 := minf(x + tile_size, half_x)
+		var z := -half_z
+		while z < half_z:
+			var z1 := minf(z + tile_size, half_z)
 			rects.append({"x0": x, "x1": x1, "z0": z, "z1": z1})
 			z = z1
 		x = x1
@@ -257,10 +276,15 @@ static func _bucket_verts_by_tile(verts: PackedVector3Array, map_def: Dictionary
 		buckets[i] = PackedVector3Array()
 	if rects.is_empty():
 		return buckets
-	var half: float = map_def.get("map_half_extents", 80.0)
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
 	var tile_size := _nav_tile_size(map_def)
-	var cols := int(ceil((half * 2.0) / tile_size))
-	var rows := int(ceil((half * 2.0) / tile_size))
+	# Per-axis col/row count. The bucket index is col * rows + row, so
+	# the X-axis stride must be the Z-axis count (rows) and vice versa.
+	# With max(half_x, half_z) the two axes would have the same col/row
+	# count, so the indexing is degenerate; the non-square map needs the
+	# actual Z-axis count here.
+	var cols := int(ceil((he.x * 2.0) / tile_size))
+	var rows := int(ceil((he.y * 2.0) / tile_size))
 	var vcount := verts.size()
 	var i := 0
 	while i + 2 < vcount:
@@ -271,10 +295,10 @@ static func _bucket_verts_by_tile(verts: PackedVector3Array, map_def: Dictionary
 		var max_x: float = maxf(a.x, maxf(b.x, c.x)) + pad
 		var min_z: float = minf(a.z, minf(b.z, c.z)) - pad
 		var max_z: float = maxf(a.z, maxf(b.z, c.z)) + pad
-		var c0: int = clampi(int(floor((min_x + half) / tile_size)), 0, cols - 1)
-		var c1: int = clampi(int(floor((max_x + half) / tile_size)), 0, cols - 1)
-		var r0: int = clampi(int(floor((min_z + half) / tile_size)), 0, rows - 1)
-		var r1: int = clampi(int(floor((max_z + half) / tile_size)), 0, rows - 1)
+		var c0: int = clampi(int(floor((min_x + he.x) / tile_size)), 0, cols - 1)
+		var c1: int = clampi(int(floor((max_x + he.x) / tile_size)), 0, cols - 1)
+		var r0: int = clampi(int(floor((min_z + he.y) / tile_size)), 0, rows - 1)
+		var r1: int = clampi(int(floor((max_z + he.y) / tile_size)), 0, rows - 1)
 		for col in range(c0, c1 + 1):
 			for row in range(r0, r1 + 1):
 				var idx: int = col * rows + row
@@ -665,8 +689,59 @@ static func _feature_contribution(feature: Dictionary, x: float, z: float) -> fl
 			return _ridge_contribution(feature, x, z)
 		"lake":
 			return _lake_contribution(feature, x, z)
+		"ramp":
+			return _ramp_contribution(feature, x, z)
 		_:
 			return 0.0
+
+
+# Rectangular ramp descending from a plateau edge to ground level. 2026-08-26:
+# canyon_ford from-scratch rebuild - the hand-drawn map has 5 ramps (yellow
+# blobs) connecting plateau tops to the surrounding grassland, and the only
+# sensible way to author them in JSON is "an anchor point at the plateau
+# edge, a direction the ramp points outward, a width, a length, and a
+# top_height (= the plateau's height)". The contribution is a clean wedge:
+# full top_height at the anchor, linearly descending to 0 at the outer
+# end, with hard width edges. Smooth side-falloff is left for v2 - the
+# plateau's own wall_falloff (which the heightmap blends into the
+# surrounding ground at the cliff line) already provides the visual
+# "rocky slopes merging into the traversible ramp" the user described in
+# the sketch.
+#
+# Convention: 0 deg = +X (east), 90 deg = -Z (north), 180 deg = -X (west),
+# 270 deg = +Z (south). The ramp points OUT from the anchor in that
+# direction. Auto-emission is a no-op - the ramp only contributes to the
+# heightmap, the cliff piece at the anchor stays in place (it sits at the
+# bottom of the ramp, the heightmap ramp goes from top_height at the
+# anchor down to 0 over `length`).
+static func _ramp_contribution(feature: Dictionary, x: float, z: float) -> float:
+	var anchor: Vector3 = _vec3_of(feature.get("anchor", Vector3.ZERO))
+	var direction_deg: float = feature.get("direction_deg", 0.0)
+	var width: float = feature.get("width", 12.0)
+	var length: float = feature.get("length", 30.0)
+	var top_height: float = feature.get("top_height", 8.0)
+	var rad: float = deg_to_rad(direction_deg)
+	# 0 deg = +X (east), 90 deg = -Z (north), 180 deg = -X, 270 deg = +Z.
+	# In screen-space Y, north is up; in Godot's XZ plane, -Z is "into the
+	# scene" (the conventional forward direction). sin/cos here give the
+	# (dx, -dz) decomposition so a 90 deg ramp really does go north.
+	var dir_x: float = cos(rad)
+	var dir_z: float = -sin(rad)
+	var dx: float = x - anchor.x
+	var dz: float = z - anchor.z
+	# Along the ramp's outward axis (positive = away from the anchor).
+	var along: float = dx * dir_x + dz * dir_z
+	if along < 0.0 or along > length:
+		return 0.0
+	# Perpendicular distance from the ramp's centerline.
+	var perp_x: float = -dir_z
+	var perp_z: float = dir_x
+	var perp: float = dx * perp_x + dz * perp_z
+	if absf(perp) > width * 0.5:
+		return 0.0
+	# Linear descent from top_height at the anchor to 0 at the outer end.
+	var t: float = along / length  # 0 at anchor, 1 at outer end
+	return top_height * (1.0 - t)
 
 
 # Convert a JSON point entry to Vector2 - the user might author as [x, z],
@@ -793,6 +868,15 @@ static func height_at(map_def: Dictionary, x: float, z: float) -> float:
 	# other 6 bundled maps don't, so they still take the analytic path.
 	var heightmap_img = _get_heightmap_image(map_def)
 	if heightmap_img:
+		# 2026-08-26: canyon_ford's from-scratch rebuild uses the
+		# analytic features[] path (plateau / ramp / etc), NOT a baked
+		# heightmap PNG, so the heightmap sampler is still square-aware
+		# for now. The non-square map is sized by half_extents() above
+		# (X for the ground mesh and navmesh, Z via _build_ground_faces'
+		# per-axis walk). A non-square heightmap PNG is a follow-up
+		# refactor - the bilinear sampler below currently assumes a
+		# square image and a square world footprint; the analytic path
+		# this rebuild actually uses doesn't touch it.
 		var half: float = map_def.get("map_half_extents", 80.0)
 		var height_scale: float = map_def.get("terrain", {}).get("height_scale", 20.0)
 		# height_scale is itself a FIELD_SPEC-flagged field (already scaled
@@ -940,32 +1024,46 @@ static func _cell_on_bridge(x0: float, x1: float, z0: float, z1: float, bridges:
 # threshold should not flip walkability because the cache rounded it.
 static var _corner_height_cache: Dictionary = {}
 
-static func _corner_heights(map_def: Dictionary, half: float, cell: float) -> Dictionary:
+static func _corner_heights(map_def: Dictionary, half: Vector2, cell: float) -> Dictionary:
 	# Keyed on the heightmap PATH as well as the name: two map dicts can
 	# share a name (or have none at all - test fixtures and inline dicts
 	# like {"map_half_extents": 300.0} are common in run_tests.gd) while
 	# describing completely different elevation, and silently serving one
 	# map's heights for another would be near-impossible to diagnose from
 	# the symptom (a subtly wrong navmesh).
+	# 2026-08-26: non-square map support - `half` is now Vector2 [hx, hz].
+	# Cache key includes both axes; the grid is now per-axis (n_x, n_z)
+	# rather than a single n, since the same cell size on a 1200x520 map
+	# gives 150 X-samples and 65 Z-samples (not 150x150, which would
+	# over-sample Z by ~2.3x and bake navmesh nav-poly vertices outside
+	# the actual playable ground).
 	var terrain: Dictionary = map_def.get("terrain", {})
-	var key = "%s:%s:%s:%s" % [map_def.get("name", ""), terrain.get("heightmap", ""), half, cell]
+	var key = "%s:%s:%s:%s:%s" % [map_def.get("name", ""), terrain.get("heightmap", ""), half.x, half.y, cell]
 	if _corner_height_cache.has(key):
 		return _corner_height_cache[key]
 	# Exactly the boundary sequence the while-loops below walk (v = min(v +
-	# cell, half), terminating at half), so corner i is always grid line i.
-	var coords := PackedFloat64Array()
-	var v := -half
-	coords.append(v)
-	while v < half:
-		v = min(v + cell, half)
-		coords.append(v)
-	var n := coords.size()
+	# cell, half_axis), terminating at half_axis), so corner i is always
+	# grid line i.
+	var coords_x := PackedFloat64Array()
+	var v_x := -half.x
+	coords_x.append(v_x)
+	while v_x < half.x:
+		v_x = min(v_x + cell, half.x)
+		coords_x.append(v_x)
+	var coords_z := PackedFloat64Array()
+	var v_z := -half.y
+	coords_z.append(v_z)
+	while v_z < half.y:
+		v_z = min(v_z + cell, half.y)
+		coords_z.append(v_z)
+	var n_x := coords_x.size()
+	var n_z := coords_z.size()
 	var heights := PackedFloat64Array()
-	heights.resize(n * n)
-	for i in range(n):
-		for j in range(n):
-			heights[i * n + j] = height_at(map_def, coords[i], coords[j])
-	var out := {"heights": heights, "n": n}
+	heights.resize(n_x * n_z)
+	for i in range(n_x):
+		for j in range(n_z):
+			heights[i * n_z + j] = height_at(map_def, coords_x[i], coords_z[j])
+	var out := {"heights": heights, "n_x": n_x, "n_z": n_z}
 	_corner_height_cache[key] = out
 	return out
 
@@ -1019,20 +1117,24 @@ const HOLE_SUBDIVISION_CELL: float = 1.0
 #
 # Bucket key is (xi, zi) - the same integer indices the existing walk already
 # uses for corner_heights, so no coordinate-system translation is needed.
-static func _bucket_holes_by_cell(holes: Array, half: float, cell: float) -> Dictionary:
+# 2026-08-26: non-square map support - `half` is now Vector2 so the
+# cell index is per-axis. Passing half.x for the Z axis (or vice versa)
+# would silently shift holes by N cells.
+static func _bucket_holes_by_cell(holes: Array, half: Vector2, cell: float) -> Dictionary:
 	var out: Dictionary = {}
 	for h in holes:
 		var hx0: float = h.x0
 		var hx1: float = h.x1
 		var hz0: float = h.z0
 		var hz1: float = h.z1
-		# Cell index from world XZ. `floor((x + half) / cell)` gives the
-		# column index the existing cell walk uses, so the bucket key is
-		# directly comparable to the walk's (xi, zi).
-		var cx0: int = int(floor((hx0 + half) / cell))
-		var cx1: int = int(floor((hx1 + half) / cell))
-		var cz0: int = int(floor((hz0 + half) / cell))
-		var cz1: int = int(floor((hz1 + half) / cell))
+		# Cell index from world XZ. `floor((x + half_axis) / cell)` gives
+		# the column/row index the existing cell walk uses (the same
+		# Vector2i indexing _build_ground_faces uses for its corner
+		# height lookup), so the bucket key is directly comparable.
+		var cx0: int = int(floor((hx0 + half.x) / cell))
+		var cx1: int = int(floor((hx1 + half.x) / cell))
+		var cz0: int = int(floor((hz0 + half.y) / cell))
+		var cz1: int = int(floor((hz1 + half.y) / cell))
 		# Clamp to non-negative - a hole exactly at the map edge can
 		# compute a fractional index that floors to -1, and we don't
 		# want that in the dict.
@@ -1048,7 +1150,7 @@ static func _bucket_holes_by_cell(holes: Array, half: float, cell: float) -> Dic
 
 static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], grid_cell: float = -1.0) -> PackedVector3Array:
 	var verts = PackedVector3Array()
-	var half: float = map_def.get("map_half_extents", 80.0)
+	var half: Vector2 = MapCatalogScript.half_extents(map_def)
 	var water_holes = []
 	for w in map_def.get("water_areas", []):
 		water_holes.append(_rect_from(w.center, w.half_extents))
@@ -1093,24 +1195,30 @@ static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], gr
 	# use it for both the walk and the corner-height grid so they stay
 	# in step at whichever coarseness the caller asked for.
 	var cell: float = grid_cell
+	# 2026-08-26: _corner_heights now takes a Vector2 half (non-square
+	# map support); returns n_x and n_z separately so the index arithmetic
+	# below stays correct for both axes.
 	var grid = _corner_heights(map_def, half, cell)
 	var corner_heights: PackedFloat64Array = grid["heights"]
-	var corner_n: int = grid["n"]
+	var corner_nx: int = grid["n_x"]
+	var corner_nz: int = grid["n_z"]
 
 	# PR-2 cleanup (2026-08-19). Hole spatial index - the inner check
 	# is now O(holes_in_cell) rather than O(total_holes). See
 	# _bucket_holes_by_cell above for the cost analysis.
+	# 2026-08-26: now passes the Vector2 half (non-square refactor);
+	# the bucket key is per-axis, consistent with the walk below.
 	var hard_buckets: Dictionary = _bucket_holes_by_cell(hard_holes, half, cell)
 	var water_buckets: Dictionary = _bucket_holes_by_cell(water_holes, half, cell)
 
 	var xi = 0
-	var x = -half
-	while x < half:
-		var x1 = min(x + cell, half)
+	var x = -half.x
+	while x < half.x:
+		var x1 = min(x + cell, half.x)
 		var zi = 0
-		var z = -half
-		while z < half:
-			var z1 = min(z + cell, half)
+		var z = -half.y
+		while z < half.y:
+			var z1 = min(z + cell, half.y)
 			var cell_key := Vector2i(xi, zi)
 			var hard_blocked := false
 			var cell_hard: Array = []
@@ -1134,12 +1242,14 @@ static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], gr
 			if not blocked and has_blobs and _cell_on_water_blob(x, x1, z, z1, map_def):
 				blocked = true
 			if not blocked:
-				# Grid line xi is world x, xi+1 is world x1 (see
-				# _corner_heights() - it walks the same sequence).
-				var h00 = corner_heights[xi * corner_n + zi]
-				var h10 = corner_heights[(xi + 1) * corner_n + zi]
-				var h01 = corner_heights[xi * corner_n + zi + 1]
-				var h11 = corner_heights[(xi + 1) * corner_n + zi + 1]
+				# Grid line xi is world x, zi is world z (see
+				# _corner_heights() - it walks the same sequence). With
+				# the non-square refactor, the X stride is n_z and the
+				# Z stride is 1.
+				var h00 = corner_heights[xi * corner_nz + zi]
+				var h10 = corner_heights[(xi + 1) * corner_nz + zi]
+				var h01 = corner_heights[xi * corner_nz + zi + 1]
+				var h11 = corner_heights[(xi + 1) * corner_nz + zi + 1]
 				var max_slope = max(
 					max(abs(h10 - h00), abs(h01 - h00)),
 					max(abs(h11 - h10), abs(h11 - h01))
@@ -1204,7 +1314,7 @@ static func _emit_subdivided_ground_quad(verts: PackedVector3Array, x0: float, x
 # never was - amphibious units cross water freely.
 static func _build_amphibious_faces(map_def: Dictionary, extra_holes: Array = [], grid_cell: float = -1.0) -> PackedVector3Array:
 	var verts = PackedVector3Array()
-	var half: float = map_def.get("map_half_extents", 80.0)
+	var half: Vector2 = MapCatalogScript.half_extents(map_def)
 	var holes = []
 	for o in map_def.get("obstacles", []):
 		holes.append(_rect_from(o.center, o.half_extents))
@@ -1218,21 +1328,25 @@ static func _build_amphibious_faces(map_def: Dictionary, extra_holes: Array = []
 	if grid_cell < 0.0:
 		grid_cell = _nav_grid_cell(map_def)
 	var cell: float = grid_cell
+	# 2026-08-26: see _build_ground_faces for the non-square refactor
+	# notes - same Vector2 half, same per-axis n_x/n_z.
 	var grid = _corner_heights(map_def, half, cell)
 	var corner_heights: PackedFloat64Array = grid["heights"]
-	var corner_n: int = grid["n"]
+	var corner_nx: int = grid["n_x"]
+	var corner_nz: int = grid["n_z"]
 	# PR-2 cleanup (2026-08-19). Hole spatial index - see
 	# _bucket_holes_by_cell in _build_ground_faces for the rationale.
+	# 2026-08-26: Vector2 half (non-square refactor).
 	var hole_buckets: Dictionary = _bucket_holes_by_cell(holes, half, cell)
 
-	var x = -half
+	var x = -half.x
 	var xi: int = 0
-	while x < half:
-		var x1 = min(x + cell, half)
-		var z = -half
+	while x < half.x:
+		var x1 = min(x + cell, half.x)
+		var z = -half.y
 		var zi: int = 0
-		while z < half:
-			var z1 = min(z + cell, half)
+		while z < half.y:
+			var z1 = min(z + cell, half.y)
 			var cell_key := Vector2i(xi, zi)
 			var blocked = false
 			if hole_buckets.has(cell_key):
@@ -1249,10 +1363,10 @@ static func _build_amphibious_faces(map_def: Dictionary, extra_holes: Array = []
 				var cell_holes: Array = hole_buckets[cell_key] if hole_buckets.has(cell_key) else []
 				_emit_subdivided_ground_quad(verts, x, x1, z, z1, cell_holes, [], [], false, map_def, true)
 			elif not blocked:
-				var h00 = corner_heights[xi * corner_n + zi]
-				var h10 = corner_heights[(xi + 1) * corner_n + zi]
-				var h01 = corner_heights[xi * corner_n + zi + 1]
-				var h11 = corner_heights[(xi + 1) * corner_n + zi + 1]
+				var h00 = corner_heights[xi * corner_nz + zi]
+				var h10 = corner_heights[(xi + 1) * corner_nz + zi]
+				var h01 = corner_heights[xi * corner_nz + zi + 1]
+				var h11 = corner_heights[(xi + 1) * corner_nz + zi + 1]
 				_add_nav_quad(verts, Vector3(x, h00, z), Vector3(x1, h10, z), Vector3(x1, h11, z1), Vector3(x, h01, z1))
 			z = z1
 			zi += 1
@@ -2333,11 +2447,20 @@ const BUILD_FRAME_BUDGET_MS: float = 8.0
 # generate_normals()'s indexed average. Output geometry is identical up to
 # floating-point noise.
 static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -> Dictionary:
-	var half: float = map_def.get("map_half_extents", 80.0)
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
 
 	# Scale resolution dynamically with extent so large maps don't explode into millions of quads
-	var mesh_step: float = maxf(GROUND_MESH_RESOLUTION, (half * 2.0) / 280.0)
-	var col_step: float = maxf(COLLISION_HEIGHTMAP_STEP, (half * 2.0) / 180.0)
+	# 2026-08-26: per-axis step so a wide non-square map (1200x520) gets
+	# a mesh_stride that's correct in BOTH directions - not the X
+	# half-extent's stride on a 520m Z axis (would over-resolve) or the
+	# Z half-extent's stride on a 1200m X axis (would under-resolve).
+	var span: Vector2 = he * 2.0
+	var mesh_step_x: float = maxf(GROUND_MESH_RESOLUTION, span.x / 280.0)
+	var mesh_step_z: float = maxf(GROUND_MESH_RESOLUTION, span.y / 280.0)
+	var col_step_x: float = maxf(COLLISION_HEIGHTMAP_STEP, span.x / 180.0)
+	var col_step_z: float = maxf(COLLISION_HEIGHTMAP_STEP, span.y / 180.0)
+	var mesh_step: float = mesh_step_x  # legacy single var for any caller that reads it
+	var col_step: float = col_step_x
 
 	var h_cache: Dictionary = {}
 	var _h = func(hx: float, hz: float) -> float:
@@ -2388,15 +2511,19 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 	var deadline: int = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 
 	# 1. Playable ground surface - one budget slice per x-row band
-	var x = -half
-	while x < half:
+	# 2026-08-26: per-axis mesh_step so the Z walk stride scales with
+	# the map's Z half-extent, not its X half-extent. A 1200x520 map
+	# gets a ~4.3m Z stride instead of a 2.1m Z stride (which would
+	# over-resolve Z by 2x).
+	var x = -he.x
+	while x < he.x:
 		if ticker != null and Time.get_ticks_usec() >= deadline:
 			await ticker.get_tree().process_frame
 			deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
-		var x1 = min(x + mesh_step, half)
-		var z = -half
-		while z < half:
-			var z1 = min(z + mesh_step, half)
+		var x1 = min(x + mesh_step_x, he.x)
+		var z = -he.y
+		while z < he.y:
+			var z1 = min(z + mesh_step_z, he.y)
 			var a = Vector3(x, _h.call(x, z), z)
 			var b = Vector3(x1, _h.call(x1, z), z)
 			var c = Vector3(x1, _h.call(x1, z1), z1)
@@ -2406,27 +2533,32 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 		x = x1
 
 	# 2. Outer terrain skirt: extends outward to the horizon so map borders never expose empty void
-	var skirt_dist: float = maxf(half * 3.5, 450.0)
-	var skirt_step: float = maxf(mesh_step * 3.0, 32.0)
-	var outer_min: float = -half - skirt_dist
-	var outer_max: float = half + skirt_dist
+	# Per-axis skirt distance too - the wider axis needs more skirt to hide its edge.
+	var skirt_dist_x: float = maxf(he.x * 3.5, 450.0)
+	var skirt_dist_z: float = maxf(he.y * 3.5, 450.0)
+	var skirt_step_x: float = maxf(mesh_step_x * 3.0, 32.0)
+	var skirt_step_z: float = maxf(mesh_step_z * 3.0, 32.0)
+	var outer_min_x: float = -he.x - skirt_dist_x
+	var outer_max_x: float = he.x + skirt_dist_x
+	var outer_min_z: float = -he.y - skirt_dist_z
+	var outer_max_z: float = he.y + skirt_dist_z
 
 	# North, South, West, East perimeter skirt sections - budget-checked per
 	# row band like the ground pass above (each full rect is cheap, but its
 	# inner loops sample height along the whole perimeter).
-	for rect_bounds in [[outer_min, outer_max, outer_min, -half],
-			[outer_min, outer_max, half, outer_max],
-			[outer_min, -half, -half, half],
-			[half, outer_max, -half, half]]:
+	for rect_bounds in [[outer_min_x, outer_max_x, outer_min_z, -he.y],
+			[outer_min_x, outer_max_x, he.y, outer_max_z],
+			[outer_min_x, -he.x, -he.y, he.y],
+			[he.x, outer_max_x, -he.y, he.y]]:
 		var curr_x: float = rect_bounds[0]
 		while curr_x < rect_bounds[1]:
 			if ticker != null and Time.get_ticks_usec() >= deadline:
 				await ticker.get_tree().process_frame
 				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
-			var next_x = min(curr_x + skirt_step, rect_bounds[1])
+			var next_x = min(curr_x + skirt_step_x, rect_bounds[1])
 			var curr_z: float = rect_bounds[2]
 			while curr_z < rect_bounds[3]:
-				var next_z = min(curr_z + skirt_step, rect_bounds[3])
+				var next_z = min(curr_z + skirt_step_z, rect_bounds[3])
 				var sa = Vector3(curr_x, _h.call(curr_x, curr_z), curr_z)
 				var sb = Vector3(next_x, _h.call(next_x, curr_z), curr_z)
 				var sc = Vector3(next_x, _h.call(next_x, next_z), next_z)
@@ -2467,23 +2599,29 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 
 	# Collision heightmap - sampled per row so big maps also spread this across
 	# frames instead of spending tens of thousands of height_at() calls in one.
-	var samples = int(half * 2.0 / col_step) + 1
+	# 2026-08-26: per-axis sample count + stride so the collision heightmap
+	# actually covers the full non-square map. HeightMapShape3D is
+	# square, so a 1200x520 map gets a `samples_x` X `samples_z` shape
+	# whose X and Z dimensions are independent (Godot's HeightMapShape3D
+	# supports this - map_width and map_depth are separate fields).
+	var samples_x = int(he.x * 2.0 / col_step_x) + 1
+	var samples_z = int(he.y * 2.0 / col_step_z) + 1
 	var height_data = PackedFloat32Array()
-	height_data.resize(samples * samples)
-	for row in range(samples):
+	height_data.resize(samples_x * samples_z)
+	for row in range(samples_z):
 		if ticker != null and Time.get_ticks_usec() >= deadline:
 			await ticker.get_tree().process_frame
 			deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
-		var wz = -half + row * col_step
-		for col in range(samples):
-			var wx = -half + col * col_step
-			height_data[row * samples + col] = height_at(map_def, wx, wz)
+		var wz = -he.y + row * col_step_z
+		for col in range(samples_x):
+			var wx = -he.x + col * col_step_x
+			height_data[row * samples_x + col] = height_at(map_def, wx, wz)
 	var shape = HeightMapShape3D.new()
-	shape.map_width = samples
-	shape.map_depth = samples
+	shape.map_width = samples_x
+	shape.map_depth = samples_z
 	shape.map_data = height_data
 
-	return {"mesh": mesh, "shape": shape, "samples": samples, "collision_scale": Vector3(col_step, 1.0, col_step)}
+	return {"mesh": mesh, "shape": shape, "samples_x": samples_x, "samples_z": samples_z, "collision_scale": Vector3(col_step_x, 1.0, col_step_z)}
 
 
 # A rectangular zone footprint as a real subdivided mesh whose every vertex
@@ -2930,9 +3068,18 @@ static func _spawn_cliff(cliff: Dictionary, parent: Node3D, map_def: Dictionary 
 	# uses for the rock blend on steep heightmap faces (lines 255-282), so
 	# a heightmap rock face and a cliff box read as the same material in
 	# the same map.
+	#
+	# 2026-08-26: scale the GLB-loaded mesh in Y so the visual matches
+	# the requested cliff_height. The straight piece GLB is CLIFF_MODEL_HEIGHT
+	# (4m) tall with origin at the BOTTOM (build_cliff_props.py:135), so a
+	# Y scale of cliff_height / CLIFF_MODEL_HEIGHT makes a 14m plateau
+	# wall read as 14m visually. Corner/end GLBs are hand-authored to fit
+	# a specific footprint - scaling them uniformly distorts the shape -
+	# so those types fall through to the BoxMesh fallback (which IS sized
+	# to the piece's actual half_extents × cliff_height, no scale needed).
 	var mesh_inst: MeshInstance3D = null
 	var glb_path: String = CLIFF_MODEL_DIR % cliff_type
-	if ResourceLoader.exists(glb_path):
+	if cliff_type == "straight" and ResourceLoader.exists(glb_path):
 		var packed: PackedScene = load(glb_path)
 		if packed != null:
 			var inst: Node = packed.instantiate()
@@ -2951,6 +3098,20 @@ static func _spawn_cliff(cliff: Dictionary, parent: Node3D, map_def: Dictionary 
 		var box: BoxMesh = BoxMesh.new()
 		box.size = Vector3(cliff.half_extents.x * 2.0, cliff_height, cliff.half_extents.y * 2.0)
 		mesh_inst.mesh = box
+
+	# Y-scale the straight-piece GLB so a 14m plateau wall reads as 14m.
+	# The X/Z scales stay at 1.0 - the auto-emission authors straight
+	# pieces at half_extents (0.5, step/2) which is a different XZ
+	# footprint than the GLB's canonical 8m × 2m, so rescaling XZ would
+	# either oversize the collision or undersize the visual; leaving the
+	# GLB at its authored 8m × 2m and accepting the slight XZ mismatch is
+	# the trade-off for v1 (the cliff visual is wider than the collider,
+	# but the slope-based navmesh carve at the cliff line keeps units
+	# off the wall either way). A future pass should re-author the
+	# straight GLB as a 1m × 1m unit cube and scale per-piece; out of
+	# scope for this turn.
+	if cliff_type == "straight" and mesh_inst.mesh != null and not (mesh_inst.mesh is BoxMesh):
+		mesh_inst.scale = Vector3(1.0, cliff_height / CLIFF_FALLBACK_HEIGHT, 1.0)
 
 	# Material: cliff.gdshader with the rock triplanar texture set. The
 	# triplanar_scale is world_scale-aware so a 4x map doesn't get
@@ -3553,8 +3714,12 @@ static func _spawn_bridge(bridge: Dictionary, parent: Node3D):
 const GRASSLAND_CLUTTER_AVOID_RADIUS: float = 7.0
 
 static func _spawn_grassland_clutter(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0):
-	var half: float = map_def.get("map_half_extents", 80.0)
-	var area = (half * 2.0) * (half * 2.0)
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	# 2026-08-26: area is the actual map area (4 * hx * hz), not the
+	# square (4 * hx^2) the legacy formula gave. A 1200x520 map is
+	# 624,000 sqm, not 1,440,000 - the latter would over-dress the map
+	# by 2.3x for a non-square layout.
+	var area = (he.x * 2.0) * (he.y * 2.0)
 	var count = clamp(int(area / 2000.0), 20, 50)
 
 	var avoid_points: Array = []
@@ -3579,7 +3744,7 @@ static func _spawn_grassland_clutter(map_def: Dictionary, parent: Node3D, prop_s
 	var attempts = 0
 	while placed < count and attempts < count * 8:
 		attempts += 1
-		var pos = Vector3(rng.randf_range(-half * 0.94, half * 0.94), 0, rng.randf_range(-half * 0.94, half * 0.94))
+		var pos = Vector3(rng.randf_range(-he.x * 0.94, he.x * 0.94), 0, rng.randf_range(-he.y * 0.94, he.y * 0.94))
 		if is_position_blocked(map_def, pos):
 			continue
 		var rejected = false
@@ -3619,10 +3784,12 @@ static func _spawn_grassland_clutter(map_def: Dictionary, parent: Node3D, prop_s
 	var tall_attempts = 0
 	while tall_placed < count and tall_attempts < count * 8:
 		tall_attempts += 1
-		var pos = Vector3(tall_rng.randf_range(-half, half), 0, tall_rng.randf_range(-half, half))
+		# 2026-08-26: per-axis range so the tall-brush edge band follows
+		# the actual non-square map bounds, not the legacy square.
+		var pos = Vector3(tall_rng.randf_range(-he.x, he.x), 0, tall_rng.randf_range(-he.y, he.y))
 		if _is_over_water_or_obstacle(map_def, pos):
 			continue
-		var on_edge = absf(pos.x) > half * 0.94 or absf(pos.z) > half * 0.94
+		var on_edge = absf(pos.x) > he.x * 0.94 or absf(pos.z) > he.y * 0.94
 		var steep_slope = not on_edge and is_position_blocked(map_def, pos)
 		if not (on_edge or steep_slope):
 			continue
@@ -3751,7 +3918,7 @@ const AMBIENT_ORE_MAX_COUNT: int = 440   # = 20 clusters * 22 items ceiling
 const AMBIENT_TREE_MAX_SLOPE: float = 0.5
 
 static func _spawn_ambient_trees(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0, ticker: Node = null) -> Array:
-	var half: float = map_def.get("map_half_extents", 80.0)
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
 	# SKIRMISH_PERF_TROUBLESHOOTING.md §12. Per-map density multiplier.
 	# Multiplies both the cluster count and the per-cluster item cap,
 	# so the prop total scales as density^2. Default 1.0; lake_crossing
@@ -3787,7 +3954,7 @@ static func _spawn_ambient_trees(map_def: Dictionary, parent: Node3D, prop_scale
 	# so an ore and a tree never overlap.
 	var placed_positions: Array = []
 	var clusters := _pick_cluster_centers(
-		rng, half, cluster_count, AMBIENT_TREE_CLUSTER_AVOID_RADIUS,
+		rng, he, cluster_count, AMBIENT_TREE_CLUSTER_AVOID_RADIUS,
 		avoid_points, bridge_rects, [], map_def)
 	for cluster_center in clusters:
 		if ticker != null and Time.get_ticks_usec() >= deadline:
@@ -3840,7 +4007,7 @@ static func _spawn_ambient_trees(map_def: Dictionary, parent: Node3D, prop_scale
 #     same map-name determinism contract holds and the two passes
 #     never draw the same RNG sequence for the same attempt.
 static func _spawn_ambient_ores(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0, ambient_tree_positions: Array = [], ticker: Node = null):
-	var half: float = map_def.get("map_half_extents", 80.0)
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
 	# Same density multiplier as the trees, so a 0.5 map cuts the ore
 	# scatter by the same proportion (see the _spawn_ambient_trees
 	# header for the math).
@@ -3864,7 +4031,7 @@ static func _spawn_ambient_ores(map_def: Dictionary, parent: Node3D, prop_scale:
 	var placed = 0
 	var deadline: int = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 	var clusters := _pick_cluster_centers(
-		rng, half, cluster_count, AMBIENT_ORE_CLUSTER_AVOID_RADIUS,
+		rng, he, cluster_count, AMBIENT_ORE_CLUSTER_AVOID_RADIUS,
 		avoid_points, bridge_rects, surface_rects, map_def)
 	for cluster_center in clusters:
 		if ticker != null and Time.get_ticks_usec() >= deadline:
@@ -3958,7 +4125,13 @@ static func slope_rock_density(slope: float) -> float:
 static func _spawn_slope_rocks(map_def: Dictionary, parent: Node3D, ticker: Node = null) -> int:
 	if not ResourceLoader.exists(BOULDER_MODEL_DIR % 0):
 		return 0
-	var half: float = map_def.get("map_half_extents", 80.0)
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	# 2026-08-26: per-axis step so the slope-rock grid actually covers
+	# the map on both axes. The grid is square and step is the same on
+	# both axes (Recast's slope_at() reads the same heightmap either way),
+	# so using max(he.x, he.y) keeps the grid step identical for both
+	# axes while ensuring the larger axis is the one that drives it.
+	var half: float = max(he.x, he.y)
 	var step: float = (half * 2.0) / float(SLOPE_ROCK_GRID_DIVISIONS)
 	# Frame-budget deadline for the per-grid-row yield in phase 1; only
 	# consulted when a ticker was supplied (see spawn_visuals()).
@@ -4109,6 +4282,11 @@ static func get_surface_type_at(map_def: Dictionary, pos: Vector3) -> String:
 	# none of the 8 bundled maps set terrain.surfacemap yet.
 	var surfacemap_img = _get_surfacemap_image(map_def)
 	if surfacemap_img:
+		# 2026-08-26: see height_at() above - surfacemap sampling is
+		# still square-aware (canyon_ford's rebuild doesn't use a baked
+		# surfacemap PNG, only the analytic features[] + the
+		# surface_zones[] rectangles that the new ramp / plateau tests
+		# don't traverse).
 		var half: float = map_def.get("map_half_extents", 80.0)
 		return _sample_surfacemap(surfacemap_img, half, pos.x, pos.z, WorldScaleScript.for_map(map_def))
 
@@ -4312,8 +4490,12 @@ static func _surface_rects(map_def: Dictionary) -> Array:
 #
 # Returns an Array of Vector2 (xz, y=0). The caller is responsible for
 # sampling the actual terrain height at the item-placement phase.
+# 2026-08-26: non-square map support - `half` is now Vector2 so the
+# random range uses the actual X and Z bounds of the map, not the
+# larger of the two (which would scatter trees outside the Z bounds of
+# a 1200x520 map).
 static func _pick_cluster_centers(
-		rng: RandomNumberGenerator, half: float, count: int, cluster_avoid_radius: float,
+		rng: RandomNumberGenerator, half: Vector2, count: int, cluster_avoid_radius: float,
 		avoid_points: Array, bridge_rects: Array, surface_rects: Array,
 		map_def: Dictionary = {}) -> Array:
 	var out: Array = []
@@ -4321,8 +4503,8 @@ static func _pick_cluster_centers(
 	var attempts := 0
 	while out.size() < count and attempts < max_attempts:
 		attempts += 1
-		var pos := Vector2(rng.randf_range(-half * 0.94, half * 0.94),
-				rng.randf_range(-half * 0.94, half * 0.94))
+		var pos := Vector2(rng.randf_range(-half.x * 0.94, half.x * 0.94),
+				rng.randf_range(-half.y * 0.94, half.y * 0.94))
 		if is_position_blocked_in_dict(pos, avoid_points, bridge_rects, surface_rects, 0.0):
 			continue
 		if not map_def.is_empty() and _pos_on_lake(map_def, Vector3(pos.x, 0, pos.y), AMBIENT_SHORE_MARGIN):

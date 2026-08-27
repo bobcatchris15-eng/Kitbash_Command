@@ -301,6 +301,17 @@ static func get_base_zone(map_def: Dictionary, zone_id: String) -> Dictionary:
 			return z
 	return {}
 
+# 2026-08-26: per-axis half extents for non-square maps. Returns
+# [half_x, half_z]; half_z defaults to half_x for square maps. The
+# canonical entry point for layout code that needs the map's footprint
+# (the nav grid, the ground visual mesh, the scatter area, etc) - prefer
+# this over reading map_half_extents directly so a non-square map doesn't
+# silently get its Z axis cropped.
+static func half_extents(map_def: Dictionary) -> Vector2:
+	var hx: float = map_def.get("map_half_extents", 80.0)
+	var hz: float = map_def.get("map_half_extents_z", hx)
+	return Vector2(hx, hz)
+
 # RTS_CORE_ROADMAP.md B10: this project has a REAL baked navmesh at
 # map-load time, unlike OpenRA (which only lints spawn counts/duplicates) -
 # so this goes further and lints actual per-spawn FAIRNESS: is the HQ pad
@@ -415,6 +426,15 @@ const FIELD_SPEC: Dictionary = {
 	"name": {"type": "string", "required": true},
 	"description": {"type": "string", "required": true},
 	"map_half_extents": {"type": "number", "required": true, "min": 1.0, "scale": true},
+	# Optional per-axis Z half-extent for non-square maps. Defaults to
+	# map_half_extents when absent, so existing square maps keep validating
+	# unchanged. Most layout code reads half_extents() (below) and treats
+	# the map as a [-half_x, +half_x] x [-half_z, +half_z] rectangle;
+	# navmesh / ground mesh / scatter sizing use max(half_x, half_z) so
+	# the coverage is right regardless of which axis is the long one.
+	# 2026-08-26: hand-drawn canyon_ford (the new 3-plateau / 2-river map)
+	# is a 1200x520 stage (2.31:1) - the wider rectangle needs this.
+	"map_half_extents_z": {"type": "number", "required": false, "min": 1.0, "scale": true},
 	"ground_color": {"type": "color", "required": true},
 	# A playtest map can opt out of the ambient tree/ore scatter
 	# (the 30-cluster pass that pads Skirmish-sized maps). The Test
@@ -654,17 +674,21 @@ static func validate_map_def(map_def: Dictionary) -> Array:
 
 	# Cross-field check (not expressible in the per-field spec alone):
 	# every resource node has to actually sit inside the map's own bounds -
-	# nothing upstream of this enforces that today.
-	var half_extents = map_def.get("map_half_extents", 0)
-	if typeof(half_extents) == TYPE_FLOAT or typeof(half_extents) == TYPE_INT:
+	# nothing upstream of this enforces that today. Per-axis bounds now
+	# (2026-08-26): a non-square map (map_half_extents_z different from
+	# map_half_extents) would otherwise reject any resource authored in
+	# the long axis's extra room.
+	var hx: float = map_def.get("map_half_extents", 0.0)
+	var hz: float = map_def.get("map_half_extents_z", hx)
+	if (typeof(hx) == TYPE_FLOAT or typeof(hx) == TYPE_INT) and (typeof(hz) == TYPE_FLOAT or typeof(hz) == TYPE_INT):
 		var nodes = map_def.get("resource_nodes", [])
 		if typeof(nodes) == TYPE_ARRAY:
 			for i in range(nodes.size()):
 				var node = nodes[i]
 				if typeof(node) == TYPE_DICTIONARY and typeof(node.get("position")) == TYPE_VECTOR3:
 					var pos: Vector3 = node["position"]
-					if abs(pos.x) > half_extents or abs(pos.z) > half_extents:
-						errors.append("resource_nodes[%d].position %s is outside map_half_extents %s" % [i, pos, half_extents])
+					if abs(pos.x) > hx or abs(pos.z) > hz:
+						errors.append("resource_nodes[%d].position %s is outside map bounds (+/-%s, +/-%s)" % [i, pos, hx, hz])
 	return errors
 
 static func _validate_dict(d: Dictionary, spec: Dictionary, prefix: String, errors: Array) -> void:

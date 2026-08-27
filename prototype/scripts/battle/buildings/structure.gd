@@ -55,9 +55,13 @@ var attack_range: float = 0.0
 # be SEEN and never as things that SEE. A base that does not light its own ground
 # is the symptom; a missing property is the cause.
 #
-# 15.0 is the old runtime's own default (building.gd:94), carried over rather
-# than reinvented. Per-kind overrides come from the catalog so an HQ or a sensor
-# building can out-see a power plant without special-casing anything here.
+# 45.0 is well above the typical hull's effective vision (base_vision authored
+# 12-30, scaled by VISION_SCALE=1.9 in module_catalog.gd to ~23-57m, most
+# hulls landing near the middle of that band) rather than the old runtime's
+# own default of 15.0 - well under hull vision, which is what "buildings
+# never lift fog" looked like.
+# Per-kind overrides come from the catalog so an HQ or a sensor building can
+# out-see a power plant without special-casing anything here.
 const DEFAULT_VISION_RANGE := 45.0
 var vision_range: float = DEFAULT_VISION_RANGE
 

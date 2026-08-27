@@ -3551,6 +3551,7 @@ static func get_full_hull_aabb(hull_node: Node3D) -> AABB:
 
 	var combined_aabb := AABB()
 	var has_mesh := false
+	var h_trans: Transform3D = hull_node.global_transform if hull_node.is_inside_tree() else hull_node.transform
 
 	var stack = [hull_node]
 	while not stack.is_empty():
@@ -3560,7 +3561,6 @@ static func get_full_hull_aabb(hull_node: Node3D) -> AABB:
 				continue
 			if child is MeshInstance3D:
 				var m_aabb = child.get_aabb()
-				var h_trans: Transform3D = hull_node.global_transform if hull_node.is_inside_tree() else hull_node.transform
 				var c_trans: Transform3D = child.global_transform if child.is_inside_tree() else child.transform
 				var rel_trans = h_trans.affine_inverse() * c_trans
 				var loc_box = rel_trans * m_aabb

@@ -1,8 +1,6 @@
 extends SceneTree
 
 const TerrainVisualScatterScript = preload("res://scripts/terrain_visual_scatter.gd")
-const ResourceNodeScript = preload("res://scripts/resource_node.gd")
-const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
 
 func _init() -> void:
 	print("==================================================")

@@ -199,9 +199,9 @@ func _count_modules(hull: Node3D) -> int:
 
 
 func _any_mesh_transparent(root: Node3D) -> bool:
+	# Ghosting sets GeometryInstance3D.transparency directly (see
+	# module_placer._set_module_ghost) - not a material property.
 	for node in root.find_children("*", "MeshInstance3D", true, false):
-		var mat: Material = node.get_surface_override_material(0)
-		if mat is StandardMaterial3D:
-			if mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
-				return true
+		if (node as MeshInstance3D).transparency > 0.0:
+			return true
 	return false

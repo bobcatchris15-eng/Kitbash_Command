@@ -2,15 +2,12 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b3f14ee640w5"
+uid="uid://ckbep0nd6vntw"
 path.s3tc="res://.godot/imported/wildflower_0_wildflower_0_mat0_albedo.png-9f59f8c9abc9d1f9631d5bd7a51d8882.s3tc.ctex"
 path.etc2="res://.godot/imported/wildflower_0_wildflower_0_mat0_albedo.png-9f59f8c9abc9d1f9631d5bd7a51d8882.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "92c1d6a775bb40be3954c19e8615f7ea"
 }
 
 [deps]

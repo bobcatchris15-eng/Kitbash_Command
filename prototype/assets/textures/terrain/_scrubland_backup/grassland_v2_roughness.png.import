@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://de1c26dbt64nc"
-path="res://.godot/imported/grassland_v2_roughness.png-e118c56ee82afd3deeace5bb84b00350.ctex"
+path="res://.godot/imported/grassland_v2_roughness.png-c3a7f97cf030ac460e7b1e893e3ae1ad.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/textures/terrain/grassland_v2_roughness.png"
-dest_files=["res://.godot/imported/grassland_v2_roughness.png-e118c56ee82afd3deeace5bb84b00350.ctex"]
+source_file="res://assets/textures/terrain/_scrubland_backup/grassland_v2_roughness.png"
+dest_files=["res://.godot/imported/grassland_v2_roughness.png-c3a7f97cf030ac460e7b1e893e3ae1ad.ctex"]
 
 [params]
 

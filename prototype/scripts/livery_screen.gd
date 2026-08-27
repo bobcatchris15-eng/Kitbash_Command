@@ -807,9 +807,9 @@ const _CONTRAST_WARN_THRESHOLD := 1.5
 
 func _check_livery_contrast(color: Color, zone_id: String) -> void:
 	var luma := color.get_luminance()
-	var lighter := max(luma, _TERRAIN_LUMINANCE)
-	var darker := min(luma, _TERRAIN_LUMINANCE)
-	var ratio := (lighter + 0.05) / (darker + 0.05)
+	var lighter: float = max(luma, _TERRAIN_LUMINANCE)
+	var darker: float = min(luma, _TERRAIN_LUMINANCE)
+	var ratio: float = (lighter + 0.05) / (darker + 0.05)
 	if ratio < _CONTRAST_WARN_THRESHOLD:
 		var zone_label := zone_id.replace("_", " ").capitalize()
 		push_warning("LIVERY: %s color (luminance %.2f) has low contrast against terrain (%.1f:1). Consider a lighter or darker pick." % [zone_label, luma, ratio])

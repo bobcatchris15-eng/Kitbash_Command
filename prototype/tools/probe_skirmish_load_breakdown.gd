@@ -2,8 +2,6 @@ extends SceneTree
 
 const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
 const MapCatalogScript = preload("res://scripts/map_catalog.gd")
-const TerrainVisualScatterScript = preload("res://scripts/terrain_visual_scatter.gd")
-const AmbientScatterScript = preload("res://scripts/ambient_scatter.gd")
 
 func _init():
 	var map_def = MapCatalogScript.get_map("scattered_peaks")

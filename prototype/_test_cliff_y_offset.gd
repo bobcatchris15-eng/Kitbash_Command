@@ -44,12 +44,17 @@ func _init() -> void:
 	var visuals_at_wrong_y: int = 0
 	var bodies_at_wrong_y: int = 0
 	var wrong_examples: Array = []
+	var cliff_count: int = 0
 	# Tolerance ±1.5m accounts for the heightmap's smoothstep falloff
 	# at the exact plateau edge (the heightmap there is slightly less
 	# than full wall_height, so base_y is slightly negative).
 	const TOL: float = 1.5
 	for child in parent.get_children():
 		if child is MeshInstance3D:
+			# _spawn_cliff writes exactly one MeshInstance3D and one
+			# StaticBody3D per cliff, so counting mesh instances gives
+			# the actual cliff count (get_child_count() would double it).
+			cliff_count += 1
 			# Visual: y should be ~0 (surrounding ground, with
 			# y_offset = -wall_height negating the heightmap level).
 			# Before the fix: y was 14m (heightmap level at edge).
@@ -71,5 +76,5 @@ func _init() -> void:
 			print("        %s" % ex)
 		quit(1)
 		return
-	print("[PASS] %d cliffs all at correct y: visuals at ~0, bodies at ~7" % parent.get_child_count())
+	print("[PASS] %d cliffs all at correct y: visuals at ~0, bodies at ~7" % cliff_count)
 	quit(0)

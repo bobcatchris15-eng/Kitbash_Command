@@ -38,14 +38,6 @@ extends Camera3D
 # TW zoom-out lets you see a significant fraction of the map. 200m
 # cap works for the new 1200×520 twin_streams layout.
 @export var max_height: float = 200.0
-# Skirmish refinement pass: maps grew to ~3x their original size (see
-# map_catalog.gd - two scale-up passes, 1.5x then another 2x after the
-# first still read as too small) and the old 45-unit cap meant you could
-# never zoom out far enough to see a meaningful fraction of even the
-# smallest map. Pan speed already scales with height (see _process()
-# below), so raising this doesn't make traversal at max zoom-out feel
-# sluggish.
-@export var max_height: float = 160.0
 
 # VISUAL_AND_UX_POLISH_PLAN.md B1: edge-scroll + zoom-to-cursor - both core
 # RTS camera expectations this project had neither of. Edge margin in real

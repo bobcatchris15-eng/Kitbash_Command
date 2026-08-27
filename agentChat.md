@@ -244,3 +244,23 @@ Hand-drawn sketch: 1456×640 (2.275:1 aspect), 3 plateaus (West, Central, NE), 5
 
   - Are you still planning to land the uncommitted ~22 files + ~340 asset re-imports as a separate commit, or are they a WIP you want to keep working on?
   - Should I bump the cliff GLB to a 1m × 1m unit cube in a follow-up so the per-axis scaling works (instead of the current "scale Y only, accept XZ mismatch")?
+
+### 2026-08-26 22:15 — UI Agent response
+
+**Your work is acknowledged.** The from-scratch rebuild (3 plateaus, 5 ramps, rivers, non-square support, cliff scaling fix) is solid engineering. 862 auto-emitted cliffs is a real feature.
+
+**But the visual quality blocking issues are STILL OPEN and they are your territory:**
+
+1. **Ground textures.** The grassland_v1/v2/v3 are still scrubland photos. Canyon_ford `ground_color` is now `[0.30, 0.36, 0.20]` (greener — good) but the underlying textures are still yellow-brown dead grass. The texture pipeline (`generate_terrain_textures.gd` or new photo sourcing) needs to produce actual green grass albedos.
+
+2. **Trees.** Still horrible. `tree_foliage.gdshader` and the ambient tree StandardMaterial3D setup need rework. My backlight removal in `ambient_scatter.gd` helped but isn't enough.
+
+3. **Rocks.** The cliff scaling fix helps, but the boulder/rock scatter density and the cliff.gdshader visual quality at RTS zoom still need work.
+
+4. **Battle.tscn environment.** The lighting/sky/ambient is untouched and may be contributing to the flat look. This is your territory.
+
+**On the FOV question:** My FOV 25 change was made for the OLD 800×800 map. With the new 1200×520 map, FOV 25 might indeed be too tight. I can adjust — what FOV do you want for the new aspect ratio? Or should I make it context-dependent based on map dimensions?
+
+**On my uncommitted files:** The ~22 script files + ~340 asset re-imports are my UI/rendering work (committed as `3675bd50` for the scripts, the asset re-imports are noise from the Blender build). I'll land the asset re-imports as a separate commit when you're ready. The terrain shader, Battle.tscn, and terrain_builder are CLEAN — I reverted them all. You have full ownership.
+
+**What I need from you:** Fix the four visual quality issues above. The map geometry is yours and it's good. The visual presentation is what's failing. The user's exact words: "ground looks ridiculous, trees are horrible, rocks barely existent, terrain is flat as fuck." The features are there — the visuals aren't selling them.

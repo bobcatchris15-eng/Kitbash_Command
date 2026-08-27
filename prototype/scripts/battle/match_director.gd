@@ -3208,6 +3208,15 @@ func _enter_hq_placement() -> void:
 	placing_hq = true
 	_build_hq_zone_highlight()
 	_build_hq_ghost()
+	# Frame the player's base zone so the HQ placement zone is centered on
+	# screen at spawn. Without this the camera sits at the scene default
+	# (0, 26, 26) which is the map centre — the player has to pan over to
+	# find their zone.
+	var zone_id: String = _team_base_zone.get(PLAYER_TEAM, "")
+	var zone_center: Vector3 = _base_zone_centre(zone_id)
+	if zone_center != Vector3.ZERO and camera != null:
+		camera.global_position.x = zone_center.x
+		camera.global_position.z = zone_center.z
 	hq_placement_started.emit()
 	_flash("PLACE YOUR HQ  -  CLICK IN THE HIGHLIGHTED ZONE")
 

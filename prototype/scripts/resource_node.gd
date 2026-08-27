@@ -100,12 +100,12 @@ const AUTHORED_MODEL_DIR := "res://assets/models/terrain/resource_%s_%d.glb"
 #     different so the per-tree ambient mesh doesn't read as a piece of
 #     a "real" lumber deposit. See CHRIS 2026-08-10 direction.
 #
-# AMBIENT_TREE_POOL_SIZE MUST match the count build_meshes.generate_
-# terrain_props() exports (currently 20); a size larger than what is
+# AMBIENT_TREE_POOL_SIZE MUST match the count build_terrain_props.py
+# exports (36: 12 species x 3 variants); a size larger than what is
 # on disk rolls indices at missing files and the same silent-fallback
 # to the procedural cylinder that AUTHORED_POOL_SIZES exists to
 # prevent.
-const AMBIENT_TREE_POOL_SIZE: int = 20
+const AMBIENT_TREE_POOL_SIZE: int = 36
 const AMBIENT_TREE_MODEL_DIR := "res://assets/models/terrain/ambient_tree_%d.glb"
 # Per-tree amount for ambient trees. Deliberately MUCH smaller than a
 # field's per-node amount (~100 for a 9-node lumber field): a single

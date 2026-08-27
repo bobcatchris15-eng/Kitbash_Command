@@ -436,6 +436,7 @@ const MODULAR_ASSEMBLY_TYPES := {
 	"resource_harvester": true, "resource_bay": true,
 	"repair_array": true, "drone_carrier": true,
 	"energy_barrier_projector": true, "heavy_barrier_projector": true,
+	"bubble_shield_projector": true,
 	# Power & energy generation / storage modules
 	"fusion_generator": true, "diesel_generator": true, "thermo_generator": true,
 	"capacitor_bank": true, "flywheel_storage": true, "solid_state_battery": true,
@@ -502,6 +503,7 @@ const MODULAR_AUTHORED_SIZES := {
 	"drone_carrier": Vector3(2.0, 1.2, 3.0),
 	"energy_barrier_projector": Vector3(1.0, 0.4, 1.0),
 	"heavy_barrier_projector": Vector3(1.2, 0.9, 1.4),
+	"bubble_shield_projector": Vector3(1.1, 0.6, 1.1),
 	"fusion_generator": Vector3(0.56, 0.48, 0.72),
 	"diesel_generator": Vector3(0.48, 0.36, 0.60),
 	"thermo_generator": Vector3(0.36, 0.28, 0.40),
@@ -2277,6 +2279,25 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		field_shield.name = "ProjectedAegisField"
 		parent_node.add_child(field_shield)
 
+	elif type_id == "bubble_shield_projector":
+		var mount_mesh = _part("energy_barrier_projector_mount")
+		var mount: MeshInstance3D = _mesh_inst(mount_mesh, base_color.darkened(0.2)) if mount_mesh else MeshInstance3D.new()
+		parent_node.add_child(mount)
+
+		var emitter_mesh = _part("armor_shield_emitter")
+		if emitter_mesh == null:
+			emitter_mesh = _part("energy_barrier_projector_array")
+		var emitter: MeshInstance3D = _mesh_inst(emitter_mesh, Color(0.2, 0.75, 0.95)) if emitter_mesh else MeshInstance3D.new()
+		emitter.position = Vector3(0, 0.12, 0)
+		parent_node.add_child(emitter)
+
+		var hull_node = parent_node.get_parent()
+		var full_aabb = get_full_hull_aabb(hull_node as Node3D) if (is_instance_valid(hull_node) and hull_node is Node3D) else AABB(Vector3(-2, -0.75, -3), Vector3(4, 1.5, 6))
+
+		var bubble_shield = build_enclosing_bubble_shield(full_aabb, parent_node.transform, tweaks)
+		bubble_shield.name = "BubbleShield"
+		parent_node.add_child(bubble_shield)
+
 	elif type_id == "resource_harvester":
 		var cutter_scale = clampf(tweaks.get("cutter_head", tweaks.get("extractor_size", 1.0)), 0.5, 2.0)
 		var mount_depth = 0.45 * clampf(tweaks.get("mount_extension", 1.0), 0.6, 1.5)
@@ -3539,7 +3560,9 @@ static func get_full_hull_aabb(hull_node: Node3D) -> AABB:
 				continue
 			if child is MeshInstance3D:
 				var m_aabb = child.get_aabb()
-				var rel_trans = hull_node.global_transform.affine_inverse() * child.global_transform
+				var h_trans: Transform3D = hull_node.global_transform if hull_node.is_inside_tree() else hull_node.transform
+				var c_trans: Transform3D = child.global_transform if child.is_inside_tree() else child.transform
+				var rel_trans = h_trans.affine_inverse() * c_trans
 				var loc_box = rel_trans * m_aabb
 				if not has_mesh:
 					combined_aabb = loc_box
@@ -3703,6 +3726,88 @@ static func build_projected_aegis_field(parent_node: Node3D, tweaks: Dictionary)
 	mat.set_shader_parameter("fresnel_power", 2.4)
 	mat.set_shader_parameter("crackle_speed", 1.1)
 	mat.set_shader_parameter("warp_strength", 0.4)
+	shield_inst.material_override = mat
+	shield_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return shield_inst
+
+static func build_enclosing_bubble_shield(full_hull_aabb: AABB, module_transform: Transform3D = Transform3D.IDENTITY, tweaks: Dictionary = {}) -> MeshInstance3D:
+	var shield_inst = MeshInstance3D.new()
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var full_size = full_hull_aabb.size
+	var full_center = full_hull_aabb.get_center()
+	var local_center = module_transform.inverse() * full_center
+
+	# 1.0m base separation / standoff from the unit's bounding envelope (scaled with tweak)
+	var standoff_mult = float(tweaks.get("bubble_standoff", tweaks.get("bubble_scale", 1.0)))
+	var margin = 1.0 * standoff_mult
+	var hx = full_size.x * 0.5
+	var hy = full_size.y * 0.5
+	var hz = full_size.z * 0.5
+
+	# Elliptical balloon radii maintaining 1m clearance across all axes
+	var rx = hx + margin
+	var ry = hy + margin
+	var rz = hz + margin
+
+	var segs_u = 32
+	var segs_v = 20
+
+	for iv in range(segs_v + 1):
+		var tv = float(iv) / float(segs_v)
+		var theta = lerpf(-PI * 0.5, PI * 0.5, tv)
+		var cos_theta = cos(theta)
+		var sin_theta = sin(theta)
+
+		for iu in range(segs_u + 1):
+			var tu = float(iu) / float(segs_u)
+			var phi = tu * TAU
+			var cos_phi = cos(phi)
+			var sin_phi = sin(phi)
+
+			var ox = rx * cos_theta * sin_phi
+			var oy = ry * sin_theta
+			var oz = rz * cos_theta * cos_phi
+
+			var px = local_center.x + ox
+			var py = local_center.y + oy
+			var pz = local_center.z + oz
+
+			# Analytical surface normal for ellipsoid: gradient of (x/rx)^2 + (y/ry)^2 + (z/rz)^2
+			var nx = ox / (rx * rx)
+			var ny = oy / (ry * ry)
+			var nz = oz / (rz * rz)
+
+			st.set_normal(Vector3(nx, ny, nz).normalized())
+			st.set_uv(Vector2(tu, tv))
+			st.add_vertex(Vector3(px, py, pz))
+
+	for iv in range(segs_v):
+		for iu in range(segs_u):
+			var i0 = iv * (segs_u + 1) + iu
+			var i1 = i0 + 1
+			var i2 = (iv + 1) * (segs_u + 1) + iu
+			var i3 = i2 + 1
+
+			st.add_index(i0)
+			st.add_index(i2)
+			st.add_index(i1)
+
+			st.add_index(i1)
+			st.add_index(i2)
+			st.add_index(i3)
+
+	var arr_mesh = st.commit()
+	shield_inst.mesh = arr_mesh
+
+	var mat = ShaderMaterial.new()
+	mat.shader = preload("res://shaders/energy_shield.gdshader")
+	mat.set_shader_parameter("shield_color", Color(0.32, 0.76, 1.0))
+	mat.set_shader_parameter("base_opacity", 0.12)
+	mat.set_shader_parameter("fresnel_power", 2.2)
+	mat.set_shader_parameter("crackle_speed", 1.0)
+	mat.set_shader_parameter("warp_strength", 0.35)
 	shield_inst.material_override = mat
 	shield_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return shield_inst

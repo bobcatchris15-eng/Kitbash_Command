@@ -1,0 +1,31 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+[PASS] cliff schema validates
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_spawn_creates_mesh_and_body (res://_test_cliff_spawn.gd:117)
+       [3] _init (res://_test_cliff_spawn.gd:54)
+[PASS] spawn creates MeshInstance3D + StaticBody3D
+WARNING: TerrainBuilder: unknown cliff type 'this_is_not_a_real_type' - falling back to 'face_0'
+   at: push_warning (core/variant/variant_utility.cpp:1033)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3083)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_unknown_type_falls_back (res://_test_cliff_spawn.gd:195)
+       [3] _init (res://_test_cliff_spawn.gd:54)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_unknown_type_falls_back (res://_test_cliff_spawn.gd:195)
+       [3] _init (res://_test_cliff_spawn.gd:54)
+[PASS] unknown type falls back to 'face_0'
+[PASS] plateau emits face_X on straight sides
+[PASS] plateau skips cliff emission on ramp side
+[PASS] plateau skips corner when ramp is at corner
+
+[PASS] all cliff spawn smoke tests pass (6 total)

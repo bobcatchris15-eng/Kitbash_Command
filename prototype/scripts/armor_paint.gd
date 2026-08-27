@@ -39,6 +39,35 @@ const PAINT_TYPE_IDS := [
 
 const SIDES := ["front", "back", "left", "right", "top", "bottom"]
 
+# kg per square metre of painted facet per 1.0 thickness. Calibrated against
+# the module catalog: a medium hull (brenntal_medium_a) is 496 kg with ~50 m2
+# of paintable surface, so full 1.0x steel coverage adds ~100 kg - about a
+# mid weapon module - and a full 3.0x turtle build adds ~300 kg, which is a
+# real drivetrain trade rather than a free win. Slat is mostly daylight and
+# nylon is a fabric; both are deliberately light.
+const MATERIAL_DENSITY := {
+	"steel_plate": 2.0, "hardened_steel": 2.0, "armor_plating": 2.0,
+	"titanium_plate": 1.5, "slat_armor": 1.0,
+	"composite_plate": 1.5, "reactive_armor": 1.5, "spaced_composite": 1.5,
+	"ceramic_ablative": 1.2, "ablative_ceramic": 1.2, "ablative_foam": 1.0,
+	"ballistic_nylon": 0.5, "carbon_fiber": 0.5,
+}
+
+# metal/crystal per square metre per 1.0 thickness. Full 1.0x coverage of a
+# medium hull lands around 50 metal for steel - meaningful next to the hull's
+# 168, not a rounding error. Crystal attaches to the manufactured materials
+# (composite, ceramic, nylon weave), not to rolled plate.
+const MATERIAL_COST := {
+	"steel_plate": Vector2(1.0, 0.0), "hardened_steel": Vector2(1.0, 0.0),
+	"armor_plating": Vector2(1.0, 0.0), "titanium_plate": Vector2(1.2, 0.2),
+	"slat_armor": Vector2(0.6, 0.0),
+	"composite_plate": Vector2(1.4, 0.3), "reactive_armor": Vector2(1.4, 0.3),
+	"spaced_composite": Vector2(1.4, 0.3),
+	"ceramic_ablative": Vector2(1.2, 0.4), "ablative_ceramic": Vector2(1.2, 0.4),
+	"ablative_foam": Vector2(1.0, 0.3),
+	"ballistic_nylon": Vector2(0.6, 0.1), "carbon_fiber": Vector2(0.6, 0.1),
+}
+
 
 # --- The plan ---------------------------------------------------------------
 
@@ -114,10 +143,19 @@ static func build_plan(hull_type_id: String, assignments: Array,
 	var side_painted := {}
 	var side_type_area := {}
 	var side_mat_area := {}
+	var side_thick_w := {}
 	for s in SIDES:
 		side_painted[s] = 0.0
 		side_type_area[s] = {}
 		side_mat_area[s] = {}
+		side_thick_w[s] = 0.0
+
+	# Weight and cost are real: painted area x thickness, scaled by the
+	# material's density and unit cost. They used to be zero ("cosmetic
+	# likenesses") which made 3.0x everywhere the free optimum; the plan now
+	# carries the bill so drivetrain and design_stats can charge it.
+	var weight := 0.0
+	var cost := Vector2.ZERO
 
 	for a in assignments:
 		if not (a is Dictionary):
@@ -137,12 +175,19 @@ static func build_plan(hull_type_id: String, assignments: Array,
 		}
 		painted[fid] = entry
 		total_painted += area
+		var thickness := float(entry["thickness"])
+		var material := str(entry["material"])
+		weight += area * thickness * float(MATERIAL_DENSITY.get(material,
+			MATERIAL_DENSITY["hardened_steel"]))
+		cost += area * thickness * (MATERIAL_COST.get(material,
+			MATERIAL_COST["hardened_steel"]) as Vector2)
 		for s in SIDES:
 			var w: float = maxf(0.0, world_normal[fid].dot(HullFacets.SIDE_AXES[s]))
 			if w <= 0.0:
 				continue
 			var wa: float = area * w
 			side_painted[s] = float(side_painted[s]) + wa
+			side_thick_w[s] = float(side_thick_w[s]) + wa * thickness
 			var ta: Dictionary = side_type_area[s]
 			ta[type_id] = float(ta.get(type_id, 0.0)) + wa
 			var ma: Dictionary = side_mat_area[s]
@@ -152,16 +197,19 @@ static func build_plan(hull_type_id: String, assignments: Array,
 	# projected area on that side - a side is allowed to be mixed, and the
 	# summary is only ever consulted when the exact facet could not be
 	# recovered, so picking the dominant one is the honest single answer.
+	# `mean_thickness` is the area-weighted mean over painted facets only.
 	var sides := {}
 	for s in SIDES:
 		var denom := float(side_total[s])
 		var cov: float = (float(side_painted[s]) / denom) if denom > 1e-9 else 0.0
+		var painted_area := float(side_painted[s])
 		sides[s] = {
 			"type_id": _dominant(side_type_area[s]),
 			"material": _dominant(side_mat_area[s]),
 			"coverage": clampf(cov, 0.0, 1.0),
-			"area": float(side_painted[s]),
+			"area": painted_area,
 			"total": denom,
+			"mean_thickness": (float(side_thick_w[s]) / painted_area) if painted_area > 1e-9 else 0.0,
 		}
 
 	plan["facets"] = painted
@@ -169,6 +217,9 @@ static func build_plan(hull_type_id: String, assignments: Array,
 	plan["coverage"] = (total_painted / total_area) if total_area > 1e-9 else 0.0
 	plan["area"] = total_painted
 	plan["total_area"] = total_area
+	plan["weight"] = weight
+	plan["cost_metal"] = int(round(cost.x))
+	plan["cost_crystal"] = int(round(cost.y))
 	plan["empty"] = painted.is_empty()
 	plan["faction"] = faction if faction != "" else LiveryScript.NO_LIVERY
 	# The triangle-to-facet map lets the resolver look up which facet a hit
@@ -180,7 +231,8 @@ static func build_plan(hull_type_id: String, assignments: Array,
 static func _empty_plan(hull_type_id: String) -> Dictionary:
 	var sides := {}
 	for s in SIDES:
-		sides[s] = {"type_id": "", "material": "", "coverage": 0.0, "area": 0.0, "total": 0.0}
+		sides[s] = {"type_id": "", "material": "", "coverage": 0.0, "area": 0.0,
+			"total": 0.0, "mean_thickness": 0.0}
 	return {
 		"hull_type": hull_type_id,
 		"facets": {},
@@ -188,6 +240,9 @@ static func _empty_plan(hull_type_id: String) -> Dictionary:
 		"coverage": 0.0,
 		"area": 0.0,
 		"total_area": 0.0,
+		"weight": 0.0,
+		"cost_metal": 0,
+		"cost_crystal": 0,
 		"empty": true,
 		"faction": LiveryScript.NO_LIVERY,
 	}
@@ -230,10 +285,10 @@ static func analyze(hull_node: Node3D = null) -> Dictionary:
 	if plan.is_empty() or bool(plan.get("empty", true)):
 		return out
 
-	# Armor paint carries NO weight or cost - the types are cosmetic likenesses
-	# (see PAINT_TYPE_IDS). The keys stay because the stat rail reads them
-	# unconditionally; they are always zero now.
-
+	# Weight and cost are REAL now: painted area x thickness x per-material
+	# density / unit cost, computed in build_plan where the world facet areas
+	# are known. analyze() only forwards them. Drivetrain adds the weight to
+	# the carried load, so a max-thickness turtle pays for it in speed.
 	var sides: Dictionary = plan.get("sides", {})
 	var weakest := ""
 	var weakest_cov := 2.0
@@ -244,9 +299,9 @@ static func analyze(hull_node: Node3D = null) -> Dictionary:
 			weakest_cov = cov
 			weakest = s
 
-	out["weight"] = 0.0
-	out["cost_metal"] = 0
-	out["cost_crystal"] = 0
+	out["weight"] = float(plan.get("weight", 0.0))
+	out["cost_metal"] = int(plan.get("cost_metal", 0))
+	out["cost_crystal"] = int(plan.get("cost_crystal", 0))
 	out["coverage"] = float(plan.get("coverage", 0.0))
 	out["facet_count"] = (plan.get("facets", {}) as Dictionary).size()
 	out["weakest_side"] = weakest

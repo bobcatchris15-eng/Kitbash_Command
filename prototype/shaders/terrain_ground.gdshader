@@ -43,7 +43,7 @@ uniform sampler2D rock_albedo : source_color, filter_linear_mipmap, repeat_enabl
 uniform sampler2D rock_normal : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform sampler2D rock_rough : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform float slope_threshold : hint_range(0.1, 1.0) = 0.65;
-uniform float slope_falloff : hint_range(0.01, 0.4) = 0.15;
+uniform float slope_falloff : hint_range(0.01, 0.4) = 0.05;
 uniform float triplanar_scale = 0.15;
 
 // Per-map bake rasters

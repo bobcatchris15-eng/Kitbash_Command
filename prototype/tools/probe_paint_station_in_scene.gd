@@ -1,11 +1,13 @@
 extends SceneTree
 # Smoke test for the in-scene Armor Station swap. Loads MainLab,
-# triggers the toolbar's "PAINT STATION" button, waits for the pan
+# triggers the toolbar's "ARMOR STATION" swap, waits for the pan
 # overlay to play out, and verifies the three swaps:
 #   1. UI_PartsMenu hides, UI_ArmorStationPanel shows
 #   2. LabEnvironment hides, PaintStationEnvironment shows
-#   3. The hull's modules are detached
-# Then triggers the back signal and verifies the reverse swaps.
+#   3. The hull's modules stay ATTACHED but ghosted (transparency),
+#      since 2026-08-25 - they used to be detached, which amputated
+#      the design exactly when the armor plan was being decided around it
+# Then exits and verifies the reverse swaps.
 # Run: Godot_v4.7.1-stable_win64_console.exe --headless --path . \
 #          --script tools/probe_paint_station_in_scene.gd
 
@@ -71,9 +73,8 @@ func _init():
 	var bp_manager = lab.get_node_or_null("BlueprintManager")
 	if bp_manager and bp_manager.has_method("save_scratch"):
 		bp_manager.save_scratch(false)
-	# The placer needs a modules count to verify strip. We don't strictly
-	# need any modules - the strip is a no-op when there are none, but
-	# the swap still runs.
+	# The placer needs modules on the hull for the ghost check to mean
+	# anything, but the swap still runs when there are none.
 	var modules_before := _count_modules(hull)
 	print("[INFO] hull has %d module(s) before paint mode" % modules_before)
 
@@ -117,15 +118,19 @@ func _init():
 		quit(1)
 		return
 	var modules_after := _count_modules(hull)
-	if modules_after != 0:
-		print("[FAIL] hull should have 0 modules after entering paint mode, got %d" % modules_after)
+	if modules_after != modules_before:
+		print("[FAIL] ghosting must not detach modules: had %d before, got %d after enter" % [modules_before, modules_after])
+		quit(1)
+		return
+	if modules_before > 0 and not _any_mesh_transparent(hull):
+		print("[FAIL] modules should be ghosted (transparency > 0) in paint mode")
 		quit(1)
 		return
 	if not ("is_paint_mode" in armor_panel and armor_panel.is_paint_mode):
 		print("[FAIL] armor panel is_paint_mode should be true")
 		quit(1)
 		return
-	print("[OK]   paint mode swap correct (parts hidden, panel visible, lab env hidden, paint env visible, 0 modules on hull)")
+	print("[OK]   paint mode swap correct (parts hidden, panel visible, lab env hidden, paint env visible, %d modules ghosted in place)" % modules_after)
 
 	# --- Simulate a paint click ------------------------------------------
 	# The panel's _unhandled_input does the paint. We invoke it
@@ -168,14 +173,18 @@ func _init():
 		return
 	var modules_restored := _count_modules(hull)
 	if modules_restored != modules_before:
-		print("[FAIL] modules should be restored: had %d before, got %d after" % [modules_before, modules_restored])
+		print("[FAIL] modules should still be attached after exit: had %d before, got %d after" % [modules_before, modules_restored])
+		quit(1)
+		return
+	if modules_before > 0 and _any_mesh_transparent(hull):
+		print("[FAIL] modules should be unghosted (opacity restored) after exit")
 		quit(1)
 		return
 	if "is_paint_mode" in armor_panel and armor_panel.is_paint_mode:
 		print("[FAIL] armor panel is_paint_mode should be false after exit")
 		quit(1)
 		return
-	print("[OK]   exit swap correct (parts visible, panel hidden, lab env visible, paint env hidden, %d modules restored)" % modules_restored)
+	print("[OK]   exit swap correct (parts visible, panel hidden, lab env visible, paint env hidden, %d modules unghosted)" % modules_restored)
 
 	print("[PASS] all swaps work end-to-end. Build -> Paint -> Build round trip preserves state.")
 	quit(0)
@@ -187,3 +196,12 @@ func _count_modules(hull: Node3D) -> int:
 		if child.has_meta("module_data"):
 			count += 1
 	return count
+
+
+func _any_mesh_transparent(root: Node3D) -> bool:
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mat: Material = node.get_surface_override_material(0)
+		if mat is StandardMaterial3D:
+			if mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+				return true
+	return false

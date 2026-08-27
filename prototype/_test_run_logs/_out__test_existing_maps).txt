@@ -1,0 +1,7 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+[PASS] open_plains loaded
+[PASS] open_plains half_extents = (840, 840) - still square after non-square refactor
+[PASS] open_plains height_at() is finite across the whole map
+[PASS] open_plains obstacles all reported as blocked
+[ALL PASS] existing square maps still work

@@ -1,0 +1,6 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+[PASS] rock triplanar uniforms are set on heightmap material
+[PASS] terrain_ground.gdshader compiles
+
+[PASS] all PR4 ground-material tests pass

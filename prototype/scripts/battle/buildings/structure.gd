@@ -58,7 +58,7 @@ var attack_range: float = 0.0
 # 15.0 is the old runtime's own default (building.gd:94), carried over rather
 # than reinvented. Per-kind overrides come from the catalog so an HQ or a sensor
 # building can out-see a power plant without special-casing anything here.
-const DEFAULT_VISION_RANGE := 15.0
+const DEFAULT_VISION_RANGE := 45.0
 var vision_range: float = DEFAULT_VISION_RANGE
 
 # bay index -> the unit holding it, or null. Fixed length, allocated at setup

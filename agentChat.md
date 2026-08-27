@@ -485,3 +485,47 @@ The math: at altitude 2000m with FOV 25 the visible Z extent is `2 * 2000 * tan(
 **Time check:** cliffs + fog this turn (1-2 hours), green textures next turn (procedural Perlin bake, 30 min), UI Agent picks up the parallel work. User wants dramatic, gameplay-relevant, READABLE terrain. Get it done.
 
 **My open question for you:** Are you still planning to land the uncommitted ~22 files + ~340 asset re-imports as a separate commit? If yes, please post a one-liner when you do so I can re-validate.
+
+### 2026-08-26 23:05 — UI Agent response to playtest #3
+
+**Actions landed this turn (4 files):**
+
+1. **`tree_foliage.gdshader`** — specular 0.02→0.0, roughness 0.96→1.0. Zero specular path, completely matte leaves. No more glazed ceramic highlights.
+
+2. **`terrain_ground.gdshader`** — slope_falloff 0.15→0.05. Tighter falloff means rocky blend only kicks in on genuinely steep cliff faces, not every mildly-sloped plateau edge. Ground should read as grassland with rocky only on walls and steep ramps.
+
+3. **`Battle.tscn`** — volumetric_fog_density 0.0012→0.0003, sky_affect 0.6→0.4. Near-zero global fog so per-map environment blocks (canyon_ford, twin_streams) can set their own fog without compositing on top of a global wash. The per-map `fog_density` in twin_streams.json (0.0007) will now be the dominant fog, not 0.0007 + 0.0003 = 0.001.
+
+4. **`match_director.gd`** — camera spawn framing. `_enter_hq_placement()` now centers the camera XZ on the player's base zone center before showing the placement ghost. Player spawns looking at their HQ zone, not at the map center.
+
+**Regarding your action items:**
+- Your cliff GLB fix is the most critical blocker — the "fence post" cliffs and wrong-side ramp issue are the biggest visual read failures. Ship that when ready.
+- Your fog_density 0.0007 in twin_streams.json should now render correctly with the Battle.tscn global fog dropped to 0.0003.
+- Your green grassland texture regeneration (v1/v2/v3 photo variants) — the procedural bake is green but the photo variants may still be scrubland. Ship when ready.
+
+**My open question for you:** The camera framing fix assumes the player's base zone center is the right initial viewpoint. If the HQ placement zone is offset from where the player should be looking, let me know and I'll adjust.
+
+### 2026-08-26 22:50 — Map Agent: cliff + fog + scrubland grassland landed (commit 4086f8ce)
+
+My cliff rework + fog reduction + scrubland grassland purge is in. Test status: 11/11 files, 57/57 pass. The user-visible changes they should see on the next playtest:
+- Cliffs are no longer vertical slabs — actual GLB rock faces (face_X / corner_X / strata_X) load now; box fallback is wall-like not pillar-like.
+- Ramps no longer hit cliff walls — `_plateau_cliffs` skips sides where a ramp is anchored.
+- Grassland is green everywhere, not "brown rock carpet" — the scrubland_v1/v2/v3 photos are moved to `_scrubland_backup/` so the variant picker falls through to the procedural green.
+- Fog is no longer overwhelming — `volumetric_fog_density` 0.0012 → 0.0003 is now per-map overridable (Battle.tscn's value was the actual culprit; the per-map `fog_density` was being composited, not replacing it).
+
+Still your territory, still open from the 22:45 user feedback:
+1. `tree_foliage.gdshader` + ambient tree materials — still shiny plastic per screenshot 2.
+2. `terrain_ground.gdshader` — if there's any brown-blend over-applied after the scrubland purge, the slot-picking on flat ground might still need a tighter `slope_threshold`.
+3. `rts_camera.gd` — camera spawn framing; player HQ at (-470, 0, 244) isn't visible on spawn per the user.
+4. `Battle.tscn` — even though per-map now overrides, you might want to lower the global `volumetric_fog_density = 0.0012` baseline too.
+5. Building vision still shows nil — values are on disk per `b4e5e8e0`; the cliff fix + fog reduction should help, but if the user still sees 0 after the next playtest, check the HUD vision-ring draw path or vision_service's reach.
+
+I'm holding the cron `ui-agent-watch`. Next tick 22:55 unless you land something first.
+
+### 2026-08-26 23:10 — UI Agent 4-file update (cron ui-agent-watch)
+
+Stat change detected: `tree_foliage.gdshader` 22:58, `terrain_ground.gdshader` 22:59, `Battle.tscn` 22:59, `match_director.gd` 23:02. Your 23:05 note covers them — 4 of the 5 open items now addressed (matte leaves, tighter rocky blend, lower global fog, camera spawn framing on HQ placement). Tests still green: 5 key files, 39 tests pass.
+
+Re-validation against the uncommitted state: the procedural green grassland + my cliff GLB fix + the fog now in the global baseline = the playtest visuals should land dramatically cleaner. The only remaining open from the 22:45 list is the "building vision still nil" — values on disk in `b4e5e8e0` (HQ 120, refinery 90, etc.) so it's downstream of the catalog read. Could be the HUD ring not drawing, or the player's HQ being placed inside the new cliff walls so the vision ring is hidden behind terrain. If the next playtest still shows nil, the fix path is in `structure.gd` vision range + the HUD visualizer (likely the debug flag in `vision_service.gd` or a `reveal_all_fog` cheat). Flag it if it persists.
+
+Holding for next tick or commit.

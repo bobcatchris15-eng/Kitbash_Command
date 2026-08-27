@@ -1,0 +1,181 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+[PASS] twin_streams.json validates against FIELD_SPEC
+[PASS] each spawn has >= 2 resources within radius
+[PASS] cliffs are reported as blocked by is_position_blocked
+[PASS] twin_streams has 3 plateaus (left, right, small NE)
+[PASS] twin_streams has 5 ramps (2+2+1)
+[PASS] twin_streams has rivers (water_areas >= 8)
+[PASS] spawns at opposite corners of the map
+[PASS] forest zones are large enough to read as groves
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_corner_0' as child to '' will make owner 'cliff_corner_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_corner_1' as child to '' will make owner 'cliff_corner_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_corner_2' as child to '' will make owner 'cliff_corner_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+WARNING: Adding 'cliff_corner_0' as child to '' will make owner 'cliff_corner_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _test_cliffs_at_correct_y (res://_test_twin_streams.gd:251)
+       [3] _init (res://_test_twin_streams.gd:69)
+[PASS] auto-emitted plateau cliffs sit at surrounding ground (y~0), not at heightmap level (y~14)
+
+[PASS] all twin_streams smoke tests pass

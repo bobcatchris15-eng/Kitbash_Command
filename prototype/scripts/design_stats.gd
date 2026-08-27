@@ -34,6 +34,7 @@ const LiveryScript = preload("res://scripts/livery.gd")
 const HarvesterFSMScript = preload("res://scripts/battle/economy/harvester_fsm.gd")
 const PowerBudgetScript = preload("res://scripts/power_budget.gd")
 const Drivetrain = preload("res://scripts/drivetrain.gd")
+const ArmorPaint = preload("res://scripts/armor_paint.gd")
 const WeaponRange = preload("res://scripts/weapon_range.gd")
 const WeaponAlpha = preload("res://scripts/weapon_alpha.gd")
 
@@ -148,15 +149,18 @@ static func analyze(hull: Node3D) -> Dictionary:
 	out["hull_hp"] = ModuleCatalog.compute_hull_max_hp(
 		hull_type, armor_thickness, armor_material, hull_scale
 	)
-	# Painted armor adds NO HP: the paint types are cosmetic likenesses (see
-	# ArmorPaint.PAINT_TYPE_IDS). Their catalog stat rows were retired; the
-	# hull's own material/thickness plate is the whole armor pool.
+	# Painted armor adds NO HP: the threshold pool is the hull's own
+	# material/thickness plate plus the painted facet's material/thickness at
+	# resolve time (damage_resolver.gd) - there is no HP pool for paint. It
+	# DOES carry weight and cost (ArmorPaint: area x thickness x density),
+	# charged here and in Drivetrain's carried load.
+	var armor_stats: Dictionary = ArmorPaint.analyze(hull)
 
 	var hull_cost = ModuleCatalog.compute_hull_cost(
 		hull_type, armor_thickness, armor_material, hull_scale
 	)
-	out["cost_metal"] = int(hull_cost.x)
-	out["cost_crystal"] = int(hull_cost.y)
+	out["cost_metal"] = int(hull_cost.x) + int(armor_stats.get("cost_metal", 0))
+	out["cost_crystal"] = int(hull_cost.y) + int(armor_stats.get("cost_crystal", 0))
 
 	for child in hull.get_children():
 		if not child.has_meta("module_data"):

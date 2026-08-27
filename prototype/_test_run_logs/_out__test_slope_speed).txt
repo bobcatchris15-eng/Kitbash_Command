@@ -1,0 +1,8 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+[PASS] slope class thresholds
+[PASS] is_position_blocked agrees with slope class
+[PASS] slope speed table values
+[PASS] surface * slope composition
+
+[PASS] all slope-speed tests pass

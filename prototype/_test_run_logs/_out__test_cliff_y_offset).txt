@@ -1,0 +1,147 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_0' as child to '' will make owner 'cliff_face_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_1' as child to '' will make owner 'cliff_face_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_2' as child to '' will make owner 'cliff_face_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_face_3' as child to '' will make owner 'cliff_face_32' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_corner_0' as child to '' will make owner 'cliff_corner_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_corner_1' as child to '' will make owner 'cliff_corner_12' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_corner_2' as child to '' will make owner 'cliff_corner_22' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+WARNING: Adding 'cliff_corner_0' as child to '' will make owner 'cliff_corner_02' inconsistent. Consider unsetting the owner beforehand.
+   at: add_child (scene/main/node.cpp:1728)
+   GDScript backtrace (most recent call first):
+       [0] _spawn_cliff (res://scripts/terrain_builder.gd:3130)
+       [1] _spawn_cliffs (res://scripts/terrain_builder.gd:3074)
+       [2] _init (res://_test_cliff_y_offset.gd:38)
+[PASS] 48 cliffs all at correct y: visuals at ~0, bodies at ~7

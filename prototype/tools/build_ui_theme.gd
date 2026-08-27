@@ -395,9 +395,9 @@ func _build_buttons(theme: Theme) -> void:
 	# 4px and 6px borders against a BORDER_EMPHASIS of 2.
 	var nav_normal := _flat(Tokens.BASE_800, Tokens.BASE_500,
 		Tokens.BORDER_HAIRLINE, Tokens.RADIUS_PANEL)
-	# The gutter. Wide on the left, hairline elsewhere - which is what makes the
-	# card read as a tab in a rack rather than as a boxed button.
-	nav_normal.border_width_left = 5
+	# The gutter. Persistent 3px at rest (was 5, only visible on hover before)
+	# so the card reads as interactive even when not hovered.
+	nav_normal.border_width_left = 3
 	Tokens.apply_elevation(nav_normal, "raised")
 
 	var nav_hover := _flat(Tokens.BASE_700, Tokens.SIGNAL_HAZARD,
@@ -505,15 +505,15 @@ func _build_buttons(theme: Theme) -> void:
 	# a chosen position rather than as a row of independent buttons.
 	var tab = _plate("moulded", "pressed", Tokens.SPACE_MD, Tokens.SPACE_SM)
 	var tab_hover = _plate("moulded", "normal", Tokens.SPACE_MD, Tokens.SPACE_SM)
-	var tab_on = _flat(Tokens.BASE_600, Tokens.SIGNAL_HAZARD, 0, 0)
-	tab_on.border_width_bottom = 3
+	var tab_on = _flat(Tokens.BASE_500, Tokens.SIGNAL_HAZARD, 0, 0)
+	tab_on.border_width_bottom = 4
 	_pad(tab_on, Tokens.SPACE_MD, Tokens.SPACE_SM)
 	theme.set_stylebox("normal", "TabButton", tab)
 	theme.set_stylebox("hover", "TabButton", tab_hover)
 	theme.set_stylebox("pressed", "TabButton", tab_on)
 	theme.set_stylebox("disabled", "TabButton", tab)
 	theme.set_color("font_color", "TabButton", Tokens.TEXT_SECONDARY)
-	theme.set_color("font_pressed_color", "TabButton", Tokens.TEXT_PRIMARY)
+	theme.set_color("font_pressed_color", "TabButton", Color(1.0, 0.93, 0.78))
 	theme.set_color("font_hover_color", "TabButton", Tokens.TEXT_PRIMARY)
 
 	# ListButton - a row in a scrolling list (parts catalog, map select,
@@ -664,10 +664,24 @@ func _build_inputs(theme: Theme, mono: FontFile) -> void:
 	var fill = _flat(Tokens.SIGNAL_HAZARD_DIM, Tokens.SIGNAL_HAZARD, Tokens.BORDER_HAIRLINE, 1)
 	theme.set_stylebox("grabber_area", "HSlider", fill)
 	theme.set_stylebox("grabber_area_highlight", "HSlider", fill)
+	# Grabber handle — amber accent, visible against the dark track.
+	var grabber = _flat(Tokens.SIGNAL_HAZARD, Tokens.BASE_500,
+		Tokens.BORDER_EMPHASIS, Tokens.RADIUS_CONTROL)
+	grabber.content_margin_top = 6
+	grabber.content_margin_bottom = 6
+	grabber.content_margin_left = 6
+	grabber.content_margin_right = 6
+	theme.set_stylebox("grabber", "HSlider", grabber)
+	theme.set_constant("grabber_size", "HSlider", 16)
 
 	var popup = _pad(_flat(Tokens.BASE_800, Tokens.BASE_400,
 		Tokens.BORDER_EMPHASIS, Tokens.RADIUS_PANEL), Tokens.SPACE_XS, Tokens.SPACE_XS)
+	var popup_hover = _pad(_flat(Tokens.BASE_600, Tokens.SIGNAL_HAZARD,
+		Tokens.BORDER_HAIRLINE, Tokens.RADIUS_PANEL), Tokens.SPACE_XS, Tokens.SPACE_XS)
 	theme.set_stylebox("panel", "PopupMenu", popup)
+	theme.set_stylebox("hover", "PopupMenu", popup_hover)
+	theme.set_stylebox("focus", "PopupMenu", popup)
+	theme.set_stylebox("pressed", "PopupMenu", popup_hover)
 	theme.set_color("font_color", "PopupMenu", Tokens.TEXT_PRIMARY)
 	theme.set_color("font_hover_color", "PopupMenu", Tokens.SIGNAL_HAZARD)
 	theme.set_color("font_separator_color", "PopupMenu", Tokens.BASE_500)

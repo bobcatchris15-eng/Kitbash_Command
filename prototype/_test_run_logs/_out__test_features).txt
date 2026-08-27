@@ -1,0 +1,11 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+FAIL: plateau emitted 40 cliffs, expected 74
+[PASS] canyon emits 124 cliffs, floor at -22, walkable on the floor
+[PASS] ridge emits walls, ridge top at +24, wall positions blocked
+[PASS] lake emits 1 water_blob, no cliffs, depth -4 (-8 with blob), far = 0 +/- noise
+[PASS] lake with floor_surface=water emits water_area + water_blob
+[PASS] _resolve_features is idempotent (no double emission)
+[PASS] unknown feature type is silent no-op
+[PASS] ramp descends from anchor to 0 at outer end, 0 outside width
+[ALL PASS] dramatic feature types PR1 tests pass

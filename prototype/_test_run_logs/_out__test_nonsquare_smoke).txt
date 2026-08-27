@@ -1,0 +1,10 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+[PASS] canyon_ford loaded via MapCatalog.get_map()
+[PASS] half_extents() returns (600, 260) for canyon_ford
+[PASS] features[] has 3 plateaus + 5 ramps
+[PASS] 182 cliffs auto-emitted from plateaus
+[PASS] height_at() returns finite values across the whole map
+[PASS] every plateau cliff line is reported as blocked
+[PASS] spawn-to-spawn path is finite across 21 samples
+[ALL PASS] canyon_ford non-square smoke

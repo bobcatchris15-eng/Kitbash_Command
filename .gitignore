@@ -169,3 +169,10 @@ Local_Agent/
 
 # refactor-session scratch
 _refactor_logs/
+prototype/err*.txt
+prototype/out*.txt
+prototype/stdout.txt
+prototype/stderr.txt
+*~RF*.TMP
+*.TMP
+twin_streams_crude.png

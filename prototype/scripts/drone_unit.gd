@@ -1,5 +1,6 @@
 extends Node3D
 const MunitionPool = preload("res://scripts/munition_pool.gd")
+const VFXBurstScript = preload("res://scripts/vfx_burst.gd")
 # Section timing around the state machine. Pairs with the BattleProfiler
 # sections in match_director / unit / auto_weapon so a playtest can see
 # total drone cost in a swarm, not just the per-drone average.
@@ -142,6 +143,9 @@ func _do_launch(delta: float):
 				# Attack: deal damage once on arrival.
 				if is_instance_valid(target) and target.has_method("take_damage"):
 					target.take_damage(damage_per_hit, damage_class, global_position)
+					if is_inside_tree():
+						var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+						VFXBurstScript.spawn(parent, target.global_position + Vector3(0, 0.4, 0), Color.CYAN, 8, 0.15, 60.0, 2.0, 5.0)
 				state = State.LOITER   # reuse LOITER for attack linger
 
 # ─── LOITER ────────────────────────────────────────────────────────────────

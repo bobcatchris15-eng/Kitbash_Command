@@ -351,9 +351,16 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	# cost nothing in combat.
 	var armor_wt_mult: float = 1.0
 	var weight: float = ModuleCatalog.compute_hull_weight(hull_type, thickness, material, hull_scale, armor_wt_mult)
-	# Painted armor adds NO weight: the paint types are cosmetic likenesses
-	# (see ArmorPaint.PAINT_TYPE_IDS). Their catalog stat rows were retired;
-	# only the hull's own material/thickness plate weighs anything.
+	# Painted armor is real bolt-on mass too (ArmorPaint: painted area x
+	# thickness x per-material density). It counts as CARRIED weight - the
+	# locomotor hauls every plate - which is what makes a max-thickness
+	# turtle trade speed for protection instead of getting free threshold.
+	# It was weightless until 2026-08-25 ("cosmetic likenesses"), which made
+	# 3.0x everywhere the free optimum.
+	var armor_weight := 0.0
+	if is_instance_valid(hull_node):
+		armor_weight = float(ArmorPaint.analyze(hull_node).get("weight", 0.0))
+	weight += armor_weight
 	# The locomotor is treated as a self-contained system "tuned for the
 	# unit" (Chris, 2026-08-16): its carrying capacity is for what it
 	# carries beyond the chassis baseline, not for the chassis itself.
@@ -361,9 +368,9 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	# `carried_weight` (= everything except hull + locomotion) while `weight`
 	# still reports the full design mass to the rest of the game.
 	#   `loco_weight`     - one or more locomotion children, summed
-	#   `carried_weight`  - weapons/generators/sensors/harvesters/propulsion parts
+	#   `carried_weight`  - painted armor, weapons/generators/sensors/harvesters/propulsion parts
 	var loco_weight: float = 0.0
-	var carried_weight: float = 0.0
+	var carried_weight: float = armor_weight
 
 	var thrust := BASE_THRUST
 	var capacity := 0.0

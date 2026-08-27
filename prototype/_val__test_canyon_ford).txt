@@ -1,0 +1,11 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+[PASS] canyon_ford.json validates against FIELD_SPEC
+[PASS] each spawn has >= 2 resources within radius
+[PASS] cliffs are reported as blocked by is_position_blocked
+[PASS] canyon_ford has 3 plateaus in terrain.features[]
+[PASS] canyon_ford has 5 ramps in terrain.features[]
+[PASS] canyon_ford has rivers (water_areas non-empty)
+[PASS] spawns are at opposite corners of the map
+
+[PASS] all canyon_ford smoke tests pass

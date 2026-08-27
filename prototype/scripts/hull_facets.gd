@@ -90,11 +90,19 @@ const WELD_QUANTUM := 10000.0
 # SHADING and displacement, not the facet itself.
 const CREASE_SPLIT_DEG := 12.0
 
-# How far the skin floats off the hull. This is a z-fighting epsilon and
-# NOTHING ELSE - armor is a surface treatment here, so any value large enough to
-# read as thickness is a bug, not a tuning choice.
+# How far the skin's BASE floats off the hull. This is a z-fighting epsilon
+# and NOTHING ELSE - the plate's visible standoff comes from its thickness
+# (below), not from this.
 const PLATE_LIFT_FRACTION := 0.0025
 const PLATE_LIFT_MIN := 0.004
+
+# Real geometric thickness per unit of the Armor Station's brush thickness,
+# in metres. 1.0x stands the plate 5cm proud of the hull; the slider's 0.5-3.0x
+# range reads as 2.5-15cm. That is a plate, not a block - and because each
+# facet extrudes by its OWN thickness, a thickness or type change across a
+# facet boundary shows as a real step at the seam, which is the read the
+# player uses to see the plan at a glance.
+const THICKNESS_LIFT_PER_UNIT := 0.05
 
 const SIDECAR_DIR := "res://assets/models/hulls"
 const SIDECAR_KEY := "facets"
@@ -694,14 +702,17 @@ static func get_surface_patterns() -> Dictionary:
 # Builds the armor plate for a facet, in the MODULE's local frame (X/Z tangent,
 # +Y the facet normal, origin at `center`).
 #
-# THE PLATE IS A SKIN FOR MOST TYPES. armor_plating, spaced_composite and
-# ablative_foam are surface treatments: the facet's own triangles lifted off
-# the hull by a hair - just enough to clear z-fighting - and cut by the type's
-# pattern. They add no thickness, have no rim and have no underside, because
-# armor here is a surface treatment on a face the player can see, not a box
-# bolted to it (Chris, 2026-08-17).
+# THE PLATE IS A SLAB. The facet's own triangles, lifted off the hull by the
+# z-fight epsilon PLUS the assignment's real thickness (THICKNESS_LIFT_PER_UNIT
+# per 1.0x), with a skirt dropped round the facet's boundary edges back down to
+# the base lift. The top still carries the type's pattern cut; there is no
+# underside (it would sit inside the hull). Thickness was a shader-only normal
+# relief until 2026-08-25, which left 0.5x and 3.0x plates with identical
+# silhouettes and no visible seam where plating changed across a facet
+# boundary - the skirt IS the seam: a thick plate meeting a thin or bare
+# neighbour shows its exposed edge.
 #
-# SLAT AND CERAMIC ARE NOT. The per-type `mode` in SURFACE_PATTERNS picks the
+# SLAT AND CERAMIC ARE DIFFERENT GEOMETRY. The per-type `mode` in SURFACE_PATTERNS picks the
 # path:
 #
 #   * slat_armor uses the cage path (see _cage). The cage is a row of closed
@@ -1090,11 +1101,23 @@ static func _emit_cage_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3,
 	return 6
 
 
-# The skin: the facet's triangles lifted by `lift` and cut by the pattern.
+# The skin, now a SLAB: the facet's triangles lifted by `lift` + the plate's
+# real thickness, cut by the pattern, with a skirt round the facet's boundary
+# edges closing the plate's side back down to the base lift. No underside - it
+# would sit inside the hull and never render.
 #
-# Outer surface only - no underside and no rim. Both would be invisible (the
-# skin is flush to the hull) and a rim is precisely what gives a plate a
-# readable EDGE THICKNESS, which is the "thick blocky plate" read being removed.
+# THE SKIRT IS THE SEAM. Every painted facet extrudes by its own thickness and
+# drops a skirt at its boundary, so the player reads the plan as geometry: a
+# 3.0x composite facet beside a 1.0x steel facet shows a step; any plate
+# beside bare hull shows a welded edge. Two adjacent plates each drop their
+# own skirt along the shared boundary, and because their crease-split corner
+# normals differ across the facet break (segmentation guarantees the break is
+# a real angle - see FACET_CONE_DEG), the two skirts are never coplanar, so
+# they do not z-fight.
+#
+# Boundary edges come from the facet's ORIGINAL triangles (an edge used by
+# exactly one triangle), not from the cut pieces, so pattern-cut interior
+# edges keep their flat shader seam and only the plate's outline gets a side.
 #
 # THE CUT IS AN ANALYTIC CLIP, NOT A DROPPED SUBDIVISION. The first version
 # subdivided each facet triangle and discarded cells whose centre fell in a gap.
@@ -1113,6 +1136,12 @@ static func _skin(surface: Dictionary, lift: float, pattern: Dictionary,
 	var axis := int(pattern.get("axis", 0))
 	var solid: bool = period <= 0.0 or duty >= 0.999
 
+	# The top sits at the z-fight epsilon PLUS the real plate thickness. All
+	# four Armor Station types are solid skins, so every painted facet pays
+	# this; cut-pattern legacy types lift the same way and keep flat cut edges.
+	var top_lift: float = lift + maxf(0.0, thickness) * THICKNESS_LIFT_PER_UNIT
+	var skirt_edges := _boundary_edges(tris, normals)
+
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var emitted := 0
@@ -1121,7 +1150,7 @@ static func _skin(surface: Dictionary, lift: float, pattern: Dictionary,
 		for k in range(3):
 			poly.append({"p": tris[t][k], "n": normals[t][k]})
 		if solid:
-			emitted += _emit_relief(st, poly, lift, bounds, relief, thickness)
+			emitted += _emit_relief(st, poly, top_lift, bounds, relief, thickness)
 			continue
 		var pieces := [poly]
 		# Component 0 is the facet's U tangent, 2 its V tangent - the same axes
@@ -1131,11 +1160,16 @@ static func _skin(surface: Dictionary, lift: float, pattern: Dictionary,
 		if axis == 1 or axis == 2:
 			pieces = _cut_bands(pieces, 2, period, duty)
 		for pc in pieces:
-			emitted += _emit_relief(st, pc, lift, bounds, relief, thickness)
+			emitted += _emit_relief(st, pc, top_lift, bounds, relief, thickness)
+	for e in skirt_edges:
+		emitted += _emit_skirt(st, e[0], e[1], e[2], e[3], lift, top_lift, bounds)
 	if emitted == 0:
 		return null
-	st.generate_normals()
-	# Required by the armor shader's normal mapping; needs the UVs set above.
+	# NO generate_normals(): every vertex above carries an explicit normal (the
+	# top uses the crease-split corner field, the skirt its outward face
+	# normal), and generate_normals would overwrite them with position-smoothed
+	# ones, rounding the plate's rim into the skirt. generate_tangents() still
+	# needs the normals and UVs we set; the armor shader's normal mapping does.
 	st.generate_tangents()
 	return st.commit()
 
@@ -1263,7 +1297,10 @@ static func _emit_relief(st: SurfaceTool, poly: Array, lift: float, bounds: Rect
 
 
 # Fan-triangulates a convex piece and emits it lifted off the hull. Returns how
-# many triangles were written.
+# many triangles were written. The normal is the piece's crease-split corner
+# normal, set explicitly: _skin no longer calls generate_normals() because the
+# slab's skirt must keep its own flat outward normals, and a position-smoothed
+# regenerate would round the rim into the skirt.
 static func _emit_poly(st: SurfaceTool, poly: Array, lift: float, bounds: Rect2) -> int:
 	var n := poly.size()
 	if n < 3:
@@ -1273,10 +1310,74 @@ static func _emit_poly(st: SurfaceTool, poly: Array, lift: float, bounds: Rect2)
 		for idx in [0, i, i + 1]:
 			var v: Dictionary = poly[idx]
 			var p: Vector3 = (v["p"] as Vector3) + (v["n"] as Vector3) * lift
+			st.set_normal(v["n"])
 			st.set_uv(_shell_uv(p, bounds))
 			st.add_vertex(p)
 		count += 1
 	return count
+
+
+# The edges of the facet used by exactly ONE triangle - the plate's outline.
+# Each entry is [a, na, b, nb]: the two corner positions and their crease-split
+# corner normals as the owning triangle carries them. Quantisation on position
+# (WELD_QUANTUM) for the same reason as _build_adjacency: a faceted hull's
+# coincident corners carry different normals, so only position can key an edge.
+static func _boundary_edges(tris: Array, normals: Array) -> Array:
+	var counts := {}
+	var edges := {}
+	for t in range(tris.size()):
+		for k in range(3):
+			var key := _edge_key(_vkey(tris[t][k]), _vkey(tris[t][(k + 1) % 3]))
+			counts[key] = int(counts.get(key, 0)) + 1
+			if not edges.has(key):
+				edges[key] = [tris[t][k], normals[t][k],
+					tris[t][(k + 1) % 3], normals[t][(k + 1) % 3]]
+	var out := []
+	for key in counts.keys():
+		if int(counts[key]) == 1:
+			out.append(edges[key])
+	return out
+
+
+# Direction-independent key for an edge: the two quantised endpoints in
+# lexicographic order, so (a,b) and (b,a) from adjacent triangles collide.
+static func _edge_key(a: Vector3i, b: Vector3i) -> String:
+	if b.x < a.x or (b.x == a.x and b.y < a.y) or (b.x == a.x and b.y == a.y and b.z < a.z):
+		var t := a
+		a = b
+		b = t
+	return "%d,%d,%d|%d,%d,%d" % [a.x, a.y, a.z, b.x, b.y, b.z]
+
+
+# One skirt quad closing the plate's side, from the base lift up to the slab
+# top, along one boundary edge. Wound to face outward: the facet's triangles
+# are oriented CCW from outside (see _facet_surface's per-triangle flip), so a
+# boundary edge a->b has the facet interior on edge_dir.cross(up)'s negative
+# side - verified against a flat CCW tri: edge (0,0,0)->(0,0,1) with interior
+# at +X gives (0,0,1)x(0,1,0) = (-1,0,0), i.e. outward.
+static func _emit_skirt(st: SurfaceTool, a: Vector3, na: Vector3, b: Vector3, nb: Vector3,
+		base_lift: float, top_lift: float, bounds: Rect2) -> int:
+	var edge := b - a
+	var up := na + nb
+	if edge.length_squared() < 1e-14 or up.length_squared() < 1e-12:
+		return 0
+	# A zero-height skirt (thickness 0, e.g. the erase preview) would be two
+	# zero-area triangles - invisible, but wasteful and degenerate for tangents.
+	if top_lift <= base_lift + 1e-4:
+		return 0
+	var outward := edge.cross(up).normalized()
+	var a_base := a + na * base_lift
+	var b_base := b + nb * base_lift
+	var a_top := a + na * top_lift
+	var b_top := b + nb * top_lift
+	# Godot's front face is CLOCKWISE from outside (see _emit_cage_quad), so the
+	# CCW-from-outside quad (a_base, b_base, b_top, a_top) is emitted reversed.
+	for idx in [2, 1, 0, 2, 0, 3]:
+		var p: Vector3 = [a_base, b_base, b_top, a_top][idx]
+		st.set_normal(outward)
+		st.set_uv(_shell_uv(p, bounds))
+		st.add_vertex(p)
+	return 2
 
 
 # The facet as a liftable surface, in module-local space: its triangles, their

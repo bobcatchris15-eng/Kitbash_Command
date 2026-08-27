@@ -96,17 +96,19 @@ adjustment_contrast = 1.02
 ; VISUAL polish 2026-08-23: VOLUMETRIC FOG. The single biggest perceptual
 ; change in this pass - adds the "thick air" / atmospheric perspective
 ; that makes a scene read as photographed rather than viewport-previewed.
-; Reduced density 0.0035->0.0012 and length 300->250 on 2026-08-26 for
-; the TW-style camera (max_height=200). The old settings washed out the
-; entire scene at moderate zoom — fog should be a subtle horizon haze,
-; not a blanket.
+; Density dropped to near-zero on 2026-08-26 so per-map environment
+; blocks (canyon_ford, twin_streams) can set their own fog without
+; composing on top of a global fog that washes everything out.
+; Length 250 covers the full fog depth without the 64m default cutting
+; off behind the camera. Albedo integration off (gi_inject=0,
+; ambient_inject=0) because the sky-aware ambient already does the read.
 volumetric_fog_enabled = true
-volumetric_fog_density = 0.0012
+volumetric_fog_density = 0.0003
 volumetric_fog_length = 250.0
 volumetric_fog_detail_spread = 2.0
 volumetric_fog_gi_inject = 0.0
 volumetric_fog_ambient_inject = 0.0
-volumetric_fog_sky_affect = 0.6
+volumetric_fog_sky_affect = 0.4
 volumetric_fog_height = 0.0
 volumetric_fog_height_density = 0.0
 ; VISUAL polish 2026-08-23: screen-space AA. In Godot 4.7, `screen_space_aa`

@@ -1,9 +1,9 @@
 {
  "description": "Verdant Estuary: A winding river delta with terraced banks, defensive bluffs, and scattered boulder cover. Control the bridge crossings or ford the shallow marshes to outflank the enemy. Dense forest groves along the flanks provide concealment for ambush forces.",
  "ground_color": [
-  0.2,
-  0.26,
-  0.21
+  0.30,
+  0.38,
+  0.23
  ],
  "map_half_extents": 240,
  "name": "Lake Crossing",

@@ -29,11 +29,15 @@ extends Camera3D
 # tracks world_scale for traversal).
 @export var zoom_step: float = 1.15
 @export var rotate_speed: float = 90.0
-# Narrow FOV (25°) gives near-orthographic framing while preserving rotation
-# and subtle depth cueing. The old 70° showed too much sky/horizon. A narrow
-# perspective FOV is the standard RTS compromise — StarCraft 2 uses ~30°.
-@export var gameplay_fov: float = 25.0
-@export var min_height: float = 20.0
+# Total War-style camera: moderate FOV that shows the battlefield at
+# strategic zoom but lets you dive in to inspect individual units.
+# ~40° is the TW sweet spot — wide enough to read terrain features,
+# tight enough that unit silhouettes stay crisp when zoomed in.
+@export var gameplay_fov: float = 40.0
+@export var min_height: float = 8.0
+# TW zoom-out lets you see a significant fraction of the map. 200m
+# cap works for the new 1200×520 twin_streams layout.
+@export var max_height: float = 200.0
 # Skirmish refinement pass: maps grew to ~3x their original size (see
 # map_catalog.gd - two scale-up passes, 1.5x then another 2x after the
 # first still read as too small) and the old 45-unit cap meant you could
@@ -80,11 +84,12 @@ func _ready():
 
 
 func _apply_pitch():
-	# Narrow FOV benefits from a slightly steeper angle than the old 70°
-	# default, but too steep flattens the depth layering and makes terrain
-	# greebling vanish. Split the difference: -45 (close) to -62 (far).
+	# Total War-style: shallower at close zoom (inspect units), steeper
+	# at far zoom (strategic overview). -35 close / -55 far gives enough
+	# range to read terrain relief at distance while letting you get
+	# almost level with units when zoomed in tight.
 	var t = (height - min_height) / (max_height - min_height)
-	rotation_degrees.x = lerp(-45.0, -62.0, t)
+	rotation_degrees.x = lerp(-35.0, -55.0, t)
 
 
 # Updates the tilt-shift far blur to track the ground at a wide band.

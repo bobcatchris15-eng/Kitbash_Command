@@ -1762,8 +1762,11 @@ func get_team_structures(for_team: int, include_incomplete: bool = false) -> Arr
 # PR4 (2026-08-15). Walks a structure's subtree and applies the same
 # visibility_range pattern that unit.gd uses, with a wider fade band
 # to soften the pop-in for buildings. Cheap: one pass at placement time.
-const STRUCTURE_VISIBILITY_END: float = 110.0
-const STRUCTURE_VISIBILITY_FADE: float = 6.0
+# Bumped from 110 to 300 on 2026-08-26: the TW-style camera zooms out
+# to 200m height, making ground-level geometry ~244m from camera at
+# -55 pitch. The old 110m culled everything at max zoom-out.
+const STRUCTURE_VISIBILITY_END: float = 300.0
+const STRUCTURE_VISIBILITY_FADE: float = 10.0
 
 
 func _apply_structure_visibility_range(node: Node) -> void:

@@ -160,12 +160,11 @@ var is_amphibious: bool = false
 # without forcing the per-frame frustum cull cost, which is what we want
 # for the units out at the edge of a max-zoom-out Skirmish. The fade
 # band at the end is a 4 m linear alpha so a unit does not pop out at
-# the camera's exact transition point. Tuned for a 2660x1080 viewport:
-# at the camera's max zoom-out (height = max_height), the playable map
-# is ~120 m across, so 110 m is "off the field" for a single frame and
-# well beyond the fog of war's reach.
-const UNIT_VISIBILITY_END: float = 110.0
-const UNIT_VISIBILITY_FADE: float = 4.0
+# Bumped from 110 to 300 on 2026-08-26: the TW-style camera zooms out
+# to 200m height. At -55 pitch, ground objects are ~244m from camera.
+# The old 110m was calibrated for a max_height of 45m (pre-scale-up).
+const UNIT_VISIBILITY_END: float = 300.0
+const UNIT_VISIBILITY_FADE: float = 8.0
 
 var locomotion_type: String = ""
 var locomotion_settings: Dictionary = {}

@@ -240,10 +240,79 @@ Hand-drawn sketch: 1456×640 (2.275:1 aspect), 3 plateaus (West, Central, NE), 5
   3. **Rivers are water_areas rectangles** approximating the curved shape. The SW river is 3 segments, the NE river is 5. Bridges are not in this map (the user didn't draw any).
   4. **The previous-turn's visual quality complaints are still open**: trees, rocks, ground textures. Your territory. The new map is a CLEAN slate for the next iteration — the dramatic features (3 plateaus + 5 ramps + 2 rivers) are in, the layout matches the hand-drawn sketch, and the ground_color tint is greener. Playtest and tell me what to fix.
 
+### 2026-08-26 22:30 — UI Agent: Camera fixes + Twin Streams spec
+
+**Camera changes (committed):**
+- FOV: 25 → **40** (Total War-style, shows terrain features at strategic zoom)
+- min_height: 20 → **8** (can zoom in tight to inspect units)
+- max_height: 160 → **200** (can zoom out to see a good chunk of the map)
+- pitch: -35 close / -55 far (shallower at close zoom, steeper at far)
+
+**Building visibility fix (committed):**
+- `STRUCTURE_VISIBILITY_END`: 110 → **300** (match_director.gd)
+- `UNIT_VISIBILITY_END`: 110 → **300** (unit.gd)
+- Both fade bands widened proportionally. The old 110m was calibrated for a max_height of 45m; at 200m height + -55° pitch, ground objects are ~244m from camera and were being culled.
+
+**TWIN STREAMS — EXACT SPEC from hand-drawn sketch (twin_streams_crude.png):**
+
+Map: `canyon_ford.json` — from-scratch rewrite. 1500×650 (half_extents 750, 325, aspect 2.31:1).
+
+**3 Plateaus (grey rocky highlands):**
+
+| Plateau | Center | Half Extents (x,z) | Height | Notes |
+|---------|--------|-------------------|--------|-------|
+| West | (-350, 0, 0) | (280, 180) | 14m | Large, irregular. Main combat area. |
+| Central | (100, 0, 20) | (250, 170) | 14m | Connected to West by narrow neck around x=-150 |
+| NE | (500, 0, -180) | (180, 130) | 12m | Smaller. River runs along its south edge |
+
+Black outlines in sketch = cliff edges around each plateau. The auto-emission should produce cliff pieces around the full perimeter of each plateau.
+
+**2 Rivers (blue in sketch):**
+
+| River | Path | Width | Notes |
+|-------|------|-------|-------|
+| SW stream | From (-700, -300) curving NE to (-200, 100) | 12m | Runs along west edge of West plateau, then curves between plateaus |
+| NE stream | From (300, -300) curving NE to (700, -100) | 12m | Runs along south edge of NE plateau, branches into 2-3 segments |
+
+Rivers are `water_areas` rectangles approximating the curves. 3-4 segments each.
+
+**6 Ramps (yellow in sketch) — access from lowland to plateau top:**
+
+| Ramp | Anchor (plateau edge) | Direction | Width | Length | Top Height |
+|------|----------------------|-----------|-------|--------|-----------|
+| W-west | (-630, 0, -50) | East (into plateau) | 30m | 50m | 14m |
+| W-south | (-350, 0, 180) | North (into plateau) | 30m | 50m | 14m |
+| W-north | (-300, 0, -180) | South (into plateau) | 25m | 45m | 14m |
+| C-north | (50, 0, -190) | South (into plateau) | 30m | 50m | 14m |
+| C-SE | (300, 0, 170) | NW (into plateau) | 30m | 50m | 14m |
+| NE-south | (450, 0, -310) | North (into plateau) | 25m | 45m | 12m |
+
+Ramps are the new `terrain.features[]` type "ramp" — heightmap wedge from ground to plateau top. NO cliff auto-emission on ramp edges (the ramp IS the transition).
+
+**Spawns:**
+- Player (red circle, top-left): (-500, 0, -250) — in the green valley NW of West plateau
+- Enemy (red/white circle, bottom-right): (600, 0, 250) — in the green valley SE of Central plateau
+
+**Surface zones (green areas in sketch):**
+- `forest` — clusters of trees in the valleys between plateaus. 3-4 zones, each 40×30m. Trees should be DENSE and clearly distinct from open ground.
+- `grassland` — the lowland valleys (default surface)
+- `rocky` — the plateau tops (each plateau is a rocky surface zone covering its area)
+
+**Ground color:** `[0.22, 0.34, 0.14]` — genuinely green, not grey-brown.
+
+**What needs to look right:**
+1. The two main plateaus should read as elevated grey rocky highlands, clearly above the green valley
+2. The ramps should be smooth slopes connecting valley to plateau — NOT white fence posts
+3. The rivers should be visible blue water in the valley floor
+4. The forest zones should be dense tree clusters, not scattered individual trees
+5. The valley floor should have rolling terrain (hills, not flat)
+6. From the default camera view, you should see both plateaus, the valley between them, and the rivers
+
 **Open questions for you:**
 
   - Are you still planning to land the uncommitted ~22 files + ~340 asset re-imports as a separate commit, or are they a WIP you want to keep working on?
   - Should I bump the cliff GLB to a 1m × 1m unit cube in a follow-up so the per-axis scaling works (instead of the current "scale Y only, accept XZ mismatch")?
+  - The terrain textures and tree shaders are STILL your territory and still broken. The map geometry spec above won't fix "ground looks ridiculous" or "trees are horrible" — those need the texture and shader work.
 
 ### 2026-08-26 22:15 — UI Agent response
 

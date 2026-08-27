@@ -207,3 +207,40 @@ The "canal" effect — the canyon IS there (20m deep, 22m wide, 360m long, auto-
 - ~340 asset re-imports (GLB + PNG size changes for ambient trees, boulders, grass tufts, reeds, shrubs, wildflowers) — these are silent-reimport noise that should land in a separate commit when ready
 
 **Map Agent watching for UI Agent updates via mtime on UI Agent's territory files** (`terrain_ground.gdshader`, `terrain_visual_scatter.gd`, `ambient_scatter.gd`, `Battle.tscn`, `rts_camera.gd`, `tree_foliage.gdshader`, `interactive_grass.gdshader`). If any of these change in the working tree, Map Agent will re-validate canyon_ford against the new visuals.
+
+### 2026-08-26 21:39 — Canyon Ford from-scratch rebuild (7dfd4a2f)
+
+**User's spec:** "Start from a scratch. Here's a screenshot, it saved as a png. Make this map. Green is grassland, default. Gray is rocky upland on the plateaus, accessible by terrain ramps in yellow, the black should be cliffs, and steep rocky slopes merging into the traversible ramps. The red circles are spawns. The blue defines small river channels."
+
+Hand-drawn sketch: 1456×640 (2.275:1 aspect), 3 plateaus (West, Central, NE), 5+ ramps, 2 spawns at opposite corners, 2-3 small river channels.
+
+**What I shipped (commit 7dfd4a2f):**
+
+  - **canyon_ford.json**: from-scratch rewrite. 1200×520m (map_half_extents=600, map_half_extents_z=260, 2.31:1). 3 plateaus (West @ (-300,50) 240×110×14, Central @ (30,20) 220×110×14, NE @ (280,150) 110×60×12), 5 ramps (one per long side of W + C, one on top of NE), player spawn NW @ (-349, 211), enemy spawn SE @ (530, -235), SW river (3 segments) + NE river (5 segments), forest zones on each plateau, marsh in low ground, gravel at ramp bases. Greener `ground_color` `[0.30, 0.36, 0.20]` so the grassland reads as grass.
+  - **Non-square map support**: new `map_half_extents_z` field in FIELD_SPEC (optional, defaults to map_half_extents). New `MapCatalog.half_extents(map_def) -> Vector2` helper. `_corner_heights`, `_build_ground_faces`, `_build_amphibious_faces`, `build_ground_visual_mesh`, `_nav_tile_rects`, `_bucket_verts_by_tile`, `_bucket_holes_by_cell`, `_pick_cluster_centers`, `_spawn_grassland_clutter`, `_spawn_ambient_trees`, `_spawn_ambient_ores`, `_spawn_slope_rocks` — all walk per-axis. Per-axis sample counts (n_x, n_z) instead of a single n, so a 1200×520 map gets 150 X-samples and 65 Z-samples (not 150×150 = 2.3x over-sampling on Z).
+  - **Ramp feature type**: new `terrain.features[]` type "ramp" with anchor / direction_deg / width / length / top_height. The heightmap contribution is a clean rectangular wedge: full top_height at the anchor, linearly descending to 0 at the outer end, hard width edges. The cliff piece at the plateau edge stays in place. No cliffs[] / water_areas auto-emission (ramp is heightmap-only).
+  - **Cliff GLB scaling fix**: `_spawn_cliff` now scales the straight-piece GLB's Y axis to `cliff_height / CLIFF_FALLBACK_HEIGHT` (the bug from the previous turn's analysis — a 14m plateau wall was reading as 4m visually). Corner / end pieces fall through to the BoxMesh fallback (they're hand-authored to a specific footprint).
+
+**Map stats (after `_resolve_features`):** 862 cliffs auto-emitted from the 3 plateaus (vs the 240 from the previous canyon_ford).
+
+**Test results (all green):**
+  - `_test_features.gd`: 8/8 (was 7, +1 ramp test)
+  - `_test_canyon_ford.gd`: 7/7 (rewritten to pin the new map shape — 3 plateaus, 5 ramps, rivers, opposite-corner spawns)
+  - `_test_nonsquare_smoke.gd`: 7/7 (new end-to-end smoke for canyon_ford)
+  - `_test_existing_maps.gd`: 4/4 (new regression guard — open_plains still works after the non-square refactor)
+  - `_test_cliff_spawn.gd`: 3/3 (Y-scaling on straight)
+  - `_test_slope_speed.gd`: 4/4, `_test_ground_rock.gd`: 2/2, `_test_forest_los.gd`: 4/4, `_test_slope_class_call.gd`: 1/1
+
+**Files NOT touched (UI Agent territory):** `shaders/terrain_ground.gdshader`, `shaders/interactive_grass.gdshader`, `shaders/tree_foliage.gdshader`, `scenes/Battle.tscn`, `scripts/hud/hud_style.gd`, `scripts/ui_tokens.gd`, `tools/build_ui_theme.gd`, plus all the asset re-imports still in your working tree.
+
+**Things to know for the next playtest:**
+
+  1. **The map is wider than tall (2.31:1)**: your `rts_camera.gd` FOV=25 is now looking at a 1200×520 stage, not a 800×800 one. The Z axis is the SHORT axis. Your camera's "follow player" framing might want to lock the shorter axis or the user will see lots of empty grassland on the long sides.
+  2. **3 plateaus + 5 ramps are at fixed positions** in canyon_ford.json. The 5 ramps auto-emit a slope on the heightmap; the cliff piece at the plateau edge is in the cliff auto-emission. The visual collision: a unit can walk up any of the 5 ramps (the slope is within MAX_WALKABLE_SLOPE), but the plateau walls are impassable.
+  3. **Rivers are water_areas rectangles** approximating the curved shape. The SW river is 3 segments, the NE river is 5. Bridges are not in this map (the user didn't draw any).
+  4. **The previous-turn's visual quality complaints are still open**: trees, rocks, ground textures. Your territory. The new map is a CLEAN slate for the next iteration — the dramatic features (3 plateaus + 5 ramps + 2 rivers) are in, the layout matches the hand-drawn sketch, and the ground_color tint is greener. Playtest and tell me what to fix.
+
+**Open questions for you:**
+
+  - Are you still planning to land the uncommitted ~22 files + ~340 asset re-imports as a separate commit, or are they a WIP you want to keep working on?
+  - Should I bump the cliff GLB to a 1m × 1m unit cube in a follow-up so the per-axis scaling works (instead of the current "scale Y only, accept XZ mismatch")?

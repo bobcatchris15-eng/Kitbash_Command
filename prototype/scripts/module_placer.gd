@@ -230,9 +230,9 @@ func _async_write_log(msg: String):
 func _unhandled_input(event):
 	# Paint mode is owned by UI_ArmorStationPanel while it's active.
 	# The panel raycasts clicks into the hull; if the placer also
-	# processed the same click, the two would race on the now-stripped
-	# hull (no modules to select, but the placer would still try to
-	# drag-or-rotate against an empty selection). One line guard.
+	# processed the same click, the two would race on the ghosted
+	# modules (the placer would try to drag-or-rotate a module the
+	# player meant to paint past). One line guard.
 	if paint_mode_active:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -531,28 +531,25 @@ func clear_hull():
 #
 # The Armor Station is a sub-mode of the Design Lab, not a separate scene
 # (see UI_ArmorStationPanel.gd's header for the rationale). When the
-# player clicks "PAINT STATION" in the toolbar, three things swap behind a
-# pan_blur sweep: the parts bin hides, the armor toolkit panel shows, the
-# cutting mat hides, the wood-desktop workbench shows, and the hull's
-# modules are stripped so the player can paint bare facets. On exit, all
-# three reverse. The strip/restore is the placer's job because the placer
-# owns the live module list - the panel only knows about the paint data.
+# player clicks "ARMOR STATION" in the toolbar, the parts bin swaps for the
+# paint toolkit and the cutting mat swaps for the wood-desktop workbench
+# behind a pan_blur sweep. The hull's MODULES STAY ON, ghosted: they used to
+# be reparented away so the player painted a bare chassis, but the armor plan
+# is a property of the WHOLE design - where a glacis plate meets the turret
+# ring is exactly the decision the player is making - and the paint raycast
+# masks to SURFACE_COLLISION_LAYER (16), which only the hull's own surface
+# body is on (lab modules are layer 2), so modules never blocked a paint
+# click anyway. Ghosting makes the mode a layer over the design instead of
+# an amputation of it.
 #
-# The strip REPARENTS rather than frees. The panel's exit() calls
-# restore_modules() which re-parents the same instances back. No
-# queue_free, no re-instantiation, no state loss in the modules
-# themselves (selection, sub-meshes, firing arc visualisations all
-# survive the round trip). This is the cheapest possible round trip and
-# matches the "no scene change" intent of the redesign.
-#
-# Capture order matters. The panel keeps the returned array across its
-# lifetime and re-adds in the same order. The placer's bookkeeping
-# (selected_module, undo_stack) tracks by reference, so re-adding
-# the same Node3D instances is identity-preserving.
+# The ghost is GeometryInstance3D.transparency on every module mesh. No
+# reparent, no queue_free, no re-instantiation - selection, sub-meshes and
+# firing-arc visualisations all survive the round trip untouched, and the
+# stat rail keeps quoting the FULL design while the player paints.
 func capture_modules_for_paint() -> Array:
 	# Returns the live module children of the hull, in their current
-	# scene-tree order. The caller (the panel) owns the lifetime across
-	# the paint session and re-parents them on exit.
+	# scene-tree order. The caller (the panel) owns the list across the
+	# paint session.
 	if not is_instance_valid(hull):
 		return []
 	var captured: Array = []
@@ -566,38 +563,64 @@ func capture_modules_for_paint() -> Array:
 		captured.append(child)
 	return captured
 
-func strip_modules_for_paint(captured: Array) -> void:
-	# Detach the captured modules from the hull so the player can paint
-	# bare facets. The caller still holds the references and is
-	# expected to re-parent them on exit. Selection must be cleared so
-	# the placer's _unhandled_input doesn't try to operate on a
-	# reparented module.
-	if captured.is_empty():
-		return
+func ghost_modules_for_paint(captured: Array) -> void:
+	# Fade the captured modules and make the placer's input inert while the
+	# panel owns the hull. Selection is cleared so the placer's
+	# _unhandled_input doesn't try to operate on a ghosted module.
 	if selected_module and captured.has(selected_module):
 		_select_module(null)
 	for m in captured:
-		if is_instance_valid(m) and m.get_parent() != null:
-			m.get_parent().remove_child(m)
-	clipping_detected = false
-	get_tree().call_group("stat_ui", "update_stats", hull)
+		if is_instance_valid(m):
+			_set_module_ghost(m, true)
 
-func restore_modules_after_paint(captured: Array) -> void:
-	# Re-parent the captured modules back to the hull. The order
-	# matches what capture_modules_for_paint() returned; the placer
-	# treats this as a full module-set change and re-runs its
-	# bookkeeping.
-	if captured.is_empty() or not is_instance_valid(hull):
-		return
+func unghost_modules_after_paint(captured: Array) -> void:
 	for m in captured:
 		if is_instance_valid(m):
-			hull.add_child(m)
-	# Re-evaluate the live state. The previous selection (if any) is
-	# re-applied by index; if the player had a module selected and we
-	# cleared it, they have to re-click. Acceptable: paint mode implies
-	# a brief context switch anyway.
-	clipping_detected = false
-	get_tree().call_group("stat_ui", "update_stats", hull)
+			_set_module_ghost(m, false)
+			_reposition_module_for_armor(m)
+
+func _reposition_module_for_armor(module: Node3D) -> void:
+	if not hull or not is_instance_valid(hull):
+		return
+	var base_pos = module.get_meta("armor_base_pos", module.position)
+	var mount_normal = module.get_meta("mount_normal", Vector3.UP)
+	module.position = _apply_armor_lift(module, base_pos, mount_normal)
+
+func _set_module_ghost(module: Node, ghosted: bool) -> void:
+	for mi in module.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).transparency = 0.78 if ghosted else 0.0
+
+## Lift a module along the surface normal so its base sits on top of the
+## painted armor slab rather than inside it.  Stores the pre-lift hull-
+## surface position as `armor_base_pos` so re-lift after paint exit can
+## start from the same surface point without reverse-raycasting.
+func _apply_armor_lift(module: Node3D, local_pos: Vector3,
+		local_normal: Vector3) -> Vector3:
+	if not hull or not is_instance_valid(hull):
+		return local_pos
+	var mesh_inst = hull.get_node_or_null("MeshInstance3D") as MeshInstance3D
+	if not mesh_inst:
+		mesh_inst = hull.get_node_or_null("PhysicsMesh") as MeshInstance3D
+	if not mesh_inst or not mesh_inst.mesh:
+		return local_pos
+	var hull_type = hull.get_meta("type_id", "")
+	var facet_result = HullFacetsScript.measure(mesh_inst, hull_type,
+		local_pos, local_normal, module.transform.basis)
+	var facet_id = facet_result.get("facet_id", -1)
+	if facet_id < 0:
+		return local_pos
+	var plan: Dictionary = hull.get_meta("armor_plan", {})
+	var facets: Dictionary = plan.get("facets", {})
+	var thickness: float = facets.get(facet_id, {}).get("thickness", 0.0)
+	# Always store the hull-surface position so re-lift after paint exit
+	# starts from the correct point even if the module was dragged to a
+	# different facet since placement.
+	module.set_meta("armor_base_pos", local_pos)
+	if thickness <= 0.0:
+		return local_pos
+	var lift := thickness * HullFacetsScript.THICKNESS_LIFT_PER_UNIT
+	return local_pos + local_normal * lift
+
 
 func _place_hull_from_ui(type_id: String):
 	if hull:
@@ -1128,7 +1151,8 @@ func _place_weapon(type_id: String, pos: Vector3, normal: Vector3, is_mirror: bo
 	var mount_xf := _mount_transform(local_pos, local_normal, type_id, wall_mount, sponson,
 		new_weapon.get_meta("sponson_embed", -1.0))
 	if hull:
-		new_weapon.position = mount_xf.origin
+		new_weapon.position = _apply_armor_lift(new_weapon, mount_xf.origin,
+			local_normal)
 	else:
 		new_weapon.global_position = pos
 	new_weapon.transform.basis = mount_xf.basis
@@ -1204,7 +1228,7 @@ func _place_weapon(type_id: String, pos: Vector3, normal: Vector3, is_mirror: bo
 						armor_pos = Vector3(0, y_off, 0)
 
 			var cat_size = catalog_data.get("size", Vector3.ONE)
-			if type_id == "energy_barrier_projector":
+			if type_id in ["energy_barrier_projector", "bubble_shield_projector"]:
 				new_weapon.scale = Vector3.ONE
 				new_weapon.position = armor_pos
 			else:
@@ -1221,10 +1245,9 @@ func _place_weapon(type_id: String, pos: Vector3, normal: Vector3, is_mirror: bo
 			# created (line ~3587 in visual_builder.gd, the "Simple box mesh
 			# for armor and basic parts" branch) with a polygonal plate whose
 			# outline is the facet's convex hull. Skipped for the energy
-			# barrier projector because that module has its own procedural
-			# visual rebuilt on the next two lines and its scale is forced to
-			# (1,1,1) above - clobbering either would undo the projector code.
-			if type_id != "energy_barrier_projector" and facet_meas.get("valid", false):
+			# barrier & bubble shield projectors because those modules have their
+			# own procedural visual rebuilt and their scale is forced to (1,1,1).
+			if not (type_id in ["energy_barrier_projector", "bubble_shield_projector"]) and facet_meas.get("valid", false):
 				if apply_facet_plate(new_weapon, facet_meas, type_id, cat_size, hull):
 					# Mesh's vertices are already in the new_weapon's local
 					# frame at the right extent and thickness, so the
@@ -1244,7 +1267,7 @@ func _place_weapon(type_id: String, pos: Vector3, normal: Vector3, is_mirror: bo
 					# catalog-sized 2 x 0.2 x 2 click target at its centre and
 					# is unselectable everywhere else.
 					_refit_module_collider(new_weapon)
-			if type_id == "energy_barrier_projector":
+			if type_id in ["energy_barrier_projector", "bubble_shield_projector"]:
 				VisualBuilderScript.build_visual(type_id, new_weapon, catalog_data.size, catalog_data.color, tweaks)
 
 	elif type_id == "resource_harvester":
@@ -2878,7 +2901,7 @@ func _update_module_placement(module: Node3D, world_pos: Vector3, normal: Vector
 	# the armor fit re-applies afterwards.
 	var mount_xf := _mount_transform(local_pos, local_normal, data.type_id, wall_mount, sponson,
 		module.get_meta("sponson_embed", -1.0))
-	module.position = mount_xf.origin
+	module.position = _apply_armor_lift(module, mount_xf.origin, local_normal)
 	module.transform.basis = mount_xf.basis
 
 	var yaw_offset = module.get_meta("yaw_offset", 0.0)

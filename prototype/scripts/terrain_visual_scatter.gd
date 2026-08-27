@@ -18,6 +18,7 @@ extends Node3D
 #  - Deterministic generation seeded by map name and seed parameters.
 
 const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
+const InteractiveGrassShader = preload("res://shaders/interactive_grass.gdshader")
 
 const GRASS_TUFT_MODEL_DIR := "res://assets/models/terrain/grass_tuft_%d.glb"
 const GRASS_TUFT_POOL_SIZE := 6
@@ -28,9 +29,9 @@ const SHRUB_POOL_SIZE := 4
 const REEDS_MODEL_DIR := "res://assets/models/terrain/reeds_%d.glb"
 const REEDS_POOL_SIZE := 3
 const AMBIENT_TREE_MODEL_DIR := "res://assets/models/terrain/ambient_tree_%d.glb"
-const AMBIENT_TREE_POOL_SIZE := 20
+const AMBIENT_TREE_POOL_SIZE := 36
 const BOULDER_MODEL_DIR := "res://assets/models/terrain/boulder_%d.glb"
-const BOULDER_POOL_SIZE := 6
+const BOULDER_POOL_SIZE := 35
 const ROCK_SPIRE_MODEL_DIR := "res://assets/models/terrain/rock_spire_%d.glb"
 const ROCK_SPIRE_POOL_SIZE := 4
 const PEBBLE_MODEL_DIR := "res://assets/models/terrain/pebble_cluster_%d.glb"
@@ -42,8 +43,9 @@ const CLIFF_CORNER_POOL_SIZE := 3
 
 const BASE_ZONE_CLEAR_RADIUS := 24.0
 
-var _material_cache: Dictionary = {}
-var _template_cache: Dictionary = {}
+static var _material_cache: Dictionary = {}
+static var _template_cache: Dictionary = {}
+var _grass_shader_mat: ShaderMaterial = null
 
 
 static func get_or_create(parent: Node3D) -> Node3D:
@@ -57,6 +59,54 @@ static func get_or_create(parent: Node3D) -> Node3D:
 	return s
 
 
+func update_unit_interaction(units: Array) -> void:
+	if _grass_shader_mat == null:
+		return
+	var count = mini(units.size(), 32)
+	var u_pos_array: Array[Vector4] = []
+	for i in range(count):
+		var u = units[i]
+		if is_instance_valid(u) and u is Node3D:
+			var node3d = u as Node3D
+			var p = node3d.global_position if node3d.is_inside_tree() else node3d.position
+			var r: float = 3.5
+			if u.has_method("get_hull_radius"):
+				r = u.get_hull_radius()
+			elif "radius" in u:
+				r = float(u.radius)
+			u_pos_array.append(Vector4(p.x, p.y, p.z, r))
+	while u_pos_array.size() < 32:
+		u_pos_array.append(Vector4.ZERO)
+	
+	_grass_shader_mat.set_shader_parameter("unit_positions", u_pos_array)
+	_grass_shader_mat.set_shader_parameter("unit_count", count)
+
+
+func _process(_delta: float) -> void:
+	if _grass_shader_mat == null or not is_inside_tree():
+		return
+	var tree_root = get_tree()
+	if tree_root == null:
+		return
+	var units = tree_root.get_nodes_in_group("units")
+	update_unit_interaction(units)
+
+
+func _get_interactive_grass_material(base_color: Color) -> ShaderMaterial:
+	if _grass_shader_mat != null:
+		return _grass_shader_mat
+	var mat = ShaderMaterial.new()
+	mat.shader = InteractiveGrassShader
+	mat.set_shader_parameter("base_color", Vector3(base_color.r * 0.78, base_color.g * 0.85, base_color.b * 0.68))
+	mat.set_shader_parameter("tip_color", Vector3(base_color.r * 1.22, base_color.g * 1.30, base_color.b * 1.08))
+	mat.set_shader_parameter("roughness", 0.95)
+	mat.set_shader_parameter("specular", 0.02)
+	mat.set_shader_parameter("wind_speed", 2.4)
+	mat.set_shader_parameter("wind_strength", 0.18)
+	_grass_shader_mat = mat
+	return _grass_shader_mat
+
+
 func _get_material(color: Color, roughness: float = 0.9, metallic: float = 0.0) -> StandardMaterial3D:
 	var key = "%s_%.2f_%.2f" % [color.to_html(false), roughness, metallic]
 	if _material_cache.has(key):
@@ -65,6 +115,7 @@ func _get_material(color: Color, roughness: float = 0.9, metallic: float = 0.0) 
 	mat.albedo_color = color
 	mat.roughness = roughness
 	mat.metallic = metallic
+	mat.specular = 0.0
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	_material_cache[key] = mat
@@ -203,18 +254,10 @@ func _load_gltf_parts(scene_path: String) -> Array:
 			parts.append({"mesh": (n as MeshInstance3D).mesh, "xform": cur_xform})
 		for c in n.get_children():
 			stack.append([c, cur_xform])
-	inst.queue_free()
+	inst.free()
 	_template_cache[scene_path] = parts
 	return parts
 
-
-# ------------------------------------------------------------------------------
-# Core MultiMesh Creation Helper
-# ------------------------------------------------------------------------------
-
-# ------------------------------------------------------------------------------
-# Core MultiMesh Creation Helper
-# ------------------------------------------------------------------------------
 
 func _add_multimesh_batch(mesh: Mesh, material: Material, transforms: Array[Transform3D], colors: Array[Color], batch_name: String, vis_begin: float = 0.0, vis_end: float = 0.0) -> MultiMeshInstance3D:
 	if transforms.is_empty() or mesh == null:
@@ -246,13 +289,11 @@ func _add_multimesh_batch(mesh: Mesh, material: Material, transforms: Array[Tran
 	return mmi
 
 
-# `ticker`/`gate` thread scatter_all's frame budget in here: the per-part
-# compose loops below are GDScript and, at grass counts, a single batch call
-# was its own multi-hundred-ms block. Null ticker = the old synchronous call.
-func _add_gltf_variant_batches(model_template_path: String, pool_size: int, variant_xforms: Dictionary, variant_colors: Dictionary, fallback_mesh: Mesh, fallback_mat: Material, batch_prefix: String, vis_begin: float = 0.0, vis_end: float = 0.0, ticker: Node = null, gate: Dictionary = {}) -> void:
+func _add_gltf_variant_batches(model_template_path: String, pool_size: int, variant_xforms: Dictionary, variant_colors: Dictionary, fallback_mesh: Mesh, fallback_mat: Material, batch_prefix: String, vis_begin: float = 0.0, vis_end: float = 0.0, ticker: Node = null, gate: Dictionary = {}, material_override: Material = null) -> void:
 	for var_idx in variant_xforms.keys():
 		var xf_list: Array = variant_xforms[var_idx]
-		if xf_list.is_empty():
+		var sz: int = xf_list.size()
+		if sz == 0:
 			continue
 		await _scatter_slice(ticker, gate)
 		var col_list: Array = variant_colors.get(var_idx, [])
@@ -262,30 +303,26 @@ func _add_gltf_variant_batches(model_template_path: String, pool_size: int, vari
 			if fallback_mesh != null:
 				var casted_xforms: Array[Transform3D] = []
 				var casted_cols: Array[Color] = []
-				for i in range(xf_list.size()):
-					casted_xforms.append(xf_list[i])
-					if i < col_list.size():
-						casted_cols.append(col_list[i])
-					else:
-						casted_cols.append(Color.WHITE)
-				_add_multimesh_batch(fallback_mesh, fallback_mat, casted_xforms, casted_cols, "%s_Fallback_%d" % [batch_prefix, var_idx], vis_begin, vis_end)
+				casted_xforms.resize(sz)
+				casted_cols.resize(sz)
+				for i in range(sz):
+					casted_xforms[i] = xf_list[i]
+					casted_cols[i] = col_list[i] if i < col_list.size() else Color.WHITE
+				var mat = material_override if material_override != null else fallback_mat
+				_add_multimesh_batch(fallback_mesh, mat, casted_xforms, casted_cols, "%s_Fallback_%d" % [batch_prefix, var_idx], vis_begin, vis_end)
 			continue
 		for p_idx in range(parts.size()):
-			await _scatter_slice(ticker, gate)
 			var part = parts[p_idx]
 			var mesh: Mesh = part["mesh"]
 			var local_xform: Transform3D = part["xform"]
 			var composed_xforms: Array[Transform3D] = []
 			var composed_cols: Array[Color] = []
-			for i in range(xf_list.size()):
-				composed_xforms.append((xf_list[i] as Transform3D) * local_xform)
-				if i < col_list.size():
-					composed_cols.append(col_list[i])
-				else:
-					composed_cols.append(Color.WHITE)
-				# The compose loop is O(instances) GDScript - slice it too.
-				await _scatter_slice(ticker, gate)
-			_add_multimesh_batch(mesh, null, composed_xforms, composed_cols, "%s_%d_%d" % [batch_prefix, var_idx, p_idx], vis_begin, vis_end)
+			composed_xforms.resize(sz)
+			composed_cols.resize(sz)
+			for i in range(sz):
+				composed_xforms[i] = (xf_list[i] as Transform3D) * local_xform
+				composed_cols[i] = col_list[i] if i < col_list.size() else Color.WHITE
+			_add_multimesh_batch(mesh, material_override, composed_xforms, composed_cols, "%s_%d_%d" % [batch_prefix, var_idx, p_idx], vis_begin, vis_end)
 
 
 # ------------------------------------------------------------------------------
@@ -321,67 +358,46 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 	var area: float = (half * 2.0) * (half * 2.0)
 	
 	# Precalculate clear points
-	var clear_points: Array[Vector3] = []
+	var clear_points_2d: Array = []
 	for bz in map_def.get("base_zones", []):
-		clear_points.append(bz.get("center", Vector3.ZERO))
+		var c = bz.get("center", Vector3.ZERO)
+		clear_points_2d.append({"p": Vector2(c.x, c.z), "r_sq": BASE_ZONE_CLEAR_RADIUS * BASE_ZONE_CLEAR_RADIUS})
 	for sp in map_def.get("spawns", []):
 		for k in sp.keys():
 			if k != "id" and sp[k] is Vector3:
-				clear_points.append(sp[k])
+				var sv: Vector3 = sp[k]
+				clear_points_2d.append({"p": Vector2(sv.x, sv.z), "r_sq": 64.0})
 	for rn in map_def.get("resource_nodes", []):
-		clear_points.append(rn.get("position", Vector3.ZERO))
+		var rv: Vector3 = rn.get("position", Vector3.ZERO)
+		clear_points_2d.append({"p": Vector2(rv.x, rv.z), "r_sq": 49.0})
 		
 	# Water & Bridges
 	var water_areas: Array = map_def.get("water_areas", [])
 	var bridges: Array = map_def.get("bridges", [])
 	var surface_zones: Array = map_def.get("surface_zones", [])
 	
-	var ground_color_arr = map_def.get("ground_color", [0.24, 0.28, 0.18])
+	var ground_color_arr = map_def.get("ground_color", [0.30, 0.38, 0.23])
 	var base_green = Color(ground_color_arr[0], ground_color_arr[1], ground_color_arr[2])
 	
-	# Height and slope memoization cache to eliminate ~100k noise evals on load
-	var height_cache: Dictionary = {}
-	var slope_cache: Dictionary = {}
 	var _h = func(pos: Vector3) -> float:
-		var key = Vector2(round(pos.x * 2.0) / 2.0, round(pos.z * 2.0) / 2.0)
-		if height_cache.has(key): return height_cache[key]
-		var v = TerrainBuilderScript.terrain_height_at(map_def, pos)
-		height_cache[key] = v
-		return v
+		return TerrainBuilderScript.terrain_height_at(map_def, pos)
 
 	var _sl = func(sx: float, sz: float) -> float:
-		var key = Vector2(round(sx * 2.0) / 2.0, round(sz * 2.0) / 2.0)
-		if slope_cache.has(key): return slope_cache[key]
-		var v = TerrainBuilderScript.slope_at(map_def, sx, sz)
-		slope_cache[key] = v
-		return v
+		return TerrainBuilderScript.slope_at(map_def, sx, sz)
 
-	var _norm = func(nx: float, nz: float) -> Vector3:
-		var eps = 1.0
-		var h_px = _h.call(Vector3(nx + eps, 0, nz))
-		var h_mx = _h.call(Vector3(nx - eps, 0, nz))
-		var h_pz = _h.call(Vector3(nx, 0, nz + eps))
-		var h_mz = _h.call(Vector3(nx, 0, nz - eps))
-		return Vector3(-(h_px - h_mx) / (2.0 * eps), 1.0, -(h_pz - h_mz) / (2.0 * eps)).normalized()
-
-	var _make_xform = func(pos: Vector3, yaw: float, scale_jitter: float, normal_blend: float = 0.5) -> Transform3D:
-		var norm = _norm.call(pos.x, pos.z)
-		var up = (Vector3.UP * (1.0 - normal_blend) + norm * normal_blend).normalized()
-		var forward = Vector3(cos(yaw), 0, sin(yaw))
-		var right = up.cross(forward).normalized()
-		if right.is_zero_approx():
-			right = up.cross(Vector3.FORWARD).normalized()
-		var fwd = right.cross(up).normalized()
-		var basis = Basis(right, up, fwd)
-		var t = Transform3D(basis, pos).scaled_local(Vector3.ONE * scale_jitter)
-		return t
+	var _fast_xform = func(pos: Vector3, yaw: float, scale_jitter: float) -> Transform3D:
+		var basis = Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale_jitter)
+		return Transform3D(basis, pos)
 
 	# --------------------------------------------------------------------------
-	# 1. DENSE AUTHORED GRASS TUFTS & WILDFLOWERS (Clustered + Scale-aware)
+	# 1. SPARSE ACCENT GRASS (Minimal 3D scatter — the ground texture does
+	#    the heavy lifting. Grass here is accent tufts and wildflowers only,
+	#    not a dense carpet. The old dense carpet (step 2.4) produced ~30k
+	#    instances that fought with the ground texture and read as "shrubs
+	#    scattered on rock" rather than as grassland.)
 	# --------------------------------------------------------------------------
-	var grass_count = clampi(int(area / 20.0), 1200, maxi(14000, int(area / 8.0)))
 	var grass_rng = RandomNumberGenerator.new()
-	grass_rng.seed = hash(map_name + "_grass_dense")
+	grass_rng.seed = hash(map_name + "_grass_lawn_continuous")
 	
 	var grass_xforms_by_variant: Dictionary = {}
 	var grass_colors_by_variant: Dictionary = {}
@@ -395,36 +411,35 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		flower_xforms_by_variant[v] = []
 		flower_colors_by_variant[v] = []
 	
-	# Cluster grass in organic patches
-	var num_grass_clusters = maxi(12, int(grass_count / 35))
-	var items_per_cluster = int(grass_count / num_grass_clusters)
+	var step_size = 7.0 * prop_scale
+	var grid_steps = int((half * 1.88) / step_size)
+	var point_counter = 0
 	
-	for c_idx in range(num_grass_clusters):
-		await _scatter_slice(ticker, gate)
-		var cluster_cx = grass_rng.randf_range(-half * 0.94, half * 0.94)
-		var cluster_cz = grass_rng.randf_range(-half * 0.94, half * 0.94)
-		var cluster_radius = grass_rng.randf_range(16.0, 38.0) * prop_scale
-		var is_flower_cluster = grass_rng.randf() < 0.18
-		
-		for i in range(items_per_cluster):
-			# Per-item gate: one cluster on a large map can spend hundreds of
-			# ms in terrain sampling alone, so cluster granularity alone
-			# still leaves visible hitches.
+	for ix in range(grid_steps):
+		if ix % 8 == 0:
 			await _scatter_slice(ticker, gate)
-			var r_jitter = (grass_rng.randf_range(-1.0, 1.0) + grass_rng.randf_range(-1.0, 1.0)) * 0.5 * cluster_radius
-			var theta = grass_rng.randf_range(0, TAU)
-			var gx = cluster_cx + cos(theta) * r_jitter
-			var gz = cluster_cz + sin(theta) * r_jitter
+		var base_gx = -half * 0.94 + float(ix) * step_size
+		for iz in range(grid_steps):
+			point_counter += 1
+			if point_counter % 1200 == 0:
+				await _scatter_slice(ticker, gate)
+				
+			var gx = base_gx + grass_rng.randf_range(-step_size * 0.45, step_size * 0.45)
+			var gz = -half * 0.94 + float(iz) * step_size + grass_rng.randf_range(-step_size * 0.45, step_size * 0.45)
+			
 			if absf(gx) > half * 0.96 or absf(gz) > half * 0.96:
 				continue
-			var pos = Vector3(gx, 0.0, gz)
-			
+			var p2 = Vector2(gx, gz)
 			var too_close = false
-			for cp in clear_points:
-				if Vector2(pos.x - cp.x, pos.z - cp.z).length() < 6.5:
+			for cp in clear_points_2d:
+				if (p2 - (cp["p"] as Vector2)).length_squared() < cp["r_sq"]:
 					too_close = true
 					break
-			if too_close or _is_in_water(pos, water_areas, bridges):
+			if too_close:
+				continue
+				
+			var pos = Vector3(gx, 0.0, gz)
+			if _is_in_water(pos, water_areas, bridges):
 				continue
 				
 			pos.y = _h.call(pos)
@@ -433,17 +448,18 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 				continue
 				
 			var yaw = grass_rng.randf_range(0, TAU)
-			var scale_jitter = grass_rng.randf_range(0.8, 1.4) * prop_scale
-			var t = _make_xform.call(pos, yaw, scale_jitter, 0.45)
+			var scale_jitter = grass_rng.randf_range(1.05, 1.40) * prop_scale
+			var t = _fast_xform.call(pos, yaw, scale_jitter)
 			
 			var tint = Color(
-				1.0 + grass_rng.randf_range(-0.12, 0.12),
-				1.0 + grass_rng.randf_range(-0.08, 0.10),
-				1.0 + grass_rng.randf_range(-0.15, 0.08),
+				1.0 + grass_rng.randf_range(-0.08, 0.08),
+				1.0 + grass_rng.randf_range(-0.05, 0.07),
+				1.0 + grass_rng.randf_range(-0.10, 0.05),
 				1.0
 			)
 			
-			if is_flower_cluster and grass_rng.randf() < 0.45:
+			# Low-frequency wildflower blooms
+			if grass_rng.randf() < 0.04:
 				var flower_var = grass_rng.randi() % WILDFLOWER_POOL_SIZE
 				flower_xforms_by_variant[flower_var].append(t)
 				flower_colors_by_variant[flower_var].append(tint)
@@ -453,19 +469,17 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 				grass_colors_by_variant[grass_var].append(tint)
 		
 	var fallback_grass_mesh = _build_grass_mesh(prop_scale)
-	var fallback_grass_mat = _get_material(base_green.lightened(0.12), 0.8)
-	# The batch builders compose every instance transform in GDScript - at
-	# grass counts that is its own multi-hundred-ms block, so slice first.
+	var interactive_grass_mat = _get_interactive_grass_material(base_green)
 	await _scatter_slice(ticker, gate)
 	await _add_gltf_variant_batches(GRASS_TUFT_MODEL_DIR, GRASS_TUFT_POOL_SIZE, grass_xforms_by_variant, grass_colors_by_variant,
-		fallback_grass_mesh, fallback_grass_mat, "Batch_GrassTuft", 0.0, 220.0, ticker, gate)
+		fallback_grass_mesh, interactive_grass_mat, "Batch_GrassLawn", 0.0, 0.0, ticker, gate, interactive_grass_mat)
 	await _add_gltf_variant_batches(WILDFLOWER_MODEL_DIR, WILDFLOWER_POOL_SIZE, flower_xforms_by_variant, flower_colors_by_variant,
-		fallback_grass_mesh, fallback_grass_mat, "Batch_Wildflower", 0.0, 220.0, ticker, gate)
+		fallback_grass_mesh, interactive_grass_mat, "Batch_Wildflower", 0.0, 0.0, ticker, gate, interactive_grass_mat)
 	
 	# --------------------------------------------------------------------------
-	# 2. AUTHORED SHRUBS & BUSHES (Clustered + Scale-aware)
+	# 2. AUTHORED SHRUBS & BUSHES
 	# --------------------------------------------------------------------------
-	var shrub_count = clampi(int(area / 100.0), 300, maxi(2500, int(area / 40.0)))
+	var shrub_count = clampi(int(area / 200.0), 40, 250)
 	var shrub_rng = RandomNumberGenerator.new()
 	shrub_rng.seed = hash(map_name + "_shrubs_v2")
 	
@@ -475,7 +489,7 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		shrub_xforms_by_variant[v] = []
 		shrub_colors_by_variant[v] = []
 	
-	var num_shrub_clusters = maxi(8, int(shrub_count / 18))
+	var num_shrub_clusters = maxi(6, int(shrub_count / 20))
 	var shrubs_per_cluster = int(shrub_count / num_shrub_clusters)
 	
 	for c_idx in range(num_shrub_clusters):
@@ -485,21 +499,23 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		var cluster_radius = shrub_rng.randf_range(14.0, 32.0) * prop_scale
 		
 		for i in range(shrubs_per_cluster):
-			await _scatter_slice(ticker, gate)
 			var r_jitter = (shrub_rng.randf_range(-1.0, 1.0) + shrub_rng.randf_range(-1.0, 1.0)) * 0.5 * cluster_radius
 			var theta = shrub_rng.randf_range(0, TAU)
 			var sx = cluster_cx + cos(theta) * r_jitter
 			var sz = cluster_cz + sin(theta) * r_jitter
 			if absf(sx) > half * 0.95 or absf(sz) > half * 0.95:
 				continue
-			var pos = Vector3(sx, 0.0, sz)
-			
+			var p2 = Vector2(sx, sz)
 			var too_close = false
-			for cp in clear_points:
-				if Vector2(pos.x - cp.x, pos.z - cp.z).length() < 8.5:
+			for cp in clear_points_2d:
+				if (p2 - (cp["p"] as Vector2)).length_squared() < cp["r_sq"]:
 					too_close = true
 					break
-			if too_close or _is_in_water(pos, water_areas, bridges):
+			if too_close:
+				continue
+				
+			var pos = Vector3(sx, 0.0, sz)
+			if _is_in_water(pos, water_areas, bridges):
 				continue
 				
 			pos.y = _h.call(pos)
@@ -509,7 +525,7 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 				
 			var yaw = shrub_rng.randf_range(0, TAU)
 			var scale_jitter = shrub_rng.randf_range(0.85, 1.5) * prop_scale
-			var t = _make_xform.call(pos, yaw, scale_jitter, 0.4)
+			var t = _fast_xform.call(pos, yaw, scale_jitter)
 			
 			var tint = Color(
 				1.0 + shrub_rng.randf_range(-0.10, 0.10),
@@ -529,9 +545,9 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		fallback_shrub_mesh, fallback_shrub_mat, "Batch_Shrub", 0.0, 320.0, ticker, gate)
 	
 	# --------------------------------------------------------------------------
-	# 3. AUTHORED VISUAL TREES (Scale-aware)
+	# 3. AUTHORED VISUAL TREES (Clustered Forest Belts)
 	# --------------------------------------------------------------------------
-	var tree_count = clampi(int(area / 200.0), 150, maxi(1200, int(area / 80.0)))
+	var tree_count = clampi(int(area / 1400.0), 80, 800)
 	var tree_rng = RandomNumberGenerator.new()
 	tree_rng.seed = hash(map_name + "_visual_trees")
 	
@@ -541,48 +557,63 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		tree_xforms_by_variant[sp_idx] = []
 		tree_colors_by_variant[sp_idx] = []
 		
-	for i in range(tree_count):
-		await _scatter_slice(ticker, gate)
-		var tx = tree_rng.randf_range(-half * 0.92, half * 0.92)
-		var tz = tree_rng.randf_range(-half * 0.92, half * 0.92)
-		var pos = Vector3(tx, 0.0, tz)
+	var num_tree_groves = maxi(8, int(tree_count / 14))
+	var trees_per_grove = int(tree_count / num_tree_groves)
+	
+	for g_idx in range(num_tree_groves):
+		var grove_cx = tree_rng.randf_range(-half * 0.90, half * 0.90)
+		var grove_cz = tree_rng.randf_range(-half * 0.90, half * 0.90)
+		var grove_radius = tree_rng.randf_range(18.0, 42.0) * prop_scale
+		var grove_species_base = (tree_rng.randi() % 12) * 3
 		
-		var too_close = false
-		for cp in clear_points:
-			if Vector2(pos.x - cp.x, pos.z - cp.z).length() < BASE_ZONE_CLEAR_RADIUS * 0.8:
-				too_close = true
-				break
-		if too_close or _is_in_water(pos, water_areas, bridges):
-			continue
+		for i in range(trees_per_grove):
+			var r_j = (tree_rng.randf_range(-1.0, 1.0) + tree_rng.randf_range(-1.0, 1.0)) * 0.5 * grove_radius
+			var theta = tree_rng.randf_range(0, TAU)
+			var tx = grove_cx + cos(theta) * r_j
+			var tz = grove_cz + sin(theta) * r_j
+			if absf(tx) > half * 0.94 or absf(tz) > half * 0.94:
+				continue
+			var p2 = Vector2(tx, tz)
+			var too_close = false
+			for cp in clear_points_2d:
+				if (p2 - (cp["p"] as Vector2)).length_squared() < cp["r_sq"]:
+					too_close = true
+					break
+			if too_close:
+				continue
+				
+			var pos = Vector3(tx, 0.0, tz)
+			if _is_in_water(pos, water_areas, bridges):
+				continue
+				
+			pos.y = _h.call(pos)
+			var slope = _sl.call(pos.x, pos.z)
+			if slope > 0.55:
+				continue
+				
+			var sp_variant_offset = tree_rng.randi() % 3
+			var sp_choice = (grove_species_base + sp_variant_offset) % AMBIENT_TREE_POOL_SIZE
+			var yaw = tree_rng.randf_range(0, TAU)
+			var scale_jitter = tree_rng.randf_range(1.15, 1.7) * prop_scale
+			var t = _fast_xform.call(pos, yaw, scale_jitter)
 			
-		pos.y = _h.call(pos)
-		var slope = _sl.call(pos.x, pos.z)
-		if slope > 0.55:
-			continue
-			
-		var sp_choice = tree_rng.randi() % AMBIENT_TREE_POOL_SIZE
-		var yaw = tree_rng.randf_range(0, TAU)
-		var scale_jitter = tree_rng.randf_range(0.85, 1.3) * prop_scale
-		var t = Transform3D().rotated(Vector3.UP, yaw).scaled(Vector3.ONE * scale_jitter)
-		t.origin = pos
-		
-		var tint = Color(
-			1.0 + tree_rng.randf_range(-0.10, 0.08),
-			1.0 + tree_rng.randf_range(-0.08, 0.08),
-			1.0 + tree_rng.randf_range(-0.10, 0.08),
-			1.0
-		)
-		tree_xforms_by_variant[sp_choice].append(t)
-		tree_colors_by_variant[sp_choice].append(tint)
+			var tint = Color(
+				1.0 + tree_rng.randf_range(-0.10, 0.08),
+				1.0 + tree_rng.randf_range(-0.08, 0.08),
+				1.0 + tree_rng.randf_range(-0.10, 0.08),
+				1.0
+			)
+			tree_xforms_by_variant[sp_choice].append(t)
+			tree_colors_by_variant[sp_choice].append(tint)
 		
 	await _scatter_slice(ticker, gate)
 	await _add_gltf_variant_batches(AMBIENT_TREE_MODEL_DIR, AMBIENT_TREE_POOL_SIZE, tree_xforms_by_variant, tree_colors_by_variant,
-		null, null, "Batch_VisualTree", 0.0, 550.0, ticker, gate)
+		null, null, "Batch_VisualTree", 0.0, 750.0, ticker, gate)
 	
 	# --------------------------------------------------------------------------
-	# 4. AUTHORED SLOPE SCREE, TALUS & PEBBLES (Normal-aligned + Clustered)
+	# 4. AUTHORED SLOPE SCREE & TALUS
 	# --------------------------------------------------------------------------
-	var scree_count = clampi(int(area / 120.0), 200, maxi(2000, int(area / 50.0)))
+	var scree_count = clampi(int(area / 250.0), 30, 150)
 	var scree_rng = RandomNumberGenerator.new()
 	scree_rng.seed = hash(map_name + "_scree_talus")
 	
@@ -593,7 +624,6 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		pebble_colors_by_variant[v] = []
 	
 	for i in range(scree_count):
-		await _scatter_slice(ticker, gate)
 		var rx = scree_rng.randf_range(-half * 0.98, half * 0.98)
 		var rz = scree_rng.randf_range(-half * 0.98, half * 0.98)
 		var pos = Vector3(rx, 0.0, rz)
@@ -608,8 +638,7 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		pos.y = _h.call(pos)
 		var yaw = scree_rng.randf_range(0, TAU)
 		var scale_jitter = scree_rng.randf_range(0.7, 1.8) * prop_scale
-		# Align completely to terrain slope normal
-		var t = _make_xform.call(pos, yaw, scale_jitter, 1.0)
+		var t = _fast_xform.call(pos, yaw, scale_jitter)
 		
 		var tint = Color(
 			1.0 + scree_rng.randf_range(-0.14, 0.12),
@@ -629,9 +658,9 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		fallback_pebble_mesh, fallback_pebble_mat, "Batch_PebbleCluster", 0.0, 220.0, ticker, gate)
 	
 	# --------------------------------------------------------------------------
-	# 5. AUTHORED ROCK SPIRES & MONOLITHS (Scale-aware)
+	# 5. AUTHORED ROCK SPIRES & MONOLITHS
 	# --------------------------------------------------------------------------
-	var spire_count = clampi(int(area / 1500.0), 20, maxi(180, int(area / 600.0)))
+	var spire_count = clampi(int(area / 1500.0), 10, 40)
 	var spire_rng = RandomNumberGenerator.new()
 	spire_rng.seed = hash(map_name + "_rock_spires")
 	
@@ -642,17 +671,19 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		spire_colors_by_variant[v] = []
 		
 	for i in range(spire_count):
-		await _scatter_slice(ticker, gate)
 		var rx = spire_rng.randf_range(-half * 0.94, half * 0.94)
 		var rz = spire_rng.randf_range(-half * 0.94, half * 0.94)
-		var pos = Vector3(rx, 0.0, rz)
-		
+		var p2 = Vector2(rx, rz)
 		var too_close = false
-		for cp in clear_points:
-			if Vector2(pos.x - cp.x, pos.z - cp.z).length() < 12.0:
+		for cp in clear_points_2d:
+			if (p2 - (cp["p"] as Vector2)).length_squared() < 144.0:
 				too_close = true
 				break
-		if too_close or _is_in_water(pos, water_areas, bridges):
+		if too_close:
+			continue
+			
+		var pos = Vector3(rx, 0.0, rz)
+		if _is_in_water(pos, water_areas, bridges):
 			continue
 			
 		pos.y = _h.call(pos)
@@ -662,7 +693,7 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 			
 		var yaw = spire_rng.randf_range(0, TAU)
 		var scale_jitter = spire_rng.randf_range(0.8, 1.4) * prop_scale
-		var t = _make_xform.call(pos, yaw, scale_jitter, 0.3)
+		var t = _fast_xform.call(pos, yaw, scale_jitter)
 		
 		var tint = Color(
 			1.0 + spire_rng.randf_range(-0.12, 0.12),
@@ -680,9 +711,9 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		fallback_pebble_mesh, fallback_pebble_mat, "Batch_RockSpire", 0.0, 650.0, ticker, gate)
 	
 	# --------------------------------------------------------------------------
-	# 6. AUTHORED CLIFF FACADES & CORNERS ON STEEP ESCARPMENTS
+	# 6. AUTHORED CLIFF FACADES & CORNERS
 	# --------------------------------------------------------------------------
-	var cliff_count = clampi(int(area / 1000.0), 30, maxi(250, int(area / 400.0)))
+	var cliff_count = clampi(int(area / 1500.0), 15, 40)
 	var cliff_rng = RandomNumberGenerator.new()
 	cliff_rng.seed = hash(map_name + "_cliff_facades")
 	
@@ -699,7 +730,6 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		cliff_corner_colors[v] = []
 		
 	for i in range(cliff_count):
-		await _scatter_slice(ticker, gate)
 		var cx = cliff_rng.randf_range(-half * 0.94, half * 0.94)
 		var cz = cliff_rng.randf_range(-half * 0.94, half * 0.94)
 		var pos = Vector3(cx, 0.0, cz)
@@ -712,19 +742,9 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 			continue
 			
 		pos.y = _h.call(pos)
-		
-		var eps = 1.0
-		var h_px = _h.call(Vector3(pos.x + eps, 0, pos.z))
-		var h_mx = _h.call(Vector3(pos.x - eps, 0, pos.z))
-		var h_pz = _h.call(Vector3(pos.x, 0, pos.z + eps))
-		var h_mz = _h.call(Vector3(pos.x, 0, pos.z - eps))
-		var grad_x = (h_px - h_mx) / (2.0 * eps)
-		var grad_z = (h_pz - h_mz) / (2.0 * eps)
-		var cliff_yaw = atan2(-grad_x, -grad_z)
-		
+		var cliff_yaw = cliff_rng.randf_range(0, TAU)
 		var scale_jitter = cliff_rng.randf_range(0.85, 1.25) * prop_scale
-		var t = Transform3D().rotated(Vector3.UP, cliff_yaw).scaled(Vector3.ONE * scale_jitter)
-		t.origin = pos
+		var t = _fast_xform.call(pos, cliff_yaw, scale_jitter)
 		
 		var tint = Color(
 			1.0 + cliff_rng.randf_range(-0.12, 0.12),
@@ -733,7 +753,6 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 			1.0
 		)
 		
-		# Wire cliff corners alongside cliff facades (30% corners, 70% straight facades)
 		if cliff_rng.randf() < 0.30:
 			var cc_var = cliff_rng.randi() % CLIFF_CORNER_POOL_SIZE
 			cliff_corner_xforms[cc_var].append(t)
@@ -750,7 +769,7 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		null, null, "Batch_CliffCorner", 0.0, 650.0, ticker, gate)
 	
 	# --------------------------------------------------------------------------
-	# 7. AUTHORED WETLAND REEDS (Near water edges & marsh zones)
+	# 7. AUTHORED WETLAND REEDS
 	# --------------------------------------------------------------------------
 	if not water_areas.is_empty() or _has_marsh_zones(surface_zones):
 		var reed_xforms_by_variant: Dictionary = {}
@@ -763,10 +782,9 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 		reed_rng.seed = hash(map_name + "_wetland_reeds")
 		
 		for water in water_areas:
-			await _scatter_slice(ticker, gate)
 			var c = water.get("center", Vector3.ZERO)
 			var he = water.get("half_extents", Vector2(10, 10))
-			var perimeter_points = int(he.x + he.y) * 4
+			var perimeter_points = mini(60, int((he.x + he.y) * 1.5))
 			for p in range(perimeter_points):
 				var side = reed_rng.randi() % 4
 				var ox = 0.0
@@ -774,21 +792,21 @@ func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = nu
 				match side:
 					0:
 						ox = reed_rng.randf_range(-he.x, he.x)
-						oz = he.y + reed_rng.randf_range(-1.0, 2.5)
+						oz = he.y + reed_rng.randf_range(-0.5, 2.0)
 					1:
 						ox = reed_rng.randf_range(-he.x, he.x)
-						oz = -he.y - reed_rng.randf_range(-1.0, 2.5)
+						oz = -he.y - reed_rng.randf_range(-0.5, 2.0)
 					2:
-						ox = he.x + reed_rng.randf_range(-1.0, 2.5)
+						ox = he.x + reed_rng.randf_range(-0.5, 2.0)
 						oz = reed_rng.randf_range(-he.y, he.y)
 					3:
-						ox = -he.x - reed_rng.randf_range(-1.0, 2.5)
+						ox = -he.x - reed_rng.randf_range(-0.5, 2.0)
 						oz = reed_rng.randf_range(-he.y, he.y)
 				var pos = Vector3(c.x + ox, 0.0, c.z + oz)
 				pos.y = _h.call(pos)
 				var yaw = reed_rng.randf_range(0, TAU)
 				var scale_jitter = reed_rng.randf_range(0.8, 1.4) * prop_scale
-				var t = _make_xform.call(pos, yaw, scale_jitter, 0.3)
+				var t = _fast_xform.call(pos, yaw, scale_jitter)
 				
 				var tint = Color(
 					1.0 + reed_rng.randf_range(-0.10, 0.10),

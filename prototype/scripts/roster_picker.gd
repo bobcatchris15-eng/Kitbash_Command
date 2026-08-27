@@ -532,6 +532,19 @@ class RosterSlot extends PanelContainer:
 			else:
 				_label.text = str(index + 1)
 				_label.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
+		# Persistent drag hint — discoverable without mousing over
+		var drag_hint = get_node_or_null("DragHint")
+		if drag_hint:
+			drag_hint.visible = true
+		else:
+			drag_hint = Label.new()
+			drag_hint.name = "DragHint"
+			drag_hint.text = "DRAG HERE"
+			drag_hint.theme_type_variation = "HintLabel"
+			drag_hint.add_theme_color_override("font_color", Tokens.BASE_400)
+			drag_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			drag_hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			add_child(drag_hint)
 		var slot_type := "any design" if not (_picker and _picker.is_harvester_slot(index)) else "harvester only"
 		tooltip_text = "Empty slot %d (%s). Drag a design here." % [index + 1, slot_type]
 
@@ -560,6 +573,10 @@ class RosterSlot extends PanelContainer:
 		if _label:
 			_label.text = entry_name
 			_label.remove_theme_color_override("font_color")
+		# Hide drag hint when slot is filled
+		var drag_hint = get_node_or_null("DragHint")
+		if drag_hint:
+			drag_hint.visible = false
 		tooltip_text = "%s\nDrag out or right-click to clear." % entry_name
 
 	func _has_repair_in_data() -> bool:

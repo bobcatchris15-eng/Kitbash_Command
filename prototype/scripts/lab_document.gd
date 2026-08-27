@@ -15,6 +15,7 @@ var _current_callout_idx = 0
 
 
 const BlueprintManagerScript = preload("res://scripts/blueprint_manager.gd")
+const BlueprintNamerScript = preload("res://scripts/blueprint_namer.gd")
 const UIFlyoutScript = preload("res://scripts/ui_flyout.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const DesignVerdictScript = preload("res://scripts/design_verdict.gd")
@@ -362,6 +363,10 @@ const TWEAK_SPECS = {
 		{"name": "field_width", "label": "Field Width / Area", "min": 0.6, "max": 2.0, "step": 0.1, "default": 1.0},
 		{"name": "barrier_capacity", "label": "Absorption Capacity", "min": 0.5, "max": 2.5, "step": 0.1, "default": 1.0},
 		{"name": "projection_distance", "label": "Projection Range (m)", "min": 15.0, "max": 35.0, "step": 1.0, "default": 25.0}
+	],
+	"bubble_shield_projector": [
+		{"name": "barrier_capacity", "label": "Shield Capacity", "min": 0.5, "max": 2.5, "step": 0.1, "default": 1.0},
+		{"name": "bubble_standoff", "label": "Balloon Separation / Standoff", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0}
 	],
 	"capacitor_bank": [
 		{"name": "bank_capacity", "label": "Capacitor Cell Count", "min": 2.0, "max": 6.0, "step": 1.0, "default": 4.0},
@@ -857,9 +862,11 @@ func sync_hull_ui(hull: Node3D):
 		var bp_name = str(hull.get_meta("blueprint_name", "")).strip_edges()
 		if BlueprintManagerScript.is_named(bp_name):
 			blueprint_name_edit.text = bp_name
+			_update_abbr_label(bp_name)
 		else:
 			lab_toolbar._reroll_name_suggestion(true)
 			hull.set_meta("blueprint_name", blueprint_name_edit.text)
+			_update_abbr_label(blueprint_name_edit.text)
 	# No faction sync: there is no faction control in the Lab any more. A
 	# blueprint saved before this change still carries its "faction" key and
 	# still deserializes, it simply has no effect until a match assigns one.
@@ -1044,6 +1051,13 @@ func _build_stats_dock() -> void:
 	UIFeedbackScript.wire(roll_btn)
 	roll_btn.pressed.connect(func(): lab_toolbar._reroll_name_suggestion())
 	name_row.add_child(roll_btn)
+
+	var abbr_label := Label.new()
+	abbr_label.name = "BlueprintAbbrLabel"
+	abbr_label.theme_type_variation = "HintLabel"
+	abbr_label.add_theme_color_override("font_color", Color(0.65, 0.75, 0.85, 0.85))
+	c1_vbox.add_child(abbr_label)
+	_update_abbr_label(blueprint_name_edit.text if blueprint_name_edit else "")
 
 	var old_name_row := _rail_vbox.get_node_or_null("BlueprintNameRow")
 	if old_name_row:
@@ -1663,7 +1677,21 @@ func _on_save_pressed(): lab_toolbar._on_save_pressed()
 func _on_test_pressed(): lab_toolbar._on_test_pressed()
 func _on_mirror_toggled(button_pressed: bool): lab_toolbar._on_mirror_toggled(button_pressed)
 func _on_library_pressed(): lab_toolbar._on_library_pressed()
-func _on_blueprint_name_changed(new_text: String): lab_toolbar._on_blueprint_name_changed(new_text)
+func _on_blueprint_name_changed(new_text: String):
+	lab_toolbar._on_blueprint_name_changed(new_text)
+	_update_abbr_label(new_text)
+
+func _update_abbr_label(name_text: String) -> void:
+	var label = find_child("BlueprintAbbrLabel", true, false) as Label
+	if not label:
+		return
+	var abbr: String = BlueprintNamerScript.suggest_abbreviation(name_text)
+	if not abbr.is_empty():
+		label.text = "Callsign: \"%s\"" % abbr
+		label.visible = true
+	else:
+		label.text = ""
+		label.visible = false
 func _on_blueprint_name_tooltip_update(new_text: String) -> void:
 	if blueprint_name_edit:
 		blueprint_name_edit.tooltip_text = new_text

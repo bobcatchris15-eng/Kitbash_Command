@@ -419,7 +419,14 @@ func _build_shell() -> void:
 		
 		tab_btn.toggled.connect(func(pressed: bool):
 			if pressed:
+				# Active tab: lifted body, amber accent rim on bottom edge
+				plate.body_color = Tokens.BASE_600
+				plate.edge_color = Tokens.SIGNAL_HAZARD
 				_show_family(tier_id)
+			else:
+				# Inactive tab: default body, no accent
+				plate.body_color = Tokens.BASE_700
+				plate.edge_color = Tokens.BASE_500
 		)
 
 	_empty_hint = Label.new()

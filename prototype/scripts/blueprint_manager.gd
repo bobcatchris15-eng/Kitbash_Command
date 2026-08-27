@@ -370,7 +370,14 @@ func serialize_hull(hull: Node3D) -> Dictionary:
 
 	if hull.has_meta("blueprint_id"):
 		blueprint["id"] = hull.get_meta("blueprint_id")
-	blueprint["name"] = hull.get_meta("blueprint_name") if hull.has_meta("blueprint_name") and hull.get_meta("blueprint_name") != "" else "Untitled Design"
+	var bp_name: String = str(hull.get_meta("blueprint_name")) if hull.has_meta("blueprint_name") and str(hull.get_meta("blueprint_name")) != "" else "Untitled Design"
+	blueprint["name"] = bp_name
+	if hull.has_meta("blueprint_abbreviation") and str(hull.get_meta("blueprint_abbreviation")).strip_edges() != "":
+		blueprint["abbreviation"] = str(hull.get_meta("blueprint_abbreviation")).strip_edges()
+	else:
+		var auto_abbr := BlueprintNamerScript.suggest_abbreviation(bp_name)
+		if auto_abbr != "":
+			blueprint["abbreviation"] = auto_abbr
 	
 	if hull.has_meta("derived_from"):
 		blueprint["derived_from"] = hull.get_meta("derived_from")
@@ -467,12 +474,22 @@ func save_blueprint() -> bool:
 		bp_name = BlueprintNamerScript.generate()
 		hull.set_meta("blueprint_name", bp_name)
 
+	var bp_abbr := ""
+	if hull.has_meta("blueprint_abbreviation"):
+		bp_abbr = str(hull.get_meta("blueprint_abbreviation")).strip_edges()
+	if bp_abbr == "":
+		bp_abbr = BlueprintNamerScript.suggest_abbreviation(bp_name)
+
 	blueprint["id"] = bp_id
 	blueprint["name"] = bp_name
+	if bp_abbr != "":
+		blueprint["abbreviation"] = bp_abbr
 	blueprint["modified_unix"] = Time.get_unix_time_from_system()
 
 	hull.set_meta("blueprint_id", bp_id)
 	hull.set_meta("blueprint_name", bp_name)
+	if bp_abbr != "":
+		hull.set_meta("blueprint_abbreviation", bp_abbr)
 	hull.set_meta("original_blueprint_name", bp_name)
 
 	var json_string = JSON.stringify(blueprint, "\t")
@@ -574,6 +591,11 @@ func restore_scratch_into_designer() -> bool:
 	if data.get("name", "") != "":
 		new_hull.set_meta("blueprint_name", data["name"])
 		new_hull.set_meta("original_blueprint_name", data["name"])
+	var bp_abbr: String = str(data.get("abbreviation", "")).strip_edges()
+	if bp_abbr == "":
+		bp_abbr = BlueprintNamerScript.suggest_abbreviation(str(data.get("name", "")))
+	if bp_abbr != "":
+		new_hull.set_meta("blueprint_abbreviation", bp_abbr)
 	if data.get("derived_from", "") != "":
 		new_hull.set_meta("derived_from", data["derived_from"])
 
@@ -892,7 +914,13 @@ func reconstruct_vehicle(blueprint_data: Dictionary, parent_node: Node3D, is_des
 	hull.set_meta("faction", faction_name)
 	hull.set_meta("nose_taper", nose_taper)
 	hull.set_meta("blueprint_id", blueprint_data.get("id", ""))
-	hull.set_meta("blueprint_name", blueprint_data.get("name", "Untitled Design"))
+	var bp_name: String = blueprint_data.get("name", "Untitled Design")
+	hull.set_meta("blueprint_name", bp_name)
+	var bp_abbr: String = str(blueprint_data.get("abbreviation", "")).strip_edges()
+	if bp_abbr == "":
+		bp_abbr = BlueprintNamerScript.suggest_abbreviation(bp_name)
+	if bp_abbr != "":
+		hull.set_meta("blueprint_abbreviation", bp_abbr)
 
 	# Painted armor. _deserialize_armor reads the v3 "armor" block (assignments
 	# keyed by baked facet id) and resolves them against the CURRENT bake; v2

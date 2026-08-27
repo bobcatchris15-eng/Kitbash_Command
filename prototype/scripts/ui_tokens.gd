@@ -61,6 +61,13 @@ const SIGNAL_GO_DIM = Color(0.133, 0.196, 0.106, 1.0)
 const TOOLKIT_WARM_HIGHLIGHT = Color(0.850, 0.720, 0.450, 0.15) # Physical brass touch feedback
 const TOOLKIT_PATINA         = Color(0.350, 0.420, 0.380, 0.25) # Aged tool rail patina accent
 
+# ACCENT ROLES — the semantic system for non-signal colour use.
+# Amber is the ONLY interactive accent (selected, active, clickable).
+# Category grouping uses a muted neutral, never a signal colour.
+const ACCENT_INTERACTIVE = SIGNAL_HAZARD       # amber — selected, active, clickable
+const ACCENT_CATEGORY    = BASE_500            # muted warm grey — category grouping
+const ACCENT_HARVESTER   = SIGNAL_INFO         # steel blue — harvester bay identity only
+
 # ---------------------------------------------------------------------------
 # TYPE SCALE
 # ---------------------------------------------------------------------------

@@ -251,18 +251,28 @@ func refresh(delta: float = 0.0) -> void:
 func _draw_radar_grid() -> void:
 	if _overlay == null or _overlay.size.x <= 0.0 or _overlay.size.y <= 0.0:
 		return
-	var center := _overlay.size * 0.5
-	var r := minf(center.x, center.y) * 0.94
+	var s := _overlay.size
 	var reticle_col := Style.RETICLE
-	# Cold-War radar range rings
-	_overlay.draw_arc(center, r * 0.33, 0.0, TAU, 32, reticle_col * 0.35, 1.0, true)
-	_overlay.draw_arc(center, r * 0.66, 0.0, TAU, 48, reticle_col * 0.40, 1.0, true)
-	_overlay.draw_arc(center, r, 0.0, TAU, 64, reticle_col * 0.65, 1.0, true)
-	# Crosshairs with center gap
-	_overlay.draw_line(Vector2(center.x, center.y - r), Vector2(center.x, center.y - 8), reticle_col * 0.40, 1.0, true)
-	_overlay.draw_line(Vector2(center.x, center.y + 8), Vector2(center.x, center.y + r), reticle_col * 0.40, 1.0, true)
-	_overlay.draw_line(Vector2(center.x - r, center.y), Vector2(center.x - 8, center.y), reticle_col * 0.40, 1.0, true)
-	_overlay.draw_line(Vector2(center.x + 8, center.y), Vector2(center.x + r, center.y), reticle_col * 0.40, 1.0, true)
+	var corner_len := 12.0
+	var edge_tick := 4.0
+	var inset := 2.0
+	# Corner brackets — rectilinear alignment cues matching the app's shape language
+	var corners := [
+		[Vector2(inset, inset), Vector2(inset + corner_len, inset), Vector2(inset, inset + corner_len)],
+		[Vector2(s.x - inset, inset), Vector2(s.x - inset - corner_len, inset), Vector2(s.x - inset, inset + corner_len)],
+		[Vector2(inset, s.y - inset), Vector2(inset + corner_len, s.y - inset), Vector2(inset, s.y - inset - corner_len)],
+		[Vector2(s.x - inset, s.y - inset), Vector2(s.x - inset - corner_len, s.y - inset), Vector2(s.x - inset, s.y - inset - corner_len)],
+	]
+	for c in corners:
+		_overlay.draw_line(c[0], c[1], reticle_col * 0.55, 1.0, true)
+		_overlay.draw_line(c[0], c[2], reticle_col * 0.55, 1.0, true)
+	# Edge ticks at midpoints
+	var mid_x := s.x * 0.5
+	var mid_y := s.y * 0.5
+	_overlay.draw_line(Vector2(mid_x, inset), Vector2(mid_x, inset + edge_tick), reticle_col * 0.40, 1.0, true)
+	_overlay.draw_line(Vector2(mid_x, s.y - inset), Vector2(mid_x, s.y - inset - edge_tick), reticle_col * 0.40, 1.0, true)
+	_overlay.draw_line(Vector2(inset, mid_y), Vector2(inset + edge_tick, mid_y), reticle_col * 0.40, 1.0, true)
+	_overlay.draw_line(Vector2(s.x - inset, mid_y), Vector2(s.x - inset - edge_tick, mid_y), reticle_col * 0.40, 1.0, true)
 
 
 func _draw_overlay() -> void:

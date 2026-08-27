@@ -80,6 +80,18 @@ Off-white, not pure white. Pure white on warm dark reads as a blown-out highligh
 | `SIGNAL_ALERT_DIM` | red fill behind red-edged controls |
 | `SIGNAL_GO_DIM` | green fill for progress and resource bars |
 
+### 2.4 Accent Roles
+
+The semantic system for non-signal colour use. Amber is the ONLY interactive accent.
+
+| Role | Token | Use |
+|---|---|---|
+| `ACCENT_INTERACTIVE` | `SIGNAL_HAZARD` | selected, active, clickable — the only interactive accent |
+| `ACCENT_CATEGORY` | `BASE_500` | category grouping — muted neutral, never a signal colour |
+| `ACCENT_HARVESTER` | `SIGNAL_INFO` | harvester bay identity only — the one permitted non-interactive accent |
+
+Do not introduce new accent colours per-screen. If a colour appears in only one place, it has no learnable meaning.
+
 ---
 
 ## 3 · Material Vocabulary
@@ -336,6 +348,26 @@ Two constraints:
 **Never let a UI click repeat identically.** `AudioManager.play_sfx()` varies pitch per play; flat repetition is a distinctly cheap-sounding tell.
 
 **Interface audio is on the SINCERE side of the tone split.** `CORE_DESIGN_LANGUAGE.md` §6 puts the absurdity in the *ordnance* — the weapons go "pew pew". Chrome, comms and alerts stay straight. Radio chatter over vocalised weapons is the whole thesis in one moment; a comedy sound on a button would spend the joke in the wrong place.
+
+### 8.2 Locked / Unavailable State
+
+The canonical pattern for locked or unavailable content:
+
+```gdscript
+card.disabled = true
+card.modulate = Color(1, 1, 1, 0.55)  # dim to 55% opacity
+# Red "LOCKED" label using HintLabel with SIGNAL_ALERT color
+var lock_label = Style.label("LOCKED", Style.SZ_MICRO, Style.BAD)
+card.add_child(lock_label)
+card.tooltip_text = "Requires: %s" % ", ".join(missing_names)
+```
+
+- `disabled = true` prevents interaction
+- `modulate` provides the visual dim (the disabled StyleBox differs from normal by only ~3% luminance, making it nearly invisible on its own)
+- Red `LOCKED` label communicates WHY it is unavailable
+- `tooltip_text` provides the specific requirement
+
+This pattern is established in `hud_production_deck.gd` and should be reused for any locked/unavailable content (parts exceeding weight capacity, designs that cannot be loaded, etc).
 
 ---
 

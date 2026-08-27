@@ -47,6 +47,13 @@ uniform vec3 ink_color : source_color = vec3(0.04, 0.035, 0.05);
 uniform float ink_curvature_gain : hint_range(0.005, 1.0) = 0.06;
 uniform float ink_rim_strength : hint_range(0.0, 1.0) = 0.55;
 
+// Friendly rim-light: adds a subtle bright edge on silhouette-facing
+// surfaces. 0.0 = off (used for enemies who get the inverted-hull outline
+// instead), >0.0 = friendly rim强度. Set by unit_assembly.gd per-team.
+uniform float friendly_rim_strength : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 friendly_rim_color : source_color = vec3(1.0, 0.95, 0.85);
+uniform float friendly_rim_power : hint_range(0.5, 8.0) = 3.0;
+
 // --- Livery Zones ---
 uniform vec4 zone_lower_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform vec4 zone_upper_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
@@ -417,5 +424,17 @@ void fragment() {
 		EMISSION = base_color.rgb * 0.12;
 	} else if (emissive_strength > 0.0) {
 		EMISSION = emissive_color.rgb * emissive_strength;
+	}
+
+	// Friendly rim-light: brightens silhouette edges on friendly units so
+	// they read clearly against terrain without the heavy outline used on
+	// enemies. The rim is directional (stronger on the sun-facing side)
+	// and composited additively via EMISSION so it doesn't wash out the
+	// livery underneath.
+	if (friendly_rim_strength > 0.0) {
+		vec3 view_dir = normalize(CAMERA_POSITION_WORLD - (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz);
+		float rim = 1.0 - max(dot(view_dir, final_world_normal), 0.0);
+		rim = pow(rim, friendly_rim_power);
+		EMISSION += friendly_rim_color * rim * friendly_rim_strength;
 	}
 }

@@ -79,6 +79,61 @@ Governing rule: terrain saturation/brightness sits below unit paint; instant tac
 - **Bridges:** full brushed-aluminum treatment, unambiguously manufactured — hazard-stripe edge markings from the shared decal library, NEUTRAL-tinted (not faction-tinted), since bridges are a chokepoint/hazard players need to spot instantly.
 - **Resource nodes:** recommend their own fixed neutral high-saturation industrial yellow/orange (hazard-adjacent, not faction-adjacent, not terrain-adjacent) purely for at-a-glance economy-target legibility, like traffic-cone orange.
 
+## 4.1 Brightness Tier Hierarchy (Visual Readability Budget)
+
+Every pixel on screen competes for attention. The brightness tier system ensures gameplay-critical elements (units) always win over decorative elements (terrain, foliage). These are hard caps, not targets — decorative elements should sit at the floor of their tier, not the ceiling.
+
+| Tier | Element | Max Luminance | Notes |
+|---|---|---|---|
+| **1 — Units** | Hull albedo, livery, outline, rim-light | Unrestricted | Units are the loudest thing on screen. Livery picker may produce any color. Outline (enemy) and rim-light (friendly) operate here. |
+| **2 — Buildings** | Refineries, manufactories, HQ | 0.75 | Man-made structures need to be readable as faction assets but must not outshine units fighting around them. |
+| **3 — Decorative foliage** | Trees, bushes, rocks | 0.45 | Foliage is a backdrop. Tree transmission/backlight is capped at 0.12 (see tree_foliage.gdshader). Grass base→tip spread is compressed to 0.06 luminance. |
+| **4 — Terrain** | Ground textures, cliffs | 0.38 | Terrain desaturated (0.25) and slightly lifted (0.04 exposure). Mip bias 0.5 suppresses micro-detail at distance. |
+| **5 — Sky/fog** | Procedural sky, volumetric fog | N/A | Sky and fog set the ambient light floor, not the ceiling. They should never be the brightest element in frame. |
+
+**Why these numbers:** A unit at full brightness (tier 1) against terrain at tier 4 gives a contrast ratio of ~2.6:1 — enough for silhouette detection at RTS zoom. If a decorative element exceeds its tier, it steals attention from units and degrades the "units are the loud thing" principle (CORE_DESIGN_LANGUAGE §1).
+
+**Enforcement:** The tree and grass shaders have hard caps in code (BACKLIGHT capped at 0.18, grass backlight removed entirely). Terrain has built-in desaturation and mip bias. Future decorative assets (new tree species, bush meshes, rock props) must be authored within their tier's luminance cap. When in doubt, go darker — a dim decorative element is invisible, but a bright one is a distraction.
+
+## 4.2 Team-Color Mask Workflow (Future Implementation)
+
+The current livery system tints the entire hull uniformly per zone. A mask-channel approach would restrict team-color to specific regions (trim, chevrons, turret bands) while keeping the base hull at a controlled neutral value. This section documents the intended workflow for when the mask channel is implemented.
+
+### Shader Side (hull_faction_material.gdshader)
+
+Add a `uniform sampler2D team_color_mask` that uses the **alpha channel** as the mask:
+- Alpha = 1.0 → full team-color tint (livery zone color applied)
+- Alpha = 0.0 → no tint (base hull albedo preserved)
+- Alpha 0.0–1.0 → partial tint (blend between base and team-color)
+
+The mask replaces the current geometric `_zone_mask()` function, which uses hull height/Y position as a proxy. A texture mask is authorable and precise.
+
+### GIMP Workflow for Mask Authoring
+
+1. **Export the hull's albedo texture** from Blender as a PNG (the base color map already exists at `assets/models/hulls/<id>.png` or similar).
+
+2. **Open in GIMP** and add a new layer named `team_color_mask` above the albedo.
+
+3. **Paint the mask in grayscale:**
+   - White (255) = team-color region (trim, chevrons, turret band)
+   - Black (0) = base hull (rivets, panels, mechanical detail)
+   - Gray (128) = partial blend (transition zones, weathering edges)
+
+4. **Typical mask regions for a hull:**
+   - Hull lower (floor): black — base hull, never team-tinted
+   - Hull upper (walls): white — primary team-color area
+   - Hull stripe (accent bands): white — team-color chevron/racing stripe
+   - Weapon action: black — mechanical, never team-tinted
+   - Weapon barrel: gray-to-white — subtle team tint on barrel shroud
+
+5. **Save the mask as the alpha channel** of the albedo texture (GIMP: Colors > Components > Decompose → edit alpha → Recompose), or as a separate grayscale PNG named `<hull_id>_team_mask.png`.
+
+6. **Import into Godot** alongside the hull mesh. The shader samples it via `hint_default_white` (defaults to all-white = full team-color everywhere, matching current behavior).
+
+### Migration Path
+
+The existing5-zone geometric system continues to work as the fallback. The mask texture is optional — hulls without a mask get the current behavior. Hulls with a mask get the precise per-region tinting. This means no existing assets break, and new hulls can be authored with masks incrementally.
+
 ## 5. Suggested Implementation Priority
 1. Build shared shader + mask-bake pipeline against ONE hull and ONE module first, validate the stretch/scale handling (section 2.4) before touching faction data at all — this is the one piece of real technical risk in the whole system.
 2. Author the 3 existing factions as data rows against that shader to prove the parameter set covers the intended range.

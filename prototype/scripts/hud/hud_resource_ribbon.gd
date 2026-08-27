@@ -60,8 +60,8 @@ func _build() -> void:
 	row.add_child(_credits)
 
 	row.add_child(Icons.rect("income", 14, Style.OK))
-	_income = Style.readout("0.0/s", Style.SZ_SMALL, Style.TEXT_DIM)
-	_income.custom_minimum_size = Vector2(52, 0)
+	_income = Style.readout("0.0/s", Style.SZ_HEAD, Style.TEXT_DIM)
+	_income.custom_minimum_size = Vector2(64, 0)
 	row.add_child(_income)
 
 	row.add_child(Style.divider(true))
@@ -76,7 +76,7 @@ func _build() -> void:
 	power_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	power_col.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(power_col)
-	_power = Style.readout("0 / 0", Style.SZ_SMALL, Style.TEXT_DIM)
+	_power = Style.readout("0 / 0", Style.SZ_HEAD, Style.TEXT_DIM)
 	_power.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	power_col.add_child(_power)
 	_power_bar = Style.bar(3, Style.POWER)
@@ -85,7 +85,7 @@ func _build() -> void:
 	row.add_child(Style.divider(true))
 
 	row.add_child(Style.heading("army"))
-	_army = Style.readout("0", Style.SZ_SMALL, Style.TEXT)
+	_army = Style.readout("0", Style.SZ_HEAD, Style.TEXT)
 	# 20, not 32: right-aligned in a 32 px box left the count sitting a visible gap
 	# away from its own ARMY label.
 	_army.custom_minimum_size = Vector2(20, 0)
@@ -93,7 +93,7 @@ func _build() -> void:
 
 	row.add_child(Style.divider(true))
 
-	_clock = Style.readout("0:00", Style.SZ_SMALL, Style.TEXT_DIM)
+	_clock = Style.readout("0:00", Style.SZ_HEAD, Style.TEXT_DIM)
 	_clock.custom_minimum_size = Vector2(44, 0)
 	row.add_child(_clock)
 

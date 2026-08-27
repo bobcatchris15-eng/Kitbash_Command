@@ -404,3 +404,33 @@ func _apply_ui_scale(s: float) -> void:
 	var f: float = clampf(float(s), 0.8, 1.5)
 	scale = Vector2(f, f)
 	fit_to_viewport()
+
+
+# --- Test Range mode ---------------------------------------------------------
+#
+# DIM EVERYTHING THAT IS NOT THE TEST UNIT. The Test Range is the player's
+# sandbox for one design at a time; every chrome element that is game-wide
+# (resource ribbon, alert log) gets pulled to a low alpha so the eye lands
+# on the unit under test first. Per-unit chrome (HP bars, selection rings)
+# lives in the 3D world, not here, and is untouched.
+#
+# WHY ONLY ribbon AND alert_log, not the whole HUD. The production deck and
+# minimap are already .visible = false in test range (match_rule_set.gd:336-338),
+# so dimming them would do nothing. The command card reflects the selected
+# unit's actions, which IS the unit under test in the test range - the
+# whole point of the panel is to show that unit's orders. The hint banner
+# is a momentary flash, not persistent chrome.
+#
+# ALPHA 0.42 matches the production deck's "future" disabled state
+# (hud_production_deck.gd:474) - one dim value across the HUD so the eye
+# reads "this is the same dim treatment, applied to non-test chrome" rather
+# than three different greys fighting each other.
+const TEST_RANGE_DIM_ALPHA := 0.42
+
+
+func set_test_range_mode(enabled: bool) -> void:
+	var dim: float = TEST_RANGE_DIM_ALPHA if enabled else 1.0
+	if ribbon != null:
+		ribbon.modulate.a = dim
+	if alert_log != null:
+		alert_log.modulate.a = dim

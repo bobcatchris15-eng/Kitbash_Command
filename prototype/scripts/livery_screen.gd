@@ -794,7 +794,25 @@ func _on_color_changed(color: Color, zone_id: String) -> void:
 	if not _livery.has(zone_id):
 		_livery[zone_id] = {}
 	_livery[zone_id]["color"] = color
+	_check_livery_contrast(color, zone_id)
 	_apply_live()
+
+
+# Livery contrast validation: warn if the picked color is too close to the
+# average terrain luminance. Uses WCAG contrast ratio; warns below 1.5:1
+# (the "barely distinguishable" threshold for adjacent same-size elements).
+# Terrain reference: average ground albedo ≈ 0.28 luminance (green/brown mix).
+const _TERRAIN_LUMINANCE := 0.28
+const _CONTRAST_WARN_THRESHOLD := 1.5
+
+func _check_livery_contrast(color: Color, zone_id: String) -> void:
+	var luma := color.get_luminance()
+	var lighter := max(luma, _TERRAIN_LUMINANCE)
+	var darker := min(luma, _TERRAIN_LUMINANCE)
+	var ratio := (lighter + 0.05) / (darker + 0.05)
+	if ratio < _CONTRAST_WARN_THRESHOLD:
+		var zone_label := zone_id.replace("_", " ").capitalize()
+		push_warning("LIVERY: %s color (luminance %.2f) has low contrast against terrain (%.1f:1). Consider a lighter or darker pick." % [zone_label, luma, ratio])
 
 func _on_finish_selected(index: int, zone_id: String) -> void:
 	var ids := LiveryScript.finish_ids()

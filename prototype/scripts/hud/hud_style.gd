@@ -73,7 +73,7 @@ const HIT := 28
 const BAND_HEIGHT := 224.0
 const MAP_SIZE := 224.0
 const CARD_WIDTH := 320.0
-const RIBBON_HEIGHT := 34.0
+const RIBBON_HEIGHT := 40.0
 
 # --- Type -------------------------------------------------------------------
 const FONT_UI := "res://assets/fonts/UIFont-Regular.ttf"

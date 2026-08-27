@@ -166,6 +166,7 @@ static func build(body: CharacterBody3D, blueprint_data: Dictionary, team: int,
 	if ModuleCatalog.needs_running_gear(locomotion_type):
 		_add_running_gear_collider(body, hull_node, base_size, bulk)
 	_add_selection_proxy(body, hull_node, base_size, bulk)
+	_apply_team_visuals(body, hull_node, team, {})
 
 	return {
 		"hull_node": hull_node,
@@ -495,3 +496,60 @@ static func build_nav_agent(body: CharacterBody3D, facts: Dictionary, controller
 	else:
 		agent.set_navigation_map(controller.get_ground_nav_map())
 	return agent
+
+
+# --- Team Outline / Rim-Light ------------------------------------------------
+# Applied once after hull construction. Enemies get an inverted-hull outline
+# (back-face pass, pushed outward). Friendlies get a rim-light uniform set on
+# their hull materials so the shader adds a subtle bright edge at silhouettes.
+
+const ENEMY_OUTLINE_SHADER = preload("res://shaders/enemy_outline.gdshader")
+const FRIENDLY_RIM_STRENGTH := 0.30
+const FRIENDLY_RIM_COLOR := Vector3(1.0, 0.95, 0.85)
+const FRIENDLY_RIM_POWER := 3.0
+const ENEMY_OUTLINE_WIDTH := 0.025
+const ENEMY_OUTLINE_COLOR := Color(0.0, 0.0, 0.0, 1.0)
+
+
+static func _apply_team_visuals(body: CharacterBody3D, hull_node: Node3D,
+		team: int, _facts: Dictionary) -> void:
+	if hull_node == null:
+		return
+	if team == 0:
+		_apply_enemy_outline(hull_node)
+	else:
+		_apply_friendly_rim(hull_node)
+
+
+static func _apply_enemy_outline(hull_node: Node3D) -> void:
+	var outline_mat := ShaderMaterial.new()
+	outline_mat.shader = ENEMY_OUTLINE_SHADER
+	outline_mat.set_shader_parameter("outline_color", ENEMY_OUTLINE_COLOR)
+	outline_mat.set_shader_parameter("outline_width", ENEMY_OUTLINE_WIDTH)
+	_add_outline_passes(hull_node, outline_mat)
+
+
+static func _apply_friendly_rim(hull_node: Node3D) -> void:
+	for child in hull_node.find_children("*", "", true, false):
+		if child is MeshInstance3D and child.material_override is ShaderMaterial:
+			var mat: ShaderMaterial = child.material_override
+			if mat.shader != null and "friendly_rim_strength" in mat.shader.get_shader_uniform_list():
+				mat.set_shader_parameter("friendly_rim_strength", FRIENDLY_RIM_STRENGTH)
+				mat.set_shader_parameter("friendly_rim_color", FRIENDLY_RIM_COLOR)
+				mat.set_shader_parameter("friendly_rim_power", FRIENDLY_RIM_POWER)
+
+
+static func _add_outline_passes(hull_node: Node3D, outline_mat: ShaderMaterial) -> void:
+	var outline_root := Node3D.new()
+	outline_root.name = "EnemyOutline"
+	hull_node.add_child(outline_root)
+	for child in hull_node.find_children("*", "", true, false):
+		if child is MeshInstance3D and child.mesh != null:
+			var mi := MeshInstance3D.new()
+			mi.mesh = child.mesh
+			mi.material_override = outline_mat
+			mi.cast_shadow = 0  # OFF
+			mi.gi_mode = 0  # DISABLED
+			# Inherit transform from the original mesh
+			mi.transform = child.transform
+			outline_root.add_child(mi)

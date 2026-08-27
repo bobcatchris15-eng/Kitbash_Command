@@ -188,6 +188,11 @@ func _on_blueprint_name_changed(new_text: String):
 	var hull = root.get_node_or_null("Hull") if root else null
 	if hull:
 		hull.set_meta("blueprint_name", new_text)
+		var abbr: String = BlueprintNamerScript.suggest_abbreviation(new_text)
+		if not abbr.is_empty():
+			hull.set_meta("blueprint_abbreviation", abbr)
+		elif hull.has_meta("blueprint_abbreviation"):
+			hull.remove_meta("blueprint_abbreviation")
 
 func _on_library_pressed():
 	var root = lab.get_node_or_null("/root/MainLab")
@@ -205,9 +210,10 @@ func _on_library_pressed():
 # armor has changed and whose modules have not.
 #
 # IN-SCENE SWAP. The Armor Station is NOT a separate scene. It is a
-# sub-mode of MainLab that swaps the parts bin for a paint toolkit,
-# swaps the cutting mat for a wood-desktop workbench, and strips the
-# hull's modules so the player can paint bare facets. The swap is
+# sub-mode of MainLab that swaps the parts bin for a paint toolkit and
+# the cutting mat for a wood-desktop workbench, and ghosts the hull's
+# modules (they stay attached - the armor plan is decided around the
+# design, not on an amputated chassis). The swap is
 # hidden by a pan_blur smear (pan_transition.gd) so the player's eye
 # reads it as a single "turn to the workbench" gesture, not three
 # discrete changes. The reverse pan (triggered by the panel's

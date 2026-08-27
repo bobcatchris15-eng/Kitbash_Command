@@ -464,6 +464,14 @@ func _add_entry_ui(entry: Dictionary) -> Control:
 	hull_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meta_hbox.add_child(hull_lbl)
 
+	var abbr: String = str(entry.get("abbreviation", "")).strip_edges()
+	if abbr != "":
+		var abbr_lbl = Label.new()
+		abbr_lbl.text = " | \"%s\"" % abbr
+		abbr_lbl.modulate = Color(0.75, 0.85, 0.95, 0.75)
+		abbr_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		meta_hbox.add_child(abbr_lbl)
+
 	var date_lbl = Label.new()
 	date_lbl.text = " | " + _format_modified(entry.get("modified_unix", 0))
 	date_lbl.modulate = Color(1, 1, 1, 0.4)

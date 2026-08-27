@@ -29,7 +29,11 @@ extends Camera3D
 # tracks world_scale for traversal).
 @export var zoom_step: float = 1.15
 @export var rotate_speed: float = 90.0
-@export var min_height: float = 16.0
+# Narrow FOV (25°) gives near-orthographic framing while preserving rotation
+# and subtle depth cueing. The old 70° showed too much sky/horizon. A narrow
+# perspective FOV is the standard RTS compromise — StarCraft 2 uses ~30°.
+@export var gameplay_fov: float = 25.0
+@export var min_height: float = 20.0
 # Skirmish refinement pass: maps grew to ~3x their original size (see
 # map_catalog.gd - two scale-up passes, 1.5x then another 2x after the
 # first still read as too small) and the old 45-unit cap meant you could
@@ -65,6 +69,9 @@ var _cam_attributes: CameraAttributesPractical = null
 func _ready():
 	height = clamp(global_position.y, min_height, max_height)
 	_apply_pitch()
+	# Apply narrow gameplay FOV — the scene's default is the old 70°; this
+	# overrides it on load so every scene gets the tight framing.
+	fov = gameplay_fov
 	# Grab the scene's CameraAttributesPractical if one is wired. This avoids
 	# creating a new DOF cost in scenes that don't have it configured.
 	if attributes != null and attributes is CameraAttributesPractical:
@@ -73,9 +80,11 @@ func _ready():
 
 
 func _apply_pitch():
-	# Steeper look-down when zoomed out
+	# Narrow FOV benefits from a slightly steeper angle than the old 70°
+	# default, but too steep flattens the depth layering and makes terrain
+	# greebling vanish. Split the difference: -45 (close) to -62 (far).
 	var t = (height - min_height) / (max_height - min_height)
-	rotation_degrees.x = lerp(-42.0, -62.0, t)
+	rotation_degrees.x = lerp(-45.0, -62.0, t)
 
 
 # Updates the tilt-shift far blur to track the ground at a wide band.

@@ -867,6 +867,16 @@ func _add_deck_card(parent: Control, title_text: String, description: String, sc
 	desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(desc_label)
 
+	# Persistent launch affordance — makes the card read as clickable at rest
+	var launch_affordance = Label.new()
+	launch_affordance.text = "SELECT >"
+	launch_affordance.theme_type_variation = "HintLabel"
+	launch_affordance.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	launch_affordance.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	launch_affordance.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	launch_affordance.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(launch_affordance)
+
 	UIFeedbackScript.wire(btn)
 	btn.pressed.connect(func():
 		if is_tutorial:

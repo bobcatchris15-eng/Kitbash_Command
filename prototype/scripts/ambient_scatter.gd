@@ -60,7 +60,7 @@ static func get_or_create(parent: Node) -> Node:
 	return batcher
 
 
-var _templates: Dictionary = {}      # scene_path -> Array[{mesh, xform}]
+static var _templates: Dictionary = {}      # scene_path -> Array[{mesh, xform, material}]
 var _pending: Dictionary = {}        # scene_path -> Array[Node3D]
 var _batches: Dictionary = {}        # scene_path -> Array[MultiMeshInstance3D]
 var _committed: bool = false
@@ -78,6 +78,7 @@ func register(scene_path: String, node: Node3D):
 		if t.is_empty():
 			return null
 		_templates[scene_path] = t
+	if not _pending.has(scene_path):
 		_pending[scene_path] = []
 	var slot: int = _pending[scene_path].size()
 	_pending[scene_path].append(node)
@@ -177,11 +178,22 @@ func _build_template(scene_path: String) -> Array:
 				if mat is StandardMaterial3D or mat is ORMMaterial3D or mat is BaseMaterial3D:
 					matte_mat.albedo_color = mat.albedo_color
 					matte_mat.albedo_texture = mat.albedo_texture
+					if mat.normal_enabled or mat.normal_texture != null:
+						matte_mat.normal_enabled = true
+						matte_mat.normal_texture = mat.normal_texture
+					if mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or (mat.albedo_texture != null and mat.albedo_texture.has_alpha()):
+						matte_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+						matte_mat.alpha_scissor_threshold = 0.45
+						matte_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+						# Backlight REMOVED: StandardMaterial3D backlight adds a
+						# translucent rim glow that makes foliage look like shiny
+						# plastic at RTS zoom. Leaves should be matte.
 				else:
 					matte_mat.albedo_color = Color(0.22, 0.28, 0.18)
-				matte_mat.roughness = 0.98
+				matte_mat.roughness = 1.0
 				matte_mat.metallic = 0.0
 				matte_mat.metallic_specular = 0.0
+				matte_mat.specular = 0.0
 				scene_materials[mat_key] = matte_mat
 
 			parts.append({"mesh": node.mesh, "xform": xform, "material": scene_materials[mat_key]})

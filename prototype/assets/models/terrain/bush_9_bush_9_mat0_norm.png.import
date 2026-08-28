@@ -2,15 +2,12 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://du8dp0678t7nu"
+uid="uid://bf26j1dreg8s5"
 path.s3tc="res://.godot/imported/bush_9_bush_9_mat0_norm.png-3d0bee4f3a4eeb1917121850dabb4fdb.s3tc.ctex"
 path.etc2="res://.godot/imported/bush_9_bush_9_mat0_norm.png-3d0bee4f3a4eeb1917121850dabb4fdb.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "c286fbd86ddcf3d2500a932f4b698b31"
 }
 
 [deps]

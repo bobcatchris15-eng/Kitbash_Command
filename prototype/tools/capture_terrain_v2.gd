@@ -135,7 +135,9 @@ func _initialize() -> void:
 	mi.material_override = TerrainBuilderScript.build_ground_material_for(
 		map_def.get("ground_color", Color(0.2, 0.26, 0.21)), map_def, _map_id)
 	world.add_child(mi)
-	print("[capture] ground mesh + material: %d ms" % (Time.get_ticks_msec() - t0))
+	var grass_chunks: int = TerrainBuilderScript.build_grass_shells(map_def, world, _map_id)
+	print("[capture] ground mesh + material: %d ms (grass shell chunks: %d)"
+		% [Time.get_ticks_msec() - t0, grass_chunks])
 
 	# --no-props isolates the GROUND. spawn_visuals with a null ticker runs
 	# fully synchronously - 162 s and ~3900 nodes on a map this size - which is
@@ -145,7 +147,7 @@ func _initialize() -> void:
 		print("[capture] props SKIPPED")
 	else:
 		var t1 := Time.get_ticks_msec()
-		await TerrainBuilderScript.spawn_visuals(map_def, world, null)
+		await TerrainBuilderScript.spawn_visuals(map_def, world, null, _map_id)
 		print("[capture] terrain dressing: %d ms, %d children" % [Time.get_ticks_msec() - t1, world.get_child_count()])
 
 	# --refplane drops calibration patches of KNOWN albedo beside the target.

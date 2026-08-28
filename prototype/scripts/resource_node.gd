@@ -366,6 +366,7 @@ func setup(res_type: String, res_amount: int):
 		fallback.material_override = mat
 		mesh_inst = fallback
 	if mesh_inst != null:
+		_matte_authored_mesh(mesh_inst)
 		var finish_script = load("res://scripts/battle/battle_finish.gd")
 		if finish_script != null:
 			finish_script.apply(mesh_inst)
@@ -402,6 +403,34 @@ func setup(res_type: String, res_amount: int):
 		label.position = Vector3(0, 3.0, 0)
 		add_child(label)
 		_update_label()
+
+
+func _matte_authored_mesh(root: Node) -> void:
+	if root == null:
+		return
+	if root is MeshInstance3D:
+		var mi: MeshInstance3D = root
+		if mi.mesh != null:
+			for si in range(mi.mesh.get_surface_count()):
+				var src_mat = mi.mesh.surface_get_material(si)
+				if src_mat is StandardMaterial3D or src_mat is ORMMaterial3D or src_mat is BaseMaterial3D:
+					var matte_mat = StandardMaterial3D.new()
+					matte_mat.albedo_color = src_mat.albedo_color
+					matte_mat.albedo_texture = src_mat.albedo_texture
+					if src_mat.normal_enabled or src_mat.normal_texture != null:
+						matte_mat.normal_enabled = true
+						matte_mat.normal_texture = src_mat.normal_texture
+					if src_mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or (src_mat.albedo_texture != null and src_mat.albedo_texture.has_alpha()):
+						matte_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+						matte_mat.alpha_scissor_threshold = 0.45
+						matte_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+					matte_mat.roughness = 1.0
+					matte_mat.metallic = 0.0
+					matte_mat.metallic_specular = 0.0
+					matte_mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+					mi.set_surface_override_material(si, matte_mat)
+	for c in root.get_children():
+		_matte_authored_mesh(c)
 
 
 # Walk the imported scene tree under `root` and set cast_shadow=OFF on every

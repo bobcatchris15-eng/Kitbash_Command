@@ -178,6 +178,11 @@ static func build(body: CharacterBody3D, blueprint_data: Dictionary, team: int,
 		"is_fixed_wing": "fixed_wing" in traits,
 		"is_naval": "naval" in traits,
 		"is_amphibious": "amphibious" in traits,
+		# A hovercraft rides on a cushion of air; there is nothing about water
+		# it cares about. Only hovercraft_skirt carried BOTH "hovering" and
+		# "amphibious", so hover_engine, grav_plates and the rest were being
+		# routed onto the GROUND navmesh and treated a lake as a wall.
+		"is_hovering": "hovering" in traits,
 		"hull_draught": ModuleCatalog.get_hull_draught(hull_type_hint),
 		"base_size": base_size,
 		"max_hp": max_hp,
@@ -491,7 +496,11 @@ static func build_nav_agent(body: CharacterBody3D, facts: Dictionary, controller
 			agent.set_navigation_map(controller.get_deep_water_nav_map())
 		else:
 			agent.set_navigation_map(controller.get_water_nav_map())
-	elif facts.get("is_amphibious", false) and controller.has_method("get_amphibious_nav_map"):
+	elif (facts.get("is_amphibious", false) or facts.get("is_hovering", false)) 			and controller.has_method("get_amphibious_nav_map"):
+		# Amphibious AND hovering share the amphibious map: it is the surface
+		# that covers land and water alike. Flying units never get here at all -
+		# they return null above and steer directly, so they already cross
+		# anything.
 		agent.set_navigation_map(controller.get_amphibious_nav_map())
 	else:
 		agent.set_navigation_map(controller.get_ground_nav_map())

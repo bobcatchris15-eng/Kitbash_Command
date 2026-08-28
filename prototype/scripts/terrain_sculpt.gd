@@ -29,9 +29,8 @@ enum Mode {
 enum SculptTool {
 	RAISE = 0,
 	LOWER = 1,
-	STAMP = 2,
-	SMOOTH = 3,
-	FLATTEN = 4,
+	SMOOTH = 2,
+	FLATTEN = 3,
 }
 
 enum GreebleType {
@@ -39,15 +38,11 @@ enum GreebleType {
 	BOULDER = 1,
 	SPIRE = 2,
 	SHRUB = 3,
-	CLIFF_FACE = 4,
-	ERASER = 5,
+	ERASER = 4,
 }
 
-const CLIFF_FACE_MODELS := ["face_0", "face_1", "face_2", "face_3", "strata_0", "strata_1", "strata_2"]
-const CLIFF_MODEL_TEMPLATE := "res://assets/models/terrain/cliff_%s.glb"
-
-const PREVIEW_DIVS := 96
-const SCULPT_GRID_DIM := 96
+const PREVIEW_DIVS := 128
+const SCULPT_GRID_DIM := 192
 const SPLAT_RES := 512
 
 const AMBIENT_TREE_MODEL_DIR := "res://assets/models/terrain/ambient_tree_%d.glb"
@@ -168,6 +163,16 @@ var _flatten_target_h: float = 0.0
 var _flatten_anchor_set: bool = false
 
 var _paint_surface: String = "forest"
+# Painted water. _water_img is the RGBA raster TerrainBuilder decodes (R
+# coverage, GB a 16-bit surface height); _water_paint_level is the height the
+# brush lays down, and _water_level_follow_ground samples the terrain under the
+# cursor instead, which is how you fill a valley you just carved without
+# reading its depth off a spinbox first.
+var _water_img: Image = null
+var _water_paint_level: float = 0.0
+var _water_level_follow_ground: bool = true
+var _water_paint_erase: bool = false
+var _painted_water_node: MeshInstance3D = null
 var _paint_brush_size: float = 35.0
 var _paint_strength: float = 0.75
 
@@ -206,6 +211,9 @@ var _status: Label = null
 var _scale_readout: Label = null
 var _new_map_dialog: PanelContainer = null
 var _ring_material: StandardMaterial3D = null
+var _last_ring_radius: float = -1.0
+var _cursor_dirty: bool = true
+var _last_flat_stamp_pos: Vector3 = Vector3(INF, INF, INF)
 
 
 func _ready() -> void:
@@ -239,7 +247,8 @@ func _push_undo() -> void:
 	var snapshot := {
 		"map": _map.duplicate(true),
 		"props": _props_list.duplicate(true),
-		"splat_img": _splat_img.duplicate() if _splat_img != null else null
+		"splat_img": _splat_img.duplicate() if _splat_img != null else null,
+		"water_img": _water_img.duplicate() if _water_img != null else null
 	}
 	_undo_stack.append(snapshot)
 	if _undo_stack.size() > MAX_UNDO_STATES:
@@ -255,6 +264,10 @@ func _undo() -> void:
 	_props_list = snapshot["props"].duplicate(true)
 	_map["props"] = _props_list
 
+	if snapshot.has("water_img"):
+		var wi = snapshot["water_img"]
+		_water_img = (wi as Image).duplicate() if wi != null else null
+		_refresh_painted_water_preview()
 	if snapshot.has("splat_img") and snapshot["splat_img"] != null:
 		var img_copy: Image = snapshot["splat_img"]
 		_splat_img = img_copy.duplicate()
@@ -299,8 +312,7 @@ func _build_world() -> void:
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(0.55, 0.55, 0.52)
 	e.ambient_light_energy = 0.95
-	e.ssao_enabled = true
-	e.ssao_radius = 2.0
+	e.ssao_enabled = false
 	env.environment = e
 	add_child(env)
 
@@ -308,7 +320,7 @@ func _build_world() -> void:
 	sun.light_energy = 1.8
 	sun.rotation_degrees = Vector3(-52.0, 34.0, 0.0)
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 2800.0
+	sun.directional_shadow_max_distance = 600.0
 	add_child(sun)
 
 	_ground = MeshInstance3D.new()
@@ -414,6 +426,9 @@ func _update_preview_line(p_start: Vector3, p_end: Vector3, width: float = 14.0)
 func _update_cursor_ring_mesh(radius: float) -> void:
 	if _cursor_ring == null:
 		return
+	if is_equal_approx(radius, _last_ring_radius):
+		return
+	_last_ring_radius = radius
 	var im: ImmediateMesh = _cursor_ring.mesh as ImmediateMesh
 	if im == null:
 		return
@@ -526,6 +541,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif _mode == Mode.GREEBLES:
 				_greeble_radius = minf(300.0, _greeble_radius + 5.0)
 				_update_cursor_ring_mesh(_greeble_radius)
+		elif event.keycode == KEY_MINUS and not event.ctrl_pressed:
+			if _mode == Mode.GREEBLES:
+				_greeble_scale_min = maxf(0.2, _greeble_scale_min * 0.85)
+				_greeble_scale_max = maxf(0.3, _greeble_scale_max * 0.85)
+				_set_status("Prop Placement Scale: %.1fx - %.1fx" % [_greeble_scale_min, _greeble_scale_max], Tokens.SIGNAL_GO)
+		elif (event.keycode == KEY_EQUAL or event.keycode == KEY_PLUS) and not event.ctrl_pressed:
+			if _mode == Mode.GREEBLES:
+				_greeble_scale_min = minf(30.0, _greeble_scale_min * 1.15)
+				_greeble_scale_max = minf(40.0, _greeble_scale_max * 1.15)
+				_set_status("Prop Placement Scale: %.1fx - %.1fx" % [_greeble_scale_min, _greeble_scale_max], Tokens.SIGNAL_GO)
 
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
@@ -547,7 +572,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	elif event is InputEventMouseMotion:
 		_mouse_screen_pos = event.position
-		_update_cursor_position(event.position)
+		_cursor_dirty = true
 		
 		var is_orbit: bool = ((event.button_mask & MOUSE_BUTTON_MASK_RIGHT) != 0) or (((event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0) and event.alt_pressed)
 		if is_orbit:
@@ -561,11 +586,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			var fwd := Vector3(right.z, 0.0, -right.x) if not _is_topdown else -_cam.global_transform.basis.y
 			_cam_pivot.position -= (right * event.relative.x + fwd * -event.relative.y) * (_cam_dist * 0.0015)
 		elif _is_mouse_down and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0 and not event.alt_pressed:
+			_update_cursor_position(event.position)
+			_cursor_dirty = false
 			_handle_drag(event.position, event.ctrl_pressed, event.shift_pressed)
 
 
 func _process(delta: float) -> void:
-	var focus_owner = get_viewport().gui_get_focus_owner()
+	var vp := get_viewport()
+	var focus_owner = vp.gui_get_focus_owner() if vp != null else null
 	var is_typing: bool = (focus_owner is LineEdit or focus_owner is TextEdit)
 	
 	if not is_typing:
@@ -606,13 +634,21 @@ func _process(delta: float) -> void:
 			_cam_pivot.position += p_dir.normalized() * pan_speed
 			_update_camera()
 
+	if _cursor_dirty and not _is_mouse_down:
+		_cursor_dirty = false
+		_update_cursor_position(_mouse_screen_pos)
+
 	if _is_mouse_down and _has_valid_hit:
 		if _mode == Mode.SCULPT:
 			var ctrl := Input.is_key_pressed(KEY_CTRL)
 			var shift := Input.is_key_pressed(KEY_SHIFT)
-			var is_stamp_falloff := (_brush_falloff == "stamp" or _brush_falloff == "flat" or _sculpt_tool == SculptTool.STAMP)
-			if not is_stamp_falloff:
+			if _brush_falloff != "flat":
 				_apply_sculpt_stroke(_last_hit_point, delta, ctrl, shift)
+			else:
+				var dist_moved := (_last_hit_point - _last_flat_stamp_pos).length()
+				if dist_moved >= _brush_radius * 0.35:
+					_apply_sculpt_stroke(_last_hit_point, delta, ctrl, shift)
+					_last_flat_stamp_pos = _last_hit_point
 		elif _mode == Mode.PAINT:
 			_apply_paint_stroke(_last_hit_point, delta)
 		elif _mode == Mode.GREEBLES and not _greeble_single_click:
@@ -654,8 +690,6 @@ func _update_cursor_position(screen_pos: Vector2) -> void:
 					_ring_material.albedo_color = Color(0.2, 0.7, 1.0, 0.95)
 				SculptTool.FLATTEN:
 					_ring_material.albedo_color = Color(1.0, 0.9, 0.2, 0.95)
-				SculptTool.STAMP:
-					_ring_material.albedo_color = Color(1.0, 0.55, 0.15, 0.95)
 		elif _mode == Mode.PAINT:
 			_update_cursor_ring_mesh(_paint_brush_size)
 			_ring_material.albedo_color = _get_surface_color(_paint_surface)
@@ -722,9 +756,8 @@ func _handle_click(screen_pos: Vector2, ctrl: bool, shift: bool) -> void:
 			_apply_greeble_stroke(_last_hit_point, 0.1)
 	elif _mode == Mode.SCULPT:
 		_push_undo()
-		if _sculpt_tool == SculptTool.STAMP:
-			_apply_stamp(_last_hit_point, ctrl)
-		elif _sculpt_tool == SculptTool.FLATTEN and not _flatten_anchor_set:
+		_last_flat_stamp_pos = _last_hit_point
+		if _sculpt_tool == SculptTool.FLATTEN and not _flatten_anchor_set:
 			_flatten_target_h = _last_hit_point.y
 			_flatten_anchor_set = true
 			_apply_sculpt_stroke(_last_hit_point, 0.05, ctrl, shift)
@@ -964,96 +997,19 @@ func _init_props_list() -> void:
 
 
 
-
-func _auto_add_cliff_meshes_to_steep_slopes(min_slope_deg: float = 75.0) -> void:
-	if _map.is_empty():
+func _update_rock_shader_params() -> void:
+	if _ground == null or _ground.material_override == null:
 		return
-	_push_undo()
-	
-	var half: float = float(_map.get("map_half_extents", 960.0))
-	var step := 18.0
-	var added_count := 0
-	var min_dist_sq := 14.0 * 14.0
-	
-	var x := -half + step * 0.5
-	while x < half:
-		var z := -half + step * 0.5
-		while z < half:
-			var h := TerrainBuilderScript.height_at(_map, x, z)
-			if h > 0.5:
-				var norm := _get_terrain_normal(x, z)
-				var slope_deg := rad_to_deg(acos(clampf(norm.y, 0.0, 1.0)))
-				if slope_deg >= min_slope_deg:
-					var too_close := false
-					for p in _props_list:
-						var ptype: String = str(p.get("type", ""))
-						if ptype.begins_with("cliff"):
-							var pos_arr = p.get("pos", [0, 0, 0])
-							var dx: float = float(pos_arr[0]) - x
-							var dz: float = float(pos_arr[2]) - z
-							if dx * dx + dz * dz < min_dist_sq:
-								too_close = true
-								break
-					
-					if not too_close:
-						var yaw := atan2(-norm.x, -norm.z)
-						var var_id := randi() % CLIFF_FACE_MODELS.size()
-						var s := randf_range(1.2, 2.0)
-						_props_list.append({
-							"type": "cliff_face",
-							"variant": var_id,
-							"pos": [snappedf(x, 0.2), snappedf(h, 0.2), snappedf(z, 0.2)],
-							"scale": snappedf(s, 0.05),
-							"yaw": snappedf(yaw, 0.05)
-						})
-						added_count += 1
-			z += step
-		x += step
-
-	if added_count > 0:
-		_map["props"] = _props_list
-		_refresh_props_multimesh()
-		_dirty = true
-		_set_status("Auto-added %d exposed rock face meshes on slopes >%.0f° (Undo with Ctrl+Z)." % [added_count, min_slope_deg], Tokens.SIGNAL_GO)
-	else:
-		_set_status("No slopes >%.0f° found to place cliff meshes." % min_slope_deg, Tokens.TEXT_SECONDARY)
-
-
-func _prune_overlapping_cliff_meshes(min_dist: float = 6.0) -> void:
-	if _props_list.is_empty():
+	var sm = _ground.material_override as ShaderMaterial
+	if sm == null:
 		return
-	_push_undo()
-	var kept_props: Array = []
-	var cliff_positions: Array = []
-	var removed := 0
-	var min_dist_sq := min_dist * min_dist
-	
-	for p in _props_list:
-		var ptype_str: String = str(p.get("type", ""))
-		if ptype_str.begins_with("cliff") or ptype_str.begins_with("rock_face"):
-			var pos_arr = p.get("pos", [0, 0, 0])
-			var pos_v := Vector2(float(pos_arr[0]), float(pos_arr[2]))
-			var overlap := false
-			for cp in cliff_positions:
-				if (pos_v - cp).length_squared() < min_dist_sq:
-					overlap = true
-					break
-			if overlap:
-				removed += 1
-			else:
-				cliff_positions.append(pos_v)
-				kept_props.append(p)
-		else:
-			kept_props.append(p)
-			
-	if removed > 0:
-		_props_list = kept_props
-		_map["props"] = _props_list
-		_refresh_props_multimesh()
-		_dirty = true
-		_set_status("Pruned %d overlapping cliff meshes to eliminate Z-fighting judder." % removed, Tokens.SIGNAL_GO)
-	else:
-		_set_status("No overlapping cliff meshes found (spacing is clean).", Tokens.TEXT_SECONDARY)
+	var terr: Dictionary = _map.get("terrain", {}) if typeof(_map.get("terrain", {})) == TYPE_DICTIONARY else {}
+	sm.set_shader_parameter("rock_pattern", int(terr.get("rock_pattern", 0)))
+	sm.set_shader_parameter("rock_strata_strength", float(terr.get("rock_strata_strength", 1.1)))
+	sm.set_shader_parameter("rock_bump_strength", float(terr.get("rock_bump_strength", 1.6)))
+	sm.set_shader_parameter("rock_strata_scale", float(terr.get("rock_strata_scale", 0.16)))
+	sm.set_shader_parameter("rock_joint_scale", float(terr.get("rock_joint_scale", 0.08)))
+
 
 func _scale_all_props(factor: float) -> void:
 	if _props_list.is_empty():
@@ -1061,11 +1017,30 @@ func _scale_all_props(factor: float) -> void:
 	_push_undo()
 	for p in _props_list:
 		var s: float = float(p.get("scale", 1.0)) * factor
-		p["scale"] = snappedf(s, 0.05)
+		p["scale"] = snappedf(clampf(s, 0.2, 50.0), 0.05)
 	_map["props"] = _props_list
 	_refresh_props_multimesh()
 	_dirty = true
 	_set_status("Scaled %d props by %.2fx (Undo with Ctrl+Z)." % [_props_list.size(), factor], Tokens.SIGNAL_GO)
+
+func _scale_rock_props(factor: float) -> void:
+	if _props_list.is_empty():
+		return
+	_push_undo()
+	var count := 0
+	for p in _props_list:
+		var ptype: String = str(p.get("type", ""))
+		if ptype.begins_with("boulder") or ptype.begins_with("rock") or ptype.begins_with("spire"):
+			var s: float = float(p.get("scale", 1.0)) * factor
+			p["scale"] = snappedf(clampf(s, 0.2, 50.0), 0.05)
+			count += 1
+	if count > 0:
+		_map["props"] = _props_list
+		_refresh_props_multimesh()
+		_dirty = true
+		_set_status("Scaled %d boulders & rocks by %.2fx (Undo with Ctrl+Z)." % [count, factor], Tokens.SIGNAL_GO)
+	else:
+		_set_status("No boulders or rocks found on map.", Tokens.TEXT_SECONDARY)
 
 func _place_single_greeble(hit: Vector3) -> void:
 	var ptype := "tree"
@@ -1079,25 +1054,9 @@ func _place_single_greeble(hit: Vector3) -> void:
 	elif _greeble_tool == GreebleType.SHRUB:
 		ptype = "shrub"
 		var_id = randi() % SHRUB_POOL_SIZE
-	elif _greeble_tool == GreebleType.CLIFF_FACE:
-		ptype = "cliff_face"
-		var_id = randi() % CLIFF_FACE_MODELS.size()
-		# Anti-stacking check to prevent Z-fighting visual judder
-		for p in _props_list:
-			var ptype_str: String = str(p.get("type", ""))
-			if ptype_str.begins_with("cliff") or ptype_str.begins_with("rock_face"):
-				var pos_arr = p.get("pos", [0, 0, 0])
-				var dx: float = float(pos_arr[0]) - hit.x
-				var dz: float = float(pos_arr[2]) - hit.z
-				if dx * dx + dz * dz < 6.0 * 6.0:
-					_set_status("Cliff face already placed here (min 6m spacing to prevent visual judder).", Tokens.TEXT_SECONDARY)
-					return
 
 	var scale_val := randf_range(_greeble_scale_min, _greeble_scale_max)
 	var yaw_val := randf_range(0.0, TAU)
-	if _greeble_tool == GreebleType.CLIFF_FACE:
-		var norm := _get_terrain_normal(hit.x, hit.z)
-		yaw_val = atan2(-norm.x, -norm.z)
 
 	_props_list.append({
 		"type": ptype,
@@ -1134,10 +1093,7 @@ func _apply_greeble_stroke(hit: Vector3, dt: float) -> void:
 		return
 
 	# Scatter new props within radius
-	var is_cliff := (_greeble_tool == GreebleType.CLIFF_FACE)
-	var spawn_rate := 1 if is_cliff else maxi(1, int(round(_greeble_density * dt * 90.0)))
-	var min_cliff_dist_sq := 7.0 * 7.0
-
+	var spawn_rate := maxi(1, int(round(_greeble_density * dt * 90.0)))
 	var rad := _greeble_radius
 	var added := 0
 	for i in range(spawn_rate):
@@ -1151,20 +1107,6 @@ func _apply_greeble_stroke(hit: Vector3, dt: float) -> void:
 		if py < -0.5:
 			continue
 
-		if is_cliff:
-			var too_close := false
-			for p in _props_list:
-				var ptype_str: String = str(p.get("type", ""))
-				if ptype_str.begins_with("cliff") or ptype_str.begins_with("rock_face"):
-					var pos_arr = p.get("pos", [0, 0, 0])
-					var dx: float = float(pos_arr[0]) - px
-					var dz: float = float(pos_arr[2]) - pz
-					if dx * dx + dz * dz < min_cliff_dist_sq:
-						too_close = true
-						break
-			if too_close:
-				continue
-
 		var ptype := "tree"
 		var var_id := randi() % AMBIENT_TREE_POOL_SIZE
 		if _greeble_tool == GreebleType.BOULDER:
@@ -1176,15 +1118,9 @@ func _apply_greeble_stroke(hit: Vector3, dt: float) -> void:
 		elif _greeble_tool == GreebleType.SHRUB:
 			ptype = "shrub"
 			var_id = randi() % SHRUB_POOL_SIZE
-		elif _greeble_tool == GreebleType.CLIFF_FACE:
-			ptype = "cliff_face"
-			var_id = randi() % CLIFF_FACE_MODELS.size()
 
 		var scale_val := randf_range(_greeble_scale_min, _greeble_scale_max)
 		var yaw_val := randf_range(0.0, TAU)
-		if _greeble_tool == GreebleType.CLIFF_FACE:
-			var norm := _get_terrain_normal(px, pz)
-			yaw_val = atan2(-norm.x, -norm.z)
 
 		_props_list.append({
 			"type": ptype,
@@ -1215,7 +1151,6 @@ func _refresh_props_multimesh() -> void:
 	var boulder_xforms: Dictionary = {}
 	var spire_xforms: Dictionary = {}
 	var shrub_xforms: Dictionary = {}
-	var cliff_xforms: Dictionary = {}
 
 	for prop in _props_list:
 		var ptype: String = str(prop.get("type", "tree"))
@@ -1244,20 +1179,12 @@ func _refresh_props_multimesh() -> void:
 			var v := var_id % SHRUB_POOL_SIZE
 			if not shrub_xforms.has(v): shrub_xforms[v] = []
 			shrub_xforms[v].append(xf)
-		elif ptype == "cliff_face" or ptype.begins_with("cliff") or ptype.begins_with("rock_face"):
-			var v := var_id % CLIFF_FACE_MODELS.size()
-			if not cliff_xforms.has(v): cliff_xforms[v] = []
-			cliff_xforms[v].append(xf)
 
 	# Batch into MultiMeshes
 	_spawn_editor_multimeshes(AMBIENT_TREE_MODEL_DIR, tree_xforms, Color(0.24, 0.40, 0.20))
 	_spawn_editor_multimeshes(BOULDER_MODEL_DIR, boulder_xforms, Color(0.48, 0.44, 0.40))
 	_spawn_editor_multimeshes(ROCK_SPIRE_MODEL_DIR, spire_xforms, Color(0.42, 0.38, 0.35))
 	_spawn_editor_multimeshes(SHRUB_MODEL_DIR, shrub_xforms, Color(0.28, 0.45, 0.22))
-	for v in cliff_xforms.keys():
-		var glb_name: String = CLIFF_FACE_MODELS[v % CLIFF_FACE_MODELS.size()]
-		var single_dict: Dictionary = {0: cliff_xforms[v]}
-		_spawn_editor_multimeshes(CLIFF_MODEL_TEMPLATE % glb_name, single_dict, Color(0.46, 0.44, 0.42))
 
 
 func _spawn_editor_multimeshes(template_path: String, xforms_by_variant: Dictionary, fallback_color: Color) -> void:
@@ -1284,6 +1211,7 @@ func _spawn_editor_multimeshes(template_path: String, xforms_by_variant: Diction
 			var mat := StandardMaterial3D.new()
 			mat.albedo_color = fallback_color
 			mmi.material_override = mat
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_props_node.add_child(mmi)
 			continue
 
@@ -1298,6 +1226,9 @@ func _spawn_editor_multimeshes(template_path: String, xforms_by_variant: Diction
 			for i in range(xf_list.size()):
 				mm.set_instance_transform(i, (xf_list[i] as Transform3D) * local_xf)
 			mmi.multimesh = mm
+			if p.has("material") and p["material"] != null:
+				mmi.material_override = p["material"]
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_props_node.add_child(mmi)
 
 
@@ -1305,12 +1236,34 @@ func _spawn_editor_multimeshes(template_path: String, xforms_by_variant: Diction
 # FAST RAYMARCH & NORMAL HELPERS
 # ==============================================================================
 
+func _sample_height_fast(x: float, z: float) -> float:
+	var half: float = float(_map.get("map_half_extents", 960.0))
+	var divs: int = PREVIEW_DIVS
+	var stride: int = divs + 1
+	if _grid_heights.size() == stride * stride and absf(x) <= half and absf(z) <= half:
+		var step_size: float = (half * 2.0) / float(divs)
+		var gx: float = (x + half) / step_size
+		var gz: float = (z + half) / step_size
+		var ix: int = clampi(int(floor(gx)), 0, divs - 1)
+		var iz: int = clampi(int(floor(gz)), 0, divs - 1)
+		var fx: float = gx - float(ix)
+		var fz: float = gz - float(iz)
+		var h00: float = _grid_heights[ix * stride + iz]
+		var h10: float = _grid_heights[(ix + 1) * stride + iz]
+		var h01: float = _grid_heights[ix * stride + (iz + 1)]
+		var h11: float = _grid_heights[(ix + 1) * stride + (iz + 1)]
+		var h0: float = h00 + (h10 - h00) * fx
+		var h1: float = h01 + (h11 - h01) * fx
+		return h0 + (h1 - h0) * fz
+	return TerrainBuilderScript.height_at(_map, x, z)
+
+
 func _get_terrain_normal(x: float, z: float) -> Vector3:
 	var delta := 1.5
-	var hl := TerrainBuilderScript.height_at(_map, x - delta, z)
-	var hr := TerrainBuilderScript.height_at(_map, x + delta, z)
-	var hd := TerrainBuilderScript.height_at(_map, x, z - delta)
-	var hu := TerrainBuilderScript.height_at(_map, x, z + delta)
+	var hl := _sample_height_fast(x - delta, z)
+	var hr := _sample_height_fast(x + delta, z)
+	var hd := _sample_height_fast(x, z - delta)
+	var hu := _sample_height_fast(x, z + delta)
 	var dh_dx := (hr - hl) / (2.0 * delta)
 	var dh_dz := (hu - hd) / (2.0 * delta)
 	return Vector3(-dh_dx, 1.0, -dh_dz).normalized()
@@ -1321,60 +1274,92 @@ func _fast_raymarch(from: Vector3, dir: Vector3):
 	if dir.length_squared() < 0.0001:
 		return null
 
-	var max_elev: float = 600.0
-	var t: float = 0.0
-	if dir.y < -0.001 and from.y > max_elev:
-		t = maxf(0.0, (max_elev - from.y) / dir.y)
+	# 1. Fast Bounding Box Clipping: Map bounds [-half, half] XZ, [-150, 200] Y
+	var box_min := Vector3(-half * 1.05, -150.0, -half * 1.05)
+	var box_max := Vector3(half * 1.05, 200.0, half * 1.05)
+	var inv_dir := Vector3(
+		1.0 / dir.x if absf(dir.x) > 1e-6 else 1e6,
+		1.0 / dir.y if absf(dir.y) > 1e-6 else 1e6,
+		1.0 / dir.z if absf(dir.z) > 1e-6 else 1e6
+	)
+	var t1 := (box_min.x - from.x) * inv_dir.x
+	var t2 := (box_max.x - from.x) * inv_dir.x
+	var t3 := (box_min.y - from.y) * inv_dir.y
+	var t4 := (box_max.y - from.y) * inv_dir.y
+	var t5 := (box_min.z - from.z) * inv_dir.z
+	var t6 := (box_max.z - from.z) * inv_dir.z
+	var t_min := maxf(maxf(minf(t1, t2), minf(t3, t4)), minf(t5, t6))
+	var t_max := minf(minf(maxf(t1, t2), maxf(t3, t4)), maxf(t5, t6))
+	if t_max < 0.0 or t_min > t_max:
+		return null
 
-	var max_dist: float = _cam_dist * 3.5 + half * 3.0
-	var prev_t: float = t
-	var prev_p: Vector3 = from + dir * t
-	var prev_diff: float = prev_p.y - TerrainBuilderScript.height_at(_map, prev_p.x, prev_p.z)
+	var t_start := maxf(0.0, t_min)
+	var t_end := t_max
 
-	if prev_diff < 0.0:
-		t = 0.0
-		prev_t = 0.0
-		prev_p = from
-		prev_diff = prev_p.y - TerrainBuilderScript.height_at(_map, prev_p.x, prev_p.z)
+	var divs: int = PREVIEW_DIVS
+	var step_size: float = (half * 2.0) / float(divs)
+	var stride: int = divs + 1
+	var has_grid: bool = _grid_heights.size() == stride * stride
 
-	var safety_iters: int = 0
-	while t < max_dist and safety_iters < 450:
-		safety_iters += 1
-		var abs_diff: float = absf(prev_diff)
-		var step: float = clampf(abs_diff * 0.4, 1.0, 10.0)
+	var t := t_start
+	var prev_t := t
+	var p := from + dir * t
+	var h_init: float = 0.0
+	if has_grid and absf(p.x) <= half and absf(p.z) <= half:
+		var gx := (p.x + half) / step_size
+		var gz := (p.z + half) / step_size
+		var ix := clampi(int(floor(gx)), 0, divs - 1)
+		var iz := clampi(int(floor(gz)), 0, divs - 1)
+		var fx := gx - float(ix)
+		var fz := gz - float(iz)
+		var h0 := _grid_heights[ix * stride + iz] + (_grid_heights[(ix + 1) * stride + iz] - _grid_heights[ix * stride + iz]) * fx
+		var h1 := _grid_heights[ix * stride + (iz + 1)] + (_grid_heights[(ix + 1) * stride + (iz + 1)] - _grid_heights[ix * stride + (iz + 1)]) * fx
+		h_init = h0 + (h1 - h0) * fz
+	else:
+		h_init = TerrainBuilderScript.height_at(_map, p.x, p.z)
+
+	var prev_diff := p.y - h_init
+	var iters: int = 0
+	while t <= t_end and iters < 80:
+		iters += 1
+		var abs_d := absf(prev_diff)
+		var step := clampf(abs_d * 0.65, 1.2, 80.0)
 		t += step
+		p = from + dir * t
 
-		var p: Vector3 = from + dir * t
-		if absf(p.x) > half * 1.6 or absf(p.z) > half * 1.6:
-			if t > half * 2.5:
-				break
-			prev_diff = p.y - 0.0
-			prev_t = t
-			prev_p = p
-			continue
+		var h: float = 0.0
+		if has_grid and absf(p.x) <= half and absf(p.z) <= half:
+			var gx := (p.x + half) / step_size
+			var gz := (p.z + half) / step_size
+			var ix := clampi(int(floor(gx)), 0, divs - 1)
+			var iz := clampi(int(floor(gz)), 0, divs - 1)
+			var fx := gx - float(ix)
+			var fz := gz - float(iz)
+			var h0 := _grid_heights[ix * stride + iz] + (_grid_heights[(ix + 1) * stride + iz] - _grid_heights[ix * stride + iz]) * fx
+			var h1 := _grid_heights[ix * stride + (iz + 1)] + (_grid_heights[(ix + 1) * stride + (iz + 1)] - _grid_heights[ix * stride + (iz + 1)]) * fx
+			h = h0 + (h1 - h0) * fz
+		else:
+			h = TerrainBuilderScript.height_at(_map, p.x, p.z)
 
-		var h: float = TerrainBuilderScript.height_at(_map, p.x, p.z)
-		var diff: float = p.y - h
-
-		if (diff <= 0.0 and prev_diff >= 0.0) or (diff >= 0.0 and prev_diff <= 0.0 and safety_iters > 1):
-			var t_low: float = prev_t
-			var t_high: float = t
-			for _iter in range(8):
-				var t_mid: float = (t_low + t_high) * 0.5
-				var p_mid: Vector3 = from + dir * t_mid
-				var h_mid: float = TerrainBuilderScript.height_at(_map, p_mid.x, p_mid.z)
+		var diff := p.y - h
+		if (diff <= 0.0 and prev_diff >= 0.0) or (diff >= 0.0 and prev_diff <= 0.0 and iters > 1):
+			var t_low := prev_t
+			var t_high := t
+			for _i in range(5):
+				var t_mid := (t_low + t_high) * 0.5
+				var p_mid := from + dir * t_mid
+				var h_mid := TerrainBuilderScript.height_at(_map, p_mid.x, p_mid.z)
 				if p_mid.y < h_mid:
 					t_high = t_mid
 				else:
 					t_low = t_mid
-			var t_final: float = (t_low + t_high) * 0.5
-			var p_final: Vector3 = from + dir * t_final
-			var h_final: float = TerrainBuilderScript.height_at(_map, p_final.x, p_final.z)
+			var t_final := (t_low + t_high) * 0.5
+			var p_final := from + dir * t_final
+			var h_final := TerrainBuilderScript.height_at(_map, p_final.x, p_final.z)
 			return Vector3(p_final.x, h_final, p_final.z)
 
 		prev_diff = diff
 		prev_t = t
-		prev_p = p
 
 	return null
 
@@ -1405,7 +1390,7 @@ func _calc_falloff(t: float, mode_str: String) -> float:
 	match mode_str:
 		"linear":
 			return 1.0 - t
-		"flat", "stamp":
+		"flat":
 			return 1.0
 		"gaussian":
 			return exp(-3.5 * t * t)
@@ -1454,34 +1439,6 @@ func _toggle_commander_view() -> void:
 		_set_status("Commander Tactical View (skirmish scale). Press F or Reset (Home) to return.", Tokens.SIGNAL_GO)
 
 
-func _apply_stamp(hit: Vector3, ctrl: bool = false) -> void:
-	var sg := _get_or_create_sculpt_grid()
-	var dim: int = int(sg["dim"])
-	var half: float = float(sg["half_extents"])
-	var data: Array = sg["data"]
-	
-	var sign_mult := -1.0 if ctrl else 1.0
-	var delta_h := _brush_strength * sign_mult
-	
-	var rad := _brush_radius
-	var grid_step := (half * 2.0) / float(dim - 1)
-	var i_min_x := clampi(int(floor((hit.x - rad + half) / grid_step)), 0, dim - 1)
-	var i_max_x := clampi(int(ceil((hit.x + rad + half) / grid_step)), 0, dim - 1)
-	var i_min_z := clampi(int(floor((hit.z - rad + half) / grid_step)), 0, dim - 1)
-	var i_max_z := clampi(int(ceil((hit.z + rad + half) / grid_step)), 0, dim - 1)
-	
-	for iz in range(i_min_z, i_max_z + 1):
-		var cz := -half + float(iz) * grid_step
-		for ix in range(i_min_x, i_max_x + 1):
-			var cx := -half + float(ix) * grid_step
-			var d := Vector2(cx - hit.x, cz - hit.z).length()
-			if d <= rad:
-				data[iz * dim + ix] = float(data[iz * dim + ix]) + delta_h
-	
-	_update_local_mesh_region(hit, rad + 24.0)
-	_dirty = true
-	_set_status("Cliff Stamp: %+.1fm across %.0fm radius (Ctrl+Click to Lower)." % [delta_h, rad], Tokens.SIGNAL_GO)
-
 func _apply_sculpt_stroke(hit: Vector3, dt: float, ctrl: bool = false, shift: bool = false) -> void:
 	var sg := _get_or_create_sculpt_grid()
 	var dim: int = int(sg["dim"])
@@ -1495,8 +1452,8 @@ func _apply_sculpt_stroke(hit: Vector3, dt: float, ctrl: bool = false, shift: bo
 		active_tool = SculptTool.LOWER if _sculpt_tool == SculptTool.RAISE else SculptTool.RAISE
 
 	var rad := _brush_radius
-	var is_stamp_falloff := (_brush_falloff == "stamp" or _brush_falloff == "flat" or active_tool == SculptTool.STAMP)
-	var str_val := _brush_strength if is_stamp_falloff else (_brush_strength * dt * 4.0)
+	var flat_falloff := _brush_falloff == "flat"
+	var str_val := _brush_strength if flat_falloff else (_brush_strength * dt * 4.0)
 	
 	var min_x := hit.x - rad
 	var max_x := hit.x + rad
@@ -1530,7 +1487,8 @@ func _apply_sculpt_stroke(hit: Vector3, dt: float, ctrl: bool = false, shift: bo
 					if d <= rad:
 						var f := _calc_falloff(d / rad, _brush_falloff)
 						var curr_h := TerrainBuilderScript.height_at(_map, cx, cz)
-						var delta_h := (target_avg - curr_h) * minf(1.0, str_val * 0.4) * f
+						var rate := 1.0 if flat_falloff else minf(1.0, str_val * 0.4)
+						var delta_h := (target_avg - curr_h) * rate * f
 						data[iz * dim + ix] = float(data[iz * dim + ix]) + delta_h
 	elif active_tool == SculptTool.FLATTEN:
 		for iz in range(i_min_z, i_max_z + 1):
@@ -1541,7 +1499,8 @@ func _apply_sculpt_stroke(hit: Vector3, dt: float, ctrl: bool = false, shift: bo
 				if d <= rad:
 					var f := _calc_falloff(d / rad, _brush_falloff)
 					var curr_h := TerrainBuilderScript.height_at(_map, cx, cz)
-					var delta_h := (_flatten_target_h - curr_h) * minf(1.0, str_val * 0.4) * f
+					var rate := 1.0 if flat_falloff else minf(1.0, str_val * 0.4)
+					var delta_h := (_flatten_target_h - curr_h) * rate * f
 					data[iz * dim + ix] = float(data[iz * dim + ix]) + delta_h
 	else:
 		var sign_mult := 1.0 if active_tool == SculptTool.RAISE else -1.0
@@ -1629,6 +1588,11 @@ func _init_splat_texture() -> void:
 		_splat_img = Image.create(SPLAT_RES, SPLAT_RES, false, Image.FORMAT_RGBA8)
 		_splat_img.fill(Color(1.0, 0.0, 0.0, 0.0))
 
+	_water_img = TerrainBuilderScript.load_water_paint(map_id)
+	if _water_img != null:
+		_water_img.convert(Image.FORMAT_RGBA8)
+		_refresh_painted_water_preview()
+
 	_splat_tex = ImageTexture.create_from_image(_splat_img)
 
 
@@ -1647,33 +1611,17 @@ func _apply_paint_stroke(hit: Vector3, dt: float) -> void:
 	var w := _splat_img.get_width()
 	var h := _splat_img.get_height()
 	
+	# WATER IS PAINTED, NOT DUG.
+	#
+	# This used to drive the terrain down to a hardcoded y = -6 so the map-wide
+	# water plane showed through the hole. That makes "paint water" mean "dig a
+	# trench to the sea": a lake could only ever exist at table height, and a
+	# mountain tarn was impossible - painting one on a hilltop would have
+	# excavated the hilltop. Now the brush writes a separate raster carrying a
+	# per-texel water SURFACE HEIGHT and leaves the terrain alone.
 	if _paint_surface == "water":
-		var rad := _paint_brush_size
-		var sg := _get_or_create_sculpt_grid()
-		var sdim: int = int(sg["dim"])
-		var sdata: Array = sg["data"]
-		var g_step := (half * 2.0) / float(sdim - 1)
-		
-		var i_min_x := clampi(int(floor((hit.x - rad + half) / g_step)), 0, sdim - 1)
-		var i_max_x := clampi(int(ceil((hit.x + rad + half) / g_step)), 0, sdim - 1)
-		var i_min_z := clampi(int(floor((hit.z - rad + half) / g_step)), 0, sdim - 1)
-		var i_max_z := clampi(int(ceil((hit.z + rad + half) / g_step)), 0, sdim - 1)
-		
-		for iz in range(i_min_z, i_max_z + 1):
-			var cz := -half + float(iz) * g_step
-			for ix in range(i_min_x, i_max_x + 1):
-				var cx := -half + float(ix) * g_step
-				var d := Vector2(cx - hit.x, cz - hit.z).length()
-				if d <= rad:
-					var fall := _calc_falloff(d / rad, "smooth")
-					var curr_h := TerrainBuilderScript.height_at(_map, cx, cz)
-					var target_water_bed := -6.0
-					if curr_h > target_water_bed:
-						var dh := (target_water_bed - curr_h) * minf(1.0, dt * 6.0) * fall
-						sdata[iz * sdim + ix] = float(sdata[iz * sdim + ix]) + dh
-		_update_local_mesh_region(hit, rad + 24.0)
-		_refresh_water_mesh()
-		_dirty = true
+		_paint_water_stroke(hit, dt)
+		return
 
 	var target_col := Color(1.0, 0.0, 0.0, 0.0)
 	if _paint_surface == "rock":
@@ -1710,6 +1658,106 @@ func _apply_paint_stroke(hit: Vector3, dt: float) -> void:
 
 	_splat_tex.update(_splat_img)
 	_dirty = true
+
+
+func _get_or_create_water_img() -> Image:
+	if _water_img == null:
+		var r: int = TerrainBuilderScript.WATER_PAINT_RES
+		_water_img = Image.create(r, r, false, Image.FORMAT_RGBA8)
+		_water_img.fill(Color(0.0, 0.0, 0.0, 1.0))
+	return _water_img
+
+
+func _paint_water_stroke(hit: Vector3, dt: float) -> void:
+	if _map.is_empty():
+		return
+	var img := _get_or_create_water_img()
+	var half: float = float(_map.get("map_half_extents", 960.0))
+	var res := img.get_width()
+
+	# The level this stroke lays down. Following the ground puts the surface
+	# just above whatever is under the cursor, so dragging along a valley floor
+	# fills it; a fixed level is what you want for a flat lake.
+	var level: float = _water_paint_level
+	if _water_level_follow_ground:
+		level = TerrainBuilderScript.height_at(_map, hit.x, hit.z) + 1.0
+	var enc: Vector2 = TerrainBuilderScript.encode_water_height(level)
+
+	var u := (hit.x / (half * 2.0) + 0.5) * float(res)
+	var v := (hit.z / (half * 2.0) + 0.5) * float(res)
+	var r_pix := (_paint_brush_size / (half * 2.0)) * float(res)
+	var px_min := clampi(int(floor(u - r_pix)), 0, res - 1)
+	var px_max := clampi(int(ceil(u + r_pix)), 0, res - 1)
+	var py_min := clampi(int(floor(v - r_pix)), 0, res - 1)
+	var py_max := clampi(int(ceil(v + r_pix)), 0, res - 1)
+	var rate := clampf(_paint_strength * dt * 8.0, 0.05, 1.0)
+
+	for py in range(py_min, py_max + 1):
+		for px in range(px_min, px_max + 1):
+			var dist := Vector2(float(px) - u, float(py) - v).length() / maxf(1.0, r_pix)
+			if dist > 1.0:
+				continue
+			var f := cos(dist * PI * 0.5)
+			f = f * f * rate
+			var cur: Color = img.get_pixel(px, py)
+			if _water_paint_erase:
+				img.set_pixel(px, py, Color(maxf(cur.r - f, 0.0), cur.g, cur.b, 1.0))
+			else:
+				# Height is SET, not blended. Averaging two lakes' heights
+				# across an overlap would tilt both their surfaces.
+				img.set_pixel(px, py, Color(minf(cur.r + f, 1.0), enc.x, enc.y, 1.0))
+
+	_refresh_painted_water_preview()
+	_dirty = true
+
+
+func _refresh_painted_water_preview() -> void:
+	if _water_img == null or _map.is_empty():
+		return
+	if _painted_water_node == null:
+		_painted_water_node = MeshInstance3D.new()
+		_painted_water_node.name = "PaintedWaterPreview"
+		if _water_node != null and _water_node.get_parent() != null:
+			_water_node.get_parent().add_child(_painted_water_node)
+		else:
+			add_child(_painted_water_node)
+		var m := ShaderMaterial.new()
+		m.shader = preload("res://shaders/water.gdshader")
+		m.set_shader_parameter("water_color", Color(0.12, 0.42, 0.65, 0.85))
+		_painted_water_node.material_override = m
+	_painted_water_node.mesh = _build_painted_water_preview_mesh()
+
+
+# Same texel-quad scheme as TerrainBuilder.build_painted_water_mesh, but run
+# off the in-memory image so the preview updates mid-stroke without a save.
+func _build_painted_water_preview_mesh() -> ArrayMesh:
+	var img := _water_img
+	if img == null or _map.is_empty():
+		return null
+	var half: float = float(_map.get("map_half_extents", 960.0))
+	var res := img.get_width()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var step := (half * 2.0) / float(res)
+	var emitted := 0
+	for py in range(res):
+		for px in range(res):
+			var c: Color = img.get_pixel(px, py)
+			if c.r < TerrainBuilderScript.WATER_PAINT_MIN_COVER:
+				continue
+			var y: float = TerrainBuilderScript.decode_water_height(c.g, c.b)
+			var x0: float = -half + float(px) * step
+			var z0: float = -half + float(py) * step
+			for vtx in [Vector3(x0, y, z0), Vector3(x0 + step, y, z0),
+					Vector3(x0 + step, y, z0 + step), Vector3(x0, y, z0),
+					Vector3(x0 + step, y, z0 + step), Vector3(x0, y, z0 + step)]:
+				st.set_normal(Vector3.UP)
+				st.set_uv(Vector2(vtx.x, vtx.z) / 40.0)
+				st.add_vertex(vtx)
+			emitted += 1
+	if emitted == 0:
+		return null
+	return st.commit()
 
 
 func _refresh_water_mesh() -> void:
@@ -2194,6 +2242,8 @@ func _save() -> void:
 		out["world_scale"] = 1.0
 
 	out["props"] = _props_list
+	if _water_img != null:
+		out["water_paint"] = TerrainBuilderScript.water_paint_path(map_id)
 
 	var gc = out.get("ground_color", [0.3, 0.35, 0.26])
 	if gc is Color:
@@ -2235,6 +2285,11 @@ func _save() -> void:
 		var splat_path := "res://data/maps/%s_splat.png" % map_id
 		_splat_img.save_png(splat_path)
 		print("[sculpt] saved %s" % splat_path)
+
+	if _water_img != null:
+		var water_path: String = TerrainBuilderScript.water_paint_path(map_id)
+		_water_img.save_png(water_path)
+		print("[sculpt] saved %s" % water_path)
 		
 	_dirty = false
 	_set_status("Saved %s.json, splat texture, and %d authored props successfully." % [map_id, _props_list.size()], Tokens.SIGNAL_GO)
@@ -2269,6 +2324,7 @@ func _rebuild_preview(full: bool = false) -> void:
 	_refresh_water_mesh()
 	_refresh_bridges_in_scene()
 	_refresh_props_multimesh()
+	_update_rock_shader_params()
 		
 	_set_status("%s updated (%d ms)" % ["Full mesh" if full else "Preview", Time.get_ticks_msec() - t0],
 		Tokens.TEXT_SECONDARY)
@@ -2310,7 +2366,7 @@ func _build_full_grid_mesh(n_divs: int = PREVIEW_DIVS) -> ArrayMesh:
 			var j_prev := maxi(0, j - 1)
 			var j_next := mini(n, j + 1)
 			var dh_dx := (heights[i_next * (n + 1) + j] - heights[i_prev * (n + 1) + j]) * inv_2step
-			var dh_dz := (_grid_heights[i * (n + 1) + j_next] - _grid_heights[i * (n + 1) + j_prev]) * inv_2step if _grid_heights.size() > (i * (n + 1) + j_next) else 0.0
+			var dh_dz := (heights[i * (n + 1) + j_next] - heights[i * (n + 1) + j_prev]) * inv_2step
 			norms[idx] = Vector3(-dh_dx, 1.0, -dh_dz).normalized()
 
 	# 3. Indices (Counter-Clockwise front-facing)
@@ -2780,7 +2836,6 @@ func _build_sculpt_tab(parent: VBoxContainer) -> void:
 	var tools := [
 		{"name": "Raise (Elevation)", "tool": SculptTool.RAISE},
 		{"name": "Lower (Depression)", "tool": SculptTool.LOWER},
-		{"name": "🧱 Cliff Stamp (+6m)", "tool": SculptTool.STAMP},
 		{"name": "Smooth (Blend)", "tool": SculptTool.SMOOTH},
 		{"name": "Flatten (Level)", "tool": SculptTool.FLATTEN},
 	]
@@ -2832,8 +2887,8 @@ func _build_sculpt_tab(parent: VBoxContainer) -> void:
 	f_opt.add_item("Smooth (Cosine Curve)")
 	f_opt.add_item("Gaussian (Soft)")
 	f_opt.add_item("Linear (Cone)")
-	f_opt.add_item("Stamp / Flat (Zero Falloff - Sheer Cliff)")
-	var falloff_keys := ["smooth", "gaussian", "linear", "stamp"]
+	f_opt.add_item("Flat (Zero Falloff - Sheer Cliff)")
+	var falloff_keys := ["smooth", "gaussian", "linear", "flat"]
 	f_opt.item_selected.connect(func(idx: int):
 		_brush_falloff = falloff_keys[idx]
 		_set_status("Falloff: %s" % f_opt.get_item_text(idx), Tokens.TEXT_SECONDARY))
@@ -2901,6 +2956,59 @@ func _build_paint_tab(parent: VBoxContainer) -> void:
 		_update_cursor_ring_mesh(_paint_brush_size))
 	bsize_row.add_child(bs_sb)
 
+	# Water brush controls. Only meaningful with the Water surface selected,
+	# but kept visible rather than hidden so the level is readable before you
+	# start a stroke - a lake painted at the wrong height is invisible until
+	# you look at it from the side.
+	var wsep := HSeparator.new()
+	parent.add_child(wsep)
+	var w_head := Label.new()
+	w_head.text = "Water Brush:"
+	w_head.theme_type_variation = "StatLabel"
+	parent.add_child(w_head)
+
+	var wfollow := CheckBox.new()
+	wfollow.text = "Surface follows ground (+1 m)"
+	wfollow.button_pressed = _water_level_follow_ground
+	wfollow.tooltip_text = "On: each stroke sits just above the terrain under the cursor - drag along a valley to flood it.
+Off: every stroke uses the fixed level below, which is what a flat lake needs."
+	wfollow.toggled.connect(func(v: bool): _water_level_follow_ground = v)
+	parent.add_child(wfollow)
+
+	var wlv_row := HBoxContainer.new()
+	parent.add_child(wlv_row)
+	var wlv_lbl := Label.new()
+	wlv_lbl.text = "Surface Height"
+	wlv_lbl.custom_minimum_size = Vector2(120, 0)
+	wlv_row.add_child(wlv_lbl)
+	var wlv_sb := SpinBox.new()
+	wlv_sb.min_value = TerrainBuilderScript.WATER_PAINT_RANGE.x
+	wlv_sb.max_value = TerrainBuilderScript.WATER_PAINT_RANGE.y
+	wlv_sb.step = 0.5
+	wlv_sb.value = _water_paint_level
+	wlv_sb.value_changed.connect(func(v: float): _water_paint_level = v)
+	wlv_row.add_child(wlv_sb)
+
+	var werase := CheckBox.new()
+	werase.text = "Erase water"
+	werase.button_pressed = _water_paint_erase
+	werase.toggled.connect(func(v: bool): _water_paint_erase = v)
+	parent.add_child(werase)
+
+	var wpick := Button.new()
+	wpick.text = "Set Height From Terrain Under Cursor"
+	wpick.pressed.connect(func():
+		if not _has_valid_hit:
+			_set_status("Point the cursor at the terrain first.", Tokens.SIGNAL_ALERT)
+			return
+		var hit: Vector3 = _last_hit_point
+		_water_paint_level = TerrainBuilderScript.height_at(_map, hit.x, hit.z) + 1.0
+		wlv_sb.value = _water_paint_level
+		_water_level_follow_ground = false
+		wfollow.button_pressed = false
+		_set_status("Water surface set to %.1f m" % _water_paint_level, Tokens.SIGNAL_GO))
+	parent.add_child(wpick)
+
 	var pstr_row := HBoxContainer.new()
 	parent.add_child(pstr_row)
 	var pstr_lbl := Label.new()
@@ -2925,6 +3033,93 @@ func _build_paint_tab(parent: VBoxContainer) -> void:
 			_dirty = true
 			_set_status("Filled ground with Base Grass.", Tokens.SIGNAL_GO))
 	parent.add_child(clear_btn)
+
+	var r_sep := HSeparator.new()
+	parent.add_child(r_sep)
+
+	var r_head := Label.new()
+	r_head.text = "⛰️ Rock & Cliff Stone Face Styling:"
+	r_head.theme_type_variation = "HeadingLabel"
+	parent.add_child(r_head)
+
+	var pat_row := HBoxContainer.new()
+	parent.add_child(pat_row)
+	var pat_lbl := Label.new()
+	pat_lbl.text = "Stone Pattern"
+	pat_lbl.custom_minimum_size = Vector2(120, 0)
+	pat_row.add_child(pat_lbl)
+	var pat_opt := OptionButton.new()
+	pat_opt.add_item("Sedimentary Strata (Tan / Shale / Iron)", 0)
+	pat_opt.add_item("Fractured Granite (Grey / Lichen)", 1)
+	pat_opt.add_item("Rugged Crag (Brownish-Red)", 2)
+	pat_opt.add_item("Limestone Bedrock (Cream / Yellow)", 3)
+	var terr: Dictionary = _map.get("terrain", {}) if typeof(_map.get("terrain", {})) == TYPE_DICTIONARY else {}
+	pat_opt.selected = int(terr.get("rock_pattern", 0))
+	pat_opt.item_selected.connect(func(idx: int):
+		if not _map.has("terrain") or typeof(_map["terrain"]) != TYPE_DICTIONARY:
+			_map["terrain"] = {}
+		_map["terrain"]["rock_pattern"] = idx
+		_update_rock_shader_params()
+		_dirty = true
+		_set_status("Selected Stone Pattern: %s" % pat_opt.get_item_text(idx), Tokens.SIGNAL_GO))
+	pat_row.add_child(pat_opt)
+
+	var rstr_row := HBoxContainer.new()
+	parent.add_child(rstr_row)
+	var rstr_lbl := Label.new()
+	rstr_lbl.text = "Strata Banding"
+	rstr_lbl.custom_minimum_size = Vector2(120, 0)
+	rstr_row.add_child(rstr_lbl)
+	var rstr_sb := SpinBox.new()
+	rstr_sb.min_value = 0.0
+	rstr_sb.max_value = 2.0
+	rstr_sb.step = 0.05
+	rstr_sb.value = float(terr.get("rock_strata_strength", 1.1))
+	rstr_sb.value_changed.connect(func(v: float):
+		if not _map.has("terrain") or typeof(_map["terrain"]) != TYPE_DICTIONARY:
+			_map["terrain"] = {}
+		_map["terrain"]["rock_strata_strength"] = v
+		_update_rock_shader_params()
+		_dirty = true)
+	rstr_row.add_child(rstr_sb)
+
+	var rbump_row := HBoxContainer.new()
+	parent.add_child(rbump_row)
+	var rbump_lbl := Label.new()
+	rbump_lbl.text = "3D Relief / Bump"
+	rbump_lbl.custom_minimum_size = Vector2(120, 0)
+	rbump_row.add_child(rbump_lbl)
+	var rbump_sb := SpinBox.new()
+	rbump_sb.min_value = 0.0
+	rbump_sb.max_value = 3.0
+	rbump_sb.step = 0.1
+	rbump_sb.value = float(terr.get("rock_bump_strength", 1.6))
+	rbump_sb.value_changed.connect(func(v: float):
+		if not _map.has("terrain") or typeof(_map["terrain"]) != TYPE_DICTIONARY:
+			_map["terrain"] = {}
+		_map["terrain"]["rock_bump_strength"] = v
+		_update_rock_shader_params()
+		_dirty = true)
+	rbump_row.add_child(rbump_sb)
+
+	var rscale_row := HBoxContainer.new()
+	parent.add_child(rscale_row)
+	var rscale_lbl := Label.new()
+	rscale_lbl.text = "Strata Layer Scale"
+	rscale_lbl.custom_minimum_size = Vector2(120, 0)
+	rscale_row.add_child(rscale_lbl)
+	var rscale_sb := SpinBox.new()
+	rscale_sb.min_value = 0.02
+	rscale_sb.max_value = 0.6
+	rscale_sb.step = 0.02
+	rscale_sb.value = float(terr.get("rock_strata_scale", 0.16))
+	rscale_sb.value_changed.connect(func(v: float):
+		if not _map.has("terrain") or typeof(_map["terrain"]) != TYPE_DICTIONARY:
+			_map["terrain"] = {}
+		_map["terrain"]["rock_strata_scale"] = v
+		_update_rock_shader_params()
+		_dirty = true)
+	rscale_row.add_child(rscale_sb)
 
 
 func _build_roads_bridges_tab(parent: VBoxContainer) -> void:
@@ -3056,7 +3251,6 @@ func _build_greebles_tab(parent: VBoxContainer) -> void:
 		{"name": "🪨 Paint Boulders", "tool": GreebleType.BOULDER, "col": Color(0.8, 0.75, 0.7)},
 		{"name": "⛰️ Paint Rock Spires", "tool": GreebleType.SPIRE, "col": Color(0.65, 0.6, 0.55)},
 		{"name": "🌿 Paint Shrubs", "tool": GreebleType.SHRUB, "col": Color(0.5, 0.8, 0.2)},
-		{"name": "🧱 Paint Cliff Faces", "tool": GreebleType.CLIFF_FACE, "col": Color(0.9, 0.55, 0.2)},
 		{"name": "🧹 Eraser Brush", "tool": GreebleType.ERASER, "col": Color(1.0, 0.25, 0.25)},
 	]
 	for gt in g_tools:
@@ -3097,22 +3291,116 @@ func _build_greebles_tab(parent: VBoxContainer) -> void:
 	d_sb.value_changed.connect(func(v: float): _greeble_density = v)
 	den_row.add_child(d_sb)
 
+	# --- PROP PLACEMENT SCALE CONTROLS ---
+	var s_head := Label.new()
+	s_head.text = "Prop Placement Scale (Use - / + keys):"
+	s_head.theme_type_variation = "SubheadingLabel"
+	parent.add_child(s_head)
+
+	var smin_row := HBoxContainer.new()
+	parent.add_child(smin_row)
+	var smin_lbl := Label.new()
+	smin_lbl.text = "Min Scale"
+	smin_lbl.custom_minimum_size = Vector2(120, 0)
+	smin_row.add_child(smin_lbl)
+	var smin_sb := SpinBox.new()
+	smin_sb.min_value = 0.2
+	smin_sb.max_value = 25.0
+	smin_sb.step = 0.1
+	smin_sb.value = _greeble_scale_min
+	smin_sb.value_changed.connect(func(v: float): _greeble_scale_min = v)
+	smin_row.add_child(smin_sb)
+
+	var smax_row := HBoxContainer.new()
+	parent.add_child(smax_row)
+	var smax_lbl := Label.new()
+	smax_lbl.text = "Max Scale"
+	smax_lbl.custom_minimum_size = Vector2(120, 0)
+	smax_row.add_child(smax_lbl)
+	var smax_sb := SpinBox.new()
+	smax_sb.min_value = 0.2
+	smax_sb.max_value = 25.0
+	smax_sb.step = 0.1
+	smax_sb.value = _greeble_scale_max
+	smax_sb.value_changed.connect(func(v: float): _greeble_scale_max = v)
+	smax_row.add_child(smax_sb)
+
+	# Quick presets row
+	var preset_row := HBoxContainer.new()
+	preset_row.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	parent.add_child(preset_row)
+	var presets := [
+		{"label": "Tiny (0.8x)", "min": 0.6, "max": 1.0},
+		{"label": "Standard (2x)", "min": 1.6, "max": 2.8},
+		{"label": "Large (5x)", "min": 3.8, "max": 6.2},
+		{"label": "Colossal (12x)", "min": 9.0, "max": 15.0},
+	]
+	for pr in presets:
+		var pb := Button.new()
+		pb.text = pr["label"]
+		pb.pressed.connect(func():
+			_greeble_scale_min = pr["min"]
+			_greeble_scale_max = pr["max"]
+			smin_sb.value = _greeble_scale_min
+			smax_sb.value = _greeble_scale_max
+			_set_status("Selected Prop Scale: %.1fx - %.1fx" % [_greeble_scale_min, _greeble_scale_max], Tokens.SIGNAL_GO))
+		preset_row.add_child(pb)
+
 	var single_check := CheckBox.new()
 	single_check.text = "Single Prop Click (1 per click)"
 	single_check.toggled.connect(func(t: bool): _greeble_single_click = t)
 	parent.add_child(single_check)
 
-	var auto_cliff_btn := Button.new()
-	auto_cliff_btn.text = "⛰️ Auto-Add Rock Faces to Steep Slopes (>70°)"
-	auto_cliff_btn.tooltip_text = "Scan terrain for slopes >70° and automatically embed oriented 3D cliff face meshes"
-	auto_cliff_btn.pressed.connect(func(): _auto_add_cliff_meshes_to_steep_slopes(70.0))
-	parent.add_child(auto_cliff_btn)
+	# --- SCALE EXISTING PLACED PROPS ---
+	var scale_sep := HSeparator.new()
+	parent.add_child(scale_sep)
 
-	var prune_cliff_btn := Button.new()
-	prune_cliff_btn.text = "🧹 Clean Overlapping Cliff Meshes"
-	prune_cliff_btn.tooltip_text = "Prunes coplanar/overlapping cliff meshes within 6m to eliminate Z-fighting visual judder"
-	prune_cliff_btn.pressed.connect(func(): _prune_overlapping_cliff_meshes(6.0))
-	parent.add_child(prune_cliff_btn)
+	var ex_head := Label.new()
+	ex_head.text = "Scale Existing Placed Props:"
+	ex_head.theme_type_variation = "SubheadingLabel"
+	parent.add_child(ex_head)
+
+	var rock_scale_grid := GridContainer.new()
+	rock_scale_grid.columns = 2
+	rock_scale_grid.add_theme_constant_override("h_separation", Tokens.SPACE_XS)
+	rock_scale_grid.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
+	parent.add_child(rock_scale_grid)
+
+	var rock_btn_p25 := Button.new()
+	rock_btn_p25.text = "🪨 Enlarge Rocks (+25%)"
+	rock_btn_p25.pressed.connect(func(): _scale_rock_props(1.25))
+	rock_scale_grid.add_child(rock_btn_p25)
+
+	var rock_btn_m25 := Button.new()
+	rock_btn_m25.text = "🪨 Shrink Rocks (-25%)"
+	rock_btn_m25.pressed.connect(func(): _scale_rock_props(0.80))
+	rock_scale_grid.add_child(rock_btn_m25)
+
+	var rock_btn_2x := Button.new()
+	rock_btn_2x.text = "🪨 2.0x Giant Rocks"
+	rock_btn_2x.pressed.connect(func(): _scale_rock_props(2.0))
+	rock_scale_grid.add_child(rock_btn_2x)
+
+	var rock_btn_half := Button.new()
+	rock_btn_half.text = "🪨 0.5x Half Size"
+	rock_btn_half.pressed.connect(func(): _scale_rock_props(0.5))
+	rock_scale_grid.add_child(rock_btn_half)
+
+	var all_scale_grid := GridContainer.new()
+	all_scale_grid.columns = 2
+	all_scale_grid.add_theme_constant_override("h_separation", Tokens.SPACE_XS)
+	all_scale_grid.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
+	parent.add_child(all_scale_grid)
+
+	var all_btn_p25 := Button.new()
+	all_btn_p25.text = "🌐 Scale All (+25%)"
+	all_btn_p25.pressed.connect(func(): _scale_all_props(1.25))
+	all_scale_grid.add_child(all_btn_p25)
+
+	var all_btn_m25 := Button.new()
+	all_btn_m25.text = "🌐 Scale All (-25%)"
+	all_btn_m25.pressed.connect(func(): _scale_all_props(0.80))
+	all_scale_grid.add_child(all_btn_m25)
 
 	var clear_btn := Button.new()
 	clear_btn.text = "Clear All Authored Props"
@@ -3393,6 +3681,29 @@ func _build_map_tab(parent: VBoxContainer) -> void:
 		_map["map_half_extents"] = v
 		_mark_dirty())
 	h_row.add_child(hsb)
+
+	# The map-wide water table. Default is negative (see
+	# TerrainBuilder.WATER_LEVEL_DEFAULT); a positive one floods any map whose
+	# terrain averages zero.
+	var wt_row := HBoxContainer.new()
+	parent.add_child(wt_row)
+	var wt_lbl := Label.new()
+	wt_lbl.text = "Water Table"
+	wt_lbl.custom_minimum_size = Vector2(100, 0)
+	wt_row.add_child(wt_lbl)
+	var wt_sb := SpinBox.new()
+	wt_sb.min_value = -80.0
+	wt_sb.max_value = 40.0
+	wt_sb.step = 0.5
+	wt_sb.value = TerrainBuilderScript.water_level_of(_map)
+	wt_sb.tooltip_text = "Height of the map-wide water plane. Painted lakes are independent of this and can sit above it."
+	wt_sb.value_changed.connect(func(v: float):
+		_push_undo()
+		_map["water_level"] = v
+		if _water_node != null:
+			_water_node.position.y = v
+		_mark_dirty())
+	wt_row.add_child(wt_sb)
 
 	var theme_lbl := Label.new()
 	theme_lbl.text = "Theme Palette Preset:"

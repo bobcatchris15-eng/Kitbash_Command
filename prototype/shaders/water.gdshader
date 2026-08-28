@@ -51,5 +51,10 @@ void fragment() {
 	NORMAL_MAP = nrm * 0.5 + 0.5;
 	ROUGHNESS = roughness;
 	SPECULAR = specular;
-	ALPHA = final_alpha;
+	// Vertex alpha feathers a PAINTED shoreline. The painted-water mesh is
+	// built from raster texels, so its outline is a staircase; carrying the
+	// brush's coverage falloff into alpha softens that edge instead of leaving
+	// a hard 4 m step. Meshes without vertex colours get COLOR = white, so the
+	// map-wide table and the authored water_areas are unaffected.
+	ALPHA = final_alpha * COLOR.a;
 }

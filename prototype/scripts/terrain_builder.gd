@@ -1021,9 +1021,114 @@ static func aspect_at(map_def: Dictionary, x: float, z: float) -> float:
 # Distance in world units to the nearest water, or INF when the map has none.
 # Reeds belong at the shoreline and pines do not; without this the scatter
 # could only express "inside water" or "not", which is not the same question.
+# Distance to the nearest water, INCLUDING the table and painted bodies.
+#
+# Rects and blobs are analytic, but the table and painted lakes are an
+# arbitrary raster shape, so those go through a cached distance field. Building
+# one is not optional at this scale: the dressing asks this question once per
+# candidate placement - tens of thousands of times per map - and a radial search
+# per query would cost more than the whole dressing pass.
+#
+# ~6 m per texel, capped at 384 on a side. The threshold that matters is
+# shore_reed's 13 m; bilinear sampling of a 6 m field lands inside ~3 m of the
+# true distance there, which is finer than the reeds are big.
+const WATER_FIELD_TARGET_TEXEL: float = 6.0
+const WATER_FIELD_MAX_DIM: int = 384
+
+static var _water_field_cache: Dictionary = {}
+
+
+static func clear_water_field_cache() -> void:
+	_water_field_cache = {}
+
+
+static func _water_distance_field(map_def: Dictionary) -> Dictionary:
+	var key: String = "%s|%.3f" % [str(map_def.get("id", "")), water_level_of(map_def)]
+	if _water_field_cache.has(key):
+		return _water_field_cache[key]
+	var half: Vector2 = MapCatalogScript.half_extents(map_def)
+	var span: float = maxf(half.x, half.y) * 2.0
+	var dim: int = clampi(int(round(span / WATER_FIELD_TARGET_TEXEL)), 16, WATER_FIELD_MAX_DIM)
+	var step_x: float = (half.x * 2.0) / float(dim)
+	var step_z: float = (half.y * 2.0) / float(dim)
+
+	var dist := PackedFloat32Array()
+	dist.resize(dim * dim)
+	var any := false
+	for j in range(dim):
+		var z: float = -half.y + (float(j) + 0.5) * step_z
+		for i in range(dim):
+			var x: float = -half.x + (float(i) + 0.5) * step_x
+			if submerged_at(map_def, x, z):
+				dist[j * dim + i] = 0.0
+				any = true
+			else:
+				dist[j * dim + i] = 1.0e9
+
+	var out := {"dim": dim, "step": maxf(step_x, step_z), "half": half, "any": any, "dist": dist}
+	if not any:
+		_water_field_cache[key] = out
+		return out
+
+	# Two-pass chamfer transform. Exact Euclidean would need a much heavier
+	# algorithm for an accuracy nobody can see at prop scale; chamfer's error
+	# is a couple of percent, well under the field's own 6 m quantisation.
+	var d_ortho: float = maxf(step_x, step_z)
+	var d_diag: float = d_ortho * 1.41421356
+	for j in range(dim):
+		for i in range(dim):
+			var idx: int = j * dim + i
+			var v: float = dist[idx]
+			if i > 0:
+				v = minf(v, dist[idx - 1] + d_ortho)
+			if j > 0:
+				v = minf(v, dist[idx - dim] + d_ortho)
+				if i > 0:
+					v = minf(v, dist[idx - dim - 1] + d_diag)
+				if i < dim - 1:
+					v = minf(v, dist[idx - dim + 1] + d_diag)
+			dist[idx] = v
+	for j in range(dim - 1, -1, -1):
+		for i in range(dim - 1, -1, -1):
+			var idx2: int = j * dim + i
+			var v2: float = dist[idx2]
+			if i < dim - 1:
+				v2 = minf(v2, dist[idx2 + 1] + d_ortho)
+			if j < dim - 1:
+				v2 = minf(v2, dist[idx2 + dim] + d_ortho)
+				if i < dim - 1:
+					v2 = minf(v2, dist[idx2 + dim + 1] + d_diag)
+				if i > 0:
+					v2 = minf(v2, dist[idx2 + dim - 1] + d_diag)
+			dist[idx2] = v2
+	out["dist"] = dist
+	_water_field_cache[key] = out
+	return out
+
+
+static func _sample_water_field(map_def: Dictionary, x: float, z: float) -> float:
+	var f: Dictionary = _water_distance_field(map_def)
+	if not bool(f.get("any", false)):
+		return INF
+	var dim: int = int(f["dim"])
+	var half: Vector2 = f["half"]
+	var u: float = clampf((x / (half.x * 2.0) + 0.5) * float(dim) - 0.5, 0.0, float(dim - 1))
+	var v: float = clampf((z / (half.y * 2.0) + 0.5) * float(dim) - 0.5, 0.0, float(dim - 1))
+	var i0: int = int(u)
+	var j0: int = int(v)
+	var i1: int = mini(i0 + 1, dim - 1)
+	var j1: int = mini(j0 + 1, dim - 1)
+	var fu: float = u - float(i0)
+	var fv: float = v - float(j0)
+	var d: PackedFloat32Array = f["dist"]
+	var a: float = lerpf(d[j0 * dim + i0], d[j0 * dim + i1], fu)
+	var b: float = lerpf(d[j1 * dim + i0], d[j1 * dim + i1], fu)
+	return lerpf(a, b, fv)
+
+
 static func water_distance_at(map_def: Dictionary, x: float, z: float) -> float:
 	_resolve_features(map_def)
-	var best := INF
+	var best := _sample_water_field(map_def, x, z)
 	for w in map_def.get("water_areas", []):
 		var c: Vector3 = _vec3_of(w.get("center", Vector3.ZERO))
 		var he: Vector2 = _vec_of(w.get("half_extents", Vector2(1, 1)))
@@ -1373,7 +1478,7 @@ static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], gr
 						hard_blocked = true
 						break
 				var cell_water: Array = water_buckets[cell_key] if water_buckets.has(cell_key) else []
-				_emit_subdivided_ground_quad(verts, x, x1, z, z1, cell_hard, cell_water, bridges, has_blobs, map_def, true)
+				_emit_subdivided_ground_quad(verts, x, x1, z, z1, cell_hard, cell_water, bridges, has_blobs, map_def, true, "block")
 				z = z1
 				zi += 1
 				continue
@@ -1398,7 +1503,17 @@ static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], gr
 					max(abs(h10 - h00), abs(h01 - h00)),
 					max(abs(h11 - h10), abs(h11 - h01))
 				) / cell
-				if max_slope > MAX_WALKABLE_SLOPE:
+				# UNDER WATER IS NOT WALKABLE. The table and any painted body
+				# were visual-only until now, so a ground unit happily drove
+				# along the bed of a lake that was being drawn over its head.
+				# Tested against the HIGHEST corner, so a cell is carved only
+				# when the whole of it is under - which leaves the shoreline
+				# cells walkable instead of eating a ring of beach.
+				var top: float = max(max(h00, h10), max(h01, h11))
+				var submerged: bool = top < water_surface_at(map_def, (x + x1) * 0.5, (z + z1) * 0.5) - SUBMERGED_MIN_DEPTH
+				if submerged and _cell_on_bridge(x, x1, z, z1, bridges):
+					submerged = false
+				if max_slope > MAX_WALKABLE_SLOPE or submerged:
 					blocked = true
 				else:
 					_add_nav_quad(verts, Vector3(x, h00, z), Vector3(x1, h10, z), Vector3(x1, h11, z1), Vector3(x, h01, z1))
@@ -1413,8 +1528,17 @@ static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], gr
 # why. Deliberately re-runs the SAME hard_holes/water_holes/blob checks the
 # coarse loop already ran, just at finer granularity within this one quad,
 # so a fine sub-cell not actually touching any hole still gets emitted.
+# `water_mode` decides what this does about the water table and painted bodies,
+# and it has to be told because the same subdivision serves two surfaces that
+# want opposite answers:
+#   "block" - ground: a submerged sub-cell is not walkable.
+#   "float" - amphibious: a submerged sub-cell IS walkable, at the surface.
+# Neither happened before, so an obstacle cell - the only kind that gets
+# subdivided - was a hole in both fixes at once: ground kept a patch of
+# lakebed walkable, and amphibious sank a patch to the bed.
 static func _emit_subdivided_ground_quad(verts: PackedVector3Array, x0: float, x1: float, z0: float, z1: float,
-		hard_holes: Array, water_holes: Array, bridges: Array, has_blobs: bool, map_def: Dictionary, has_heightmap: bool = true) -> void:
+		hard_holes: Array, water_holes: Array, bridges: Array, has_blobs: bool, map_def: Dictionary, has_heightmap: bool = true,
+		water_mode: String = "") -> void:
 	var sub = HOLE_SUBDIVISION_CELL
 	var sx = x0
 	while sx < x1:
@@ -1439,12 +1563,25 @@ static func _emit_subdivided_ground_quad(verts: PackedVector3Array, x0: float, x
 				var h10 = terrain_height_at(map_def, Vector3(sx1, 0, sz))
 				var h11 = terrain_height_at(map_def, Vector3(sx1, 0, sz1))
 				var h01 = terrain_height_at(map_def, Vector3(sx, 0, sz1))
-				var max_slope = maxf(
-					maxf(absf(h10 - h00), absf(h01 - h00)),
-					maxf(absf(h11 - h10), absf(h11 - h01))
-				) / maxf(sx1 - sx, 0.001)
-				if max_slope <= MAX_WALKABLE_SLOPE:
-					_add_nav_quad(verts, Vector3(sx, h00, sz), Vector3(sx1, h10, sz), Vector3(sx1, h11, sz1), Vector3(sx, h01, sz1))
+				var drowned := false
+				if water_mode != "":
+					var surf: float = water_surface_at(map_def, (sx + sx1) * 0.5, (sz + sz1) * 0.5)
+					if surf > NO_WATER * 0.5:
+						if water_mode == "float":
+							h00 = maxf(h00, surf)
+							h10 = maxf(h10, surf)
+							h11 = maxf(h11, surf)
+							h01 = maxf(h01, surf)
+						elif water_mode == "block":
+							var top: float = maxf(maxf(h00, h10), maxf(h01, h11))
+							drowned = top < surf - SUBMERGED_MIN_DEPTH 								and not _cell_on_bridge(sx, sx1, sz, sz1, bridges)
+				if not drowned:
+					var max_slope = maxf(
+						maxf(absf(h10 - h00), absf(h01 - h00)),
+						maxf(absf(h11 - h10), absf(h11 - h01))
+					) / maxf(sx1 - sx, 0.001)
+					if max_slope <= MAX_WALKABLE_SLOPE:
+						_add_nav_quad(verts, Vector3(sx, h00, sz), Vector3(sx1, h10, sz), Vector3(sx1, h11, sz1), Vector3(sx, h01, sz1))
 			sz = sz1
 		sx = sx1
 
@@ -1505,12 +1642,22 @@ static func _build_amphibious_faces(map_def: Dictionary, extra_holes: Array = []
 				# Per-cell bucket slice for the subdivided quad - see
 				# _build_ground_faces' equivalent comment for why this is correct.
 				var cell_holes: Array = hole_buckets[cell_key] if hole_buckets.has(cell_key) else []
-				_emit_subdivided_ground_quad(verts, x, x1, z, z1, cell_holes, [], [], false, map_def, true)
+				_emit_subdivided_ground_quad(verts, x, x1, z, z1, cell_holes, [], [], false, map_def, true, "float")
 			elif not blocked:
 				var h00 = corner_heights[xi * corner_nz + zi]
 				var h10 = corner_heights[(xi + 1) * corner_nz + zi]
 				var h01 = corner_heights[xi * corner_nz + zi + 1]
 				var h11 = corner_heights[(xi + 1) * corner_nz + zi + 1]
+				# FLOAT, do not crawl the bed. This surface carries amphibious
+				# and hovering units, both of which sit ON the water. Emitting
+				# it at terrain height sent a path down to the bottom of a
+				# 30 m deep lake and the unit followed it under.
+				var surface: float = water_surface_at(map_def, (x + x1) * 0.5, (z + z1) * 0.5)
+				if surface > NO_WATER * 0.5:
+					h00 = maxf(h00, surface)
+					h10 = maxf(h10, surface)
+					h01 = maxf(h01, surface)
+					h11 = maxf(h11, surface)
 				_add_nav_quad(verts, Vector3(x, h00, z), Vector3(x1, h10, z), Vector3(x1, h11, z1), Vector3(x, h01, z1))
 			z = z1
 			zi += 1
@@ -2056,6 +2203,32 @@ static func build_ground_amphibious_tiles(map_def: Dictionary, extra_holes: Arra
 # single region per surface stays correct and simple. `water_map`/
 # `deep_water_map` must already exist (map_create() + cell_size/cell_height/
 # active), same as build_ground_amphibious_tiles().
+# Navigable surface over everything the table or a painted body covers. Emitted
+# AT the water surface, not at the bed: a boat floats on the top.
+static func _build_submerged_water_faces(map_def: Dictionary) -> PackedVector3Array:
+	var verts := PackedVector3Array()
+	var img := _water_paint_for(str(map_def.get("id", "")))
+	if not has_water_table(map_def) and img == null:
+		return verts
+	var half: Vector2 = MapCatalogScript.half_extents(map_def)
+	var cell: float = _nav_grid_cell(map_def)
+	var x := -half.x
+	while x < half.x:
+		var x1: float = minf(x + cell, half.x)
+		var z := -half.y
+		while z < half.y:
+			var z1: float = minf(z + cell, half.y)
+			var cx: float = (x + x1) * 0.5
+			var cz: float = (z + z1) * 0.5
+			var surface: float = water_surface_at(map_def, cx, cz)
+			if surface > NO_WATER * 0.5 and height_at(map_def, cx, cz) < surface - SUBMERGED_MIN_DEPTH:
+				_add_nav_quad(verts, Vector3(x, surface, z), Vector3(x1, surface, z),
+					Vector3(x1, surface, z1), Vector3(x, surface, z1))
+			z = z1
+		x = x1
+	return verts
+
+
 static func build_water_and_deep_water(map_def: Dictionary, water_map: RID, deep_water_map: RID, sync: bool) -> Dictionary:
 	var cell_size = _nav_cell_size(map_def)
 	var pending: Array = []
@@ -2067,6 +2240,10 @@ static func build_water_and_deep_water(map_def: Dictionary, water_map: RID, deep
 			Vector3(rect.x1, 0, rect.z1), Vector3(rect.x0, 0, rect.z1))
 	for blob in map_def.get("water_blobs", []):
 		water_verts.append_array(_water_blob_fan_verts(blob, 0.0))
+	# The table and painted bodies are navigable water too, or a boat could
+	# only ever use a hand-authored water_areas rect and a painted lake would
+	# be scenery.
+	water_verts.append_array(_build_submerged_water_faces(map_def))
 	var water_region: RID = RID()
 	if water_verts.size() > 0:
 		water_region = NavigationServer3D.region_create()
@@ -2232,7 +2409,7 @@ static func bake_pending_entry_async(entry: Dictionary, cell_size: float, on_don
 
 # --- Visuals ---
 
-static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = null):
+static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = null, map_id: String = ""):
 	# Pass a `ticker` node (the loading screen passes itself) to spread this
 	# pass over multiple frames: each sub-phase below checks the same
 	# BUILD_FRAME_BUDGET_MS gate build_ground_visual_mesh() uses, and yields
@@ -2265,7 +2442,7 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 	# separable on a v2 map.
 	var prop_scale = float(map_def.get("terrain", {}).get("prop_scale",
 		WorldScaleScript.for_map(map_def)))
-	_spawn_merged_water(map_def, parent, prop_scale)
+	_spawn_merged_water(map_def, parent, prop_scale, map_id)
 	await _slice.call()
 	# Cliffs between water and obstacles: terrain infrastructure sits
 	# underneath everything decorative, so the visual order is water →
@@ -2370,6 +2547,13 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 				total += int(dressed[k])
 			BattleLogger.log_build_step("terrain.dressing_v2", 0.0, {"placed": total})
 			await _slice.call()
+		# ONE commit for everything registered above. The dressing commits as
+		# part of its own pass, and commit() is idempotent, so this only does
+		# real work on the authored-props path where the dressing is skipped -
+		# without it the cliff strata would register and never be built.
+		var batcher = AmbientScatterScript.get_or_create(parent)
+		if batcher != null:
+			batcher.commit()
 		_tag_terrain_debris(parent, _pre_ids)
 		return
 
@@ -2640,6 +2824,374 @@ static func terrain_generator(map_def: Dictionary) -> String:
 # bound at runtime on any map - they are baked, and then not used. That is a
 # v1 defect, and per the freeze it stays as it is; v2 simply must not inherit
 # it, so it takes the id from the caller who actually knows it.
+# --- water ------------------------------------------------------------------
+#
+# The map-wide water table. NEGATIVE by default, and that is the whole point:
+# the old default was +0.05, which sits ABOVE the resting height of terrain
+# that averages zero, so every v2 map came up flooded from edge to edge with
+# only the plateaus and ridges above the surface. -2.0 puts the table below
+# ordinary ground and leaves it visible in genuine depressions - canyon floors,
+# carved basins - which is what a water table is for.
+#
+# Per-map override: `water_level` in the map JSON.
+const WATER_LEVEL_DEFAULT: float = -2.0
+
+# Painted water encoding, shared by the sculpt tool's brush and the mesh
+# builder below. R is coverage; G and B carry a 16-bit surface height mapped
+# over WATER_PAINT_RANGE. 8 bits alone would quantise a lake surface to ~0.5 m
+# steps, which is enough to make a shoreline visibly wrong; the second byte
+# costs nothing and takes that to millimetres.
+const WATER_PAINT_RANGE := Vector2(-64.0, 64.0)
+const WATER_PAINT_RES: int = 512
+const WATER_PAINT_MIN_COVER: float = 0.35
+
+
+# --- the one water query -----------------------------------------------------
+#
+# Everything that needs to know "is there water here" goes through
+# submerged_at(). Before this there were three separate notions of water -
+# water_areas rects, water_blobs, and (visual only) the table plane - and the
+# table was invisible to every one of them, so a unit walked across the bottom
+# of a lake the renderer was drawing over its head.
+#
+# The painted raster is cached per map id: it is sampled tens of thousands of
+# times per navmesh bake, and re-loading a 512x512 PNG for each would dominate.
+static var _water_paint_cache: Dictionary = {}
+
+
+static func _water_paint_for(map_id: String) -> Image:
+	if map_id == "":
+		return null
+	if _water_paint_cache.has(map_id):
+		return _water_paint_cache[map_id]
+	var img := load_water_paint(map_id)
+	_water_paint_cache[map_id] = img
+	return img
+
+
+static func clear_water_paint_cache() -> void:
+	_water_paint_cache = {}
+
+
+# Height of the water surface over (x, z). Painted bodies WIN over the table: a
+# tarn painted at +18 m on a map whose table is -2 m has to read as +18 m, or
+# painting it was pointless.
+# Does this map have a water table at all? v1 maps are frozen, and they were
+# authored when water meant "a water_areas rect" - giving them a table
+# retroactively would flood any of them whose terrain dips below -2 and change
+# a shipped map's pathing. Same opt-in condition the table PLANE already uses,
+# so the visual and the navmesh agree about which maps have one.
+static func has_water_table(map_def: Dictionary) -> bool:
+	if map_def.has("water_level"):
+		return true
+	if terrain_generator(map_def) == "v2":
+		return true
+	var terr = map_def.get("terrain", {})
+	return typeof(terr) == TYPE_DICTIONARY and terr.has("sculpt_grid")
+
+
+# Well below any terrain: "there is no water here", without needing an
+# is-there-water boolean threaded alongside every height comparison.
+const NO_WATER: float = -1.0e9
+
+
+static func water_surface_at(map_def: Dictionary, x: float, z: float) -> float:
+	var surface: float = water_level_of(map_def) if has_water_table(map_def) else NO_WATER
+	var img := _water_paint_for(str(map_def.get("id", "")))
+	if img != null:
+		var half: Vector2 = MapCatalogScript.half_extents(map_def)
+		var u: float = (x / (half.x * 2.0)) + 0.5
+		var v: float = (z / (half.y * 2.0)) + 0.5
+		if u >= 0.0 and u <= 1.0 and v >= 0.0 and v <= 1.0:
+			var px: int = clampi(int(u * float(img.get_width())), 0, img.get_width() - 1)
+			var pz: int = clampi(int(v * float(img.get_height())), 0, img.get_height() - 1)
+			var c: Color = img.get_pixel(px, pz)
+			if c.r >= WATER_PAINT_MIN_COVER:
+				surface = maxf(surface, decode_water_height(c.g, c.b))
+	return surface
+
+
+# A shoreline is not a step function. Terrain a couple of centimetres under the
+# surface is a wet beach, not a lake, and carving the navmesh at exactly the
+# waterline leaves a ragged fringe of single-cell holes along every shore. A
+# unit can drive through a puddle.
+const SUBMERGED_MIN_DEPTH: float = 0.6
+
+
+static func submerged_at(map_def: Dictionary, x: float, z: float) -> bool:
+	return height_at(map_def, x, z) < water_surface_at(map_def, x, z) - SUBMERGED_MIN_DEPTH
+
+
+static func water_level_of(map_def: Dictionary) -> float:
+	return float(map_def.get("water_level", WATER_LEVEL_DEFAULT))
+
+
+static func water_paint_path(map_id: String) -> String:
+	return "res://data/maps/%s_water.png" % map_id
+
+
+static func encode_water_height(h: float) -> Vector2:
+	var t: float = clampf((h - WATER_PAINT_RANGE.x)
+		/ maxf(WATER_PAINT_RANGE.y - WATER_PAINT_RANGE.x, 0.001), 0.0, 1.0)
+	var q: int = clampi(int(round(t * 65535.0)), 0, 65535)
+	return Vector2(float(q >> 8) / 255.0, float(q & 0xFF) / 255.0)
+
+
+static func decode_water_height(g: float, b: float) -> float:
+	var q: float = (g * 255.0) * 256.0 + (b * 255.0)
+	return WATER_PAINT_RANGE.x + (q / 65535.0) * (WATER_PAINT_RANGE.y - WATER_PAINT_RANGE.x)
+
+
+static func load_water_paint(map_id: String) -> Image:
+	if map_id == "":
+		return null
+	var p := water_paint_path(map_id)
+	if ResourceLoader.exists(p):
+		var t: Texture2D = load(p)
+		if t != null:
+			return t.get_image()
+	if FileAccess.file_exists(p):
+		return Image.load_from_file(ProjectSettings.globalize_path(p))
+	return null
+
+
+# Coverage at a texel CORNER: the mean of the up-to-four texels touching it.
+# Sampling per corner rather than per texel makes neighbouring quads agree on
+# their shared edge, so the alpha gradient is continuous instead of flat per
+# quad - which would just move the staircase from the outline into the shading.
+static func _water_corner_alpha(img: Image, cx: int, cy: int) -> float:
+	var w := img.get_width()
+	var h := img.get_height()
+	var acc := 0.0
+	var n := 0
+	for dy in [-1, 0]:
+		for dx in [-1, 0]:
+			var px: int = cx + dx
+			var py: int = cy + dy
+			if px < 0 or py < 0 or px >= w or py >= h:
+				continue
+			acc += img.get_pixel(px, py).r
+			n += 1
+	if n == 0:
+		return 0.0
+	return smoothstep(0.06, WATER_PAINT_MIN_COVER, acc / float(n))
+
+
+# One mesh for every painted body. Texels are emitted as quads at their own
+# encoded height, so two lakes at different altitudes come out of a single
+# raster without needing to be separated into regions first.
+static func build_painted_water_mesh(map_def: Dictionary, map_id: String) -> ArrayMesh:
+	var img := load_water_paint(map_id)
+	if img == null:
+		return null
+	var half: Vector2 = MapCatalogScript.half_extents(map_def)
+	var w := img.get_width()
+	var h := img.get_height()
+	if w < 2 or h < 2:
+		return null
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var emitted := 0
+	var step_x: float = (half.x * 2.0) / float(w)
+	var step_z: float = (half.y * 2.0) / float(h)
+	# Emit BELOW the visible threshold and let alpha carry the edge, so the
+	# shoreline fades over two or three texels instead of ending on a hard
+	# raster step. A painted lake is a staircase in geometry no matter what;
+	# the fade is what stops it looking like one.
+	var emit_at: float = WATER_PAINT_MIN_COVER * 0.35
+	for py in range(h):
+		for px in range(w):
+			var c: Color = img.get_pixel(px, py)
+			if c.r < emit_at:
+				continue
+			var y: float = decode_water_height(c.g, c.b)
+			var x0: float = -half.x + float(px) * step_x
+			var z0: float = -half.y + float(py) * step_z
+			var x1: float = x0 + step_x
+			var z1: float = z0 + step_z
+			var quad := [
+				[Vector3(x0, y, z0), _water_corner_alpha(img, px, py)],
+				[Vector3(x1, y, z0), _water_corner_alpha(img, px + 1, py)],
+				[Vector3(x1, y, z1), _water_corner_alpha(img, px + 1, py + 1)],
+				[Vector3(x0, y, z1), _water_corner_alpha(img, px, py + 1)],
+			]
+			for k in [0, 1, 2, 0, 2, 3]:
+				var v: Vector3 = quad[k][0]
+				st.set_color(Color(1.0, 1.0, 1.0, quad[k][1]))
+				st.set_normal(Vector3.UP)
+				st.set_uv(Vector2(v.x, v.z) / TERRAIN_TILE_WORLD_SIZE)
+				st.add_vertex(v)
+			emitted += 1
+	if emitted == 0:
+		return null
+	st.generate_tangents()
+	return st.commit()
+
+
+const GRASS_SHELL_SHADER = preload("res://shaders/terrain_grass_shells.gdshader")
+
+# Shell-grass tuning. See shaders/terrain_grass_shells.gdshader for what a
+# shell is and why this is affordable.
+#
+# The two numbers that matter together are GRASS_CHUNK_SIZE and
+# GRASS_VIEW_DISTANCE. Godot culls by distance from the camera to an
+# instance's AABB, so a single whole-map carpet could never be range-culled -
+# its AABB is the map. Chunking it is what lets the carpet cost nothing at
+# battle altitude, and the chunk has to be small enough that a chunk near the
+# camera does not drag in geometry 500 m away.
+const GRASS_CHUNK_SIZE: float = 96.0
+const GRASS_MESH_STEP: float = 4.0     # carpet follows terrain, not blades
+const GRASS_SHELL_COUNT: int = 8
+const GRASS_VIEW_DISTANCE: float = 110.0
+const GRASS_VIEW_FADE: float = 25.0
+# Below this mean splat-grass coverage a chunk is not built at all - no point
+# submitting a carpet over the canyon floor to have every texel discarded.
+const GRASS_CHUNK_MIN_COVER: float = 0.12
+# Slope at which grass cover reaches zero. 0.70 is MAX_WALKABLE_SLOPE; grass
+# gives up well before a vehicle does.
+const GRASS_MAX_SLOPE: float = 0.38
+
+
+# The spiky carpet. v2 maps only; v1 keeps its own scattered grass meshes.
+# Returns the number of chunks built, which the probe reports.
+static func build_grass_shells(map_def: Dictionary, parent: Node3D, map_id: String = "") -> int:
+	if parent == null or terrain_generator(map_def) != "v2":
+		return 0
+	var half: Vector2 = MapCatalogScript.half_extents(map_def)
+
+	# Read the splat once on the CPU so empty chunks are never built. The
+	# shader also samples it per fragment, but that only saves shading - this
+	# saves the mesh, the MultiMesh and the draw call.
+	var splat_img: Image = null
+	if map_id != "":
+		var sp := "res://data/maps/%s_splat.png" % map_id
+		if ResourceLoader.exists(sp):
+			var t: Texture2D = load(sp)
+			if t != null:
+				splat_img = t.get_image()
+		elif FileAccess.file_exists(sp):
+			splat_img = Image.load_from_file(ProjectSettings.globalize_path(sp))
+
+	var root := Node3D.new()
+	root.name = "GrassShells"
+	parent.add_child(root)
+
+	var mat := ShaderMaterial.new()
+	mat.shader = GRASS_SHELL_SHADER
+	mat.set_shader_parameter("map_half_extents", maxf(half.x, half.y))
+	if splat_img != null:
+		mat.set_shader_parameter("splat_tex", ImageTexture.create_from_image(splat_img))
+		mat.set_shader_parameter("use_splat", true)
+
+	var built := 0
+	var cz := -half.y
+	while cz < half.y:
+		var cz1: float = minf(cz + GRASS_CHUNK_SIZE, half.y)
+		var cx := -half.x
+		while cx < half.x:
+			var cx1: float = minf(cx + GRASS_CHUNK_SIZE, half.x)
+			if _grass_chunk_cover(map_def, splat_img, half, cx, cx1, cz, cz1) >= GRASS_CHUNK_MIN_COVER:
+				var mesh := _build_grass_chunk_mesh(map_def, cx, cx1, cz, cz1)
+				if mesh != null:
+					root.add_child(_grass_chunk_instance(mesh, mat, built))
+					built += 1
+			cx = cx1
+		cz = cz1
+	return built
+
+
+static func _grass_chunk_instance(mesh: ArrayMesh, mat: Material, index: int) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_custom_data = true
+	mm.mesh = mesh
+	mm.instance_count = GRASS_SHELL_COUNT
+	for i in range(GRASS_SHELL_COUNT):
+		# Shell 0 sits ON the ground; the top shell reaches grass_height. The
+		# index rides in custom data so all N shells are one draw call.
+		var t: float = float(i + 1) / float(GRASS_SHELL_COUNT)
+		mm.set_instance_transform(i, Transform3D.IDENTITY)
+		mm.set_instance_custom_data(i, Color(t, 0.0, 0.0, 1.0))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = mat
+	mmi.name = "GrassChunk_%d" % index
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# The cull that makes this free at battle zoom.
+	mmi.visibility_range_end = GRASS_VIEW_DISTANCE
+	mmi.visibility_range_end_margin = GRASS_VIEW_FADE
+	mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	return mmi
+
+
+static func _grass_chunk_cover(map_def: Dictionary, splat: Image, half: Vector2,
+		x0: float, x1: float, z0: float, z1: float) -> float:
+	if splat == null:
+		return 1.0
+	var acc := 0.0
+	var n := 0
+	for i in range(4):
+		for j in range(4):
+			var x: float = lerpf(x0, x1, (float(i) + 0.5) / 4.0)
+			var z: float = lerpf(z0, z1, (float(j) + 0.5) / 4.0)
+			var u: float = clampf(x / (maxf(half.x, half.y) * 2.0) + 0.5, 0.0, 1.0)
+			var v: float = clampf(z / (maxf(half.x, half.y) * 2.0) + 0.5, 0.0, 1.0)
+			var px: int = clampi(int(u * float(splat.get_width())), 0, splat.get_width() - 1)
+			var pz: int = clampi(int(v * float(splat.get_height())), 0, splat.get_height() - 1)
+			acc += splat.get_pixel(px, pz).r
+			n += 1
+	return acc / float(maxi(n, 1))
+
+
+static func _build_grass_chunk_mesh(map_def: Dictionary, x0: float, x1: float,
+		z0: float, z1: float) -> ArrayMesh:
+	var nx: int = maxi(int(ceil((x1 - x0) / GRASS_MESH_STEP)), 1)
+	var nz: int = maxi(int(ceil((z1 - z0) / GRASS_MESH_STEP)), 1)
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var cols := PackedColorArray()
+	var idx := PackedInt32Array()
+	for i in range(nx + 1):
+		var x: float = lerpf(x0, x1, float(i) / float(nx))
+		for j in range(nz + 1):
+			var z: float = lerpf(z0, z1, float(j) / float(nz))
+			verts.append(Vector3(x, height_at(map_def, x, z), z))
+			# Central differences on the height field - the carpet has to sit
+			# on the same surface the ground mesh draws.
+			const D := 1.5
+			var hx: float = height_at(map_def, x + D, z) - height_at(map_def, x - D, z)
+			var hz: float = height_at(map_def, x, z + D) - height_at(map_def, x, z - D)
+			norms.append(Vector3(-hx, 2.0 * D, -hz).normalized())
+			# GRASS FIT IN VERTEX COLOUR, from the real height field rather than
+			# from this carpet's own normal. The carpet is a 4 m grid and a
+			# canyon wall is 6-8 m across, so the carpet's normal on a wall is a
+			# smoothed ramp, not a vertical - the shader's normal-based slope
+			# test passed and grass grew up the cliffs. slope_at() is the same
+			# source of truth the dressing rules and the navmesh use, and it
+			# does not care what resolution the carpet happens to be.
+			var sl: float = slope_at(map_def, x, z)
+			cols.append(Color(clampf(1.0 - sl / GRASS_MAX_SLOPE, 0.0, 1.0), 0.0, 0.0, 1.0))
+	for i in range(nx):
+		for j in range(nz):
+			var a: int = i * (nz + 1) + j
+			var b: int = (i + 1) * (nz + 1) + j
+			var c: int = (i + 1) * (nz + 1) + j + 1
+			var d: int = i * (nz + 1) + j + 1
+			# Same winding as the ground mesh (see _emit_quad's note).
+			idx.append_array([a, b, c, a, c, d])
+	if verts.is_empty():
+		return null
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts
+	arr[Mesh.ARRAY_NORMAL] = norms
+	arr[Mesh.ARRAY_COLOR] = cols
+	arr[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return mesh
+
+
 static func build_ground_material_for(ground_color: Color, map_def: Dictionary = {}, map_id: String = "") -> Material:
 	if terrain_generator(map_def) == "v2":
 		return build_ground_material_v2(ground_color, map_def, map_id)
@@ -2656,6 +3208,12 @@ static func v2_ground_tint(ground_color: Color) -> Color:
 	if v <= 0.001:
 		return Color.WHITE
 	return Color.from_hsv(ground_color.h, ground_color.s * 0.45, 1.0)
+
+# Green enough that no amount of darkness makes it volcanic or arid.
+static func _is_green_hue(c: Color) -> bool:
+	var h: float = c.h * 360.0
+	return c.s > 0.06 and h > 70.0 and h < 175.0
+
 
 static func build_ground_material_v2(ground_color: Color, map_def: Dictionary, map_id: String = "") -> Material:
 	var mat := ShaderMaterial.new()
@@ -2683,32 +3241,71 @@ static func build_ground_material_v2(ground_color: Color, map_def: Dictionary, m
 			theme_name = "arid"
 		elif ground_color.b > 0.6 and ground_color.r > 0.6:
 			theme_name = "tundra"
-		elif ground_color.r < 0.35 and ground_color.g < 0.35 and ground_color.b < 0.35:
+		elif (ground_color.r < 0.35 and ground_color.g < 0.35 and ground_color.b < 0.35
+				and not _is_green_hue(ground_color)):
+			# "Dark" is not the same as "volcanic". sentinel_divide's ground
+			# colour is (0.30, 0.34, 0.28) - a dark GREEN, and a temperate map -
+			# and the darkness test alone classified it volcanic, which handed
+			# its cliffs the grey-purple ash tint. Excluding green hues costs
+			# nothing and a real volcanic map is never green.
 			theme_name = "volcanic"
 		else:
 			theme_name = "temperate"
 
 	var cliff_tint := Color.WHITE
-	var strata_str: float = 0.45
+	# Per-theme strata prominence. This had been computed and then silently
+	# dropped when the shader uniform was renamed - every theme got the same
+	# banding. Values are rescaled for the mix: as a multiply they could only
+	# ever darken, so 0.45 read as "barely there".
+	var strata_str: float = 0.85
 	match theme_name:
 		"arid":
 			cliff_tint = Color(0.92, 0.72, 0.54)
-			strata_str = 0.65
+			strata_str = 1.0
 		"desert":
 			cliff_tint = Color(0.95, 0.58, 0.38)
-			strata_str = 0.70
+			strata_str = 1.0
 		"tundra":
 			cliff_tint = Color(0.68, 0.74, 0.85)
-			strata_str = 0.40
+			strata_str = 0.72
 		"volcanic":
 			cliff_tint = Color(0.42, 0.40, 0.44)
-			strata_str = 0.50
+			strata_str = 0.90
 		_: # temperate
 			cliff_tint = Color(0.85, 0.88, 0.82)
-			strata_str = 0.45
+			strata_str = 0.85
 
 	mat.set_shader_parameter("cliff_rock_tint", cliff_tint)
-	mat.set_shader_parameter("strata_strength", strata_str)
+
+	var terr: Dictionary = map_def.get("terrain", {}) if typeof(map_def.get("terrain", {})) == TYPE_DICTIONARY else {}
+	var r_pat: int = int(terr.get("rock_pattern", 0))
+	var r_strata: float = float(terr.get("rock_strata_strength", strata_str))
+	var r_bump: float = float(terr.get("rock_bump_strength", 2.1))
+	# BED THICKNESS. Note these defaults are the ones that count - the shader's
+	# own uniform defaults are dead the moment this sets the parameter, which
+	# is why raising the default in the .gdshader alone changed nothing.
+	# 0.16 put one bed per ~6 units, i.e. three or four bands on a 22 m wall,
+	# and a cliff rendered as a couple of big flat slabs. 0.5 is ~2 m beds.
+	var r_scale: float = float(terr.get("rock_strata_scale", 0.5))
+	var r_joint: float = float(terr.get("rock_joint_scale", 0.16))
+	# SET BY MEASUREMENT, because the render response to this is heavily
+	# compressed and reasoning about it from albedo alone gives the wrong
+	# answer. Measured rendered cliff luminance against grass at 0.543:
+	#     gain 0.45 -> 0.703   gain 0.30 -> 0.670
+	#     gain 0.18 -> 0.594   gain 0.10 -> 0.513
+	# A 33% albedo cut (0.45 -> 0.30) moved the output 5%, because AgX is well
+	# into its shoulder at this map's exposure. 0.18 puts the face just above
+	# the grass, which is what a sunlit rock face should be. The value looks
+	# unphysically dark as an albedo precisely BECAUSE the scene exposure is
+	# hot - the honest fix for that lives in the map environment, not here.
+	var r_gain: float = float(terr.get("rock_albedo_gain", 0.18))
+
+	mat.set_shader_parameter("rock_pattern", r_pat)
+	mat.set_shader_parameter("rock_strata_strength", r_strata)
+	mat.set_shader_parameter("rock_bump_strength", r_bump)
+	mat.set_shader_parameter("rock_strata_scale", r_scale)
+	mat.set_shader_parameter("rock_joint_scale", r_joint)
+	mat.set_shader_parameter("rock_albedo_gain", r_gain)
 
 	var half: float = float(map_def.get("map_half_extents", 100.0))
 	mat.set_shader_parameter("map_half_extents", half)
@@ -2939,7 +3536,24 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 		indices.append(ia)
 		indices.append(ic)
 		indices.append(idd)
-		var n: Vector3 = (b - a).cross(d - a).normalized()
+		# THE GROUND FACES UP. Corners arrive as a(x,z) b(x1,z) c(x1,z1)
+		# d(x,z1) with x1>x and z1>z, which is CLOCKWISE seen from above -
+		# correct for Godot's front-face winding, but it means the right-hand
+		# rule points the face normal DOWN. Both (b-a)x(c-a) and (b-a)x(d-a)
+		# give -Y here; the operands have to be swapped, not relabelled.
+		#
+		# Measured with tools/probe_ground_material.gd, the whole ground mesh
+		# had a mean normal of (0.000, -0.999, 0.000). Two consequences, and
+		# the second is the one that hid the first:
+		#   - the terrain caught no sun, so it rendered at value_floor.
+		#   - the v2 shader derives slope as 1.0 - clamp(normal.y, 0, 1), which
+		#     with y = -1 is slope 1.0 EVERYWHERE. Every pixel of every map was
+		#     therefore drawn as full triplanar cliff rock under the biome
+		#     cliff tint. The grass layer was never sampled at all.
+		# So this reads as "the ground texture is dark mud" rather than as a
+		# lighting fault, which is why it survived several passes over the
+		# plates themselves.
+		var n: Vector3 = (c - a).cross(b - a).normalized()
 		nrm_acc[ia] += n
 		nrm_acc[ib] += n
 		nrm_acc[ic] += n
@@ -3371,7 +3985,40 @@ static func _spawn_shallow_water_marker(zone: Dictionary, parent: Node3D, prop_s
 
 const WATER_SHADER = preload("res://shaders/water.gdshader")
 
-static func _spawn_merged_water(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0) -> void:
+# The water material, in one place. Three call sites built it inline with
+# slightly different parameters, so a change to the water look had to be made
+# three times and one of them was always missed.
+static func _make_water_material() -> ShaderMaterial:
+	var mat := ShaderMaterial.new()
+	mat.shader = WATER_SHADER
+	var tex_a = _get_terrain_textures("blue_water")
+	mat.set_shader_parameter("normal_map_a", tex_a.normal)
+	var tex_b = _get_terrain_textures("blue_water", "v1")
+	mat.set_shader_parameter("normal_map_b", tex_b.normal if tex_b.normal else tex_a.normal)
+	mat.set_shader_parameter("shallow_color", Color(0.12, 0.42, 0.65, 0.85))
+	mat.set_shader_parameter("deep_color", Color(0.04, 0.15, 0.32, 0.95))
+	return mat
+
+
+# Painted bodies are INDEPENDENT of the table and of water_areas: a map can
+# have all three. Added before the branch below because that branch returns
+# early when the map has no water_areas, which is the common case for a v2 map
+# and would otherwise skip painted water entirely.
+static func _spawn_painted_water(map_def: Dictionary, parent: Node3D, map_id: String) -> void:
+	if map_id == "":
+		return
+	var mesh := build_painted_water_mesh(map_def, map_id)
+	if mesh == null:
+		return
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.name = "PaintedWater"
+	mi.material_override = _make_water_material()
+	parent.add_child(mi)
+
+
+static func _spawn_merged_water(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0, map_id: String = "") -> void:
+	_spawn_painted_water(map_def, parent, map_id)
 	var water_areas = map_def.get("water_areas", [])
 	var water_blobs = map_def.get("water_blobs", [])
 	if water_areas.is_empty() and water_blobs.is_empty():
@@ -3384,16 +4031,8 @@ static func _spawn_merged_water(map_def: Dictionary, parent: Node3D, prop_scale:
 			mesh_inst.mesh = w_mesh
 			mesh_inst.name = "WaterTablePlane"
 			
-			var mat := ShaderMaterial.new()
-			mat.shader = WATER_SHADER
-			var tex_a = _get_terrain_textures("blue_water")
-			mat.set_shader_parameter("normal_map_a", tex_a.normal)
-			var tex_b = _get_terrain_textures("blue_water", "v1")
-			mat.set_shader_parameter("normal_map_b", tex_b.normal if tex_b.normal else tex_a.normal)
-			mat.set_shader_parameter("shallow_color", Color(0.12, 0.42, 0.65, 0.85))
-			mat.set_shader_parameter("deep_color", Color(0.04, 0.15, 0.32, 0.95))
-			mesh_inst.material_override = mat
-			mesh_inst.position = Vector3(0.0, float(map_def.get("water_level", 0.05)), 0.0)
+			mesh_inst.material_override = _make_water_material()
+			mesh_inst.position = Vector3(0.0, water_level_of(map_def), 0.0)
 			parent.add_child(mesh_inst)
 		return
 
@@ -4962,6 +5601,8 @@ static func is_water_at(map_def: Dictionary, x: float, z: float) -> bool:
 	# Resolve feature emissions so a `lake` feature's auto-emitted water_area
 	# is in the iteration below. Idempotent.
 	_resolve_features(map_def)
+	if submerged_at(map_def, x, z):
+		return true
 	var pos = Vector3(x, 0, z)
 	for w in map_def.get("water_areas", []):
 		if _point_in_rect(pos, _rect_from(w.center, w.half_extents)):
@@ -5017,6 +5658,11 @@ static func _pos_on_lake(map_def: Dictionary, pos: Vector3, margin: float = 0.0)
 # water or poking through a building regardless of which decor tier it's
 # in, but a steep slope is exactly the terrain tall brush is FOR.
 static func _is_over_water_or_obstacle(map_def: Dictionary, pos: Vector3) -> bool:
+	# The table and painted bodies count. Without this a painted lake grew
+	# trees out of it, because every scatter pass asked this question and this
+	# question only knew about authored rects and blobs.
+	if submerged_at(map_def, pos.x, pos.z):
+		return true
 	for w in map_def.get("water_areas", []):
 		if _point_in_rect(pos, _rect_from(w.center, w.half_extents)):
 			return true

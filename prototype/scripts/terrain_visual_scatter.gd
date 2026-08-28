@@ -99,8 +99,8 @@ func _get_interactive_grass_material(base_color: Color) -> ShaderMaterial:
 	mat.shader = InteractiveGrassShader
 	mat.set_shader_parameter("base_color", Vector3(base_color.r * 0.78, base_color.g * 0.85, base_color.b * 0.68))
 	mat.set_shader_parameter("tip_color", Vector3(base_color.r * 1.22, base_color.g * 1.30, base_color.b * 1.08))
-	mat.set_shader_parameter("roughness", 0.95)
-	mat.set_shader_parameter("specular", 0.02)
+	mat.set_shader_parameter("roughness", 1.0)
+	mat.set_shader_parameter("specular", 0.0)
 	mat.set_shader_parameter("wind_speed", 2.4)
 	mat.set_shader_parameter("wind_strength", 0.18)
 	_grass_shader_mat = mat
@@ -115,7 +115,8 @@ func _get_material(color: Color, roughness: float = 0.9, metallic: float = 0.0) 
 	mat.albedo_color = color
 	mat.roughness = roughness
 	mat.metallic = metallic
-	mat.specular = 0.0
+	mat.metallic_specular = 0.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	_material_cache[key] = mat
@@ -231,6 +232,15 @@ func _build_reed_mesh(prop_scale: float = 1.0) -> ArrayMesh:
 # GLTF Template Extraction (MultiMesh Part Loader)
 # ------------------------------------------------------------------------------
 
+static func _surface_mesh(src: Mesh, index: int) -> Mesh:
+	if src.get_surface_count() <= 1:
+		return src
+	var out := ArrayMesh.new()
+	out.add_surface_from_arrays(src.surface_get_primitive_type(index),
+		src.surface_get_arrays(index))
+	return out
+
+
 static func _load_gltf_parts(scene_path: String) -> Array:
 	if _template_cache.has(scene_path):
 		return _template_cache[scene_path]
@@ -244,6 +254,7 @@ static func _load_gltf_parts(scene_path: String) -> Array:
 		return []
 	var parts: Array = []
 	var stack: Array = [[inst, Transform3D.IDENTITY]]
+	var scene_materials: Dictionary = {}
 	while not stack.is_empty():
 		var item: Array = stack.pop_back()
 		var n: Node = item[0]
@@ -251,7 +262,42 @@ static func _load_gltf_parts(scene_path: String) -> Array:
 		if n is Node3D and n != inst:
 			cur_xform = cur_xform * (n as Node3D).transform
 		if n is MeshInstance3D and n.mesh != null:
-			parts.append({"mesh": (n as MeshInstance3D).mesh, "xform": cur_xform})
+			var src_mesh: Mesh = n.mesh
+			for si in range(maxi(src_mesh.get_surface_count(), 1)):
+				var mat: Material = n.material_override
+				if mat == null and si < n.get_surface_override_material_count():
+					mat = n.get_surface_override_material(si)
+				if mat == null and si < src_mesh.get_surface_count():
+					mat = src_mesh.surface_get_material(si)
+
+				var mat_key: String = "default"
+				if mat != null:
+					mat_key = str(mat.resource_path) if str(mat.resource_path) != "" else "id:%d" % mat.get_instance_id()
+				if not scene_materials.has(mat_key):
+					var matte_mat := StandardMaterial3D.new()
+					if mat is StandardMaterial3D or mat is ORMMaterial3D or mat is BaseMaterial3D:
+						matte_mat.albedo_color = mat.albedo_color
+						matte_mat.albedo_texture = mat.albedo_texture
+						if mat.normal_enabled or mat.normal_texture != null:
+							matte_mat.normal_enabled = true
+							matte_mat.normal_texture = mat.normal_texture
+						if mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or (mat.albedo_texture != null and mat.albedo_texture.has_alpha()):
+							matte_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+							matte_mat.alpha_scissor_threshold = 0.45
+							matte_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+					else:
+						matte_mat.albedo_color = Color(0.22, 0.28, 0.18)
+					matte_mat.roughness = 1.0
+					matte_mat.metallic = 0.0
+					matte_mat.metallic_specular = 0.0
+					matte_mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+					scene_materials[mat_key] = matte_mat
+
+				parts.append({
+					"mesh": _surface_mesh(src_mesh, si),
+					"xform": cur_xform,
+					"material": scene_materials[mat_key],
+				})
 		for c in n.get_children():
 			stack.append([c, cur_xform])
 	inst.free()
@@ -322,7 +368,8 @@ func _add_gltf_variant_batches(model_template_path: String, pool_size: int, vari
 			for i in range(sz):
 				composed_xforms[i] = (xf_list[i] as Transform3D) * local_xform
 				composed_cols[i] = col_list[i] if i < col_list.size() else Color.WHITE
-			_add_multimesh_batch(mesh, material_override, composed_xforms, composed_cols, "%s_%d_%d" % [batch_prefix, var_idx, p_idx], vis_begin, vis_end)
+			var mat: Material = material_override if material_override != null else part.get("material")
+			_add_multimesh_batch(mesh, mat, composed_xforms, composed_cols, "%s_%d_%d" % [batch_prefix, var_idx, p_idx], vis_begin, vis_end)
 
 
 func spawn_authored_props(props: Array, prop_scale: float = 1.0, ticker: Node = null) -> void:

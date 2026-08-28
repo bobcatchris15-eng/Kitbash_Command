@@ -120,13 +120,38 @@ def normalize(a):
 # rough/bumpy it is. Three tones minimum - two reads as a duotone pattern
 # rather than as ground.
 PLATES = {
+    # Turf. See build_grass_plate for why this one is not a tone blend.
+    # target_linear 0.085: real green sward sits near 0.08-0.10 linear. The old
+    # 0.130 was set to match the dirt and rock plates, but those are genuinely
+    # brighter surfaces than grass and matching them made the turf read as
+    # pale scrub.
+    #
+    # Sizes below are in PIXELS and assume the 28 m tile the shader uses for
+    # layer 0. At 2048 px that is 73 px/m, so blade_len 15 is a ~20 cm blade
+    # and the clump period in build_grass_plate (37) lands near 40 cm - the
+    # tussock scale, which is the part that still reads once the camera is
+    # back at battle altitude and individual blades are far below a pixel.
     "ground_grass": dict(
-        target_linear=0.130,
+        kind="grass",
+        target_linear=0.085,
         seed=1101,
-        tones=[(0.165, 0.204, 0.114), (0.243, 0.271, 0.153),
-               (0.125, 0.157, 0.094), (0.290, 0.290, 0.180)],
-        tone_weights=[0.38, 0.30, 0.20, 0.12],
-        grain=0.055, bump=0.55, rough=(0.86, 0.96),
+        blade_density=0.085,      # ~356k blades at 2048
+        blade_len=15.0,
+        angle_jitter=0.55,
+        curl=0.30,
+        samples=14,
+        root_dark=0.22,           # blade base value, before the tip ramp
+        coverage_norm=7.0,        # splat weight that counts as full cover
+        soil=(0.088, 0.079, 0.055),
+        # Greener than they look: the first pass used R/G ratios around 0.73
+        # and the plate came out olive. Sward sits nearer 0.55-0.62, with one
+        # drier straw tone for variety rather than the whole palette leaning
+        # yellow.
+        blade_tones=[(0.205, 0.360, 0.130), (0.265, 0.430, 0.165),
+                     (0.150, 0.295, 0.115), (0.330, 0.450, 0.200),
+                     (0.310, 0.340, 0.150)],
+        drift=0.10,
+        bump=1.15, rough=(0.72, 0.94),
     ),
     "ground_rock": dict(
         target_linear=0.155,
@@ -193,6 +218,112 @@ PLATES = {
         grain=0.042, bump=0.42, rough=(0.84, 0.95),
     ),
 }
+
+
+# --- turf ---------------------------------------------------------------
+# Grass is the one surface that CANNOT be made out of isotropic fbm.
+#
+# build_plate() blends tone palettes through smooth noise, which is right for
+# dirt, rock and sand - those really are statistically isotropic. Turf is not.
+# What makes grass read as grass is anisotropy at two scales: thousands of thin
+# directional blades, and tussock clumping at roughly a third of a metre. Blend
+# noise gives neither, so the old ground_grass plate measured a linear
+# luminance spread of only 0.103..0.154 (p5..p95, a 1.5x ratio) - flat felt.
+# Real turf has deep shadow between the blades and lit tips above it, which is
+# a 3-4x ratio, and that contrast IS the texture.
+#
+# So this rasterises actual blades. Each is a short curved stroke whose
+# direction comes from a low-frequency flow field (so neighbours lean together,
+# as grass does) plus per-blade jitter. Value runs dark at the root to bright at
+# the tip, over a dark soil floor that shows through the gaps. The accumulated
+# tip height becomes the normal map, which is where the "spikiness" comes from
+# at close range without any geometry at all.
+def build_grass_plate(name, cfg, size):
+    seed = cfg["seed"]
+    rng = np.random.default_rng(seed)
+
+    # Local lean coherence, tussock clumping, and a slow colour drift so the
+    # plate is not one flat green.
+    flow = normalize(fbm(size, 23, 2, seed + 7))
+    clump = normalize(fbm(size, 37, 3, seed + 11))
+    drift = normalize(fbm(size, 61, 2, seed + 19))
+
+    n_blades = int(size * size * cfg["blade_density"])
+    rx = rng.uniform(0.0, size, n_blades)
+    ry = rng.uniform(0.0, size, n_blades)
+    ri = (ry.astype(np.int64) % size, rx.astype(np.int64) % size)
+
+    # Direction: flow field + jitter. Grass leans, it does not point randomly.
+    ang = flow[ri] * 2.0 * np.pi + rng.normal(0.0, cfg["angle_jitter"], n_blades)
+    # Length is clump-modulated, so tussocks are taller than the sward between.
+    length = (cfg["blade_len"] * (0.45 + 1.15 * clump[ri])
+              * rng.uniform(0.55, 1.45, n_blades))
+
+    steps = cfg["samples"]
+    t = np.linspace(0.0, 1.0, steps)[None, :]
+    curl = rng.uniform(-1.0, 1.0, n_blades)[:, None] * cfg["curl"]
+    ca, sa = np.cos(ang)[:, None], np.sin(ang)[:, None]
+    # Perpendicular term grows as t^2 so the blade arcs over rather than kinking.
+    px = rx[:, None] + ca * length[:, None] * t - sa * curl * length[:, None] * t * t
+    py = ry[:, None] + sa * length[:, None] * t + ca * curl * length[:, None] * t * t
+
+    xi = (np.rint(px).astype(np.int64) % size)
+    yi = (np.rint(py).astype(np.int64) % size)
+    flat = (yi * size + xi).ravel()
+
+    # Root-to-tip value ramp, and a per-blade brightness so neighbouring blades
+    # separate instead of merging into a mat.
+    tip = np.broadcast_to(t, px.shape)
+    blade_v = rng.uniform(0.70, 1.30, n_blades)[:, None]
+    weight = (cfg["root_dark"] + (1.0 - cfg["root_dark"]) * tip) * blade_v
+    weight = np.broadcast_to(weight, px.shape).ravel()
+
+    cells = size * size
+    w_acc = np.bincount(flat, weights=weight, minlength=cells)
+    h_acc = np.bincount(flat, weights=weight * tip.ravel(), minlength=cells)
+
+    # Per-blade hue pick, splatted the same way.
+    hues = np.array(cfg["blade_tones"], dtype=np.float64)
+    pick = rng.integers(0, len(hues), n_blades)
+    col = np.zeros((cells, 3), dtype=np.float64)
+    for k in range(len(hues)):
+        m = np.broadcast_to((pick == k)[:, None], px.shape).ravel()
+        col[:, 0] += np.bincount(flat[m], weights=weight[m], minlength=cells) * hues[k][0]
+        col[:, 1] += np.bincount(flat[m], weights=weight[m], minlength=cells) * hues[k][1]
+        col[:, 2] += np.bincount(flat[m], weights=weight[m], minlength=cells) * hues[k][2]
+
+    w2 = w_acc.reshape(size, size)
+    cov = np.clip(w2 / cfg["coverage_norm"], 0.0, 1.0)
+    blades = (col.reshape(size, size, 3) / np.clip(w_acc, 1e-6, None).reshape(size, size, 1))
+
+    # The soil floor. It is meant to be seen in the gaps - that shadow is what
+    # gives turf its depth. Making it as light as the blades is what produced
+    # flat felt last time.
+    soil = np.array(cfg["soil"], dtype=np.float64)[None, None, :]
+    albedo = soil * (1.0 - cov[..., None]) + blades * cov[..., None]
+
+    # Slow hue drift across the plate, small enough not to become a landmark
+    # when tiled (see build_plate's note on whole-plate features).
+    albedo *= (1.0 + (drift - 0.5) * 2.0 * cfg["drift"])[..., None]
+    albedo = np.clip(albedo, 0.0, 1.0)
+    albedo = retarget_albedo(albedo, cfg["target_linear"])
+
+    # Height = mean tip height reached in the texel, so blade tips stand proud
+    # of the gaps and the normal map carries the blade direction.
+    height = h_acc.reshape(size, size) / np.clip(w_acc.reshape(size, size), 1e-6, None)
+    height = normalize(height * cov + 0.15 * clump)
+
+    strength = cfg["bump"] * (size / 512.0)
+    dzdx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * strength
+    dzdy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * strength
+    nx, ny, nz = -dzdx, -dzdy, np.ones_like(height)
+    inv = 1.0 / np.sqrt(nx * nx + ny * ny + nz * nz)
+    normal = np.dstack([nx * inv * 0.5 + 0.5, ny * inv * 0.5 + 0.5, nz * inv * 0.5 + 0.5])
+
+    r_lo, r_hi = cfg["rough"]
+    # Blades are glossier than the soil between them.
+    rough = r_hi - (r_hi - r_lo) * cov
+    return albedo, normal, np.dstack([rough, height, np.zeros_like(rough)])
 
 
 def build_plate(name, cfg, size):
@@ -295,15 +426,16 @@ def main():
         if name not in PLATES:
             raise SystemExit("unknown plate %r (known: %s)" % (name, ", ".join(PLATES)))
         print("%s @ %dpx" % (name, args.size))
-        alb, nrm, rgh = build_plate(name, PLATES[name], args.size)
+        cfg = PLATES[name]
+        builder = build_grass_plate if cfg.get("kind") == "grass" else build_plate
+        alb, nrm, rgh = builder(name, cfg, args.size)
         save(alb, os.path.join(TEXTURES_DIR, "%s_albedo.png" % name))
         save(nrm, os.path.join(TEXTURES_DIR, "%s_normal.png" % name))
         save(rgh, os.path.join(TEXTURES_DIR, "%s_roughness.png" % name))
-        lum = alb @ [0.2126, 0.7152, 0.0722]
         linlum = srgb_to_linear(alb) @ [0.2126, 0.7152, 0.0722]
-        print("  sRGB mean=%.3f spread=%.3f | LINEAR albedo=%.4f (target %.3f)"
-              % (lum.mean(), np.percentile(lum, 95) - np.percentile(lum, 5),
-                 linlum.mean(), PLATES[name]["target_linear"]))
+        p5, p95 = np.percentile(linlum, 5), np.percentile(linlum, 95)
+        print("  LINEAR albedo=%.4f (target %.3f) | p5=%.4f p95=%.4f ratio=%.2fx"
+              % (linlum.mean(), cfg["target_linear"], p5, p95, p95 / max(p5, 1e-6)))
 
 
 if __name__ == "__main__":

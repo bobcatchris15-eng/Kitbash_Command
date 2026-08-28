@@ -150,6 +150,13 @@ static func _load_map_file(map_id: String, path: String) -> void:
 		_fail_load(path, "failed schema validation:\n  %s" % "\n  ".join(errors))
 		return
 
+	# STAMP THE ID, after validation so the validator never sees it as an
+	# unknown field. Without this, map_def.get("id") is empty on every map -
+	# the terrain dressing's determinism seed silently fell back to the map's
+	# display NAME, and anything wanting to find a per-map raster (the painted
+	# water introduced alongside this) had no way to name it from a map_def
+	# alone. Every consumer already assumed this key was there.
+	decoded["id"] = map_id
 	_cache[map_id] = decoded
 
 static func _fail_load(path: String, reason: String) -> void:
@@ -614,7 +621,26 @@ const FIELD_SPEC: Dictionary = {
 	# so 16x (the project's stated target) validates without bumping
 	# the cap every time world_scale.gd's DEFAULT moves.
 	"world_scale": {"type": "number", "required": false, "min": 0.1},
+	# Height of the map-wide water table, in world units. Was read by
+	# TerrainBuilder with a hardcoded 0.05 default and never declared here, so
+	# a map that set it had the value dropped by the schema and got the default
+	# anyway. "scale": true because it is a height like any other length.
+	#
+	# The default is NEGATIVE (see TerrainBuilder.WATER_LEVEL_DEFAULT): a table
+	# at 0.05 sits above the resting height of terrain that averages zero, so a
+	# v2 map came up flooded from edge to edge.
+	"water_level": {"type": "number", "required": false, "scale": true},
+	# Painted water bodies - one RGBA raster per map, R = coverage, GB = a
+	# 16-bit surface height. Lets a lake sit ABOVE the table (a mountain tarn)
+	# instead of only where the ground dips below it.
+	"water_paint": {"type": "string", "required": false},
 	"schema_version": {"type": "number", "required": true, "min": 1},
+	# The map's own id (its filename stem). Stamped in by _load_map after
+	# validation, and declared here so a round trip - load, then validate the
+	# loaded dictionary, which the sculpt tool's save path and the probes both
+	# do - does not trip over it as an unknown field. Optional because a map on
+	# disk does not have to carry it; the loader is the authority.
+	"id": {"type": "string", "required": false},
 	# Reserved fields (B3): not authored by any of the 8 bundled maps yet,
 	# so deliberately shallow specs (no "item") - just type-checked, not
 	# deeply validated, until something actually populates them.

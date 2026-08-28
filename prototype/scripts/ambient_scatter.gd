@@ -245,7 +245,7 @@ func _build_template(scene_path: String) -> Array:
 					matte_mat.roughness = 1.0
 					matte_mat.metallic = 0.0
 					matte_mat.metallic_specular = 0.0
-					matte_mat.specular = 0.0
+					matte_mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 					scene_materials[mat_key] = matte_mat
 
 				parts.append({

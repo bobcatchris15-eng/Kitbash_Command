@@ -2,15 +2,12 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bhnsslyi6rp7u"
+uid="uid://bonnrecajsww"
 path.s3tc="res://.godot/imported/thicket_4_thicket_4_mat0_rough.png-3d634e3d7479425c6e128879003021ba.s3tc.ctex"
 path.etc2="res://.godot/imported/thicket_4_thicket_4_mat0_rough.png-3d634e3d7479425c6e128879003021ba.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "31b287f0ba6ea58ab73924b6d0d35de3"
 }
 
 [deps]

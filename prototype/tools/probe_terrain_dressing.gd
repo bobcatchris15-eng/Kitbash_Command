@@ -55,9 +55,21 @@ func _initialize() -> void:
 	_check(not TerrainDressingScript._aspect_ok(180.0, [0, 60]),
 		"south does not match a north rule")
 
-	var wd_dry := TerrainBuilderScript.water_distance_at(map_def, 0.0, 0.0)
-	print("  water distance at map centre: %s" % ("INF (no water)" if wd_dry == INF else "%.0f m" % wd_dry))
-	_check(wd_dry > 0.0, "water distance is positive away from water")
+	# Water distance now covers the table and painted bodies, not just authored
+	# rects - so "the map centre" is no longer a safe stand-in for "dry ground".
+	# On sentinel_divide the centre is the canyon floor, which really is under
+	# the table. Test the SHAPE of the field instead: zero in the water,
+	# positive on high ground, and monotonically increasing as you climb away.
+	var wet_pt := Vector2(0.0, 0.0)
+	var dry_pt := Vector2(-485.0, 254.0)
+	var wd_wet := TerrainBuilderScript.water_distance_at(map_def, wet_pt.x, wet_pt.y)
+	var wd_dry := TerrainBuilderScript.water_distance_at(map_def, dry_pt.x, dry_pt.y)
+	print("  water distance: canyon floor %.0f m | plateau top %s" % [
+		wd_wet, "INF" if wd_dry == INF else "%.0f m" % wd_dry])
+	_check(TerrainBuilderScript.submerged_at(map_def, wet_pt.x, wet_pt.y),
+		"the canyon floor is under the water table")
+	_check(wd_wet <= 0.001, "water distance is zero IN water", "%.2f m" % wd_wet)
+	_check(wd_dry > 0.0, "water distance is positive on dry ground", "%.0f m" % wd_dry)
 
 	var curv_rim := TerrainBuilderScript.curvature_at(map_def, -240.0, 120.0)
 	print("  curvature at the plateau rim: %+.3f" % curv_rim)

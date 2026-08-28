@@ -63,11 +63,7 @@ void fragment() {
 	vec3 final_albedo = tex_color.rgb * foliage_tint * COLOR.rgb;
 	ALBEDO = final_albedo;
 	
-	// Specular is clamped extremely low to completely eliminate shiny plastic spots
+	// Specular is zeroed to eliminate shiny plastic spots and bright white reflections
 	ROUGHNESS = roughness_scale;
-	SPECULAR = specular_strength;
-	
-	// Subsurface transmission glow when backlit by the sun — capped to
-	// prevent trees from outshining units at any sun angle.
-	BACKLIGHT = min(final_albedo * transmission_amount, vec3(0.18));
+	SPECULAR = 0.0;
 }

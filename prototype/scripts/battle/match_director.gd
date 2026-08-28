@@ -973,6 +973,14 @@ func _setup_terrain() -> void:
 				current_map.get("ground_color", Color(0.2, 0.26, 0.21)), current_map, map_id)
 			BattleLogger.log_build_step("terrain.ground_material",
 				float(Time.get_ticks_usec() - _t_mat) / 1000.0)
+			# Shell-textured grass over the top. v2 maps only, chunked, and
+			# range-culled - at battle altitude every chunk is out of range and
+			# this draws nothing at all.
+			var _t_grass := Time.get_ticks_usec()
+			var chunks: int = TerrainBuilder.build_grass_shells(current_map, ground, map_id)
+			if chunks > 0:
+				BattleLogger.log_build_step("terrain.grass_shells",
+					float(Time.get_ticks_usec() - _t_grass) / 1000.0, {"chunks": chunks})
 		var col: CollisionShape3D = ground.get_node_or_null("CollisionShape3D")
 		if col:
 			# SKIRMISH_PERF_TROUBLESHOOTING.md §11.5 + §12. The flat_ground_collider
@@ -1068,7 +1076,7 @@ func _setup_terrain() -> void:
 	_deep_water_nav_region = nav.deep_water_region
 
 	var _t_vis := Time.get_ticks_usec()
-	await TerrainBuilder.spawn_visuals(current_map, self, _build_ticker())
+	await TerrainBuilder.spawn_visuals(current_map, self, _build_ticker(), map_id)
 	# Ambient scatter. PROGRESS.md's 2026-08-10 entry measured ~1650
 	# ResourceNode instances on a 210-half map before the clustering change,
 	# so this is a credible second home for the load time even though the

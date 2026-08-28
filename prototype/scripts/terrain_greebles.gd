@@ -69,6 +69,9 @@ static func _flat_material(color: Color, roughness: float = 0.85) -> StandardMat
 	var mat = StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.roughness = roughness
+	mat.metallic = 0.0
+	mat.metallic_specular = 0.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	return mat
 
 static func _scaled_count(base_count: int, prop_scale: float) -> int:

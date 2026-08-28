@@ -120,7 +120,13 @@ uniform float splat_warp_scale = 0.035;    // noise frequency
 
 // --- Slope-driven rock ------------------------------------------------------
 // A WIDE ramp, deliberately. See note (3) in the header.
-uniform float slope_rock_lo : hint_range(0.0, 1.0) = 0.30;
+// Lowered from 0.30 (46 deg) to meet rock_strata_lo. The strata are mixed into
+// the ROCK channel, so they are then weighted by that channel in the final
+// blend - if rock has no weight at 45 deg, banding there is invisible no
+// matter what the strata ramp says. On bimodal terrain (flat or near-vertical)
+// this barely changes coverage; on a gentler map it is the difference between
+// a banded cliff and a grassy one.
+uniform float slope_rock_lo : hint_range(0.0, 1.0) = 0.22;
 uniform float slope_rock_hi : hint_range(0.0, 1.0) = 0.72;
 uniform float slope_rock_gain : hint_range(0.0, 3.0) = 1.6;
 // Beyond this slope the rock layer is projected triplanar instead of from
@@ -141,8 +147,34 @@ uniform float detail_normal_scale = 0.55;
 uniform float detail_normal_amount : hint_range(0.0, 1.0) = 0.35;
 
 uniform vec3 cliff_rock_tint : source_color = vec3(1.0, 1.0, 1.0);
-uniform float strata_strength : hint_range(0.0, 1.0) = 0.45;
-uniform float strata_scale = 0.15;
+uniform int rock_pattern : hint_range(0, 3) = 0; // 0 = Layered Strata, 1 = Fractured Granite, 2 = Rugged Crag, 3 = Chiseled Slabs
+// Clamped to 1.0 at the mix, so the old 0..2 hint was a lie above 1 and the
+// 1.1 default spent 0.1 on nothing.
+uniform float rock_strata_strength : hint_range(0.0, 1.0) = 0.92;
+// The strata get their OWN slope ramp. They used to ride on `tri`, the
+// triplanar gate (0.45..0.78 = 65..80 deg), but those answer different
+// questions: triplanar is about a texture STRETCHING on a steep face, strata
+// are about rock being EXPOSED. Sharing the gate meant a 65 deg face - a
+// cliff by any reading - got essentially no banding.
+// slope here is 1 - normal.y, so 0.23 is ~40 deg and 0.50 is ~60 deg.
+uniform float rock_strata_lo : hint_range(0.0, 1.0) = 0.23;
+uniform float rock_strata_hi : hint_range(0.0, 1.0) = 0.50;
+// Authored band colours run 0.36..0.98 sRGB, which is 0.04..0.95 LINEAR -
+// far above real rock (limestone sits near 0.25 linear). Harmless while the
+// bands only multiplied the plate; with a real mix they would blow out.
+// 0.62 was still far too bright once the mix actually asserted the colour:
+// the fragment path later applies a 1.35 lift and the cliff tint, so a 0.88
+// sandstone landed near 0.72 sRGB - white rock. Working back from a target of
+// ~0.45 sRGB on the lit face: 0.45 / (0.88 * 0.85 * 1.35) = 0.45.
+uniform float rock_albedo_gain : hint_range(0.1, 1.5) = 0.45;
+uniform float rock_bump_strength : hint_range(0.0, 3.0) = 1.6;
+// BED THICKNESS, and the single most important knob for whether a cliff reads
+// as stratified. The band index is floor(bed_y * this), so 0.16 means one bed
+// per 6.25 units - only three or four bands on a 22 m wall, which renders as
+// large flat slabs of one colour rather than as bedding. 0.5 gives ~2 m beds,
+// which is the real range for sandstone/shale sequences.
+uniform float rock_strata_scale : hint_range(0.01, 1.0) = 0.5;
+uniform float rock_joint_scale : hint_range(0.01, 1.0) = 0.08;
 
 varying vec3 v_world_pos;
 varying vec3 v_world_normal;
@@ -170,6 +202,144 @@ float value_noise(vec2 p) {
 	float c = hash21(i + vec2(0.0, 1.0));
 	float d = hash21(i + vec2(1.0, 1.0));
 	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float sample_rock_height(vec3 p) {
+	float h = 0.0;
+	if (rock_pattern == 0) {
+		// Pattern 0: Organic Tilted Sedimentary Strata (Tilted dip, folding & non-uniform bed thickness)
+		float dip = p.x * 0.18 - p.z * 0.12; // Natural tectonic tilt (~12° dip)
+		float fold1 = value_noise(p.xz * 0.022) * 6.0; // Large geological fold undulations
+		float fold2 = value_noise(p.xz * 0.075 + vec2(p.y * 0.05)) * 1.8;
+		float bed_y = p.y + dip + fold1 + fold2;
+
+		// Non-uniform bedding thickness (mix of thick sandstone beds and thin shale laminations)
+		float non_uniform_y = bed_y + sin(bed_y * 0.16 + 1.4) * 3.4 + sin(bed_y * 0.042) * 7.0;
+		float bed_scaled = non_uniform_y * rock_strata_scale;
+		float step_tier = pow(fract(bed_scaled), 0.32) * 1.4;
+		float fine_strata = sin(bed_scaled * 16.0 + value_noise(p.xz * 0.1) * 2.0) * 0.22;
+		
+		// Irregular diagonal joint fractures & cross-bedding
+		float vertical_crack = smoothstep(0.86, 0.98, abs(sin((p.x * 0.75 + p.z * 0.65) * rock_joint_scale * 3.14 + value_noise(p.yz * 0.05) * 2.2))) * 0.55;
+		h = (step_tier + fine_strata - vertical_crack) * 1.25;
+	} else if (rock_pattern == 1) {
+		// Pattern 1: Organic Fractured Granite / Bedrock (Domain-warped multi-axial stress joints)
+		vec2 warp = vec2(
+			value_noise(p.xz * 0.032 + vec2(p.y * 0.04)),
+			value_noise(p.zx * 0.032 - vec2(p.y * 0.04 + 19.3))
+		) * 4.5;
+		vec3 pw = p + vec3(warp.x, warp.y * 0.5, warp.y);
+
+		float a1 = sin((pw.x * 0.866 + pw.z * 0.500) * rock_joint_scale * 3.5 + pw.y * 0.08);
+		float a2 = sin((-pw.x * 0.500 + pw.z * 0.866) * rock_joint_scale * 3.1 - pw.y * 0.06);
+		float a3 = sin((pw.x * 0.250 - pw.z * 0.968) * rock_joint_scale * 2.7 + pw.y * 0.11);
+		
+		float block_terr = floor(a1 * 1.6) * 0.32 + floor(a2 * 1.6) * 0.28 + floor(a3 * 1.4) * 0.24;
+		float crack = -pow(clamp(1.0 - min(abs(a1), min(abs(a2), abs(a3))), 0.0, 1.0), 4.8) * 1.35;
+		float micro = (value_noise(p.xz * 0.12 + vec2(p.y * 0.08)) - 0.5) * 0.45;
+		h = (block_terr + crack + micro) * 1.35;
+	} else if (rock_pattern == 2) {
+		// Pattern 2: Rugged Mountain Crag (Multi-octave sharp jagged rock noise)
+		float n1 = value_noise(p.xz * rock_strata_scale * 3.0 + vec2(p.y * 0.15));
+		float n2 = value_noise(p.xz * rock_strata_scale * 7.5 - vec2(p.y * 0.35));
+		float n3 = value_noise(p.xz * rock_strata_scale * 16.0 + vec2(p.y * 0.8));
+		float crag = (n1 * 0.52 + n2 * 0.32 + n3 * 0.16) * 2.0 - 1.0;
+		float ledge = sin(p.y * rock_strata_scale * 4.0 + (p.x * 0.2 - p.z * 0.15)) * 0.35;
+		h = (crag + ledge) * 1.4;
+	} else {
+		// Pattern 3: Organic Chiseled Slabs / Limestone Bedrock (Domain-warped non-uniform bedding)
+		vec2 slab_warp = vec2(
+			value_noise(p.xz * 0.028 + vec2(p.y * 0.035)),
+			value_noise(p.zx * 0.028 - vec2(p.y * 0.035 + 14.7))
+		) * 3.8;
+		vec3 spw = p + vec3(slab_warp.x, slab_warp.y * 0.4, slab_warp.y);
+
+		float dip = spw.x * 0.14 - spw.z * 0.09;
+		float non_uniform_bed = (spw.y + dip) + sin((spw.y + dip) * 0.18 + 1.2) * 2.8 + sin((spw.y + dip) * 0.05) * 5.2;
+		float row = floor(non_uniform_bed * rock_strata_scale * 1.8);
+		
+		float u_shift = float(int(abs(row)) % 3) * 3.8 + value_noise(spw.xz * 0.05) * 4.0;
+		float col_coord = (spw.x * 0.85 + spw.z * 0.52 + u_shift) * rock_joint_scale * 1.8;
+		float col_idx = floor(col_coord);
+		
+		float block_seed = fract(sin(row * 12.9898 + col_idx * 78.233) * 43758.5453);
+		float slab_lift = (block_seed - 0.5) * 0.9;
+		
+		float border = smoothstep(0.03, 0.12, fract(non_uniform_bed * rock_strata_scale * 1.8))
+		             * smoothstep(0.03, 0.12, fract(col_coord));
+		float chip = (value_noise(spw.xz * 0.15 + vec2(spw.y * 0.1)) - 0.5) * 0.35;
+		h = (slab_lift + (border - 0.5) * 0.6 + chip) * 1.35;
+	}
+	return h;
+}
+
+vec3 sample_rock_color(vec3 p, vec2 wpos, float crevice_occ) {
+	vec3 col = vec3(1.0);
+	if (rock_pattern == 0) {
+		// Pattern 0: Sedimentary Strata
+		// Mostly light tan-yellow, with gray and black for some bands, and rare red ones
+		float dip = p.x * 0.18 - p.z * 0.12;
+		float fold1 = value_noise(p.xz * 0.022) * 6.0;
+		float fold2 = value_noise(p.xz * 0.075 + vec2(p.y * 0.05)) * 1.8;
+		float bed_y = p.y + dip + fold1 + fold2;
+		float non_uniform_y = bed_y + sin(bed_y * 0.16 + 1.4) * 3.4 + sin(bed_y * 0.042) * 7.0;
+		float bed_scaled = non_uniform_y * rock_strata_scale;
+		
+		float band_idx = floor(bed_scaled);
+		float band_hash = fract(sin(band_idx * 127.1 + 311.7) * 43758.5453);
+		
+		vec3 tan_yellow = mix(vec3(0.88, 0.79, 0.58), vec3(0.98, 0.89, 0.68), fract(bed_scaled));
+		vec3 dark_shale = mix(vec3(0.36, 0.36, 0.38), vec3(0.18, 0.18, 0.20), fract(bed_scaled));
+		vec3 red_iron = mix(vec3(0.74, 0.28, 0.20), vec3(0.84, 0.36, 0.24), fract(bed_scaled));
+		
+		if (band_hash < 0.09) {
+			// Rare red hematite/iron band (~9%)
+			col = red_iron;
+		} else if (band_hash < 0.30) {
+			// Gray and black shale bands (~21%)
+			col = dark_shale;
+		} else {
+			// Mostly light tan-yellow sandstone (~70%)
+			col = tan_yellow;
+		}
+		
+		// Fine sedimentary laminations
+		float fine = sin(bed_scaled * 16.0 + value_noise(wpos * 0.08) * 2.0) * 0.08;
+		col += vec3(fine);
+		col *= mix(0.75, 1.15, crevice_occ);
+
+	} else if (rock_pattern == 1) {
+		// Pattern 1: Fractured Granite
+		// Mottled various grey with occasional small patches of light green lichen
+		float g1 = value_noise(wpos * 0.08 + vec2(p.y * 0.05));
+		float g2 = value_noise(wpos * 0.28 + vec2(p.y * 0.15));
+		float g_mottle = g1 * 0.6 + g2 * 0.4;
+		vec3 granite_grey = mix(vec3(0.42, 0.42, 0.45), vec3(0.85, 0.85, 0.83), g_mottle);
+		
+		// Occasional light green lichen colonies
+		float lichen_mask = value_noise(wpos * 0.07 + vec2(p.y * 0.04 + 31.4));
+		float lichen_grain = value_noise(wpos * 0.42 - vec2(p.y * 0.2));
+		float is_lichen = smoothstep(0.68, 0.78, lichen_mask) * smoothstep(0.35, 0.65, lichen_grain);
+		vec3 lichen_green = vec3(0.55, 0.72, 0.40);
+		
+		col = mix(granite_grey, lichen_green, is_lichen * 0.88);
+		col *= mix(0.70, 1.15, crevice_occ);
+
+	} else if (rock_pattern == 2) {
+		// Pattern 2: Rugged Crag
+		// Light brownish-red
+		float c_mottle = value_noise(wpos * 0.06) * 0.65 + value_noise(wpos * 0.22) * 0.35;
+		vec3 brown_red = mix(vec3(0.72, 0.42, 0.30), vec3(0.88, 0.54, 0.38), c_mottle);
+		col = brown_red * mix(0.75, 1.15, crevice_occ);
+
+	} else {
+		// Pattern 3: Limestone Bedrock / Chiseled Slabs
+		// Limestone cream / yellow
+		float l_mottle = value_noise(wpos * 0.05) * 0.7 + value_noise(wpos * 0.18) * 0.3;
+		vec3 cream_yellow = mix(vec3(0.88, 0.82, 0.66), vec3(0.98, 0.94, 0.78), l_mottle);
+		col = cream_yellow * mix(0.75, 1.15, crevice_occ);
+	}
+	return col;
 }
 
 float luma(vec3 c) {
@@ -250,10 +420,48 @@ void fragment() {
 		float rz = texture(rough_1, v_world_pos.xy / layer_tile_size.y).r;
 		r1 = mix(r1, rx * bl.x + r1 * bl.y + rz * bl.z, tri);
 
-		// Horizontal geological strata modulation on sheer cliffs
-		float strata = sin(v_world_pos.y * strata_scale * 6.28318 + value_noise(wpos * 0.05) * 2.5);
-		strata = pow(clamp(strata * 0.5 + 0.5, 0.0, 1.0), 2.2);
-		a1 *= mix(1.0, 0.72 + 0.38 * strata, tri * strata_strength);
+	}
+
+	// --- procedural geological strata ---------------------------------------
+	// Deliberately OUTSIDE the triplanar block above: see rock_strata_lo.
+	float strata_mask = smoothstep(rock_strata_lo, rock_strata_hi, slope);
+	if (strata_mask > 0.001) {
+		float strata_h = sample_rock_height(v_world_pos);
+		float crevice_occ = clamp(1.0 + strata_h * 0.35, 0.45, 1.25);
+		vec3 rock_color = sample_rock_color(v_world_pos, wpos, crevice_occ);
+
+		// MIX, NOT MULTIPLY. `a1 * rock_color` can only ever make a band
+		// DARKER than the rock plate under it, so a red hematite band on grey
+		// stone came out as muddy pink staining rather than as a band - the
+		// authored palette could tint but never assert itself. The old * 1.35
+		// was compensating for that double-darkening.
+		// Capped below 1.0 on purpose: a full replace throws away the rock
+		// plate's own grain and leaves flat vertex-lit colour with only the
+		// procedural bump on it. Keeping ~15% of the plate holds the fine
+		// texture that stops a cliff face looking like painted card.
+		// The biome tint is applied at PARTIAL strength here. It was authored
+		// when the rock channel was just a plate that needed recolouring per
+		// biome; now the pattern supplies its own geology, and the temperate
+		// tint (0.85, 0.88, 0.82) is slightly green - measured, it pulled a
+		// tan sandstone to a neutral cream (rendered 0.728/0.707/0.581, R and
+		// G within 3%). Half strength keeps the biome shift without erasing
+		// the rock's own hue.
+		vec3 biome = mix(vec3(1.0), cliff_rock_tint, 0.45);
+		a1 = mix(a1, rock_color * rock_albedo_gain * biome,
+			strata_mask * clamp(rock_strata_strength, 0.0, 1.0) * 0.85);
+
+		// Ledge relief. Three taps: the Y one is what actually carves the
+		// horizontal bedding shelves, so it stays despite being the single
+		// most expensive line here. If this ever costs too much on a weak
+		// GPU, dropping the Y tap is the lever - it will flatten the ledges.
+		float eps = 0.10;
+		float hx = sample_rock_height(v_world_pos + vec3(eps, 0.0, 0.0));
+		float hz = sample_rock_height(v_world_pos + vec3(0.0, 0.0, eps));
+		float hy = sample_rock_height(v_world_pos + vec3(0.0, eps, 0.0));
+		vec3 rock_grad = vec3(-(hx - strata_h) / eps, -(hy - strata_h) / eps * 0.35, -(hz - strata_h) / eps);
+		vec3 n1_unpacked = n1 * 2.0 - 1.0;
+		n1_unpacked = normalize(n1_unpacked + rock_grad * rock_bump_strength * 1.2 * strata_mask);
+		n1 = n1_unpacked * 0.5 + 0.5;
 	}
 
 	// --- height-weighted blend ---------------------------------------------

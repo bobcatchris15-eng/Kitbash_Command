@@ -2427,28 +2427,11 @@ LINEUP = [
     # -- KESTREL AEROWORKS (12): fuselages, wings sawn off ---------------
     H("kestrel_scout_a", "kestrel", "scout", "Kestrel Recon Fuselage",
       (2.5, 1.15, 4.1), [], {"boom_frac": 0.48, "fin_h": 0.46}),
-    H("kestrel_scout_b", "kestrel", "scout", "Kestrel Pathfinder",
-      (2.3, 0.95, 4.9), [], {"boom_frac": 0.40, "boom_z": 0.00,
-                             "stub_w": 0.11, "fin_h": 0.52}),
-    H("kestrel_scout_c", "kestrel", "scout", "Kestrel Drone Tender",
-      (2.7, 1.05, 4.3), [],
-      {"canopies": (), "boom_frac": 0.52, "fin_h": 0.38,
-       "spine_h": 0.20, "spine_zw": 0.20}),
     H("kestrel_light_a", "kestrel", "light", "Kestrel Strafer",
       (3.2, 1.05, 5.3), [], {"stub_w": 0.22, "stub_l": 0.30, "fin_h": 0.34}),
-    H("kestrel_light_b", "kestrel", "light", "Kestrel Interceptor",
-      (2.9, 1.00, 5.9), [], {"boom_frac": 0.44, "boom_z": 0.0,
-                             "stub_w": 0.13, "fin_h": 0.40}),
-    H("kestrel_light_c", "kestrel", "light", "Kestrel Tandem Trainer",
-      (2.8, 1.25, 5.5), [], {"canopies": (-0.56, -0.10), "boom_frac": 0.50,
-                             "fin_h": 0.36}),
     H("kestrel_medium_a", "kestrel", "medium", "Kestrel Gunship",
       (3.6, 1.50, 6.1), [],
       {"facet_cut": 0.22, "stub_w": 0.14, "fin_h": 0.34}),
-    H("kestrel_medium_b", "kestrel", "medium", "Kestrel Bay Bomber",
-      (3.5, 1.60, 6.5), [("trunk", {"th": 0.26, "w": 0.54, "z0": -0.40,
-                                    "z1": 0.30})],
-      {"boom_frac": 0.54, "fin_h": 0.36}),
     H("kestrel_heavy_a", "kestrel", "heavy", "Kestrel Heavy Lifter",
       (4.5, 1.95, 7.7), [],
       {"facet_cut": 0.20, "stub_w": 0.12, "stub_z": -0.44,
@@ -2708,15 +2691,6 @@ LINEUP = [
     # -- TALLOW additions folded into the consolidated block above --------
 
     # -- KESTREL AEROWORKS additions (2): more fuselages ----------------
-    H("kestrel_medium_c", "kestrel", "medium", "Kestrel Airliner",
-      (3.4, 1.50, 6.4), [],
-      {"canopies": (), "boom_frac": 0.34, "boom_z": 0.42,
-       "stub_w": 0.07, "fin_h": 0.44, "spine_h": 0.10, "spine_zw": 0.30}),
-    H("kestrel_transport_b", "kestrel", "transport", "Kestrel Airlifter",
-      (4.0, 1.85, 8.8), [("well", {"z0": 0.10, "wall_h": 0.26, "w": 0.70})],
-      {"canopies": (), "boom_frac": 0.70, "boom_z": 0.60,
-       "stub_w": 0.16, "fin_h": 0.48, "facet_cut": 0.20}),
-
     # -- HALVORSEN YARD additions (3): more boats -----------------------
     # -- CALDER MOBILITY additions (2): extreme arrowheads --------------
     H("calder_medium_c", "calder", "medium", "Calder Dart",

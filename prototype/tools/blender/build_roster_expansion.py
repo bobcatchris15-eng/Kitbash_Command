@@ -954,80 +954,6 @@ def build_mine_layer():
 	export_bmesh(bm, "mine_layer_chute", "mine_layer_chute.glb", color=(0.19, 0.20, 0.17, 1.0))
 
 
-# ---------------------------------------------------------------------------
-# BALLISTA
-# The straight-faced absurdity piece. Has to read as a genuine siege engine
-# from across the battlefield: torsion bundles, swept arms, a bowstring, a
-# ratcheted windlass and a loaded bolt.
-# ---------------------------------------------------------------------------
-def build_ballista():
-	# 1. TURNTABLE + TIMBER FRAME - origin at deck
-	bm = bmesh.new()
-	add_cyl_z(bm, (0, 0, 0.03), 0.30, 0.06, segments=24)          # iron turntable
-	for i in range(10):                                           # rivets
-		a = (i / 10) * math.tau
-		add_cyl_z(bm, (math.cos(a) * 0.26, math.sin(a) * 0.26, 0.062), 0.014, 0.014, segments=6)
-	add_cyl_z(bm, (0, 0, 0.09), 0.16, 0.06, segments=18)          # pivot boss
-	# Timber side frames running fore-aft
-	for side in (-1, 1):
-		add_box(bm, (side * 0.17, 0.02, 0.20), (0.055, 0.62, 0.16), bevel=0.010)
-		# Iron strapping across the timbers
-		for sy in (-0.20, 0.06, 0.26):
-			add_box(bm, (side * 0.17, sy, 0.20), (0.062, 0.028, 0.17), bevel=0.004)
-	add_box(bm, (0, -0.26, 0.16), (0.34, 0.06, 0.07), bevel=0.008)  # rear cross-beam
-	add_box(bm, (0, 0.30, 0.16), (0.34, 0.06, 0.07), bevel=0.008)   # front cross-beam
-	export_bmesh(bm, "ballista_frame", "ballista_frame.glb", color=(0.40, 0.29, 0.17, 1.0),
-				 metallic=0.15, roughness=0.75)
-
-	# 2. STOCK / SLIDER with windlass - origin at frame top centre
-	bm = bmesh.new()
-	add_box(bm, (0, 0.02, 0.03), (0.11, 0.80, 0.055), bevel=0.008)   # stock beam
-	add_box(bm, (0, 0.02, 0.065), (0.045, 0.78, 0.022), bevel=0.004)  # bolt groove
-	# Windlass drum and crank at the rear
-	add_cyl_x(bm, (0, -0.34, 0.06), 0.055, 0.20, segments=16)
-	for side in (-1, 1):
-		add_cyl_x(bm, (side * 0.115, -0.34, 0.06), 0.070, 0.02, segments=14)   # ratchet discs
-		for i in range(8):                                                     # ratchet teeth
-			a = (i / 8) * math.tau
-			add_box(bm, (side * 0.125, -0.34 + math.cos(a) * 0.062, 0.06 + math.sin(a) * 0.062),
-					(0.014, 0.018, 0.018), bevel=0.002)
-		# Geared motor drive on the windlass instead of a hand crank - the
-		# ballista is deliberately archaic, but it is still a module a
-		# vehicle carries, not something a crew winds by hand.
-		add_cyl_x(bm, (side * 0.155, -0.34, 0.09), 0.032, 0.055, segments=14)
-		add_cyl_x(bm, (side * 0.190, -0.34, 0.09), 0.020, 0.020, segments=10)
-		add_box(bm, (side * 0.150, -0.34, 0.14), (0.045, 0.050, 0.040), bevel=0.005)
-	add_box(bm, (0, -0.20, 0.09), (0.03, 0.10, 0.03), bevel=0.004)             # trigger claw
-	export_bmesh(bm, "ballista_stock", "ballista_stock.glb", color=(0.44, 0.32, 0.19, 1.0),
-				 metallic=0.15, roughness=0.75)
-
-	# 3. TORSION BUNDLE + ARM - one side, mirrored by visual_builder.
-	#    Origin at the bundle's mounting point on the frame.
-	bm = bmesh.new()
-	add_cyl_z(bm, (0, 0, 0.10), 0.062, 0.20, segments=16)          # sinew bundle
-	add_cyl_z(bm, (0, 0, 0.205), 0.075, 0.03, segments=16)         # top washer
-	add_cyl_z(bm, (0, 0, 0.005), 0.075, 0.03, segments=16)         # bottom washer
-	for i in range(6):                                             # tensioning pegs
-		a = (i / 6) * math.tau
-		add_cyl_z(bm, (math.cos(a) * 0.058, math.sin(a) * 0.058, 0.225), 0.011, 0.05, segments=6)
-	# Swept throwing arm, angled forward and slightly out
-	add_box(bm, (0.055, 0.14, 0.15), (0.045, 0.30, 0.05), bevel=0.008)
-	add_box(bm, (0.115, 0.30, 0.15), (0.035, 0.16, 0.04), bevel=0.006)
-	add_cyl_z(bm, (0.135, 0.375, 0.15), 0.022, 0.055, segments=12)  # string nock
-	export_bmesh(bm, "ballista_arm", "ballista_arm.glb", color=(0.38, 0.27, 0.16, 1.0),
-				 metallic=0.15, roughness=0.78)
-
-	# 4. BOLT - origin at its rear, points +Y
-	bm = bmesh.new()
-	add_cyl_y(bm, (0, 0.16, 0), 0.022, 0.56, segments=14)          # shaft
-	add_taper_y(bm, (0, 0.49, 0), 0.038, 0.004, 0.14, segments=14)  # iron head
-	add_cyl_y(bm, (0, 0.41, 0), 0.030, 0.03, segments=14)          # head collar
-	for i in range(3):                                             # fletching vanes
-		a = (i / 3) * math.tau
-		add_box(bm, (math.cos(a) * 0.035, -0.08, math.sin(a) * 0.035),
-				(0.010, 0.10, 0.055), bevel=0.002)
-	export_bmesh(bm, "ballista_bolt", "ballista_bolt.glb", color=(0.24, 0.22, 0.19, 1.0),
-				 metallic=0.6, roughness=0.5)
 
 
 # ---------------------------------------------------------------------------
@@ -1070,6 +996,5 @@ if __name__ == "__main__":
 	build_anti_materiel_rifle()
 	build_napalm_mortar()
 	build_mine_layer()
-	build_ballista()
 	build_smoke_discharger()
 	print("ROSTER_EXPANSION_PARTS_DONE")

@@ -66,6 +66,11 @@ const FILES := [
 	"res://tools/probe_shield_system.gd",
 	"res://tools/probe_skirmish_load_breakdown.gd",
 	"res://tools/verify_greebles_and_grass.gd",
+	"res://scripts/auto_weapon.gd",
+	"res://scripts/battle/ai/commander.gd",
+	"res://scripts/battle/economy/production_service.gd",
+	"res://scripts/hud/hud_production_deck.gd",
+	"res://scripts/weapon_alpha.gd",
 ]
 
 func _init():

@@ -70,7 +70,7 @@ const Profiler = preload("res://scripts/battle/battle_profiler.gd")
 # anti-air" and pick something else.
 const ANTI_AIR_WEAPONS := ["ciws", "flak_cannon", "pd_laser", "sam_launcher", "aa_autocannon"]
 const ANTI_ARMOR_WEAPONS := ["gauss_railgun", "artillery", "ion_cannon",
-	"coil_gun", "recoilless_rifle", "ballista", "anti_materiel_rifle", "particle_lance"]
+	"coil_gun", "recoilless_rifle", "anti_materiel_rifle", "particle_lance"]
 const POINT_DEFENSE_WEAPONS := ["ciws", "pd_laser", "flak_cannon"]
 const INDIRECT_WEAPONS := ["artillery", "mortar_array", "spigot_mortar", "rocket_artillery", "cluster_dispenser", "plasma_lobber", "mk19_grenade_launcher", "napalm_mortar"]
 

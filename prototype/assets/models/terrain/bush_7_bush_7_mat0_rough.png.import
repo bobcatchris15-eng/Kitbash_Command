@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://18g4eplkwui7"
-path="res://.godot/imported/bush_7_bush_7_mat0_rough.png-742986081999d60dfd1cc7573d845a8f.ctex"
+path.s3tc="res://.godot/imported/bush_7_bush_7_mat0_rough.png-742986081999d60dfd1cc7573d845a8f.s3tc.ctex"
+path.etc2="res://.godot/imported/bush_7_bush_7_mat0_rough.png-742986081999d60dfd1cc7573d845a8f.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "dd2ff903df288325083c3f8dc60f26db"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/terrain/bush_7_bush_7_mat0_rough.png"
-dest_files=["res://.godot/imported/bush_7_bush_7_mat0_rough.png-742986081999d60dfd1cc7573d845a8f.ctex"]
+dest_files=["res://.godot/imported/bush_7_bush_7_mat0_rough.png-742986081999d60dfd1cc7573d845a8f.s3tc.ctex", "res://.godot/imported/bush_7_bush_7_mat0_rough.png-742986081999d60dfd1cc7573d845a8f.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +42,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

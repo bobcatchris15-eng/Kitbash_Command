@@ -140,6 +140,10 @@ uniform float value_floor : hint_range(0.0, 0.25) = 0.055;
 uniform float detail_normal_scale = 0.55;
 uniform float detail_normal_amount : hint_range(0.0, 1.0) = 0.35;
 
+uniform vec3 cliff_rock_tint : source_color = vec3(1.0, 1.0, 1.0);
+uniform float strata_strength : hint_range(0.0, 1.0) = 0.45;
+uniform float strata_scale = 0.15;
+
 varying vec3 v_world_pos;
 varying vec3 v_world_normal;
 
@@ -220,6 +224,9 @@ void fragment() {
 	vec3 a2 = mix(texture(albedo_2, uv2).rgb, texture(albedo_2, uv2 * detile_ratio + d_off).rgb, detile);
 	vec3 a3 = mix(texture(albedo_3, uv3).rgb, texture(albedo_3, uv3 * detile_ratio + d_off).rgb, detile);
 
+	vec3 n1 = texture(normal_1, uv1).rgb;
+	float r1 = texture(rough_1, uv1).r;
+
 	// Rock reprojected triplanar on steep ground so a cliff face is not a
 	// vertically smeared top-down projection.
 	float tri = smoothstep(triplanar_lo, triplanar_hi, slope);
@@ -229,7 +236,24 @@ void fragment() {
 		vec3 tx = texture(albedo_1, v_world_pos.zy / layer_tile_size.y).rgb;
 		vec3 tz = texture(albedo_1, v_world_pos.xy / layer_tile_size.y).rgb;
 		vec3 tri_rock = tx * bl.x + a1 * bl.y + tz * bl.z;
-		a1 = mix(a1, tri_rock, tri);
+		a1 = mix(a1, tri_rock * cliff_rock_tint, tri);
+
+		// Triplanar normals for crisp 3D cliff crevices & fractures
+		vec3 nx = texture(normal_1, v_world_pos.zy / layer_tile_size.y).rgb * 2.0 - 1.0;
+		vec3 ny = n1 * 2.0 - 1.0;
+		vec3 nz = texture(normal_1, v_world_pos.xy / layer_tile_size.y).rgb * 2.0 - 1.0;
+		vec3 tri_nrm = (nx * bl.x + ny * bl.y + nz * bl.z) * 0.5 + 0.5;
+		n1 = mix(n1, tri_nrm, tri);
+
+		// Triplanar roughness
+		float rx = texture(rough_1, v_world_pos.zy / layer_tile_size.y).r;
+		float rz = texture(rough_1, v_world_pos.xy / layer_tile_size.y).r;
+		r1 = mix(r1, rx * bl.x + r1 * bl.y + rz * bl.z, tri);
+
+		// Horizontal geological strata modulation on sheer cliffs
+		float strata = sin(v_world_pos.y * strata_scale * 6.28318 + value_noise(wpos * 0.05) * 2.5);
+		strata = pow(clamp(strata * 0.5 + 0.5, 0.0, 1.0), 2.2);
+		a1 *= mix(1.0, 0.72 + 0.38 * strata, tri * strata_strength);
 	}
 
 	// --- height-weighted blend ---------------------------------------------
@@ -246,12 +270,12 @@ void fragment() {
 	vec3 alb = a0 * bw.r + a1 * bw.g + a2 * bw.b + a3 * bw.a;
 
 	vec3 nrm = texture(normal_0, uv0).rgb * bw.r
-	         + texture(normal_1, uv1).rgb * bw.g
+	         + n1 * bw.g
 	         + texture(normal_2, uv2).rgb * bw.b
 	         + texture(normal_3, uv3).rgb * bw.a;
 
 	float rgh = texture(rough_0, uv0).r * bw.r
-	          + texture(rough_1, uv1).r * bw.g
+	          + r1 * bw.g
 	          + texture(rough_2, uv2).r * bw.b
 	          + texture(rough_3, uv3).r * bw.a;
 
@@ -283,6 +307,8 @@ void fragment() {
 	alb *= 1.0 + (value_noise(wpos * macro_drift_scale) - 0.5) * 2.0 * macro_drift;
 
 	alb *= ground_tint.rgb;
+	// Brightness lift & clarity boost for clean battlefield readability
+	alb *= 1.35;
 	// Floor, not a lift: a lift washes the whole image toward grey, while a
 	// floor only touches texels that had already collapsed.
 	alb = max(alb, vec3(value_floor));

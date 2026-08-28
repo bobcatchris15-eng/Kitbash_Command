@@ -790,7 +790,7 @@ func _ready():
 		elevation_down_limit = ModuleCatalog.get_elevation_down(type_id, data.tweaks)
 
 
-		if type_id in ["basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "ciws", "coil_gun", "autocannon", "ballista", "anti_materiel_rifle", "hypervelocity_missile", "aa_autocannon"]:
+		if type_id in ["basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "ciws", "coil_gun", "autocannon", "anti_materiel_rifle", "hypervelocity_missile", "aa_autocannon"]:
 			damage_class = "kinetic"
 		elif type_id in ["artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flak_cannon", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "mine_layer", "spigot_mortar", "rocket_artillery", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile"]:
 			damage_class = "explosive"
@@ -1465,14 +1465,28 @@ func _fire_at_target():
 		var light_e = 4.0 + _caliber * 3.0
 		VFXBurstScript.spawn(self, flash_pos, laser_color, particle_count, 0.1, flash_spread, 2.0, flash_speed_max, Vector3.ZERO, 0.4, 0.9, null, -global_transform.basis.z, laser_color, light_r, light_e)
 
-	var sfx_name = "cannon"
+	# Each weapon family gets its own vocalised ordnance report. Empty string
+	# means a non-firing module (sensor, booster) - no report at all. Keys map
+	# 1:1 to voice.ORDNANCE entries, so a new weapon sound is a one-line add
+	# here plus a generator in tools/audio/voice.py.
+	var sfx_name := ""
 	match type_id:
-		"basic_cannon", "artillery", "flak_cannon", "plasma_lobber", "recoilless_rifle", "ballista", "napalm_mortar", "anti_materiel_rifle", "spigot_mortar": sfx_name = "cannon"
-		"heavy_machine_gun", "rotary_cannon", "ciws", "autocannon", "mk19_grenade_launcher", "aa_autocannon": sfx_name = "machine_gun"
-		"gauss_railgun", "heavy_laser", "pd_laser", "arc_projector", "ion_cannon", "coil_gun", "microwave_emitter", "particle_lance": sfx_name = "laser"
-		"guided_missile", "missile_pod", "cluster_dispenser", "smoke_discharger", "mine_layer", "hypervelocity_missile", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "rocket_artillery", "sensor_beacon_launcher": sfx_name = "missile"
+		"basic_cannon", "recoilless_rifle", "anti_materiel_rifle": sfx_name = "cannon"
+		"artillery": sfx_name = "artillery"
+		"heavy_machine_gun": sfx_name = "machine_gun"
+		"rotary_cannon": sfx_name = "rotary"
+		"flak_cannon", "flak_battery", "ciws", "autocannon", "aa_autocannon": sfx_name = "autocannon"
+		"mk19_grenade_launcher": sfx_name = "grenade"
+		"gauss_railgun", "coil_gun": sfx_name = "gauss"
+		"heavy_laser", "pd_laser", "point_defense_laser", "laser_cannon", "arc_projector", "ion_cannon", "microwave_emitter", "particle_lance": sfx_name = "beam"
+		"guided_missile", "missile_pod", "cluster_dispenser", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "drone_carrier": sfx_name = "missile"
+		"hypervelocity_missile", "rocket_artillery": sfx_name = "rocket"
+		"smoke_discharger", "mine_layer", "sensor_beacon_launcher": sfx_name = "smoke"
+		"mortar_array", "napalm_mortar", "spigot_mortar": sfx_name = "mortar"
+		"flamethrower": sfx_name = "flamethrower"
+		"plasma_lobber", "plasma_launcher": sfx_name = "plasma"
 		"resource_harvester", "repair_array": sfx_name = "harvest"
-	if get_node_or_null("/root/AudioManager"):
+	if sfx_name != "" and get_node_or_null("/root/AudioManager"):
 		get_node("/root/AudioManager").play_sfx_3d(sfx_name, global_position, null, 50.0)
 
 	# Call unique visual functions
@@ -1541,8 +1555,6 @@ func _fire_at_target():
 			_fire_napalm_mortar()
 		"mine_layer":
 			_fire_mine_layer()
-		"ballista":
-			_fire_ballista()
 		"resource_harvester":
 			_fire_resource_harvester_tether()
 		"repair_array":
@@ -2811,39 +2823,6 @@ func _fire_mine_layer():
 # Ballista: one enormous bolt, slowly. Visually a real flying bolt rather
 # than a tracer streak, because at this cycle rate the player will watch
 # every single shot travel.
-func _fire_ballista():
-	var parent = _effects_parent()
-	if parent == null: return
-	var bolt = MeshInstance3D.new()
-	bolt.mesh = MunitionPool.unit_cylinder()
-	bolt.material_override = MunitionPool.albedo(Color(0.35, 0.26, 0.16))
-	parent.add_child(bolt)
-
-	var start = global_position + Vector3(0, 0.5, 0)
-	var end = target.global_position if is_instance_valid(target) else start + (-global_transform.basis.z * 20.0)
-	var delta = end - start
-	var dir_len = delta.length()
-	if dir_len > 0.001:
-		var y_axis = delta / dir_len
-		var up_candidate = Vector3.UP if absf(y_axis.dot(Vector3.UP)) < 0.99 else Vector3.FORWARD
-		var x_axis = y_axis.cross(up_candidate).normalized()
-		var z_axis = x_axis.cross(y_axis).normalized()
-		var basis = Basis(x_axis * 0.09, y_axis * 1.1, z_axis * 0.09)
-		bolt.global_transform = Transform3D(basis, start)
-	else:
-		bolt.global_position = start
-		bolt.scale = Vector3(0.09, 1.1, 0.09)
-
-	var tween = create_tween()
-	tween.tween_property(bolt, "global_position", end, 0.3)
-	tween.finished.connect(func():
-		if is_instance_valid(bolt): bolt.queue_free()
-		_apply_ammo_impact(end)
-		if is_instance_valid(target):
-			_deal_weapon_damage(target, dps * fire_rate)
-		_spawn_explosion_visual(end, 0.35, Color(0.6, 0.45, 0.25))
-	)
-
 # The dedicated obscurant launcher. Lobs a canister short of the target
 # rather than at it: a screen is only useful BETWEEN you and them, so
 # putting the cloud on top of the enemy would defeat the entire purpose.

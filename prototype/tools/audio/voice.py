@@ -566,6 +566,229 @@ def harvest(variant: int = 0) -> np.ndarray:
     return utter(spec, f"harvest:{variant}")
 
 
+def autocannon(variant: int = 0) -> np.ndarray:
+    """Crisp single "pew". A 20-30mm's report: brighter and tighter than the
+    cannon's "ka-POW", with none of the machine-gun's burr."""
+    g = d.rng(f"ac:{variant}")
+    base = 300.0 * (1.0 + g.uniform(-0.13, 0.13))
+    spec = VoiceSpec(
+        segs=[
+            Seg("p", 0.009, "p", 0.9),
+            Seg("v", 0.030, "iy", 1.0),
+            Seg("v", 0.052, "iy>uw", 1.0),
+        ],
+        f0=[(0.0, base * 1.35), (0.30, base * 1.02), (1.0, base * 0.40)],
+        breath=0.05, jitter=0.014, shimmer=0.05, effort=0.95, burst_db=13.5,
+    )
+    return utter(spec, f"ac:{variant}")
+
+
+def rotary(variant: int = 0) -> np.ndarray:
+    """Buzzy "brrrt". A rotary cannon's report is a rolling rasp, not a click."""
+    g = d.rng(f"rot:{variant}")
+    base = 150.0 * (1.0 + g.uniform(-0.10, 0.10))
+    spec = VoiceSpec(
+        segs=[
+            Seg("p", 0.010, "b", 0.8),
+            Seg("v", 0.090, "er", 1.0),     # the rolled "rr"
+            Seg("f", 0.060, "sh", 0.8),     # the escaping gas
+            Seg("v", 0.040, "er", 0.6),
+        ],
+        f0=[(0.0, base * 1.20), (0.5, base * 1.05), (1.0, base * 0.7)],
+        # High jitter makes the "rr" warble like a real rotary's beat.
+        breath=0.10, jitter=0.030, shimmer=0.09,
+        effort=1.05, burst_db=12.5,
+    )
+    return utter(spec, f"rot:{variant}")
+
+
+def artillery(variant: int = 0) -> np.ndarray:
+    """Deep, long "ka-BOOM". A howitzer is the cannon turned down an octave and
+    stretched out."""
+    g = d.rng(f"art:{variant}")
+    stretch = 1.0 + g.uniform(-0.12, 0.12)
+    base = 54.0 * (1.0 + g.uniform(-0.10, 0.10))
+    spec = VoiceSpec(
+        segs=[
+            Seg("p", 0.016, "k", 0.7),
+            Seg("v", 0.070 * stretch, "aa", 0.4),
+            Seg("_", 0.034),
+            Seg("p", 0.018, "b", 1.0),
+            Seg("v", 0.140 * stretch, "uw", 1.0),
+            Seg("v", 0.320 * stretch, "uw>aa", 1.0),
+            Seg("n", 0.300 * stretch, "m", 0.5),
+        ],
+        f0=[(0.0, base * 1.20), (0.15, base * 1.55), (0.40, base * 1.00),
+            (0.75, base * 0.62), (1.0, base * 0.36)],
+        breath=0.09, jitter=0.030, shimmer=g.uniform(0.09, 0.15),
+        effort=g.uniform(1.2, 1.55), burst_db=g.uniform(11.0, 14.0),
+    )
+    return utter(spec, f"art:{variant}")
+
+
+def mortar(variant: int = 0) -> np.ndarray:
+    """Soft "thoop" launch, then a distant "oom". A lobbed round is air and a
+    thump, not a bang."""
+    g = d.rng(f"mort:{variant}")
+    base = 120.0 * (1.0 + g.uniform(-0.10, 0.10))
+    spec = VoiceSpec(
+        segs=[
+            Seg("f", 0.060, "f", 0.7),
+            Seg("v", 0.110, "uw", 0.7),
+            Seg("v", 0.140, "uw>uh", 0.6),
+            Seg("p", 0.014, "b", 0.9),
+            Seg("v", 0.180, "aa", 0.7),
+        ],
+        f0=[(0.0, base * 0.9), (0.4, base * 1.2), (1.0, base * 0.6)],
+        breath=0.18, jitter=0.016, shimmer=0.06, effort=0.7, burst_db=8.0,
+    )
+    return utter(spec, f"mort:{variant}")
+
+
+def railgun(variant: int = 0) -> np.ndarray:
+    """Electric "zzzt-CRACK". A coil/rail report is a sizzle then a slap."""
+    g = d.rng(f"rail:{variant}")
+    base = 95.0 * (1.0 + g.uniform(-0.10, 0.10))
+    spec = VoiceSpec(
+        segs=[
+            Seg("f", 0.090, "sh", 0.9),      # the charge sizzle
+            Seg("v", 0.050, "ih", 0.6),
+            Seg("p", 0.014, "k", 1.0),       # the projectile slam
+            Seg("v", 0.120, "ae", 1.0),
+            Seg("v", 0.200, "ae>uw", 0.9),
+        ],
+        f0=[(0.0, base * 1.3), (0.3, base * 1.0), (0.6, base * 0.8),
+            (1.0, base * 0.45)],
+        breath=0.12, jitter=0.02, shimmer=0.07, effort=1.1, burst_db=13.0,
+    )
+    return utter(spec, f"rail:{variant}")
+
+
+def flamethrower(variant: int = 0) -> np.ndarray:
+    """Harsh "fwoooosh-roar". A flame projector is all breath and snarl."""
+    g = d.rng(f"flame:{variant}")
+    base = 110.0 * (1.0 + g.uniform(-0.08, 0.08))
+    spec = VoiceSpec(
+        segs=[
+            Seg("f", 0.070, "f", 0.8),
+            Seg("v", 0.120, "uw", 0.6),
+            Seg("f", 0.360, "sh", 1.0),     # the roar, swelling then dying
+            Seg("v", 0.080, "er", 0.4),
+        ],
+        f0=[(0.0, base * 0.8), (0.35, base * 1.25), (1.0, base * 0.7)],
+        breath=0.55, jitter=0.018, shimmer=0.10, effort=0.8, burst_db=5.0,
+    )
+    return utter(spec, f"flame:{variant}")
+
+
+def beam(variant: int = 0) -> np.ndarray:
+    """Sustained electric "zzziip". Energy lances/ion/PDL read as a sizzling
+    whine with a bright tail."""
+    g = d.rng(f"beam:{variant}")
+    base = 360.0 * (1.0 + g.uniform(-0.12, 0.12))
+    tail = 0.060 * g.uniform(0.8, 1.3)
+    spec = VoiceSpec(
+        segs=[
+            Seg("f", 0.030, "z", 0.7),       # the crackle at ignition
+            Seg("v", 0.040, "iy", 1.0),
+            Seg("v", 0.150, "iy>uw", 1.0),
+            Seg("v", tail, "uw", 0.30),
+        ],
+        f0=[(0.0, base * 1.05), (0.12, base * 1.30), (1.0, base * 0.22)],
+        breath=0.06, jitter=0.01, shimmer=0.04,
+        effort=g.uniform(0.75, 1.0), burst_db=12.0,
+    )
+    return utter(spec, f"beam:{variant}")
+
+
+def plasma(variant: int = 0) -> np.ndarray:
+    """Gurgly "blorp-BOOM". A plasma bolt is a wet pop then a hollow boom."""
+    g = d.rng(f"plasma:{variant}")
+    stretch = 1.0 + g.uniform(-0.12, 0.12)
+    base = 100.0 * (1.0 + g.uniform(-0.10, 0.10))
+    spec = VoiceSpec(
+        segs=[
+            Seg("p", 0.012, "b", 0.8),
+            Seg("v", 0.060 * stretch, "uh", 0.8),
+            Seg("v", 0.120 * stretch, "uw", 1.0),
+            Seg("p", 0.014, "b", 0.9),
+			Seg("v", 0.160 * stretch, "ao>aa", 0.9),
+            Seg("n", 0.200 * stretch, "m", 0.5),
+        ],
+        f0=[(0.0, base * 1.2), (0.3, base * 1.4), (0.6, base * 1.0),
+            (1.0, base * 0.5)],
+        breath=0.12, jitter=0.025, shimmer=0.08, effort=1.0, burst_db=11.0,
+    )
+    return utter(spec, f"plasma:{variant}")
+
+
+def grenade(variant: int = 0) -> np.ndarray:
+    """Dry "pop-thunk". A grenade launcher's report is a cough, not a roar."""
+    g = d.rng(f"nade:{variant}")
+    base = 175.0 * (1.0 + g.uniform(-0.12, 0.12))
+    spec = VoiceSpec(
+        segs=[
+            Seg("p", 0.011, "p", 1.0),
+			Seg("v", 0.040, "aa", 0.9),
+            Seg("p", 0.010, "k", 0.6),
+            Seg("v", 0.050, "uh", 0.5),
+        ],
+        f0=[(0.0, base * 1.1), (1.0, base * 0.7)],
+        breath=0.05, jitter=0.016, shimmer=0.05, effort=0.9, burst_db=13.0,
+    )
+    return utter(spec, f"nade:{variant}")
+
+
+def gauss(variant: int = 0) -> np.ndarray:
+    """Magnetic "thunk-zing". A coilgun's report is a low thud under a hum."""
+    g = d.rng(f"gauss:{variant}")
+    base = 130.0 * (1.0 + g.uniform(-0.10, 0.10))
+    spec = VoiceSpec(
+        segs=[
+            Seg("p", 0.012, "d", 0.9),
+            Seg("v", 0.060, "uw", 1.0),
+            Seg("v", 0.080, "uw>ih", 0.7),
+            Seg("f", 0.070, "z", 0.5),     # the coil whine
+        ],
+        f0=[(0.0, base * 1.1), (0.4, base * 1.3), (1.0, base * 0.6)],
+        breath=0.08, jitter=0.02, shimmer=0.07, effort=1.0, burst_db=12.0,
+    )
+    return utter(spec, f"gauss:{variant}")
+
+
+def smoke(variant: int = 0) -> np.ndarray:
+    """Soft "pfut". A deployable going off is a puff, not a bang."""
+    g = d.rng(f"smoke:{variant}")
+    base = 140.0 * (1.0 + g.uniform(-0.12, 0.12))
+    spec = VoiceSpec(
+        segs=[
+            Seg("f", 0.040, "f", 0.6),
+            Seg("v", 0.070, "uh", 0.6),
+            Seg("f", 0.050, "sh", 0.4),
+        ],
+        f0=[(0.0, base * 0.9), (1.0, base * 1.2)],
+        breath=0.30, jitter=0.014, shimmer=0.05, effort=0.6, burst_db=6.0,
+    )
+    return utter(spec, f"smoke:{variant}")
+
+
+def rocket(variant: int = 0) -> np.ndarray:
+    """Sharp "fshh-EW". A rocket's launch is a bright streak, not a soft whoosh."""
+    g = d.rng(f"rocket:{variant}")
+    base = 200.0 * (1.0 + g.uniform(-0.10, 0.10))
+    spec = VoiceSpec(
+        segs=[
+            Seg("f", 0.050, "f", 0.8),
+            Seg("v", 0.090, "uw", 0.6),
+            Seg("f", 0.200, "sh", 1.0),
+            Seg("v", 0.090, "uw>ih", 0.7),
+        ],
+        f0=[(0.0, base * 0.9), (0.4, base * 1.25), (1.0, base * 0.8)],
+        breath=0.45, jitter=0.016, shimmer=0.08, effort=0.8, burst_db=7.0,
+    )
+    return utter(spec, f"rocket:{variant}")
+
+
 # sfx key -> generator. sfx.py iterates this to build the variant banks, so
 # adding a weapon voice means adding one line here and nothing else.
 ORDNANCE = {
@@ -576,6 +799,18 @@ ORDNANCE = {
     "explosion": explosion,
     "hit": hit,
     "harvest": harvest,
+    "autocannon": autocannon,
+    "rotary": rotary,
+    "artillery": artillery,
+    "mortar": mortar,
+    "railgun": railgun,
+    "flamethrower": flamethrower,
+    "beam": beam,
+    "plasma": plasma,
+    "grenade": grenade,
+    "gauss": gauss,
+    "smoke": smoke,
+    "rocket": rocket,
 }
 
 

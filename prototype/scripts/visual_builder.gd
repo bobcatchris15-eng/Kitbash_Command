@@ -417,7 +417,7 @@ const MODULAR_ASSEMBLY_TYPES := {
 	"heavy_laser": true, "plasma_lobber": true, "ciws": true, "pd_laser": true, "flak_cannon": true,
 	"smoke_discharger": true,
 	"mk19_grenade_launcher": true, "recoilless_rifle": true, "coil_gun": true,
-	"autocannon": true, "napalm_mortar": true, "mine_layer": true, "ballista": true,
+	"autocannon": true, "napalm_mortar": true, "mine_layer": true,
 	"anti_materiel_rifle": true,
 	"arc_projector": true, "microwave_emitter": true, "particle_lance": true,
 	"spigot_mortar": true, "rocket_artillery": true,
@@ -482,7 +482,6 @@ const MODULAR_AUTHORED_SIZES := {
 	"autocannon": Vector3(0.35, 0.35, 1.4),
 	"napalm_mortar": Vector3(0.7, 0.6, 0.7),
 	"mine_layer": Vector3(0.9, 0.5, 0.9),
-	"ballista": Vector3(1.2, 0.9, 2.4),
 	"anti_materiel_rifle": Vector3(0.4, 0.4, 2.2),
 	"arc_projector": Vector3(0.5, 0.5, 1.0),
 	"microwave_emitter": Vector3(0.7, 0.6, 0.9),
@@ -2580,7 +2579,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			parent_node.add_child(cells)
 
 	elif type_id in ["mk19_grenade_launcher", "autocannon", "recoilless_rifle", "coil_gun",
-					 "ballista", "napalm_mortar", "mine_layer", "smoke_discharger",
+					 "napalm_mortar", "mine_layer", "smoke_discharger",
 					 "anti_materiel_rifle", "arc_projector", "microwave_emitter",
 					 "particle_lance", "spigot_mortar", "rocket_artillery",
 					 "hypervelocity_missile", "sam_launcher", "loitering_munition",
@@ -3383,60 +3382,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 					var chute = _mesh_inst(chute_mesh, Color(0.19, 0.20, 0.17))
 					chute.position = Vector3(0, 0.08, 0.28)
 					parent_node.add_child(chute)
-
-			"ballista":
-				# 1. TURNTABLE + TIMBER FRAME
-				var frame_mesh = _part("ballista_frame")
-				if frame_mesh:
-					var frame = _mesh_inst(frame_mesh, base_color)
-					frame.scale = Vector3(length, 1.0, 1.0)
-					parent_node.add_child(frame)
-				else:
-					var frame = MeshInstance3D.new()
-					var f_box = BoxMesh.new()
-					f_box.size = Vector3(0.60 * length, 0.28, 0.63)
-					frame.mesh = f_box
-					frame.material_override = _flat_mat(base_color)
-					frame.position = Vector3(0, 0.14, 0)
-					parent_node.add_child(frame)
-
-				var frame_top = 0.28
-
-				# 2. STOCK + WINDLASS - draw length stretches the stock
-				var stock_mesh = _part("ballista_stock")
-				if stock_mesh:
-					var stock = _mesh_inst(stock_mesh, base_color.lightened(0.05))
-					stock.scale = Vector3(1.0, 1.0, length)
-					stock.position = Vector3(0, frame_top, 0)
-					parent_node.add_child(stock)
-
-				# 3. TORSION BUNDLES + THROWING ARMS - mirrored pair. The
-				# authored part is the LEFT arm; the right is the same mesh
-				# with a negative X scale, which is why it is one file.
-				var arm_mesh = _part("ballista_arm")
-				for side in [-1.0, 1.0]:
-					if arm_mesh:
-						var arm = _mesh_inst(arm_mesh, base_color.darkened(0.08))
-						arm.scale = Vector3(side * length, 1.0, 1.0)
-						arm.position = Vector3(side * 0.17, frame_top - 0.02, -0.22 * length)
-						parent_node.add_child(arm)
-					else:
-						var arm = MeshInstance3D.new()
-						var a_box = BoxMesh.new()
-						a_box.size = Vector3(0.05, 0.05, 0.30 * length)
-						arm.mesh = a_box
-						arm.material_override = _flat_mat(base_color.darkened(0.08))
-						arm.position = Vector3(side * 0.20, frame_top + 0.08, -0.30 * length)
-						arm.rotation = Vector3(0, side * 0.45, 0)
-						parent_node.add_child(arm)
-
-				# 4. LOADED BOLT - caliber is bolt thickness
-				var bolt_mesh = _part("ballista_bolt")
-				if bolt_mesh:
-					var bolt = _mesh_inst(bolt_mesh, Color(0.24, 0.22, 0.19))
-					bolt.scale = Vector3(caliber, caliber, length)
-					bolt.position = Vector3(0, frame_top + 0.075, -0.10 * length)
-					parent_node.add_child(bolt)
 
 			"smoke_discharger":
 				var tube_count = clamp(int(tweaks.get("tube_count", 4.0)), 2, 6)
@@ -6519,7 +6464,7 @@ static func _apply_tweak_deformations(type_id: String, parent: Node3D, tweaks: D
 	if children.is_empty(): return
 
 	match type_id:
-		"basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flamethrower", "ion_cannon", "heavy_laser", "laser_cannon", "plasma_lobber", "plasma_launcher", "ciws", "pd_laser", "point_defense_laser", "flak_cannon", "flak_battery", "drone_carrier", "resource_harvester", "repair_array", "sensor_suite", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "coil_gun", "autocannon", "napalm_mortar", "mine_layer", "ballista", "anti_materiel_rifle", "arc_projector", "microwave_emitter", "particle_lance", "spigot_mortar", "rocket_artillery", "hypervelocity_missile", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "aa_autocannon", "sensor_beacon_launcher", "booster_rack":
+		"basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flamethrower", "ion_cannon", "heavy_laser", "laser_cannon", "plasma_lobber", "plasma_launcher", "ciws", "pd_laser", "point_defense_laser", "flak_cannon", "flak_battery", "drone_carrier", "resource_harvester", "repair_array", "sensor_suite", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "coil_gun", "autocannon", 		"napalm_mortar", "mine_layer", "anti_materiel_rifle", "arc_projector", "microwave_emitter", "particle_lance", "spigot_mortar", "rocket_artillery", "hypervelocity_missile", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "aa_autocannon", "sensor_beacon_launcher", "booster_rack":
 			return
 
 # Builds a wedge (triangular prism) mesh from a base_size Vector3.

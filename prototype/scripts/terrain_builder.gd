@@ -444,14 +444,12 @@ static func _get_heightmap_image(map_def: Dictionary) -> Image:
 		return null
 	if _heightmap_cache.has(path):
 		return _heightmap_cache[path]
-	# load(), not Image.load_from_file() - the latter reads the raw PNG off
-	# disk directly, which only exists in a dev checkout. In an exported
-	# build only the imported resource ships in the .pck, so load_from_file()
-	# silently returns null there (every heightmap/surfacemap .import sidecar
-	# is importer="image"/type="Image" specifically so this load() resolves
-	# to a real Image in both dev and export, not a CompressedTexture2D).
-	var img = load(path) as Image
-	_heightmap_cache[path] = img # caches the null on failure too - avoids re-attempting a broken path every single tick
+	var img: Image = null
+	if ResourceLoader.exists(path):
+		img = load(path) as Image
+	elif FileAccess.file_exists(path):
+		img = Image.load_from_file(ProjectSettings.globalize_path(path))
+	_heightmap_cache[path] = img
 	return img
 
 static func _get_surfacemap_image(map_def: Dictionary) -> Image:
@@ -461,7 +459,11 @@ static func _get_surfacemap_image(map_def: Dictionary) -> Image:
 		return null
 	if _surfacemap_cache.has(path):
 		return _surfacemap_cache[path]
-	var img = load(path) as Image
+	var img: Image = null
+	if ResourceLoader.exists(path):
+		img = load(path) as Image
+	elif FileAccess.file_exists(path):
+		img = Image.load_from_file(ProjectSettings.globalize_path(path))
 	_surfacemap_cache[path] = img
 	return img
 
@@ -938,6 +940,25 @@ static func height_at(map_def: Dictionary, x: float, z: float) -> float:
 	else:
 		for feature in features:
 			h += _feature_contribution(feature, x, z)
+	if typeof(terr) == TYPE_DICTIONARY and terr.has("sculpt_grid"):
+		var sg = terr["sculpt_grid"]
+		if typeof(sg) == TYPE_DICTIONARY:
+			var s_data: Array = sg.get("data", [])
+			var s_dim: int = int(sg.get("dim", 0))
+			var s_half: float = float(sg.get("half_extents", map_def.get("map_half_extents", 80.0)))
+			if s_dim > 1 and s_data.size() >= s_dim * s_dim and s_half > 0.0:
+				var u: float = clampf((x + s_half) / (s_half * 2.0), 0.0, 1.0) * float(s_dim - 1)
+				var v: float = clampf((z + s_half) / (s_half * 2.0), 0.0, 1.0) * float(s_dim - 1)
+				var ix: int = clampi(int(floor(u)), 0, s_dim - 2)
+				var iz: int = clampi(int(floor(v)), 0, s_dim - 2)
+				var fx: float = u - float(ix)
+				var fz: float = v - float(iz)
+				var h00: float = float(s_data[iz * s_dim + ix])
+				var h10: float = float(s_data[iz * s_dim + (ix + 1)])
+				var h01: float = float(s_data[(iz + 1) * s_dim + ix])
+				var h11: float = float(s_data[(iz + 1) * s_dim + (ix + 1)])
+				var sh: float = lerpf(lerpf(h00, h10, fx), lerpf(h01, h11, fx), fz)
+				h += sh
 	return h
 
 # v2 feature composition: raised features take the TALLEST, carved features the
@@ -2325,6 +2346,15 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 	# harvestable deposits, i.e. economy, and moving them into a cosmetic rule
 	# file would put gameplay balance in an art asset.
 	if v2_ground:
+		# If the map has authored props (trees, boulders, cliff meshes, etc. painted in editor),
+		# spawn them directly via TerrainVisualScatter!
+		var authored_props: Array = map_def.get("props", [])
+		if not authored_props.is_empty():
+			var visual_scatter = TerrainVisualScatterScript.get_or_create(parent)
+			if visual_scatter != null:
+				await visual_scatter.spawn_authored_props(authored_props, prop_scale, ticker)
+				await _slice.call()
+
 		# ORE FIRST. The dressing commits the shared MultiMesh batcher itself
 		# (it has to - see its own note on global_transform), and registering
 		# after a commit is refused. Ore is economy, not dressing, so it keeps
@@ -2332,13 +2362,14 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 		if not bool(map_def.get("disable_ambient_scatter", false)):
 			await _spawn_ambient_ores(map_def, parent, prop_scale, [], ticker)
 			await _slice.call()
-		var dressed: Dictionary = await TerrainDressingScript.scatter(
-			map_def, parent, prop_scale, ticker, str(map_def.get("id", "")))
-		var total := 0
-		for k in dressed:
-			total += int(dressed[k])
-		BattleLogger.log_build_step("terrain.dressing_v2", 0.0, {"placed": total})
-		await _slice.call()
+		if authored_props.is_empty():
+			var dressed: Dictionary = await TerrainDressingScript.scatter(
+				map_def, parent, prop_scale, ticker, str(map_def.get("id", "")))
+			var total := 0
+			for k in dressed:
+				total += int(dressed[k])
+			BattleLogger.log_build_step("terrain.dressing_v2", 0.0, {"placed": total})
+			await _slice.call()
 		_tag_terrain_debris(parent, _pre_ids)
 		return
 
@@ -2403,7 +2434,7 @@ const TERRAIN_TEXTURE_DIR = "res://assets/textures/terrain/"
 # Texture repeats once per this many world units - fixed, not derived from
 # zone size, since (unlike a Design Lab hull) these zones are static map
 # geometry that's never scaled at runtime; a plain tiled UV is enough.
-const TERRAIN_TILE_WORLD_SIZE: float = 6.0
+const TERRAIN_TILE_WORLD_SIZE: float = 24.0
 
 static var _terrain_texture_cache: Dictionary = {}
 # surface_type -> Array of variant suffixes that actually exist on disk
@@ -2510,7 +2541,7 @@ static func _build_terrain_material(surface_type: String, footprint: Vector2, ti
 # the baked texture's own mid-tone albedo doesn't compound into something
 # far darker than either color alone.
 static func build_ground_material(ground_color: Color, footprint: Vector2) -> StandardMaterial3D:
-	return _build_terrain_material("grassland", footprint, ground_color.lightened(0.55))
+	return _build_terrain_material("grassland", footprint, v2_ground_tint(ground_color))
 
 # Same baked grassland texture as build_ground_material(), but for
 # build_ground_visual_mesh()'s dense heightmap mesh, which bakes its own
@@ -2528,7 +2559,7 @@ static func build_ground_material(ground_color: Color, footprint: Vector2) -> St
 const GROUND_BLEND_SHADER = preload("res://shaders/terrain_ground.gdshader")
 
 static func build_ground_material_heightmap(ground_color: Color, map_def: Dictionary = {}) -> Material:
-	var mat: ShaderMaterial = build_blended_surface_material("grassland", ground_color.lightened(0.55), map_def) as ShaderMaterial
+	var mat: ShaderMaterial = build_blended_surface_material("grassland", v2_ground_tint(ground_color), map_def) as ShaderMaterial
 	# VISUAL polish 2026-08-23: rock triplanar overlay switched from
 	# "base" to "_v1". The base rocky_albedo.png is the GDScript-generated
 	# procedural brickwork (32x32 faceted cells with ink-seam cracks)
@@ -2644,6 +2675,41 @@ static func build_ground_material_v2(ground_color: Color, map_def: Dictionary, m
 		mat.set_shader_parameter("detail_normal_tex", load(V2_DETAIL_NORMAL))
 	mat.set_shader_parameter("ground_tint", v2_ground_tint(ground_color))
 
+	var theme_name: String = str(map_def.get("theme", "")).to_lower()
+	if theme_name == "":
+		if ground_color.r > 0.6 and ground_color.g > 0.5:
+			theme_name = "desert"
+		elif ground_color.r > 0.5 and ground_color.b < 0.4:
+			theme_name = "arid"
+		elif ground_color.b > 0.6 and ground_color.r > 0.6:
+			theme_name = "tundra"
+		elif ground_color.r < 0.35 and ground_color.g < 0.35 and ground_color.b < 0.35:
+			theme_name = "volcanic"
+		else:
+			theme_name = "temperate"
+
+	var cliff_tint := Color.WHITE
+	var strata_str: float = 0.45
+	match theme_name:
+		"arid":
+			cliff_tint = Color(0.92, 0.72, 0.54)
+			strata_str = 0.65
+		"desert":
+			cliff_tint = Color(0.95, 0.58, 0.38)
+			strata_str = 0.70
+		"tundra":
+			cliff_tint = Color(0.68, 0.74, 0.85)
+			strata_str = 0.40
+		"volcanic":
+			cliff_tint = Color(0.42, 0.40, 0.44)
+			strata_str = 0.50
+		_: # temperate
+			cliff_tint = Color(0.85, 0.88, 0.82)
+			strata_str = 0.45
+
+	mat.set_shader_parameter("cliff_rock_tint", cliff_tint)
+	mat.set_shader_parameter("strata_strength", strata_str)
+
 	var half: float = float(map_def.get("map_half_extents", 100.0))
 	mat.set_shader_parameter("map_half_extents", half)
 
@@ -2652,15 +2718,19 @@ static func build_ground_material_v2(ground_color: Color, map_def: Dictionary, m
 		push_warning("TerrainBuilder v2: no map id supplied - per-map rasters (splat/macro/curvature/wetness) cannot be located and the ground will render as base layer + slope rock only.")
 	else:
 		var splat_path := "res://data/maps/%s_splat.png" % mid
+		var splat_tex: Texture2D = null
 		if ResourceLoader.exists(splat_path):
-			mat.set_shader_parameter("splat_tex", load(splat_path))
+			splat_tex = load(splat_path)
+		elif FileAccess.file_exists(splat_path):
+			var img := Image.load_from_file(ProjectSettings.globalize_path(splat_path))
+			if img != null:
+				splat_tex = ImageTexture.create_from_image(img)
+		
+		if splat_tex != null:
+			mat.set_shader_parameter("splat_tex", splat_tex)
 			mat.set_shader_parameter("use_splat", true)
 		else:
-			# Without a splat the shader falls back to layer 0 everywhere plus
-			# the slope-driven rock channel, which is still a valid (if plain)
-			# surface - not an error. Say so, because a map that MEANT to have
-			# one and silently renders as flat grass is hard to diagnose.
-			push_warning("TerrainBuilder v2: no splat raster for map '%s' (%s) - ground will be base layer + slope rock only. Run tools/terrain/build_terrain.py on it." % [mid, splat_path])
+			push_warning("TerrainBuilder v2: no splat raster for map '%s' (%s) - ground will be base layer + slope rock only." % [mid, splat_path])
 		for entry in [["macro", "macro_tex", "use_macro"], ["curvature", "curvature_tex", "use_curvature"], ["wetness", "wetness_tex", "use_wetness"]]:
 			var p := "res://data/maps/%s_%s.png" % [mid, entry[0]]
 			if ResourceLoader.exists(p):
@@ -2869,7 +2939,7 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 		indices.append(ia)
 		indices.append(ic)
 		indices.append(idd)
-		var n: Vector3 = (b - a).cross(c - a).normalized()
+		var n: Vector3 = (b - a).cross(d - a).normalized()
 		nrm_acc[ia] += n
 		nrm_acc[ib] += n
 		nrm_acc[ic] += n
@@ -3305,6 +3375,26 @@ static func _spawn_merged_water(map_def: Dictionary, parent: Node3D, prop_scale:
 	var water_areas = map_def.get("water_areas", [])
 	var water_blobs = map_def.get("water_blobs", [])
 	if water_areas.is_empty() and water_blobs.is_empty():
+		if terrain_generator(map_def) == "v2" or map_def.has("water_level") or map_def.get("terrain", {}).has("sculpt_grid"):
+			var he: Vector2 = MapCatalogScript.half_extents(map_def)
+			var half_dim: float = maxf(he.x, he.y)
+			var w_mesh := PlaneMesh.new()
+			w_mesh.size = Vector2(half_dim * 2.5, half_dim * 2.5)
+			var mesh_inst := MeshInstance3D.new()
+			mesh_inst.mesh = w_mesh
+			mesh_inst.name = "WaterTablePlane"
+			
+			var mat := ShaderMaterial.new()
+			mat.shader = WATER_SHADER
+			var tex_a = _get_terrain_textures("blue_water")
+			mat.set_shader_parameter("normal_map_a", tex_a.normal)
+			var tex_b = _get_terrain_textures("blue_water", "v1")
+			mat.set_shader_parameter("normal_map_b", tex_b.normal if tex_b.normal else tex_a.normal)
+			mat.set_shader_parameter("shallow_color", Color(0.12, 0.42, 0.65, 0.85))
+			mat.set_shader_parameter("deep_color", Color(0.04, 0.15, 0.32, 0.95))
+			mesh_inst.material_override = mat
+			mesh_inst.position = Vector3(0.0, float(map_def.get("water_level", 0.05)), 0.0)
+			parent.add_child(mesh_inst)
 		return
 
 	var st = SurfaceTool.new()
@@ -4212,20 +4302,56 @@ static func _spawn_building_obstacle(obstacle: Dictionary, parent: Node3D, base_
 # just a color patch - it's the visual proof the navmesh carve-out actually
 # corresponds to a walkable structure).
 static func _spawn_bridge(bridge: Dictionary, parent: Node3D):
-	var c: Vector3 = bridge.center
-	var he: Vector2 = bridge.half_extents
-	var deck_h: float = bridge.get("deck_height", BRIDGE_DECK_HEIGHT)
+	var c: Vector3 = _vec3_of(bridge.get("center", Vector3.ZERO))
+	var he_raw = bridge.get("half_extents", Vector2(10.0, 10.0))
+	var he: Vector2 = he_raw if he_raw is Vector2 else Vector2(float(he_raw[0]), float(he_raw[1]))
+	var deck_h: float = float(bridge.get("deck_height", BRIDGE_DECK_HEIGHT))
+	var rot: float = float(bridge.get("rotation_deg", 0.0))
 
-	var deck = MeshInstance3D.new()
-	var box = BoxMesh.new()
+	var b_root := Node3D.new()
+	b_root.name = "Bridge"
+	b_root.position = Vector3(c.x, c.y + deck_h * 0.5, c.z)
+	b_root.rotation_degrees.y = rot
+	parent.add_child(b_root)
+
+	# 1. Main Deck
+	var deck := MeshInstance3D.new()
+	var box := BoxMesh.new()
 	box.size = Vector3(he.x * 2.0, deck_h, he.y * 2.0)
 	deck.mesh = box
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.5, 0.42, 0.32)
-	mat.roughness = 0.8
-	deck.material_override = mat
-	parent.add_child(deck)
-	deck.global_position = Vector3(c.x, deck_h / 2.0, c.z)
+	var dmat := StandardMaterial3D.new()
+	dmat.albedo_color = Color(0.42, 0.40, 0.38) # Concrete road deck
+	dmat.roughness = 0.85
+	deck.material_override = dmat
+	b_root.add_child(deck)
+
+	# 2. Side Guardrails
+	var rail_mat := StandardMaterial3D.new()
+	rail_mat.albedo_color = Color(0.72, 0.70, 0.65) # Steel/concrete barrier
+	rail_mat.roughness = 0.6
+	for side in [-1.0, 1.0]:
+		var rail := MeshInstance3D.new()
+		var r_box := BoxMesh.new()
+		r_box.size = Vector3(0.6, 1.2, he.y * 2.0)
+		rail.mesh = r_box
+		rail.material_override = rail_mat
+		rail.position = Vector3((he.x - 0.3) * side, deck_h * 0.5 + 0.6, 0)
+		b_root.add_child(rail)
+
+	# 3. Support Piers extending downwards
+	var pier_mat := StandardMaterial3D.new()
+	pier_mat.albedo_color = Color(0.35, 0.34, 0.32)
+	pier_mat.roughness = 0.9
+	var pier_count := maxi(1, int(he.y / 25.0))
+	for p_idx in range(pier_count):
+		var p_z := -he.y + (float(p_idx + 0.5) / float(pier_count)) * (he.y * 2.0)
+		var pier := MeshInstance3D.new()
+		var p_mesh := BoxMesh.new()
+		p_mesh.size = Vector3(he.x * 0.8, 14.0, 4.0)
+		pier.mesh = p_mesh
+		pier.material_override = pier_mat
+		pier.position = Vector3(0, -7.0, p_z)
+		b_root.add_child(pier)
 
 # Sparse grassland ground clutter (grass tufts/rocks/brush) scattered
 # across the WHOLE map's baseline ground - deliberately not per-area-dense

@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cisixkjtqgi4q"
-path="res://.godot/imported/thicket_5_thicket_5_mat0_rough.png-f593665c917a06677a7ce163169717ce.ctex"
+path.s3tc="res://.godot/imported/thicket_5_thicket_5_mat0_rough.png-f593665c917a06677a7ce163169717ce.s3tc.ctex"
+path.etc2="res://.godot/imported/thicket_5_thicket_5_mat0_rough.png-f593665c917a06677a7ce163169717ce.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "383de3abc2374c6e68d65cad97b8ff52"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/terrain/thicket_5_thicket_5_mat0_rough.png"
-dest_files=["res://.godot/imported/thicket_5_thicket_5_mat0_rough.png-f593665c917a06677a7ce163169717ce.ctex"]
+dest_files=["res://.godot/imported/thicket_5_thicket_5_mat0_rough.png-f593665c917a06677a7ce163169717ce.s3tc.ctex", "res://.godot/imported/thicket_5_thicket_5_mat0_rough.png-f593665c917a06677a7ce163169717ce.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +42,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

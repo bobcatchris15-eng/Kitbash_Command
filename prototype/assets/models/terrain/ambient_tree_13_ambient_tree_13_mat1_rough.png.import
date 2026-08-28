@@ -2,15 +2,12 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5b3jneovqqi7"
+uid="uid://c7wl27557cyb4"
 path.s3tc="res://.godot/imported/ambient_tree_13_ambient_tree_13_mat1_rough.png-62e78c8c02a495739b398c41cb09d47e.s3tc.ctex"
 path.etc2="res://.godot/imported/ambient_tree_13_ambient_tree_13_mat1_rough.png-62e78c8c02a495739b398c41cb09d47e.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "b931b6a44b658eca9bb098df0351dc9f"
 }
 
 [deps]
@@ -30,7 +27,7 @@ compress/normal_map=0
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1
-roughness/mode=1
+roughness/mode=0
 roughness/src_normal=""
 process/channel_remap/red=0
 process/channel_remap/green=1

@@ -934,6 +934,39 @@ COMMS_PHRASES = ["ack", "affirm", "negative", "engaging", "structure_lost",
                  "low_power", "ready", "unit_lost"]
 
 
+# --- Build-complete chimes, one distinct motif per roster slot -----------------
+#
+# A vehicle rolling out of the factory is a notification the player should learn
+# to read by ear: slot N has its own two-note rising motif on a fixed root, so a
+# regular roster means "that chime = my third design". Sincere (bell partials),
+# never vocalised - this is an interface cue, on the wrong side of the split for
+# comedy. 12 slots span just over two octaves on a mostly-diatonic ladder, so no
+# two adjacent slots are confusable.
+
+_UNIT_READY_ROOTS = [196.0, 220.0, 246.94, 261.63, 293.66, 329.63, 349.23,
+                     392.0, 440.0, 493.88, 523.25, 587.33]  # G3..D#5
+
+
+def unit_ready(slot: int, variant: int = 0) -> np.ndarray:
+    """A build-complete chime for roster slot `slot` (1..12)."""
+    g = d.rng(f"ready:{slot}:{variant}")
+    root = _UNIT_READY_ROOTS[(slot - 1) % 12] * (1.0 + g.uniform(-0.008, 0.008))
+    dur = 0.46
+    out = d.silence(dur)
+    # Rising motif: root -> major third, bell-like (fundamental + octave + fifth)
+    # with a quick attack and a long decay so it reads as "done" and rings off.
+    for semi, amp, t0 in ((0.0, 1.0, 0.0), (4.0, 0.66, 0.13)):
+        f = root * (2.0 ** (semi / 12.0))
+        for mult, a in ((1.0, 1.0), (2.0, 0.45), (3.0, 0.22)):
+            tone = d.sine(f * mult, dur - t0) * d.decay_env(
+                dur - t0, 240.0 / mult, 0.004) * a * amp
+            d.place(out, tone, t0)
+    # A soft contact tick at the onset so the event reads as a thing arriving.
+    tick = d.filt(g.uniform(-1.0, 1.0, d.n_samples(0.02)), "bp", 2600.0, 0.8)
+    d.place(out, tick * d.decay_env(0.02, 600.0, 0.0002) * 0.35, 0.0)
+    return d.match_loudness(out, -16.0)
+
+
 def manifest() -> dict:
     """Every sound the game can play, as {key: [(name, callable), ...]}."""
     out: dict = {}
@@ -997,6 +1030,9 @@ def manifest() -> dict:
     add("impact_catastrophic", impact_catastrophic, 4)
 
     # Construction and economy.
+    for _slot in range(1, 13):
+        add(f"unit_ready_{_slot}",
+            lambda i, s=_slot: unit_ready(s, i), 3)
     add("construct", construct_start, 3)
     add("construct_loop", construct_loop, 2)
     add("construct_done", construct_done, 3)

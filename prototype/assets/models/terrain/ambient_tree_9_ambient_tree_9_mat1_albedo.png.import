@@ -2,15 +2,12 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://du2b2f41pajte"
+uid="uid://bwtkxjmr1x0yf"
 path.s3tc="res://.godot/imported/ambient_tree_9_ambient_tree_9_mat1_albedo.png-8ee7030a5536f09fcb83ab6bce200814.s3tc.ctex"
 path.etc2="res://.godot/imported/ambient_tree_9_ambient_tree_9_mat1_albedo.png-8ee7030a5536f09fcb83ab6bce200814.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "0d3221dd9ae56286c328f4b2103e3fa3"
 }
 
 [deps]

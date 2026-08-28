@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cden4phkh0fju"
-path="res://.godot/imported/bush_0_bush_0_mat1_albedo.png-a7ddbf67c707c8b1c3b9e34da19ef8ad.ctex"
+path.s3tc="res://.godot/imported/bush_0_bush_0_mat1_albedo.png-a7ddbf67c707c8b1c3b9e34da19ef8ad.s3tc.ctex"
+path.etc2="res://.godot/imported/bush_0_bush_0_mat1_albedo.png-a7ddbf67c707c8b1c3b9e34da19ef8ad.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "aa43124b28de066b1b622a6bde9c3d84"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/terrain/bush_0_bush_0_mat1_albedo.png"
-dest_files=["res://.godot/imported/bush_0_bush_0_mat1_albedo.png-a7ddbf67c707c8b1c3b9e34da19ef8ad.ctex"]
+dest_files=["res://.godot/imported/bush_0_bush_0_mat1_albedo.png-a7ddbf67c707c8b1c3b9e34da19ef8ad.s3tc.ctex", "res://.godot/imported/bush_0_bush_0_mat1_albedo.png-a7ddbf67c707c8b1c3b9e34da19ef8ad.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +42,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

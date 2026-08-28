@@ -164,8 +164,7 @@ const WEAPON_FIRE_PROFILES = {
 	# --- Roster expansion ---
 	# Belt-fed: fast for a grenade weapon, slow for an autogun.
 	"mk19_grenade_launcher": {"fire_rate": 0.5, "fire_range": 30.0, "laser_color": Color(0.55, 0.62, 0.30)},
-	# The slowest direct-fire cycle in the roster bar the ballista - one
-	# enormous HEAT round, then a long, exposed reload.
+	# One enormous HEAT round, then a long, exposed reload.
 	"recoilless_rifle":   {"fire_rate": 3.2,  "fire_range": 38.0, "laser_color": Color(1.0, 0.72, 0.35)},
 	# Roughly half gauss_railgun's 3.5s cycle at a shorter reach - the
 	# turreted, affordable hitscan option.
@@ -183,9 +182,6 @@ const WEAPON_FIRE_PROFILES = {
 	# Short "range" because it is not really shooting - it lobs a mine a
 	# short way ahead and leaves it there.
 	"mine_layer":         {"fire_rate": 3.5,  "fire_range": 14.0, "laser_color": Color(0.62, 0.56, 0.30)},
-	# The slowest weapon in the game, by a distance. A torsion frame does
-	# not cycle quickly.
-	"ballista":           {"fire_rate": 4.0,  "fire_range": 34.0, "laser_color": Color(0.60, 0.46, 0.30)},
 	# Short-ranged and quick-cycling: a discharger lays a screen right in
 	# front of its own vehicle, it doesn't shell a distant position. dps is
 	# 0.0 in the catalog and every round it fires is a zero-damage
@@ -227,7 +223,6 @@ const MUZZLE_OFFSETS: Dictionary = {
 	"anti_materiel_rifle":   Vector3(0.0, 0.28, -1.12),
 	"recoilless_rifle":      Vector3(0.0, 0.27, -0.85),
 	"coil_gun":              Vector3(0.0, 0.27, -0.88),
-	"ballista":              Vector3(0.0, 0.36, -0.10),
 	"spigot_mortar":         Vector3(0.0, 0.45, -0.17),  # 50° elev pivot
 	"arc_projector":         Vector3(0.0, 0.35, -0.04),
 	"microwave_emitter":     Vector3(0.0, 0.26, -0.08),
@@ -1068,34 +1063,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color(0.48, 0.44, 0.26)
 		},
 
-		# Straight-faced absurdity, exactly where VISUAL_ART_DIRECTION.md
-		# says it belongs: a torsion-spring bolt thrower, bolted to a
-		# machine that also mounts railguns. Mechanically it earns its
-		# place - enormous per-shot kinetic damage (so it clears armor
-		# thresholds outright rather than chipping) at almost no crystal
-		# cost, paid for with the slowest cycle in the roster. The cheap
-		# answer to heavy armor for a design that can't afford a railgun.
-		"ballista": {
-			"name": "Ballista",
-			"category": "weapon",
-			"required_building": "tech_lab",
-			# Indirect fire - needs open sky, so it is levelled on a vertical
-			# face but never enclosed in a sponson housing. See
-			# ModuleCatalog.is_sponson_capable().
-			"sponson_capable": false,
-			"hp": 110.0,
-			"weight": 140.0,
-			"base_traverse": 0.337,
-			"metal": 35,
-			"crystal": 0,
-			"dps": 70.0,
-			# A big timber-and-torsion frame - it needs a level, solid base
-			# the way a mortar does, for much the same reason.
-			"pintle_min_up_alignment": 0.5,
-			"size": Vector3(2.0, 1.5, 4.0),
-			"color": Color(0.44, 0.33, 0.20)
-		},
-
 		# The dedicated obscurant launcher (complement to shell-based smoke -
 		# see WEAPON_AMMO_OPTIONS). Categorised "weapon" so it gets
 		# auto_weapon.gd's targeting/firing logic like every other launcher,
@@ -1893,7 +1860,6 @@ const MODULE_FLAVOR = {
 	"anti_materiel_rifle": "One round, correctly placed, at considerable expense. The sight costs more than the gun.",
 	"napalm_mortar": "Deploys thickened fuel. The affected area remains affected for some time.",
 	"mine_layer": "Emplaces area denial. Minefield records are maintained to the extent practicable.",
-	"ballista": "Torsion-spring bolt thrower. Procurement has twice declined to explain this line item.",
 	# Support
 	"resource_harvester": "Extracts and hauls. Slow, unarmed, and statistically the first thing shot at.",
 	"repair_array": "Field repair. Restores structure. Does not restore crews, morale, or paperwork.",
@@ -2293,7 +2259,6 @@ const MODULE_ROLES = {
 	"recoilless_rifle": "Direct-Fire Guns",
 	"basic_cannon": "Direct-Fire Guns",
 	"rotary_cannon": "Direct-Fire Guns",
-	"ballista": "Direct-Fire Guns",
 
 	# Anything whose damage arrives as charge rather than mass - includes the
 	# electromagnetic launchers, which fire a slug but are built, costed and
@@ -2668,11 +2633,11 @@ const PROJECTILE_CLASS = {
 	"loitering_munition": "guided", "anti_radiation_missile": "guided",
 	"bunker_buster": "guided", "cruise_missile": "guided",
 	# Roster expansion: a coil gun accelerates a slug the same way a rail
-	# does (hitscan); the recoilless/autocannon/ballista all throw a real
+	# does (hitscan); the recoilless/autocannon all throw a real
 	# projectile fast and flat; the grenade launcher, napalm mortar and
 	# mine layer all lob.
 	"coil_gun": "hitscan",
-	"recoilless_rifle": "ballistic", "autocannon": "ballistic", "ballista": "ballistic",
+	"recoilless_rifle": "ballistic", "autocannon": "ballistic",
 	"anti_materiel_rifle": "ballistic",
 	"mk19_grenade_launcher": "arc", "napalm_mortar": "arc", "mine_layer": "arc",
 	"cluster_dispenser": "arc", "plasma_lobber": "arc",
@@ -2902,9 +2867,6 @@ const WEAPON_AMMO_OPTIONS = {
 	# hence it heading the list (get_ammo() falls back to options[0]).
 	"napalm_mortar":     ["incendiary", "standard", "smoke"],
 	"mine_layer":        ["standard", "he", "incendiary"],
-	# Flaming ballista bolts are both period-appropriate and, per the
-	# straight-faced tone rule, never acknowledged as funny by anyone.
-	"ballista":          ["standard", "ap", "incendiary", "smoke"],
 	# The dedicated obscurant launcher - the complement to the shell-based
 	# smoke above, not a duplicate of it: far larger, faster-blooming clouds,
 	# but it can do nothing else whatsoever.
@@ -4046,7 +4008,6 @@ const ELEVATION_LIMITS := {
 	"anti_materiel_rifle": {"up": 42.0, "down": 15.0},
 	"coil_gun":            {"up": 40.0, "down": 10.0},
 	"gauss_railgun":       {"up": 30.0, "down": 8.0},
-	"ballista":            {"up": 45.0, "down": 10.0},
 	"flamethrower":        {"up": 40.0, "down": 20.0},
 	"plasma_lobber":       {"up": 50.0, "down": 10.0},
 	"cluster_dispenser":   {"up": 45.0, "down": 8.0},

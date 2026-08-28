@@ -75,7 +75,7 @@ const REGIME_BRUTE := "brute"
 # explosive.
 const KINETIC_TYPES := [
 	"basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "ciws",
-	"coil_gun", "autocannon", "ballista", "anti_materiel_rifle",
+	"coil_gun", "autocannon", "anti_materiel_rifle",
 	"hypervelocity_missile", "aa_autocannon",
 ]
 const EXPLOSIVE_TYPES := [

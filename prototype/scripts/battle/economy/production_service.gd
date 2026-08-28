@@ -41,7 +41,7 @@ const Profiler = preload("res://scripts/battle/battle_profiler.gd")
 const SPEED_PCT: Array[int] = [100, 75, 60, 50]
 
 signal queue_changed(team: int, queue: String)
-signal unit_completed(team: int, queue: String, blueprint: Dictionary)
+signal unit_completed(team: int, queue: String, blueprint: Dictionary, slot: int)
 signal structure_ready(team: int, queue: String, job: Dictionary)
 
 var _queues: Dictionary = {}
@@ -80,7 +80,7 @@ func depth(team: int, name: String) -> int:
 # feeding that queue - queueing a heavy tank with no heavy manufactory has to
 # fail loudly at the door rather than sit in a line that can never advance.
 func enqueue_unit(team: int, blueprint: Dictionary, cost: int,
-		base_time: float, queue_name: String) -> Dictionary:
+		base_time: float, queue_name: String, slot: int = -1) -> Dictionary:
 	var contributors := _contributor_count(team, queue_name)
 	if contributors <= 0:
 		return {}
@@ -89,6 +89,7 @@ func enqueue_unit(team: int, blueprint: Dictionary, cost: int,
 	var job := _make_job(blueprint.get("name", "UNIT"), cost, base_time, contributors)
 	job["blueprint"] = blueprint
 	job["is_structure"] = false
+	job["slot"] = slot
 	queue(team, queue_name).append(job)
 	queue_changed.emit(team, queue_name)
 	return job
@@ -319,7 +320,7 @@ func _tick_queue(team: int, queue_name: String, delta: float) -> void:
 		Profiler.stop("production.exit_blockers", _t_bl)
 	var _t_cu := Profiler.start()
 	q.pop_front()
-	unit_completed.emit(team, queue_name, job["blueprint"])
+	unit_completed.emit(team, queue_name, job["blueprint"], int(job.get("slot", -1)))
 	queue_changed.emit(team, queue_name)
 	Profiler.stop("production.complete_unit", _t_cu)
 

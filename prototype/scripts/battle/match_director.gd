@@ -507,8 +507,11 @@ func _ready() -> void:
 	# around in - duck-typed the same way the rest of this file treats the
 	# camera, so a camera without the property (an older scene, a test stub)
 	# degrades to its own default rather than erroring.
-	if camera and "world_scale" in camera:
-		camera.world_scale = WorldScaleScript.for_map(current_map)
+	if camera:
+		if "world_scale" in camera:
+			camera.world_scale = WorldScaleScript.for_map(current_map)
+		if "current_map" in camera:
+			camera.current_map = current_map
 	_scale_lighting_to_world()
 
 	orders = OrderServiceScript.new()
@@ -734,10 +737,16 @@ func _on_match_ended_audio(winning_team: int) -> void:
 	_audio.play_music("victory" if winning_team == PLAYER_TEAM else "defeat")
 
 
-func _on_unit_completed_audio(team: int, _queue: String, _blueprint: Dictionary) -> void:
+func _on_unit_completed_audio(team: int, _queue: String, _blueprint: Dictionary, slot: int = -1) -> void:
 	if _audio == null or team != PLAYER_TEAM:
 		return
-	_audio.play_sfx("unit_rollout")
+	# A distinct build-complete chime per roster slot, so the player learns
+	# which bay a vehicle rolled out of by ear alone. Falls back to the generic
+	# rollout for slots outside the 1..12 range (e.g. Test Range designs).
+	if slot >= 0 and slot < 12:
+		_audio.play_sfx("unit_ready_%d" % (slot + 1))
+	else:
+		_audio.play_sfx("unit_rollout")
 	_audio.play_voice("radio_ready")
 
 
@@ -856,6 +865,8 @@ func _scale_lighting_to_world() -> void:
 			light.light_color = env_data["sun_color"]
 		if env_data.has("sun_energy"):
 			light.light_energy = float(env_data["sun_energy"])
+		else:
+			light.light_energy = 1.35
 		# Per-map time of day. Default matches the ~39 deg elevation baked into
 		# Battle.tscn's own transform, so a map that says nothing is unchanged.
 		if env_data.has("sun_elevation_deg") or env_data.has("sun_azimuth_deg"):
@@ -869,6 +880,8 @@ func _scale_lighting_to_world() -> void:
 		env.ssao_radius = WorldScaleScript.scaled_f(SSAO_RADIUS_BASE, current_map)
 		if env_data.has("ambient_light_energy"):
 			env.ambient_light_energy = float(env_data["ambient_light_energy"])
+		else:
+			env.ambient_light_energy = 0.75
 		# See map_catalog.gd's FIELD_SPEC entry: the scene's blue fill was
 		# colouring every map the same regardless of its own palette.
 		if env_data.has("ambient_light_color"):
@@ -876,6 +889,8 @@ func _scale_lighting_to_world() -> void:
 		# See map_catalog.gd's FIELD_SPEC entry for why exposure is per-map.
 		if env_data.has("tonemap_exposure"):
 			env.tonemap_exposure = float(env_data["tonemap_exposure"])
+		else:
+			env.tonemap_exposure = 1.25
 		if env_data.has("fog_enabled"):
 			env.fog_enabled = bool(env_data["fog_enabled"])
 			if env_data.has("fog_density"):
@@ -3604,7 +3619,7 @@ func _ai_placement_site(for_team: int, kind: String, blueprint: Dictionary = {})
 	return site
 
 
-func _on_unit_completed(for_team: int, queue_name: String, blueprint: Dictionary) -> void:
+func _on_unit_completed(for_team: int, queue_name: String, blueprint: Dictionary, _slot: int = -1) -> void:
 	var factory := _exit_structure(for_team, queue_name)
 	var at: Vector3 = factory.exit_position() if factory != null else Vector3.ZERO
 	spawn_unit(blueprint, for_team, snap_to_navmesh(at))
@@ -4815,6 +4830,9 @@ func _nearest_ambient_to(pos: Vector3) -> Node3D:
 func _on_group_recentre(centre: Vector3) -> void:
 	if camera == null or not camera.has_method("ray_plane_hit"):
 		return
+	if "_ground_y_smoothed" in camera:
+		camera._ground_y_smoothed = centre.y
+		camera._ground_initialized = true
 	var screen_centre := get_viewport().get_visible_rect().size * 0.5
 	var looking_at = camera.ray_plane_hit(screen_centre, centre.y)
 	if looking_at == null:

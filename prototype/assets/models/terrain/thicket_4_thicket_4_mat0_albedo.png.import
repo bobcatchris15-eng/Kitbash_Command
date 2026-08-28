@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://mp81rc3cbv2f"
-path="res://.godot/imported/thicket_4_thicket_4_mat0_albedo.png-ca2c5d776e4aef0ceae15a2be4eb3f69.ctex"
+path.s3tc="res://.godot/imported/thicket_4_thicket_4_mat0_albedo.png-ca2c5d776e4aef0ceae15a2be4eb3f69.s3tc.ctex"
+path.etc2="res://.godot/imported/thicket_4_thicket_4_mat0_albedo.png-ca2c5d776e4aef0ceae15a2be4eb3f69.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "d7c24bdff55da5d35d61af68779c32ae"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/terrain/thicket_4_thicket_4_mat0_albedo.png"
-dest_files=["res://.godot/imported/thicket_4_thicket_4_mat0_albedo.png-ca2c5d776e4aef0ceae15a2be4eb3f69.ctex"]
+dest_files=["res://.godot/imported/thicket_4_thicket_4_mat0_albedo.png-ca2c5d776e4aef0ceae15a2be4eb3f69.s3tc.ctex", "res://.godot/imported/thicket_4_thicket_4_mat0_albedo.png-ca2c5d776e4aef0ceae15a2be4eb3f69.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +42,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

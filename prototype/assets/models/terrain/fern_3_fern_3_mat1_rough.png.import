@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bo4bamw4rlv2q"
-path="res://.godot/imported/fern_3_fern_3_mat1_rough.png-5849b757aaaa80a2e0b04223288c762b.ctex"
+path.s3tc="res://.godot/imported/fern_3_fern_3_mat1_rough.png-5849b757aaaa80a2e0b04223288c762b.s3tc.ctex"
+path.etc2="res://.godot/imported/fern_3_fern_3_mat1_rough.png-5849b757aaaa80a2e0b04223288c762b.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "7b12414919776d202fab24526738b7db"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/terrain/fern_3_fern_3_mat1_rough.png"
-dest_files=["res://.godot/imported/fern_3_fern_3_mat1_rough.png-5849b757aaaa80a2e0b04223288c762b.ctex"]
+dest_files=["res://.godot/imported/fern_3_fern_3_mat1_rough.png-5849b757aaaa80a2e0b04223288c762b.s3tc.ctex", "res://.godot/imported/fern_3_fern_3_mat1_rough.png-5849b757aaaa80a2e0b04223288c762b.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +42,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

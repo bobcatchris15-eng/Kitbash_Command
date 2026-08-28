@@ -178,9 +178,8 @@ func _initialize() -> void:
 	var cam := Camera3D.new()
 	cam.fov = 45.0
 	cam.far = 4000.0
-	cam.position = _at + _eye
-	cam.look_at(_at, Vector3.UP)
 	world.add_child(cam)
+	cam.look_at_from_position(_at + _eye, _at, Vector3.UP)
 	cam.current = true
 	print("[capture] camera at %s looking at %s" % [cam.position, _at])
 	_armed = true

@@ -216,6 +216,150 @@
         "res://assets/audio/sfx/harvest_07.wav"
       ]
     },
+    "autocannon": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/autocannon_01.wav",
+        "res://assets/audio/sfx/autocannon_02.wav",
+        "res://assets/audio/sfx/autocannon_03.wav",
+        "res://assets/audio/sfx/autocannon_04.wav",
+        "res://assets/audio/sfx/autocannon_05.wav",
+        "res://assets/audio/sfx/autocannon_06.wav",
+        "res://assets/audio/sfx/autocannon_07.wav"
+      ]
+    },
+    "rotary": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/rotary_01.wav",
+        "res://assets/audio/sfx/rotary_02.wav",
+        "res://assets/audio/sfx/rotary_03.wav",
+        "res://assets/audio/sfx/rotary_04.wav",
+        "res://assets/audio/sfx/rotary_05.wav",
+        "res://assets/audio/sfx/rotary_06.wav",
+        "res://assets/audio/sfx/rotary_07.wav"
+      ]
+    },
+    "artillery": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/artillery_01.wav",
+        "res://assets/audio/sfx/artillery_02.wav",
+        "res://assets/audio/sfx/artillery_03.wav",
+        "res://assets/audio/sfx/artillery_04.wav",
+        "res://assets/audio/sfx/artillery_05.wav",
+        "res://assets/audio/sfx/artillery_06.wav",
+        "res://assets/audio/sfx/artillery_07.wav"
+      ]
+    },
+    "mortar": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/mortar_01.wav",
+        "res://assets/audio/sfx/mortar_02.wav",
+        "res://assets/audio/sfx/mortar_03.wav",
+        "res://assets/audio/sfx/mortar_04.wav",
+        "res://assets/audio/sfx/mortar_05.wav",
+        "res://assets/audio/sfx/mortar_06.wav",
+        "res://assets/audio/sfx/mortar_07.wav"
+      ]
+    },
+    "railgun": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/railgun_01.wav",
+        "res://assets/audio/sfx/railgun_02.wav",
+        "res://assets/audio/sfx/railgun_03.wav",
+        "res://assets/audio/sfx/railgun_04.wav",
+        "res://assets/audio/sfx/railgun_05.wav",
+        "res://assets/audio/sfx/railgun_06.wav",
+        "res://assets/audio/sfx/railgun_07.wav"
+      ]
+    },
+    "flamethrower": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/flamethrower_01.wav",
+        "res://assets/audio/sfx/flamethrower_02.wav",
+        "res://assets/audio/sfx/flamethrower_03.wav",
+        "res://assets/audio/sfx/flamethrower_04.wav",
+        "res://assets/audio/sfx/flamethrower_05.wav",
+        "res://assets/audio/sfx/flamethrower_06.wav",
+        "res://assets/audio/sfx/flamethrower_07.wav"
+      ]
+    },
+    "beam": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/beam_01.wav",
+        "res://assets/audio/sfx/beam_02.wav",
+        "res://assets/audio/sfx/beam_03.wav",
+        "res://assets/audio/sfx/beam_04.wav",
+        "res://assets/audio/sfx/beam_05.wav",
+        "res://assets/audio/sfx/beam_06.wav",
+        "res://assets/audio/sfx/beam_07.wav"
+      ]
+    },
+    "plasma": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/plasma_01.wav",
+        "res://assets/audio/sfx/plasma_02.wav",
+        "res://assets/audio/sfx/plasma_03.wav",
+        "res://assets/audio/sfx/plasma_04.wav",
+        "res://assets/audio/sfx/plasma_05.wav",
+        "res://assets/audio/sfx/plasma_06.wav",
+        "res://assets/audio/sfx/plasma_07.wav"
+      ]
+    },
+    "grenade": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/grenade_01.wav",
+        "res://assets/audio/sfx/grenade_02.wav",
+        "res://assets/audio/sfx/grenade_03.wav",
+        "res://assets/audio/sfx/grenade_04.wav",
+        "res://assets/audio/sfx/grenade_05.wav",
+        "res://assets/audio/sfx/grenade_06.wav",
+        "res://assets/audio/sfx/grenade_07.wav"
+      ]
+    },
+    "gauss": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/gauss_01.wav",
+        "res://assets/audio/sfx/gauss_02.wav",
+        "res://assets/audio/sfx/gauss_03.wav",
+        "res://assets/audio/sfx/gauss_04.wav",
+        "res://assets/audio/sfx/gauss_05.wav",
+        "res://assets/audio/sfx/gauss_06.wav",
+        "res://assets/audio/sfx/gauss_07.wav"
+      ]
+    },
+    "smoke": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/smoke_01.wav",
+        "res://assets/audio/sfx/smoke_02.wav",
+        "res://assets/audio/sfx/smoke_03.wav",
+        "res://assets/audio/sfx/smoke_04.wav",
+        "res://assets/audio/sfx/smoke_05.wav",
+        "res://assets/audio/sfx/smoke_06.wav",
+        "res://assets/audio/sfx/smoke_07.wav"
+      ]
+    },
+    "rocket": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/rocket_01.wav",
+        "res://assets/audio/sfx/rocket_02.wav",
+        "res://assets/audio/sfx/rocket_03.wav",
+        "res://assets/audio/sfx/rocket_04.wav",
+        "res://assets/audio/sfx/rocket_05.wav",
+        "res://assets/audio/sfx/rocket_06.wav",
+        "res://assets/audio/sfx/rocket_07.wav"
+      ]
+    },
     "radio_ack": {
       "bus": "Voice",
       "files": [
@@ -433,6 +577,102 @@
         "res://assets/audio/sfx/impact_catastrophic_02.wav",
         "res://assets/audio/sfx/impact_catastrophic_03.wav",
         "res://assets/audio/sfx/impact_catastrophic_04.wav"
+      ]
+    },
+    "unit_ready_1": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_1_01.wav",
+        "res://assets/audio/sfx/unit_ready_1_02.wav",
+        "res://assets/audio/sfx/unit_ready_1_03.wav"
+      ]
+    },
+    "unit_ready_2": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_2_01.wav",
+        "res://assets/audio/sfx/unit_ready_2_02.wav",
+        "res://assets/audio/sfx/unit_ready_2_03.wav"
+      ]
+    },
+    "unit_ready_3": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_3_01.wav",
+        "res://assets/audio/sfx/unit_ready_3_02.wav",
+        "res://assets/audio/sfx/unit_ready_3_03.wav"
+      ]
+    },
+    "unit_ready_4": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_4_01.wav",
+        "res://assets/audio/sfx/unit_ready_4_02.wav",
+        "res://assets/audio/sfx/unit_ready_4_03.wav"
+      ]
+    },
+    "unit_ready_5": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_5_01.wav",
+        "res://assets/audio/sfx/unit_ready_5_02.wav",
+        "res://assets/audio/sfx/unit_ready_5_03.wav"
+      ]
+    },
+    "unit_ready_6": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_6_01.wav",
+        "res://assets/audio/sfx/unit_ready_6_02.wav",
+        "res://assets/audio/sfx/unit_ready_6_03.wav"
+      ]
+    },
+    "unit_ready_7": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_7_01.wav",
+        "res://assets/audio/sfx/unit_ready_7_02.wav",
+        "res://assets/audio/sfx/unit_ready_7_03.wav"
+      ]
+    },
+    "unit_ready_8": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_8_01.wav",
+        "res://assets/audio/sfx/unit_ready_8_02.wav",
+        "res://assets/audio/sfx/unit_ready_8_03.wav"
+      ]
+    },
+    "unit_ready_9": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_9_01.wav",
+        "res://assets/audio/sfx/unit_ready_9_02.wav",
+        "res://assets/audio/sfx/unit_ready_9_03.wav"
+      ]
+    },
+    "unit_ready_10": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_10_01.wav",
+        "res://assets/audio/sfx/unit_ready_10_02.wav",
+        "res://assets/audio/sfx/unit_ready_10_03.wav"
+      ]
+    },
+    "unit_ready_11": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_11_01.wav",
+        "res://assets/audio/sfx/unit_ready_11_02.wav",
+        "res://assets/audio/sfx/unit_ready_11_03.wav"
+      ]
+    },
+    "unit_ready_12": {
+      "bus": "SFX",
+      "files": [
+        "res://assets/audio/sfx/unit_ready_12_01.wav",
+        "res://assets/audio/sfx/unit_ready_12_02.wav",
+        "res://assets/audio/sfx/unit_ready_12_03.wav"
       ]
     },
     "construct": {

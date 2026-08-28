@@ -545,7 +545,10 @@ const FIELD_SPEC: Dictionary = {
 		"center": {"type": "vector3", "required": true, "scale": true},
 		"half_extents": {"type": "vector2", "required": true, "scale": true},
 		"deck_height": {"type": "number", "required": false, "scale": true},
+		"rotation_deg": {"type": "number", "required": false},
 	}},
+	"roads": {"type": "array", "required": false},
+	"props": {"type": "array", "required": false},
 	"resource_nodes": {"type": "array", "required": false, "item": {
 		"position": {"type": "vector3", "required": true, "scale": true},
 		# "metal" is the historical id for ore and every bundled map still uses
@@ -673,6 +676,7 @@ const FIELD_SPEC: Dictionary = {
 		# gameplay range. Defaults to world_scale when unset, so no existing
 		# map changes.
 		"prop_scale": {"type": "number", "required": false, "min": 0.05, "max": 32.0},
+		"sculpt_grid": {"type": "dictionary", "required": false},
 	}},
 	"environment": {"type": "dictionary", "required": false, "item": {
 		"sky_color": {"type": "color", "required": false},

@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://krrory3ks8i0"
-path="res://.godot/imported/fern_3_fern_3_mat1_albedo.png-cd198f29343eb0fca0132d47bb9c423d.ctex"
+path.s3tc="res://.godot/imported/fern_3_fern_3_mat1_albedo.png-cd198f29343eb0fca0132d47bb9c423d.s3tc.ctex"
+path.etc2="res://.godot/imported/fern_3_fern_3_mat1_albedo.png-cd198f29343eb0fca0132d47bb9c423d.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "548fbebf89c5389e29cfe4a4b70a9916"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/terrain/fern_3_fern_3_mat1_albedo.png"
-dest_files=["res://.godot/imported/fern_3_fern_3_mat1_albedo.png-cd198f29343eb0fca0132d47bb9c423d.ctex"]
+dest_files=["res://.godot/imported/fern_3_fern_3_mat1_albedo.png-cd198f29343eb0fca0132d47bb9c423d.s3tc.ctex", "res://.godot/imported/fern_3_fern_3_mat1_albedo.png-cd198f29343eb0fca0132d47bb9c423d.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +42,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

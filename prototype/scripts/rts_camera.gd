@@ -3,118 +3,140 @@ extends Camera3D
 # zoom, middle-mouse drag pan. Reads InputService's cam_* actions rather than
 # raw keycodes - see scripts/core/input_service.gd's header for why.
 #
-# DOF (re-enabled): tilt-shift depth-of-field band — the miniature lens feel
-# from CORE_DESIGN_LANGUAGE §2. Tilt-shift was killed 2026-08-10 due to a 3 FPS
-# regression (never recovered) caused by two things:
-#   1. The full-screen DOF post-process pass (Godot rendering cost — unavoidable)
-#   2. Writing CameraAttributesPractical properties every frame from _process()
+# ADAPTIVE TERRAIN ELEVATION FOLLOWING:
+# The camera dynamically and smoothly adapts its altitude to match the broad
+# terrain elevation beneath the focal area (plateaus, mountain passes, valleys,
+# tiered ground), while using a 5-point area filter so isolated spires or sharp
+# rocks don't cause sudden jolts. It also enforces a minimum terrain clearance
+# floor so the camera never clips into elevated terrain or cliffs.
 #
-# Fix for #2: DOF distances are updated ONLY in _on_zoom(), not every frame.
-# That cuts per-frame writes to zero unless the user is actively scrolling.
-# The full-screen pass cost remains; kept conservative (0.06, far-blur only) so
-# the battle scene stays in budget. Initialise from the scene's
-# CameraAttributesPractical sub_resource if present, otherwise leave null so
-# the DOF wiring becomes a no-op on scenes that don't have it.
+# DOF (re-enabled): tilt-shift depth-of-field band — the miniature lens feel
+# from CORE_DESIGN_LANGUAGE §2.
+
+const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
+const PointerGainScript = preload("res://scripts/core/pointer_gain.gd")
 
 @export var pan_speed: float = 30.0
 # Multiplicative zoom: each wheel notch multiplies the camera height by this
-# ratio rather than adding a fixed number of metres. The old additive step
-# (zoom_speed * world_scale metres) meant one notch jumped ~32 m on a
-# world_scale=4 map across a 10..160 range - about five notches for the whole
-# sweep, with the bottom notch launching straight off the ground. A ratio step
-# is small in metres near the floor where framing precision matters and grows
-# with distance out where coverage matters, and is inherently scale-free: the
-# same perceived zoom-per-notch at any world_scale, so unlike the additive
-# version it must NOT be multiplied by world_scale here (pan speed below still
-# tracks world_scale for traversal).
+# ratio rather than adding a fixed number of metres.
 @export var zoom_step: float = 1.15
 @export var rotate_speed: float = 90.0
 # Total War-style camera: moderate FOV that shows the battlefield at
 # strategic zoom but lets you dive in to inspect individual units.
-# ~40° is the TW sweet spot — wide enough to read terrain features,
-# tight enough that unit silhouettes stay crisp when zoomed in.
 @export var gameplay_fov: float = 40.0
 @export var min_height: float = 8.0
 # TW zoom-out lets you see a significant fraction of the map. 200m
 # cap works for the new 1200×520 twin_streams layout.
 @export var max_height: float = 200.0
 
-# VISUAL_AND_UX_POLISH_PLAN.md B1: edge-scroll + zoom-to-cursor - both core
-# RTS camera expectations this project had neither of. Edge margin in real
-# pixels (viewport-space, not logical/stretched) - kept modest so it
-# doesn't trigger from a build-bar click a few pixels off the bottom edge.
+# Edge-scroll margin in real pixels
 @export var edge_scroll_margin: float = 18.0
 
-# CORE_DESIGN_LANGUAGE.md §3.2: scales pan speed and middle-drag, so
-# traversing a map that's now genuinely bigger under world_scale doesn't
-# get proportionally slower via keyboard/edge-scroll/middle-drag - long
-# cross-map travel time is the accepted design (§3.2's own "accept long
-# traversal" call), but getting there shouldn't fight the input itself.
-# Set by whichever runtime loads the map (match_director.gd) - defaults to
-# 1.0 so a camera with nothing setting it behaves exactly as before.
-var world_scale: float = 1.0
+# Adaptive ground tracking properties
+@export var ground_follow_speed: float = 4.5
+@export var min_terrain_clearance: float = 5.0
 
+var world_scale: float = 1.0
 var height: float = 26.0
 
-# CameraAttributesPractical reference. Initialised from the scene sub_resource
-# if the scene wired one (Battle.tscn does). Left null if not, so all DOF
-# helpers become safe no-ops.
+# Map definition context for direct analytical terrain queries
+var current_map: Dictionary = {}
+
+var _ground_y_smoothed: float = 0.0
+var _ground_initialized: bool = false
+
+# CameraAttributesPractical reference for DOF
 var _cam_attributes: CameraAttributesPractical = null
 
+var _middle_drag_origin: Vector2 = Vector2.ZERO
+var _middle_drag_last: Vector2 = Vector2.ZERO
 
-func _ready():
-	height = clamp(global_position.y, min_height, max_height)
+
+func _ready() -> void:
+	# Keep user height relative to ground
+	height = clamp(height, min_height, max_height)
 	_apply_pitch()
-	# Apply narrow gameplay FOV — the scene's default is the old 70°; this
-	# overrides it on load so every scene gets the tight framing.
 	fov = gameplay_fov
-	# Grab the scene's CameraAttributesPractical if one is wired. This avoids
-	# creating a new DOF cost in scenes that don't have it configured.
+	
 	if attributes != null and attributes is CameraAttributesPractical:
 		_cam_attributes = attributes
 		_apply_dof_distances()
 
+	# Initialize ground elevation immediately
+	var init_ground := compute_target_ground_height()
+	_ground_y_smoothed = init_ground
+	_ground_initialized = true
+	global_position.y = _ground_y_smoothed + height
 
-func _apply_pitch():
+
+func _apply_pitch() -> void:
 	# Total War-style: shallower at close zoom (inspect units), steeper
-	# at far zoom (strategic overview). -35 close / -55 far gives enough
-	# range to read terrain relief at distance while letting you get
-	# almost level with units when zoomed in tight.
+	# at far zoom (strategic overview). -35 close / -55 far.
 	var t = (height - min_height) / (max_height - min_height)
 	rotation_degrees.x = lerp(-35.0, -55.0, t)
 
 
-# Updates the tilt-shift far blur to track the ground at a wide band.
-# Called ONLY on zoom events — never in _process(). Far blur only: near blur
-# on a panning RTS camera produces a double-blur artifact that reads as a
-# lens scratch rather than depth.
-#
-# VISUAL polish 2026-08-23: tilt-shift lightened a lot. The previous
-# (height + 30.0) / lerp(10..50) values put the focus band right at the
-# playable area and made the soft falloff quite wide, which read as
-# "everything past the front units is mush" at tactical zoom. Pushed
-# the band well past the visible map (height + 150) and narrowed the
-# transition (lerp 3..12) so the effect is a subtle hint of falloff at
-# the far horizon rather than a band across the play area. If even this
-# is too much, set dof_blur_far_enabled = false on the CameraAttributes
-# in Battle.tscn and the camera's writes here become no-ops.
-func _apply_dof_distances():
+func _apply_dof_distances() -> void:
 	if _cam_attributes == null:
 		return
-	# Ground level is always near world origin in Kitbash Command.
-	# Focus on the ground plane; the far blur fades everything above it.
 	_cam_attributes.dof_blur_far_distance = height + 150.0
-	# Transition width: wider at max zoom so the band is legible at distance,
-	# narrower when close so the units at mid-height stay sharp.
 	var t = (height - min_height) / (max_height - min_height)
 	_cam_attributes.dof_blur_far_transition = lerp(3.0, 12.0, t)
 
 
-# Pure function (no Input/viewport reads) so it's directly testable headless -
-# given where the mouse sits relative to the viewport and the margin, which
-# way (if any) should the camera pan. Returns a possibly-diagonal, NOT
-# normalized direction (matches keyboard pan's own union-then-normalize
-# below - a corner shouldn't scroll faster than an edge).
+# ==============================================================================
+# ADAPTIVE TERRAIN ELEVATION SAMPLING
+# ==============================================================================
+
+func sample_terrain_height(x: float, z: float) -> float:
+	if not current_map.is_empty():
+		return TerrainBuilderScript.height_at(current_map, x, z)
+	
+	# Fallback to physics raycast if inside scene tree
+	if is_inside_tree() and get_world_3d() != null:
+		var space := get_world_3d().direct_space_state
+		if space != null:
+			var query := PhysicsRayQueryParameters3D.create(
+				Vector3(x, 2000.0, z),
+				Vector3(x, -2000.0, z),
+				1
+			)
+			var res := space.intersect_ray(query)
+			if not res.is_empty() and res.has("position"):
+				return float(res["position"].y)
+	return 0.0
+
+
+func get_focal_ground_pos() -> Vector2:
+	var pitch_rad: float = deg_to_rad(absf(rotation_degrees.x))
+	var yaw_rad: float = deg_to_rad(rotation_degrees.y)
+	var forward_dist: float = height / maxf(0.15, tan(pitch_rad))
+	forward_dist = clampf(forward_dist, 5.0, 350.0)
+	var focus_x: float = global_position.x - sin(yaw_rad) * forward_dist
+	var focus_z: float = global_position.z - cos(yaw_rad) * forward_dist
+	return Vector2(focus_x, focus_z)
+
+
+func compute_target_ground_height() -> float:
+	var focal_xz := get_focal_ground_pos()
+	var r: float = clampf(height * 0.35, 15.0, 50.0)
+	
+	# 5-point area kernel: center + 4 cardinal offsets
+	var h_center := sample_terrain_height(focal_xz.x, focal_xz.y)
+	var h1 := sample_terrain_height(focal_xz.x + r, focal_xz.y)
+	var h2 := sample_terrain_height(focal_xz.x - r, focal_xz.y)
+	var h3 := sample_terrain_height(focal_xz.x, focal_xz.y + r)
+	var h4 := sample_terrain_height(focal_xz.x, focal_xz.y - r)
+	
+	# Weighted: center 50%, surrounding 50%
+	var avg_ground := h_center * 0.5 + (h1 + h2 + h3 + h4) * 0.125
+	return avg_ground
+
+
+# ==============================================================================
+# INPUT & MOVEMENT
+# ==============================================================================
+
 static func compute_edge_scroll_direction(mouse_pos: Vector2, viewport_size: Vector2, margin: float) -> Vector2:
 	var dir = Vector2.ZERO
 	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
@@ -130,10 +152,6 @@ static func compute_edge_scroll_direction(mouse_pos: Vector2, viewport_size: Vec
 	return dir
 
 
-# Yaw-relative pan: keyboard input is camera-relative, but world movement is
-# axis-aligned. Maps a screen direction back to a world direction by rotating
-# the input by the camera's current yaw so WASD always means "forward in the
-# view", regardless of where the camera is pointed.
 static func pan_to_world(input: Vector2, yaw_deg: float) -> Vector2:
 	var yaw := deg_to_rad(yaw_deg)
 	var sin_y := sin(yaw)
@@ -144,10 +162,6 @@ static func pan_to_world(input: Vector2, yaw_deg: float) -> Vector2:
 	)
 
 
-# Returns a unit direction (0,0 when nothing to do) for the camera to scroll
-# toward given the current mouse position and viewport size. Pulled into a
-# pure function so test_rts_camera.gd can pin the four-quadrant + corner
-# behaviour without instantiating a Camera3D.
 static func compute_movement(
 	keyboard: Vector2, mouse_pos: Vector2, viewport_size: Vector2, margin: float,
 	window_has_focus: bool
@@ -158,23 +172,16 @@ static func compute_movement(
 	return move
 
 
-# Yaw-up vector of a Camera3D pitched by `pitch_deg` - same algebra as
-# designer_camera.gd's, kept here so the ground-stick offset this camera
-# computes for ray-plane hit math doesn't depend on Godot's transform
-# pipeline re-running mid-call.
 static func compute_yaw_up(pitch_deg: float) -> Vector3:
 	return Vector3(0.0, sin(deg_to_rad(pitch_deg)), cos(deg_to_rad(pitch_deg)))
 
 
-func _process(delta):
+func _process(delta: float) -> void:
 	var move := Input.get_vector("cam_pan_left", "cam_pan_right", "cam_pan_up", "cam_pan_down")
 
-	# Edge-scroll only while the window actually has input focus - otherwise
-	# a mouse merely sitting near the edge of an unfocused window (e.g. this
-	# game running behind another one) would silently drag the camera.
 	if is_inside_tree() and get_window() and get_window().has_focus():
-		var vp = get_viewport()
-		var edge_dir = compute_edge_scroll_direction(vp.get_mouse_position(), vp.get_visible_rect().size, edge_scroll_margin)
+		var vp := get_viewport()
+		var edge_dir := compute_edge_scroll_direction(vp.get_mouse_position(), vp.get_visible_rect().size, edge_scroll_margin)
 		move += edge_dir
 
 	if Input.is_action_pressed("cam_rotate_left"): rotation_degrees.y += rotate_speed * delta
@@ -187,53 +194,53 @@ func _process(delta):
 		global_position.x += world_move.x
 		global_position.z += world_move.y
 
-	global_position.y = lerp(global_position.y, height, 10.0 * delta)
+	# Adaptive Ground Height Interpolation
+	var target_ground := compute_target_ground_height()
+	if not _ground_initialized:
+		_ground_y_smoothed = target_ground
+		_ground_initialized = true
+
+	_ground_y_smoothed = lerp(_ground_y_smoothed, target_ground, ground_follow_speed * delta)
+
+	# Safety floor: camera must never clip into the terrain directly beneath it
+	var under_cam_h := sample_terrain_height(global_position.x, global_position.z)
+	var min_allowed_cam_y := under_cam_h + min_terrain_clearance
+
+	var target_cam_y := maxf(_ground_y_smoothed + height, min_allowed_cam_y)
+	global_position.y = lerp(global_position.y, target_cam_y, 8.0 * delta)
 
 
-# VISUAL_AND_UX_POLISH_PLAN.md B1: where the mouse ray hits a flat plane at
-# world Y=`plane_y` - the same "flat ground" approximation skirmish.gd's own
-# _raycast_ground() effectively assumes for cursor-driven placement/orders.
-# A pure function of the camera's own transform + a screen point, so it's
-# testable without a real physics world (no CollisionShape3D needed to hit).
-func ray_plane_hit(screen_pos: Vector2, plane_y: float = 0.0):
-	var origin = project_ray_origin(screen_pos)
-	var dir = project_ray_normal(screen_pos)
-	if abs(dir.y) < 0.0001:
+func ray_plane_hit(screen_pos: Vector2, plane_y: float = -999999.0):
+	if plane_y == -999999.0:
+		plane_y = _ground_y_smoothed
+	var origin := project_ray_origin(screen_pos)
+	var dir := project_ray_normal(screen_pos)
+	if absf(dir.y) < 0.0001:
 		return null
-	var t = (plane_y - origin.y) / dir.y
+	var t := (plane_y - origin.y) / dir.y
 	if t < 0.0:
 		return null
 	return origin + dir * t
 
 
-# Zoom-to-cursor: keep the world point under the cursor at the same screen
-# position before and after the height change. Done by ray-plane hitting
-# before and after and shifting the camera by the world delta.
-#
-# `notches` is a signed wheel-notch count: each notch scales the height by
-# zoom_step (see its comment above for why this replaced the additive step).
-func _on_zoom(screen_pos: Vector2, notches: float):
+func _on_zoom(screen_pos: Vector2, notches: float) -> void:
 	height = clamp(height * pow(zoom_step, notches), min_height, max_height)
 	_apply_pitch()
 	_apply_dof_distances()
-	var before = ray_plane_hit(screen_pos)
-	# Snap y to the new target before the second hit so the after-raycast
-	# is measured against the camera's REAL post-zoom transform, not a
-	# stale one mid-lerp.
-	global_position.y = height
-	var after = ray_plane_hit(screen_pos)
+	var before = ray_plane_hit(screen_pos, _ground_y_smoothed)
+	
+	# Update camera Y relative to smoothed ground
+	var under_cam_h := sample_terrain_height(global_position.x, global_position.z)
+	var min_allowed_cam_y := under_cam_h + min_terrain_clearance
+	global_position.y = maxf(_ground_y_smoothed + height, min_allowed_cam_y)
+	
+	var after = ray_plane_hit(screen_pos, _ground_y_smoothed)
 	if before != null and after != null:
 		global_position.x += before.x - after.x
 		global_position.z += before.z - after.z
 
 
-const PointerGainScript = preload("res://scripts/core/pointer_gain.gd")
-
-var _middle_drag_origin: Vector2 = Vector2.ZERO
-var _middle_drag_last: Vector2 = Vector2.ZERO
-
-
-func _unhandled_input(event):
+func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("cam_zoom_in"):
 		_on_zoom(get_viewport().get_mouse_position(), -1.0)
 	elif event.is_action_pressed("cam_zoom_out"):
@@ -242,7 +249,7 @@ func _unhandled_input(event):
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
 			_middle_drag_origin = event.position
 			_middle_drag_last = event.position
-	elif event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_MIDDLE:
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_MIDDLE) != 0:
 		var raw_delta: Vector2 = event.position - _middle_drag_last
 		_middle_drag_last = event.position
 		if raw_delta.length() == 0:

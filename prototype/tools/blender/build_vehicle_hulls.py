@@ -637,69 +637,125 @@ def body_brenntal(bm, w, h, l, opt):
 # --- TALLOW & VANCE ---------------------------------------------------------
 
 def _tallow_section(z, hl, l, w, h, frame_w, cab_l_frac, cab_h_frac, cab_w_frac,
-                    cab_rake, cut, flare_frac, flare_z1, flare_zw1, flare_z2, flare_zw2):
-    """Cross-section for Tallow at a given z.
+                    cab_rake, cut, flare_frac, flare_z1, flare_zw1, flare_z2, flare_zw2,
+                    oc):
+    """Cross-section for Tallow at a given z, with outcrops grown into the
+    single loft (NOT bolted-on parts).
 
-    Closed-body truck. The cross-section is an octagon whose height varies
-    along z: low chassis at the rear (the flatbed), tall cab at the front
-    (with a sloped/raked top to read as a windshield). The bottom is
-    always at y = -h/2 (flat underside). Paired wheel-arch flares widen
-    the body at two axle stations (fenders) — the distinct Tallow read.
+    Constant 16-vertex outline, so the result is ONE continuous mesh. The
+    cross-section is an octagon whose height varies along z (tall raked cab
+    at the front, low flatbed at the rear, flat underside at y=-h/2). The
+    outcrops are reserved vertex slots that collapse onto the base edge when
+    inactive and rise into the body when active:
 
-    The cab has a raked top: at the very front of the cab z range, the
-    cross-section's top is at the cab front height; at the rear of the cab
-    z range, the cross-section's top is at the cab back height (taller
-    than the front - the cab roof is taller than the windshield). After
-    the cab z range, the cross-section's top drops to the flatbed height.
+      * collar  - a raised octagonal NECK on the cab roof (turret seat). Grows
+                  over the cab z-range; reads as "a turret mounts here".
+      * boss    - a longitudinal bulge on each side (sponson shoulder / gun
+                  mount). Grows over the mid body z-range.
+      * rail    - the flatbed deck edge lifts into a perimeter RAIL lip over
+                  the flatbed z-range (cargo/equipment runs along it).
+      * plinth  - a raised PAD on the rear deck (module feet land here). Grows
+                  over the rear z-range.
+
+    Bigger hulls pass larger collar_h / boss_d / plinth_h / rail_h, so they
+    simply carry more and larger outcrops - the structural diversity the
+    catalogue was missing. Every outcrop height is derived from h (never w),
+    so autofit() stays convergent.
     """
     cab_z_start = -hl
     cab_z_end = -hl + l * cab_l_frac
     flatbed_z_start = cab_z_end
 
     if z <= cab_z_start:
-        # Pre-cab: chassis height (low)
         h_frac = 0.40
     elif z <= cab_z_start + l * 0.04:
-        # Glacis front: ramps up from chassis to cab front
         t = (z - cab_z_start) / (l * 0.04)
         h_frac = 0.40 + (cab_h_frac * cab_rake - 0.40) * t
     elif z <= cab_z_end:
-        # Cab: tall, with raked top
         t = (z - cab_z_start) / max(l * cab_l_frac, 1e-6)
         h_front = cab_h_frac * cab_rake
         h_back = cab_h_frac
         h_frac = h_front + (h_back - h_front) * t
     elif z <= flatbed_z_start + l * 0.04:
-        # Drop from cab back to flatbed
         t = (z - flatbed_z_start) / (l * 0.04)
         h_frac = cab_h_frac + (0.40 - cab_h_frac) * t
     else:
-        # Flatbed: low chassis height
         h_frac = 0.40
 
     full_w = frame_w
-    # Wheel-arch flares - wide fender bulges at two axle stations
     if flare_frac > 1e-6:
         t1 = HF.smooth_transition(z, flare_z1, flare_zw1)
         t2 = HF.smooth_transition(z, flare_z2, flare_zw2)
-        flare_t = max(t1, t2)
-        full_w *= 1.0 + flare_frac * flare_t
+        full_w *= 1.0 + flare_frac * max(t1, t2)
     full_h = h * h_frac
     cy = full_h / 2.0 - h / 2.0
-    return HF.oct_outline(full_w, full_h, cut, cut, cy=cy)
+
+    # Outcrop activations along z (0..1)
+    t_collar = HF.smooth_transition(z, oc["collar_zc"], oc["collar_zw"]) if oc["collar_h"] > 0 else 0.0
+    t_boss = HF.smooth_transition(z, oc["boss_zc"], oc["boss_zw"]) if oc["boss_d"] > 0 else 0.0
+    t_plinth = HF.smooth_transition(z, oc["plinth_zc"], oc["plinth_zw"]) if oc["plinth_h"] > 0 else 0.0
+    t_rail = HF.smooth_transition(z, oc["rail_zc"], oc["rail_zw"]) if oc["rail_h"] > 0 else 0.0
+
+    deck_y0 = cy + full_h
+    deck_y = deck_y0 + oc["rail_h"] * t_rail
+    collar_h = oc["collar_h"] * h * t_collar
+    plinth_h = oc["plinth_h"] * h * t_plinth
+    boss_d = oc["boss_d"] * w * t_boss
+
+    hw = full_w / 2.0
+    cx_ = min(cut, hw * 0.9)
+    cy_ = min(cut, full_h * 0.9)
+    y_bot = cy - full_h
+
+    # Base octagon corners
+    bl = (-hw + cx_, y_bot)
+    br = ( hw - cx_, y_bot)
+    rb = ( hw, y_bot + cy_)
+    rt = ( hw, deck_y - cy_)
+    tr = ( hw - cx_, deck_y)
+    tl = (-hw + cx_, deck_y)
+    lt = (-hw, deck_y - cy_)
+    lb = (-hw, y_bot + cy_)
+
+    # Side boss bulges (vertical right/left edges pushed outward in x)
+    y_bot_edge = y_bot + cy_
+    y_top_edge = deck_y - cy_
+    y_b = cy - (full_h - cy_) * 0.30
+    y_t = cy + (full_h - cy_) * 0.30
+    rbb = (hw + boss_d, y_b)
+    rbt = (hw + boss_d, y_t)
+    lbb = (-hw - boss_d, y_b)
+    lbt = (-hw - boss_d, y_t)
+
+    # Deck-top peak slots (collar front, plinth rear). Inactive: sit on the
+    # flat deck edge at monotonically descending x so the top edge stays a
+    # straight line. collar_hw / plinth_hw are small enough (< the inactive
+    # slot x) that an active peak never reorders the perimeter.
+    deck_xR = hw - cx_
+    span = deck_xR - (-hw + cx_)
+    cR = (deck_xR - 0.15 * span, deck_y)
+    cL = (deck_xR - 0.30 * span, deck_y)
+    pR = (deck_xR - 0.55 * span, deck_y)
+    pL = (deck_xR - 0.70 * span, deck_y)
+    if collar_h > 1e-4:
+        cR = (oc["collar_hw"] * w, deck_y + collar_h)
+        cL = (-oc["collar_hw"] * w, deck_y + collar_h)
+    if plinth_h > 1e-4:
+        pR = (oc["plinth_hw"] * w, deck_y + plinth_h)
+        pL = (-oc["plinth_hw"] * w, deck_y + plinth_h)
+
+    # 16 vertices, counter-clockwise, constant count for every z
+    return [bl, br, rb, rbb, rbt, rt, tr, cR, cL, pR, pL, tl, lt, lbt, lbb, lb]
 
 
 def body_tallow(bm, w, h, l, opt):
-    """Closed-body truck. Cab at the front, flatbed at the rear.
+    """Closed-body truck. Cab at the front, flatbed at the rear. ONE loft.
 
-    ONE loft. The cross-section's height varies along z: low chassis at
-    the flatbed, tall cab with a raked top (windshield shorter than
-    roof) at the front, sloped transition between them. Paired wheel-arch
-    flares widen the body at two axle stations. Bottom always at y=-h/2
-    (flat underside).
-
-    The "open spaceframe" character of the old Tallow is gone - the new
-    Tallow is a single closed body. The cab + flatbed vocabulary is kept.
+    The outcrops (collar neck, side bosses, bed rail, rear plinth) are grown
+    into the loft via _tallow_section - there are no bolted-on elements, so
+    the hull is a single continuous mesh. Bigger hulls pass larger outcrop
+    heights, so they read as structurally richer (more mount-looking geometry)
+    rather than a scaled copy of the small one.
     """
     hl = l / 2.0
     frame_w = w * opt.get("frame_w", 0.90)
@@ -714,13 +770,34 @@ def body_tallow(bm, w, h, l, opt):
     flare_z2 = hl * opt.get("flare_z2", 0.52)
     flare_zw2 = l * opt.get("flare_zw2", 0.12)
 
+    # Outcrop parameters. collar/boss/plinth/rail heights are fractions of
+    # h or w; z-centres/widths are absolute z (Godot -Z is nose). Defaults
+    # give a modest pickup; each LINEUP entry scales them up for bigger hulls.
+    oc = {
+        "collar_h": opt.get("collar_h", 0.0),
+        "collar_hw": opt.get("collar_hw", 0.18),
+        "collar_zc": opt.get("collar_zc", -hl + l * cab_l_frac * 0.5),
+        "collar_zw": opt.get("collar_zw", l * cab_l_frac * 0.7),
+        "boss_d": opt.get("boss_d", 0.0),
+        "boss_zc": opt.get("boss_zc", 0.04 * l),
+        "boss_zw": opt.get("boss_zw", 0.72 * l),
+        "plinth_h": opt.get("plinth_h", 0.0),
+        "plinth_hw": opt.get("plinth_hw", 0.10),
+        "plinth_zc": opt.get("plinth_zc", 0.42 * l),
+        "plinth_zw": opt.get("plinth_zw", 0.42 * l),
+        "rail_h": opt.get("rail_h", 0.0),
+        "rail_zc": opt.get("rail_zc", 0.30 * l),
+        "rail_zw": opt.get("rail_zw", 0.95 * l),
+    }
+
     def sec(z):
         return _tallow_section(
             z, hl, l, w, h, frame_w, cab_l_frac, cab_h_frac, cab_w_frac,
             cab_rake, cut, flare_frac, flare_z1, flare_zw1, flare_z2, flare_zw2,
+            oc,
         )
 
-    HF.loft_evolution(bm, -hl, hl, sec, n_sections=12, cap_chamfer=cut)
+    HF.loft_evolution(bm, -hl, hl, sec, n_sections=14, cap_chamfer=cut)
 
 
 # --- ORRIN COLLECTIVE (symmetric, tumblehome) -------------------------------
@@ -2420,41 +2497,33 @@ LINEUP = [
       (3.3, 2.70, 5.1), [], {"tiers": 3, "plinth_h": 0.26,
                              "casemate_l": 0.40, "casemate_w": 0.58}),
 
-    # -- TALLOW & VANCE (12): open spaceframes --------------------------
+    # -- TALLOW & VANCE: cab + flatbed trucks. Outcrops (collar neck, side
+    #    bosses, bed rail, rear plinth) are grown into the single loft in
+    #    body_tallow - no bolted-on elements. Fewer hulls than before, but
+    #    each bigger one carries more and larger outcrops, so the roster
+    #    reads as distinct vehicles rather than one scaled hull.
     H("tallow_scout_a", "tallow", "scout", "Tallow Runabout",
-      (2.4, 1.05, 3.9), [], {"cab_l": 0.34, "beams": 2, "post_h": 0.26}),
+      (2.4, 1.05, 3.9),
+      [], {"cab_l": 0.34, "collar_h": 0.16, "boss_d": 0.05}),
     H("tallow_light_a", "tallow", "light", "Tallow Pickup",
-      (2.8, 1.15, 4.9), [], {"cab_l": 0.30, "beams": 2}),
-    H("tallow_light_b", "tallow", "light", "Tallow Gun Truck",
-      (3.0, 1.25, 5.1), [("barbette", {"z": 0.34, "r": 0.28, "bh": 0.24})],
-      {"cab_l": 0.26, "beams": 2, "rail_h": 0.14}),
+      (2.8, 1.15, 4.9),
+      [], {"cab_l": 0.30, "collar_h": 0.22, "boss_d": 0.08, "rail_h": 0.10}),
     H("tallow_medium_a", "tallow", "medium", "Tallow Flatbed",
-      (3.4, 1.25, 6.3), [], {"beams": 3}),
+      (3.4, 1.25, 6.3),
+      [], {"cab_l": 0.26, "collar_h": 0.24, "boss_d": 0.10,
+          "rail_h": 0.14, "plinth_h": 0.12}),
     H("tallow_medium_b", "tallow", "medium", "Tallow Stake Bed",
-      (3.5, 1.60, 6.5), [("bolster", {"bh": 0.46, "z": (-0.06, 0.60)})],
-      {"beams": 3, "rail_h": 0.34}),
+      (3.5, 1.60, 6.5),
+      [], {"cab_l": 0.26, "collar_h": 0.26, "boss_d": 0.10,
+          "rail_h": 0.16, "plinth_h": 0.16}),
     H("tallow_heavy_a", "tallow", "heavy", "Tallow Lowboy",
-      (4.3, 1.40, 8.1), [], {"deck_h": 0.38, "deck_lift": 0.02, "beams": 4,
-                             "cab_h": 0.90, "post_h": 0.30}),
-    H("tallow_heavy_b", "tallow", "heavy", "Tallow Prime Mover",
-      (4.1, 1.85, 7.1), [("ballast", {"z": 0.74, "h": 0.62, "w": 0.74})],
-      {"cab_l": 0.38, "cab_h": 0.90, "beams": 2}),
-    H("tallow_transport_a", "tallow", "transport", "Tallow Container Carrier",
-      (3.9, 1.35, 8.9), [("flatbed", {"z0": -0.34, "z1": 0.96,
-                                      "deck_h": 0.30, "rail_h": 0.22})],
-      {"beams": 4, "cab_l": 0.22}),
-    H("tallow_transport_b", "tallow", "transport", "Tallow Tanker Frame",
-      (3.7, 1.75, 8.5), [("trunk", {"th": 0.40, "w": 0.62, "z0": -0.30})],
-      {"beams": 4, "cab_l": 0.24}),
-    H("tallow_transport_c", "tallow", "transport", "Tallow Bolster Hauler",
-      (3.8, 1.80, 9.1), [("bolster", {"bh": 0.52, "z": (-0.10, 0.34, 0.78)})],
-      {"beams": 4, "cab_l": 0.22, "rail_h": 0.12}),
-    H("tallow_transport_d", "tallow", "transport", "Tallow Double Deck",
-      (3.9, 2.10, 8.7), [("second_deck", {"lift": 0.46, "z0": -0.26})],
-      {"beams": 3, "cab_l": 0.24}),
-    H("tallow_oddball_a", "tallow", "oddball", "Tallow Gantry Rig",
-      (4.1, 2.45, 7.5), [("gantry", {"gh": 0.62, "z": 0.30})],
-      {"beams": 3, "cab_l": 0.22}),
+      (4.3, 1.40, 8.1),
+      [], {"cab_l": 0.22, "cab_h": 0.90, "collar_h": 0.28, "boss_d": 0.13,
+          "rail_h": 0.18, "plinth_h": 0.20}),
+    H("tallow_transport_a", "tallow", "transport", "Tallow Carrier",
+      (3.9, 1.35, 8.9),
+      [], {"cab_l": 0.22, "collar_h": 0.24, "boss_d": 0.12,
+          "rail_h": 0.18, "plinth_h": 0.22}),
 
     # -- ORRIN COLLECTIVE (8): symmetric salvage -----------------------
     H("orrin_scout_a", "orrin", "scout", "Orrin Skulker",
@@ -2648,17 +2717,7 @@ LINEUP = [
       {"sail_w": 0.0, "bow_frac": 0.12, "keel_frac": 0.44,
        "stern_w": 0.42}, domain="Naval"),
 
-    # -- TALLOW & VANCE additions (3): more real flatbeds ---------------
-    H("tallow_medium_c", "tallow", "medium", "Tallow Stake Bed",
-      (3.5, 1.45, 6.4), [("bolster", {"bh": 0.40, "z": (-0.10, 0.62)})],
-      {"cab_l": 0.26, "beams": 3}),
-    H("tallow_heavy_c", "tallow", "heavy", "Tallow Dropside",
-      (4.2, 1.55, 7.9), [("well", {"z0": -0.30, "wall_h": 0.24, "w": 0.86})],
-      {"cab_l": 0.24, "cab_h": 0.80, "beams": 4}),
-    H("tallow_transport_e", "tallow", "transport", "Tallow Cab-Over Flatbed",
-      (3.8, 1.60, 8.7), [("flatbed", {"z0": -0.06, "z1": 0.96,
-                                      "deck_h": 0.22, "rail_h": 0.18})],
-      {"cab_l": 0.15, "cab_h": 0.95, "cab_rake": 0.92, "beams": 4}),
+    # -- TALLOW additions folded into the consolidated block above --------
 
     # -- KESTREL AEROWORKS additions (2): more fuselages ----------------
     H("kestrel_medium_c", "kestrel", "medium", "Kestrel Airliner",

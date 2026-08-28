@@ -231,7 +231,7 @@ func _build_reed_mesh(prop_scale: float = 1.0) -> ArrayMesh:
 # GLTF Template Extraction (MultiMesh Part Loader)
 # ------------------------------------------------------------------------------
 
-func _load_gltf_parts(scene_path: String) -> Array:
+static func _load_gltf_parts(scene_path: String) -> Array:
 	if _template_cache.has(scene_path):
 		return _template_cache[scene_path]
 	if not ResourceLoader.exists(scene_path):
@@ -325,6 +325,91 @@ func _add_gltf_variant_batches(model_template_path: String, pool_size: int, vari
 			_add_multimesh_batch(mesh, material_override, composed_xforms, composed_cols, "%s_%d_%d" % [batch_prefix, var_idx, p_idx], vis_begin, vis_end)
 
 
+func spawn_authored_props(props: Array, prop_scale: float = 1.0, ticker: Node = null) -> void:
+	await _spawn_authored_props(props, prop_scale, ticker)
+
+func _spawn_authored_props(props: Array, prop_scale: float = 1.0, ticker: Node = null) -> void:
+	var tree_xforms: Dictionary = {}
+	var tree_colors: Dictionary = {}
+	var boulder_xforms: Dictionary = {}
+	var boulder_colors: Dictionary = {}
+	var spire_xforms: Dictionary = {}
+	var spire_colors: Dictionary = {}
+	var shrub_xforms: Dictionary = {}
+	var shrub_colors: Dictionary = {}
+	var cliff_xforms: Dictionary = {}
+	var cliff_colors: Dictionary = {}
+
+	for prop in props:
+		var ptype: String = str(prop.get("type", "tree"))
+		var pos_arr = prop.get("pos", [0, 0, 0])
+		var pos := Vector3(float(pos_arr[0]), float(pos_arr[1]), float(pos_arr[2]))
+		var s: float = float(prop.get("scale", 1.0)) * prop_scale
+		var yaw: float = float(prop.get("yaw", 0.0))
+		var var_id: int = int(prop.get("variant", 0))
+		var col_arr = prop.get("color", [1.0, 1.0, 1.0])
+		var col := Color(col_arr[0], col_arr[1], col_arr[2]) if col_arr.size() >= 3 else Color.WHITE
+
+		var basis := Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s)
+		var xf := Transform3D(basis, pos)
+
+		if ptype.begins_with("tree") or ptype.begins_with("ambient_tree"):
+			var v := var_id % AMBIENT_TREE_POOL_SIZE
+			if not tree_xforms.has(v): tree_xforms[v] = []; tree_colors[v] = []
+			tree_xforms[v].append(xf)
+			tree_colors[v].append(col)
+		elif ptype.begins_with("boulder") or ptype.begins_with("rock"):
+			var v := var_id % BOULDER_POOL_SIZE
+			if not boulder_xforms.has(v): boulder_xforms[v] = []; boulder_colors[v] = []
+			boulder_xforms[v].append(xf)
+			boulder_colors[v].append(col)
+		elif ptype.begins_with("spire") or ptype.begins_with("rock_spire"):
+			var v := var_id % ROCK_SPIRE_POOL_SIZE
+			if not spire_xforms.has(v): spire_xforms[v] = []; spire_colors[v] = []
+			spire_xforms[v].append(xf)
+			spire_colors[v].append(col)
+		elif ptype.begins_with("shrub") or ptype.begins_with("bush"):
+			var v := var_id % SHRUB_POOL_SIZE
+			if not shrub_xforms.has(v): shrub_xforms[v] = []; shrub_colors[v] = []
+			shrub_xforms[v].append(xf)
+			shrub_colors[v].append(col)
+		elif ptype.begins_with("cliff") or ptype.begins_with("rock_face"):
+			var cliff_names = ["face_0", "face_1", "face_2", "face_3", "strata_0", "strata_1", "strata_2"]
+			var v := var_id % cliff_names.size()
+			if not cliff_xforms.has(v): cliff_xforms[v] = []; cliff_colors[v] = []
+			cliff_xforms[v].append(xf)
+			cliff_colors[v].append(col)
+
+	var gate := {"t": Time.get_ticks_usec() + int(TerrainBuilderScript.BUILD_FRAME_BUDGET_MS * 1000.0)}
+
+	if not tree_xforms.is_empty():
+		var fb_mat := _get_material(Color(0.24, 0.40, 0.20))
+		await _add_gltf_variant_batches(AMBIENT_TREE_MODEL_DIR, AMBIENT_TREE_POOL_SIZE, tree_xforms, tree_colors, null, fb_mat, "Authored_Tree", 0.0, 1800.0, ticker, gate)
+
+	if not boulder_xforms.is_empty():
+		var fb_mat := _get_material(Color(0.48, 0.44, 0.40))
+		await _add_gltf_variant_batches(BOULDER_MODEL_DIR, BOULDER_POOL_SIZE, boulder_xforms, boulder_colors, null, fb_mat, "Authored_Boulder", 0.0, 1500.0, ticker, gate)
+
+	if not spire_xforms.is_empty():
+		var fb_mat := _get_material(Color(0.42, 0.38, 0.35))
+		await _add_gltf_variant_batches(ROCK_SPIRE_MODEL_DIR, ROCK_SPIRE_POOL_SIZE, spire_xforms, spire_colors, null, fb_mat, "Authored_Spire", 0.0, 1600.0, ticker, gate)
+
+	if not shrub_xforms.is_empty():
+		var fb_shrub := _build_shrub_mesh(prop_scale)
+		var fb_mat := _get_material(Color(0.28, 0.45, 0.22))
+		await _add_gltf_variant_batches(SHRUB_MODEL_DIR, SHRUB_POOL_SIZE, shrub_xforms, shrub_colors, fb_shrub, fb_mat, "Authored_Shrub", 0.0, 1200.0, ticker, gate)
+
+	if not cliff_xforms.is_empty():
+		var cliff_names = ["face_0", "face_1", "face_2", "face_3", "strata_0", "strata_1", "strata_2"]
+		var fb_mat := _get_material(Color(0.46, 0.44, 0.42))
+		for v in cliff_xforms.keys():
+			var glb_name: String = cliff_names[v % cliff_names.size()]
+			var glb_path := "res://assets/models/terrain/cliff_%s.glb" % glb_name
+			var single_batch: Dictionary = {v: cliff_xforms[v]}
+			var single_col: Dictionary = {v: cliff_colors[v]}
+			await _add_gltf_variant_batches(glb_path.replace(glb_name, "%s"), 1, single_batch, single_col, null, fb_mat, "Authored_Cliff_" + glb_name, 0.0, 2200.0, ticker, gate)
+
+
 # ------------------------------------------------------------------------------
 # Main Scatter Pipeline
 # ------------------------------------------------------------------------------
@@ -341,6 +426,12 @@ func _scatter_slice(ticker: Node, gate: Dictionary) -> void:
 
 func scatter_all(map_def: Dictionary, prop_scale: float = 1.0, ticker: Node = null) -> void:
 	if bool(map_def.get("disable_ambient_scatter", false)):
+		return
+
+	# If the map has authored painted props, load them directly and bypass procedural loops!
+	var authored_props: Array = map_def.get("props", [])
+	if not authored_props.is_empty():
+		await _spawn_authored_props(authored_props, prop_scale, ticker)
 		return
 
 	# FRAME-CHUNKING (2026-08-23). This pass measured 60 s wall-clock on a

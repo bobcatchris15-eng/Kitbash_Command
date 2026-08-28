@@ -310,10 +310,6 @@ const TWEAK_SPECS = {
 		{"name": "tube_count", "label": "Mines Per Volley", "min": 1.0, "max": 4.0, "step": 1.0, "default": 1.0},
 		{"name": "payload_size", "label": "Mine Charge Size", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
 	],
-	"ballista": [
-		{"name": "caliber", "label": "Bolt Thickness", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-		{"name": "barrel_length", "label": "Draw Length", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
-	],
 	# Tube count is the discharger's one real handle: more tubes means more
 	# canisters per volley and so a wider screen, at the usual weight/cost.
 	"smoke_discharger": [

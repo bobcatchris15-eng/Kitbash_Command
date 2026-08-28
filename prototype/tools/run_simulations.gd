@@ -292,7 +292,7 @@ func _build_weapons() -> void:
 # and are filtered out above - which is 23 of the 40 armed weapons this tool
 # tunes, i.e. well over half:
 #
-#   kinetic   -> thermal : coil_gun, autocannon, ballista, anti_materiel_rifle,
+#   kinetic   -> thermal : coil_gun, autocannon, anti_materiel_rifle,
 #                          hypervelocity_missile, aa_autocannon, aps_interceptor
 #   explosive -> thermal : smoke_discharger, mk19_grenade_launcher,
 #                          recoilless_rifle, mine_layer, spigot_mortar,

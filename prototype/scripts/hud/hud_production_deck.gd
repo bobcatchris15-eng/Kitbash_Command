@@ -506,7 +506,8 @@ func _items_for(queue_name: String) -> Array:
 		return out
 
 	var want_defence: bool = queue_name == BuildingCatalog.QUEUE_DEFENSE
-	for design in _director.roster:
+	for slot in range(_director.roster.size()):
+		var design: Dictionary = _director.roster[slot]
 		var is_def: bool = _director.is_defence_design(design)
 		if is_def != want_defence:
 			continue
@@ -516,6 +517,7 @@ func _items_for(queue_name: String) -> Array:
 		out.append({
 			"blueprint": design,
 			"kind": "defense" if want_defence else "",
+			"slot": slot,
 			"label": str(design.get("name", "DESIGN")).to_upper(),
 			"cost": cost,
 			"time": DesignCosting.build_time_for_cost(cost),
@@ -633,4 +635,4 @@ func _enqueue_one(item: Dictionary) -> void:
 		return
 	_director.production.enqueue_unit(
 		_local_team, item["blueprint"], int(item["cost"]),
-		float(item["time"]), _active)
+		float(item["time"]), _active, int(item.get("slot", -1)))

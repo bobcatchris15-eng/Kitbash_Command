@@ -4131,20 +4131,87 @@ def build_ambient_tree(name, seed=0):
 
 
 def build_oil_derrick(name, seed=0, color=(0.22, 0.22, 0.24)):
-	"""A squat pump-jack frame - reads as infrastructure sitting on the
-	ground rather than a mineral growing out of it, same intent
-	resource_node.gd's existing box "derrick" comment already states."""
-	import random
-	rng = random.Random(seed)
+	"""Two believable oil-well silhouettes, replacing the old squat box frame.
+
+	Resource nodes are placed at native model scale, so these are sized to
+	read as real field infrastructure beside a tank rather than as a mineral
+	nub. Variant is chosen by the asset index in the name:
+	  * resource_oil_0 -> a steel lattice DRILLING DERRICK (square tower,
+	    corner posts, per-bay X-bracing, crown block, central drill string
+	    and a front "christmas tree" wellhead).
+	  * resource_oil_1 -> a NODDING-DONKEY PUMP JACK (Samson A-frame, walking
+	    beam, horse head, counterweight, gearbox and a wellhead tank).
+	"""
+	import math
 	bm = bmesh.new()
-	add_box(bm, (0, 0.15, 0), (1.6, 0.3, 1.6), bevel=0.03)
-	for x_sign in (-1, 1):
-		for z_sign in (-1, 1):
-			add_cyl_y(bm, (x_sign * 0.6, 1.2, z_sign * 0.6), 0.06, 2.4, segments=6)
-	add_box(bm, (0, 2.4, 0), (1.5, 0.15, 0.5), bevel=0.02)
-	add_cyl_y(bm, (0, 1.2, 0), 0.08, 2.4, segments=6)
+	variant = 1 if name.rstrip("/").endswith("1") else 0
+
+	if variant == 0:
+		# --- LATTICE DRILLING DERRICK ---
+		c = 1.1                       # half-width of the square tower
+		levels = [0.3, 1.8, 3.3, 4.8, 6.3, 7.0]
+		# Base skid + drill-floor platform
+		add_box(bm, (0, 0.15, 0), (3.4, 0.3, 3.4), bevel=0.03)
+		add_box(bm, (0, 0.55, 0), (2.6, 0.4, 2.6), bevel=0.04)
+		# Four vertical corner posts
+		for sx in (-1, 1):
+			for sz in (-1, 1):
+				add_cyl_y(bm, (sx * c, 3.65, sz * c), 0.09, 7.0, segments=6)
+		# Horizontal rails + X-braces on every face, per bay
+		for li in range(len(levels) - 1):
+			y0, y1 = levels[li], levels[li + 1]
+			dy = y1 - y0
+			mid = (y0 + y1) / 2.0
+			for sx in (-1, 1):
+				add_box(bm, (sx * c, mid, 0), (0.10, 0.10, 2 * c), bevel=0.01)
+			for sz in (-1, 1):
+				add_box(bm, (0, mid, sz * c), (2 * c, 0.10, 0.10), bevel=0.01)
+			L = math.hypot(2 * c, dy)
+			th = math.atan2(2 * c, dy)        # brace tilt on the x=+-c faces (about X)
+			ph = math.atan2(-2 * c, dy)       # brace tilt on the z=+-c faces (about Z)
+			bw = 0.07
+			for sx in (-1, 1):
+				add_box(bm, (sx * c, mid, 0), (bw, L, bw),
+						rot_axis="x", rot_angle=th, bevel=0.005)
+				add_box(bm, (sx * c, mid, 0), (bw, L, bw),
+						rot_axis="x", rot_angle=-th, bevel=0.005)
+			for sz in (-1, 1):
+				add_box(bm, (0, mid, sz * c), (bw, L, bw),
+						rot_axis="z", rot_angle=ph, bevel=0.005)
+				add_box(bm, (0, mid, sz * c), (bw, L, bw),
+						rot_axis="z", rot_angle=-ph, bevel=0.005)
+		# Crown block + central drill string
+		add_box(bm, (0, 7.25, 0), (1.5, 0.5, 1.5), bevel=0.04)
+		add_cyl_y(bm, (0, 3.5, 0), 0.12, 7.0, segments=8)
+		# Wellhead "christmas tree" at the front
+		add_box(bm, (0, 0.9, 1.7), (0.5, 1.0, 0.5), bevel=0.03)
+		add_cyl_y(bm, (0, 1.4, 1.7), 0.07, 1.0, segments=6)
+		add_cyl_y(bm, (0.2, 1.2, 1.7), 0.05, 0.7, segments=6)
+	else:
+		# --- NODDING-DONKEY PUMP JACK ---
+		add_box(bm, (0, 0.15, 0), (3.4, 0.3, 1.8), bevel=0.03)   # skid
+		# Samson post (A-frame)
+		Ls = math.hypot(0.6, 2.7)
+		aL = math.atan2(-0.6, 2.7)
+		aR = math.atan2(0.6, 2.7)
+		add_box(bm, (-0.3, 1.65, 0), (0.18, Ls, 0.18),
+				rot_axis="z", rot_angle=aL, bevel=0.02)
+		add_box(bm, (0.3, 1.65, 0), (0.18, Ls, 0.18),
+				rot_axis="z", rot_angle=aR, bevel=0.02)
+		# Walking beam + horse head (front) + counterweight (rear)
+		add_box(bm, (0, 3.15, 0), (3.6, 0.16, 0.28), bevel=0.02)
+		add_box(bm, (-1.7, 3.5, 0), (0.45, 0.9, 0.3), bevel=0.02)
+		add_cyl_y(bm, (-1.7, 4.1, 0), 0.06, 0.6, segments=6)
+		add_box(bm, (1.7, 2.3, 0), (0.9, 0.9, 0.7), bevel=0.03)
+		# Pitman / gearbox column + connecting rod stub
+		add_box(bm, (1.7, 1.4, 0), (0.5, 1.6, 0.5), bevel=0.02)
+		add_box(bm, (1.7, 1.4, 0), (0.25, 1.2, 0.25))
+		# Wellhead tank at the front
+		add_cyl_y(bm, (-2.4, 0.6, 0), 0.5, 1.2, segments=12)
+		add_box(bm, (-2.4, 1.3, 0), (1.2, 0.2, 1.2), bevel=0.02)
+
 	obj = make_object_from_bmesh(bm, name)
-	finalize(obj, name, color=color, metallic=0.65, roughness=0.4)
+	finalize(obj, name, color=color, metallic=0.7, roughness=0.38)
 	return obj
 
 

@@ -2561,14 +2561,6 @@ LINEUP = [
       (2.2, 0.95, 4.3), [("mast", {"mh": 0.40, "z": 0.20, "vane": 0.36})],
       {"body_w_min": 0.40, "body_h_min": 0.42, "body_h_max": 0.66,
        "sponson_w": 0.10, "sponson_zc": 0.05, "sponson_zw": 0.28}),
-    H("calder_light_a", "calder", "light", "Calder Striker",
-      (2.9, 1.00, 5.0), [], {"body_w_min": 0.50, "body_h_min": 0.42,
-                             "body_h_max": 0.74, "sponson_w": 0.18,
-                             "sponson_zc": 0.05, "sponson_zw": 0.32}),
-    H("calder_light_b", "calder", "light", "Calder Interceptor",
-      (3.0, 1.10, 5.3), [], {"body_w_min": 0.52, "body_h_min": 0.46,
-                             "body_h_max": 0.78, "sponson_w": 0.20,
-                             "sponson_zc": 0.10, "sponson_zw": 0.30}),
     H("calder_light_c", "calder", "light", "Calder Skirmisher",
       (2.8, 1.20, 5.5), [],
       {"body_w_min": 0.50, "body_h_min": 0.44, "body_h_max": 0.76,
@@ -2683,19 +2675,6 @@ LINEUP = [
     # -- KESTREL AEROWORKS additions (2): more fuselages ----------------
     # -- HALVORSEN YARD additions (3): more boats -----------------------
     # -- CALDER MOBILITY additions (2): extreme arrowheads --------------
-    H("calder_medium_c", "calder", "medium", "Calder Dart",
-      (3.3, 1.15, 6.0), [],
-      {"body_w_min": 0.14, "body_h_min": 0.34, "body_h_max": 0.66,
-       "sponson_w": 0.06, "sponson_zc": 0.10, "sponson_zw": 0.24,
-       "wing_w": 1.30}),
-    H("calder_heavy_b", "calder", "heavy", "Calder Lance",
-      (4.0, 1.50, 7.0), [],
-      {"body_w_min": 0.20, "body_h_min": 0.40, "body_h_max": 0.76,
-       "sponson_w": 0.10, "sponson_zc": 0.0, "sponson_zw": 0.30,
-       "wing_w": 1.30,
-       "barbette_w": 0.36, "barbette_h": 0.18,
-       "barbette_zc": 0.62, "barbette_zw": 0.05}),
-
     # -- MOREAU YARDS (8): rounded, waisted, double-ended ---------------
     # 16-facet rounded section, both ends taper away, optional midships
     # waist. The hull leaves its bounding box alone for most of its length.

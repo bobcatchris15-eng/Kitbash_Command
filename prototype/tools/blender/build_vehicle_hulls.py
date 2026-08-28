@@ -1994,6 +1994,9 @@ def body_hexton(bm, w, h, l, opt):
     aft_cab_w = opt.get("aft_cab_w", 0.62)
     aft_cab_len = opt.get("aft_cab_len", 0.26)
     aft_cab_z = opt.get("aft_cab_z", 0.48)
+    turret_h = opt.get("turret_h", 0.0)
+    turret_zc = hl * opt.get("turret_zc", 0.0)
+    turret_zw = l * opt.get("turret_zw", 0.10)
 
     if twin:
         gap = w * gap_frac
@@ -2029,10 +2032,12 @@ def body_hexton(bm, w, h, l, opt):
             fw, fh = _hexton_fw_fh(z, hl, l, nose_frac, tail_frac)
             W = w * fw
             H = h * fh
+            if turret_h > 1e-6:
+                H *= 1.0 + turret_h * HF.smooth_transition(z, turret_zc, turret_zw)
             cy = -h / 2.0 + H / 2.0
             return HF.hex_flat_outline(W, H, top_frac, bottom_frac, cy, 0.0)
 
-        HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=min(w, h) * 0.07)
+        HF.loft_evolution(bm, -hl, hl, sec, n_sections=12, cap_chamfer=min(w, h) * 0.07)
 
     if aft_cab:
         # Elevated box at the stern, sitting on the hex deck
@@ -2784,12 +2789,10 @@ LINEUP = [
     H("hexton_scout_a", "hexton", "scout", "Hexton Surveyor",
       (2.4, 1.10, 4.4), [("mast", {"mh": 0.48, "z": 0.10})],
       {"top_frac": 0.58, "bottom_frac": 0.60, "nose_frac": 0.12}),
-    H("hexton_light_a", "hexton", "light", "Hexton Runner",
-      (2.9, 1.15, 5.0), [],
-      {"top_frac": 0.55, "bottom_frac": 0.57, "nose_frac": 0.14}),
     H("hexton_light_b", "hexton", "light", "Hexton Picket",
-      (3.0, 1.20, 5.1), [("barbette", {"z": 0.10, "r": 0.24, "bh": 0.18})],
-      {"top_frac": 0.52, "bottom_frac": 0.55}),
+      (3.0, 1.20, 5.1), [],
+      {"top_frac": 0.52, "bottom_frac": 0.55,
+       "turret_h": 0.15, "turret_zc": 0.039, "turret_zw": 0.10}),
     H("hexton_medium_a", "hexton", "medium", "Hexton Hauler",
       (3.5, 1.35, 6.0), [],
       {"top_frac": 0.56, "bottom_frac": 0.58}),

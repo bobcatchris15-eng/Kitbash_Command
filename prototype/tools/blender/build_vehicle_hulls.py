@@ -1728,7 +1728,7 @@ def body_moreau(bm, w, h, l, opt):
 # --- DURHAM MOTORS ----------------------------------------------------------
 
 def _durham_section(z, hl, l, w, h, cut, cab_frac, cab_h, cargo_h, wind_frac,
-                    nose_taper):
+                    nose_taper, turret_h=0.0, turret_zc=0.0, turret_zw=0.10):
     """Cross-section for Durham at a given z.
 
     A regular-old-vehicle box: oct_outline throughout, constant width
@@ -1763,6 +1763,8 @@ def _durham_section(z, hl, l, w, h, cut, cab_frac, cab_h, cargo_h, wind_frac,
         fh = cab_h
     else:
         fh = cargo_h
+        if turret_h > 1e-6:
+            fh += turret_h * HF.smooth_transition(z, turret_zc, turret_zw)
 
     W = w * fw
     H = h * fh
@@ -1791,10 +1793,14 @@ def body_durham(bm, w, h, l, opt):
     cargo_h = opt.get("cargo_h", 0.72)
     wind_frac = opt.get("wind_frac", 0.10)
     nose_taper = opt.get("nose_taper", 0.10)
+    turret_h = opt.get("turret_h", 0.0)
+    turret_zc = hl * opt.get("turret_zc", 0.0)
+    turret_zw = l * opt.get("turret_zw", 0.10)
 
     def sec(z):
         return _durham_section(z, hl, l, w, h, cut, cab_frac, cab_h,
-                               cargo_h, wind_frac, nose_taper)
+                               cargo_h, wind_frac, nose_taper,
+                               turret_h, turret_zc, turret_zw)
 
     # Non-uniform sampling: cluster a pair around the cab rear wall.
     cab_z_end = -hl + l * cab_frac
@@ -1816,6 +1822,9 @@ def body_durham(bm, w, h, l, opt):
         hl - l * 0.06,
         hl,
     ]
+    if turret_h > 1e-6:
+        tz = turret_zc
+        raw_zs.extend([max(tz - eps, -hl + 0.01), min(tz + eps, hl - 0.01)])
     zs = sorted(set(raw_zs))
     # Ensure the seam pair stays adjacent after dedup.
     sections = [(z, sec(z)) for z in zs]
@@ -2707,14 +2716,12 @@ LINEUP = [
       (2.9, 1.10, 5.0), [],
       {"cab_frac": 0.30, "cab_h": 0.96, "cargo_h": 0.70}),
     H("durham_light_b", "durham", "light", "Durham Gun Mule",
-      (3.0, 1.15, 5.1), [("barbette", {"z": 0.22, "r": 0.26, "bh": 0.20})],
-      {"cab_frac": 0.28, "cab_h": 0.94, "cargo_h": 0.72}),
+      (3.0, 1.15, 5.1), [],
+      {"cab_frac": 0.28, "cab_h": 0.94, "cargo_h": 0.72,
+       "turret_h": 0.22, "turret_zc": 0.086, "turret_zw": 0.12}),
     H("durham_medium_a", "durham", "medium", "Durham Boxer",
       (3.5, 1.35, 6.0), [],
       {"cab_frac": 0.32, "cab_h": 1.00, "cargo_h": 0.74}),
-    H("durham_medium_b", "durham", "medium", "Durham Stake Bed",
-      (3.6, 1.45, 6.1), [("flatbed", {"z0": 0.08, "z1": 0.88, "rail_h": 0.22})],
-      {"cab_frac": 0.26, "cab_h": 0.96, "cargo_h": 0.68, "nose_taper": 0.08}),
     H("durham_heavy_a", "durham", "heavy", "Durham Hauler",
       (4.4, 1.70, 7.4), [("well", {"z0": -0.10, "z1": 0.84, "wall_h": 0.28, "w": 0.80})],
       {"cab_frac": 0.30, "cab_h": 1.00, "cargo_h": 0.78}),

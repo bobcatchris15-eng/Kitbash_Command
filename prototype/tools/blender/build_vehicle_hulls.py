@@ -1835,7 +1835,8 @@ def body_durham(bm, w, h, l, opt):
 
 def _spectre_section(z, hl, l, w, h, cut, nose_frac, tip_w, tip_h_frac,
                      stern_frac, stern_tip_w, stern_tip_h_frac,
-                     canopy_w, canopy_h, canopy_zc, canopy_zw):
+                     canopy_w, canopy_h, canopy_zc, canopy_zw,
+                     turret_w=0.0, turret_h=0.0, turret_zc=0.0, turret_zw=0.10):
     """Cross-section for Spectre at a given z.
 
     Pure arrowhead / delta: plan view is a sharp triangle (tip_w ~0.03 at
@@ -1873,9 +1874,20 @@ def _spectre_section(z, hl, l, w, h, cut, nose_frac, tip_w, tip_h_frac,
     # Chamfer scales with this section's size — narrow tip would self-intersect otherwise.
     c = min(cut, W * 0.18, H * 0.26)
     # Keep belly width safe for deck edge inset.
-    # Mesa / canopy on the deck — 4-vertex peak, right-to-left flat segment when inactive.
+    # Mesa on the deck — 4-vertex peak. A turret (loft-grown barbette) and a
+    # canopy are mutually exclusive per z-slice, so they share vertices 5-8:
+    # whichever is active at this z wins, else the deck is flat.
+    t_turret = HF.smooth_transition(z, turret_zc, turret_zw) if turret_w > 0 else 0.0
     t_canopy = HF.smooth_transition(z, canopy_zc, canopy_zw) if canopy_w > 0 else 0.0
-    if canopy_w > 0 and canopy_h > 0 and t_canopy > 1e-6:
+    if turret_w > 0 and turret_h > 0 and t_turret > 1e-6:
+        rw = min(W * turret_w / 2.0, (W / 2.0 - c) * 0.92)
+        rht = rw * 0.72
+        RH = h * turret_h * t_turret
+        v5_x, v5_y = rw, deck_y
+        v6_x, v6_y = rht, deck_y + RH
+        v7_x, v7_y = -rht, deck_y + RH
+        v8_x, v8_y = -rw, deck_y
+    elif canopy_w > 0 and canopy_h > 0 and t_canopy > 1e-6:
         rw = min(W * canopy_w / 2.0, (W / 2.0 - c) * 0.88)
         rht = rw * 0.70
         RH = h * canopy_h * t_canopy
@@ -1922,12 +1934,17 @@ def body_spectre(bm, w, h, l, opt):
     canopy_h = opt.get("canopy_h", 0.0)
     canopy_zc = hl * opt.get("canopy_zc", -0.08)
     canopy_zw = l * opt.get("canopy_zw", 0.09)
+    turret_w = opt.get("turret_w", 0.0)
+    turret_h = opt.get("turret_h", 0.0)
+    turret_zc = hl * opt.get("turret_zc", 0.0)
+    turret_zw = l * opt.get("turret_zw", 0.10)
 
     def sec(z):
         return _spectre_section(
             z, hl, l, w, h, cut, nose_frac, tip_w, tip_h_frac,
             stern_frac, stern_tip_w, stern_tip_h_frac,
             canopy_w, canopy_h, canopy_zc, canopy_zw,
+            turret_w, turret_h, turret_zc, turret_zw,
         )
 
     HF.loft_evolution(bm, -hl, hl, sec, n_sections=14, cap_chamfer=cut * 0.7)
@@ -2738,9 +2755,6 @@ LINEUP = [
     H("spectre_scout_a", "spectre", "scout", "Spectre Needle",
       (2.4, 0.95, 4.3), [],
       {"nose_frac": 0.40, "tip_w": 0.03, "tip_h": 0.34, "stern_tip_w": 0.68}),
-    H("spectre_light_a", "spectre", "light", "Spectre Dart",
-      (2.9, 1.05, 5.0), [],
-      {"nose_frac": 0.36, "tip_w": 0.04, "tip_h": 0.36}),
     H("spectre_light_b", "spectre", "light", "Spectre Kestrel",
       (3.0, 1.10, 5.2), [],
       {"nose_frac": 0.34, "tip_w": 0.05, "tip_h": 0.38,
@@ -2749,12 +2763,14 @@ LINEUP = [
       (3.5, 1.25, 6.0), [],
       {"nose_frac": 0.36, "tip_w": 0.04, "tip_h": 0.36}),
     H("spectre_medium_b", "spectre", "medium", "Spectre Glaive",
-      (3.6, 1.35, 6.2), [("barbette", {"z": 0.08, "r": 0.24, "bh": 0.18})],
+      (3.6, 1.35, 6.2), [],
       {"nose_frac": 0.38, "tip_w": 0.05, "tip_h": 0.38,
-       "canopy_w": 0.32, "canopy_h": 0.20}),
+       "canopy_w": 0.32, "canopy_h": 0.20,
+       "turret_w": 0.30, "turret_h": 0.13, "turret_zc": 0.026, "turret_zw": 0.10}),
     H("spectre_heavy_a", "spectre", "heavy", "Spectre Halberd",
-      (4.5, 1.65, 7.5), [("barbette", {"z": -0.04, "r": 0.30, "bh": 0.20})],
-      {"nose_frac": 0.36, "tip_w": 0.04, "tip_h": 0.38, "stern_tip_w": 0.62}),
+      (4.5, 1.65, 7.5), [],
+      {"nose_frac": 0.36, "tip_w": 0.04, "tip_h": 0.38, "stern_tip_w": 0.62,
+       "turret_w": 0.34, "turret_h": 0.12, "turret_zc": -0.011, "turret_zw": 0.10}),
     H("spectre_transport_a", "spectre", "transport", "Spectre Haul",
       (4.0, 1.55, 8.3), [("well", {"z0": 0.06, "z1": 0.82, "wall_h": 0.26, "w": 0.76})],
       {"nose_frac": 0.30, "tip_w": 0.06, "tip_h": 0.40, "stern_frac": 0.08}),

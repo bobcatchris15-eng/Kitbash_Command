@@ -232,7 +232,7 @@ CLASSES = ["scout", "light", "medium", "heavy", "transport", "oddball"]
 # --- HALVORSEN YARD ---------------------------------------------------------
 
 def _halvorsen_section(z, hw, hl, w, h, l, chine, keel, deck_cut, rim_h,
-                       bow_drop, flare_frac, flare_zc, flare_zw):
+                       bow_drop, flare_frac, flare_zc, flare_zw, oc=None):
     """Cross-section for Halvorsen at a given z.
 
     A chine outline is the base, sized to fit the hull's height fraction at
@@ -271,6 +271,17 @@ def _halvorsen_section(z, hw, hl, w, h, l, chine, keel, deck_cut, rim_h,
         w_frac = 1.00
     else:
         w_frac = 0.95
+
+    # Integrated outcrops - grown into the loft by modulating the section
+    # height/width along z, never bolted on. Bigger hulls pass larger
+    # magnitudes, so they read as more heavily structured.
+    if oc:
+        block_t = HF.smooth_transition(z, oc["block_zc"], oc["block_zw"]) if oc["block_h"] > 1e-6 else 0.0
+        h_frac = min(1.7, h_frac + oc["block_h"] * block_t)
+        boss_t = HF.smooth_transition(z, oc["boss_zc"], oc["boss_zw"]) if oc["boss_d"] > 1e-6 else 0.0
+        w_frac = min(1.5, w_frac + oc["boss_d"] * boss_t)
+        pad_t = HF.smooth_transition(z, oc["pad_zc"], oc["pad_zw"]) if oc["pad_h"] > 1e-6 else 0.0
+        h_frac = min(1.7, h_frac + oc["pad_h"] * pad_t)
 
     h_active = h * h_frac
     # Bow flare - deck widens at the bow, keel stays narrow.
@@ -321,10 +332,23 @@ def body_halvorsen(bm, w, h, l, opt):
     flare_zc = hl * opt.get("flare_zc", -0.58)
     flare_zw = l * opt.get("flare_zw", 0.14)
 
+    # Outcrops scale with hull size so larger hulls carry more structure.
+    oc = {
+        "block_h": opt.get("block_h", 0.0),
+        "block_zc": hl * opt.get("block_zc", -0.10),
+        "block_zw": l * opt.get("block_zw", 0.20),
+        "boss_d": opt.get("boss_d", 0.0),
+        "boss_zc": hl * opt.get("boss_zc", 0.0),
+        "boss_zw": l * opt.get("boss_zw", 0.34),
+        "pad_h": opt.get("pad_h", 0.0),
+        "pad_zc": hl * opt.get("pad_zc", 0.0),
+        "pad_zw": l * opt.get("pad_zw", 0.12),
+    }
+
     def sec(z):
         return _halvorsen_section(
             z, w / 2.0, hl, w, h, l, chine, keel, deck_cut, rim_h, bow_drop,
-            flare_frac, flare_zc, flare_zw,
+            flare_frac, flare_zc, flare_zw, oc,
         )
 
     HF.loft_evolution(bm, -hl, hl, sec, n_sections=10, cap_chamfer=min(w, h) * 0.10)
@@ -2381,41 +2405,24 @@ def H(hid, mfr, cls, name, size, elements=(), body=None, domain="Ground"):
 LINEUP = [
     # -- HALVORSEN YARD (13): boats ashore -------------------------------
     H("halvorsen_scout_a", "halvorsen", "scout", "Halvorsen Picket Launch",
-      (2.4, 1.15, 3.9), [("mast", {"mh": 0.62, "z": 0.20})],
-      {"bulwark_h": 0.20}),
+      (2.4, 1.15, 3.9), [],
+      {"bulwark_h": 0.20, "block_h": 0.42, "block_zc": 0.20, "block_zw": 0.10}),
     H("halvorsen_light_a", "halvorsen", "light", "Halvorsen Gunboat",
-      (2.8, 1.15, 4.8), [("barbette", {"z": -0.30, "r": 0.30, "bh": 0.20})]),
-    H("halvorsen_light_b", "halvorsen", "light", "Halvorsen Patrol Skiff",
-      (2.9, 1.05, 5.1), [("spine", {"sh": 0.20, "z0": -0.10})],
-      {"chine_frac": 0.30, "keel_frac": 0.52}, domain="Naval"),
+      (2.8, 1.15, 4.8), [],
+      {"pad_h": 0.28, "pad_zc": -0.30, "pad_zw": 0.12}),
     H("halvorsen_medium_a", "halvorsen", "medium", "Halvorsen Monitor",
-      (3.8, 1.35, 5.7), [("barbette", {"z": -0.14, "r": 0.36, "bh": 0.22})]),
-    H("halvorsen_medium_b", "halvorsen", "medium", "Halvorsen Cutter",
-      (3.3, 1.55, 6.3), [("bridge", {"steps": 2, "z": 0.34, "w": 0.56,
-                                     "total": 0.62})]),
+      (3.8, 1.35, 5.7), [],
+      {"pad_h": 0.30, "pad_zc": -0.14, "pad_zw": 0.14, "boss_d": 0.10}),
     H("halvorsen_heavy_a", "halvorsen", "heavy", "Halvorsen Armoured Monitor",
-      (4.5, 1.75, 7.3), [("barbette", {"z": -0.44, "r": 0.34, "bh": 0.22}),
-                         ("barbette", {"z": 0.46, "r": 0.30, "bh": 0.20})]),
-    H("halvorsen_heavy_b", "halvorsen", "heavy", "Halvorsen Bridge Ship",
-      (4.3, 2.10, 7.5), [("bridge", {"steps": 3, "z": 0.06, "total": 0.80})]),
-    H("halvorsen_heavy_c", "halvorsen", "heavy", "Halvorsen Dreadnought Hull",
-      (5.1, 1.70, 8.1), [("barbette", {"z": -0.20, "r": 0.30, "bh": 0.20})],
-      {"bulwark_h": 0.13}),
+      (4.5, 1.75, 7.3), [],
+      {"block_h": 0.30, "block_zc": 0.0, "block_zw": 0.40, "boss_d": 0.16,
+       "pad_h": 0.22, "pad_zc": -0.20, "pad_zw": 0.16}),
     H("halvorsen_transport_a", "halvorsen", "transport", "Halvorsen Landing Barge",
       (4.1, 1.45, 7.7), [("ramp", {}), ("well", {"z0": -0.22, "wall_h": 0.40})],
       {"bulwark": False}),
-    H("halvorsen_transport_b", "halvorsen", "transport", "Halvorsen Lighter",
-      (3.9, 1.25, 8.3), [("flatbed", {"z0": -0.34, "rail_h": 0.22})],
-      {"bulwark": False}, domain="Naval"),
-    H("halvorsen_transport_c", "halvorsen", "transport", "Halvorsen Trunk Tanker",
-      (3.9, 1.65, 8.5), [("trunk", {"th": 0.38, "z0": -0.56})],
-      {"bulwark_h": 0.12}),
     H("halvorsen_oddball_a", "halvorsen", "oddball", "Halvorsen Catamaran",
-      (5.3, 1.50, 7.1), [("mast", {"mh": 0.48})],
-      {"bulwark": False}, domain="Naval"),
-    H("halvorsen_oddball_b", "halvorsen", "oddball", "Halvorsen Cradle Crawler",
-      (4.1, 1.60, 6.3), [], {"bulwark": False,
-                             "chine_frac": 0.60, "keel_frac": 0.10}),
+      (5.3, 1.50, 7.1), [],
+      {"bulwark": False, "block_h": 0.34, "block_zc": 0.0, "block_zw": 0.30}),
 
     # -- KESTREL AEROWORKS (12): fuselages, wings sawn off ---------------
     H("kestrel_scout_a", "kestrel", "scout", "Kestrel Recon Fuselage",
@@ -2730,19 +2737,6 @@ LINEUP = [
        "stub_w": 0.16, "fin_h": 0.48, "facet_cut": 0.20}),
 
     # -- HALVORSEN YARD additions (3): more boats -----------------------
-    H("halvorsen_scout_b", "halvorsen", "scout", "Halvorsen Swift",
-      (2.5, 1.10, 4.4), [("mast", {"mh": 0.50, "z": 0.10})],
-      {"chine_frac": 0.24, "keel_frac": 0.22, "bulwark_h": 0.10}),
-    H("halvorsen_heavy_d", "halvorsen", "heavy", "Halvorsen Harbor Tug",
-      (4.3, 2.00, 7.0), [("bridge", {"steps": 3, "z": -0.18, "total": 0.85,
-                                     "w": 0.60}),
-                         ("mast", {"mh": 0.55, "z": -0.02})],
-      {"bulwark_h": 0.26, "chine_frac": 0.50, "keel_frac": 0.46}),
-    H("halvorsen_transport_d", "halvorsen", "transport", "Halvorsen Stone Scow",
-      (4.2, 1.40, 8.2), [("flatbed", {"z0": -0.40, "rail_h": 0.16})],
-      {"bulwark": False, "chine_frac": 0.64, "keel_frac": 0.74},
-      domain="Naval"),
-
     # -- CALDER MOBILITY additions (2): extreme arrowheads --------------
     H("calder_medium_c", "calder", "medium", "Calder Dart",
       (3.3, 1.15, 6.0), [],

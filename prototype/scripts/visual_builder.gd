@@ -348,7 +348,7 @@ const LOCOMOTION_MODULAR_TYPES := {
 	"hover_engine": true, "ornithopter_wing": true,
 	"buoyant_envelope": true, "screw_drive": true,
 	"half_track": true, "rocker_bogie": true, "air_cushion_skirt": true,
-	"anti_grav_plate": true,
+	"anti_grav_plate": true, "plasma_thruster": true,
 }
 
 # Firing elevation applied as a PIVOT ROTATION for the two weapons whose barrels
@@ -429,7 +429,7 @@ const MODULAR_ASSEMBLY_TYPES := {
 	"hover_engine": true, "ornithopter_wing": true,
 	"buoyant_envelope": true, "screw_drive": true,
 	"half_track": true, "rocker_bogie": true, "air_cushion_skirt": true,
-	"anti_grav_plate": true,
+	"anti_grav_plate": true, "plasma_thruster": true,
 	# Support modules with dedicated modular assembly code - must bypass the
 	# monolithic _part(type_id) path or their sub-part assembly branches are never reached.
 	"sensor_suite": true, "heavy_sensor_suite": true, "directional_radar": true,
@@ -472,6 +472,7 @@ const MODULAR_AUTHORED_SIZES := {
 	"rocker_bogie": Vector3(0.65, 0.9, 2.6),
 	"air_cushion_skirt": Vector3(1.6, 0.45, 1.6),
 	"anti_grav_plate": Vector3(0.9, 0.25, 0.9),
+	"plasma_thruster": Vector3(0.9, 0.5, 1.2),
 	"sensor_suite": Vector3(0.6, 2.2, 0.6),
 	"heavy_sensor_suite": Vector3(1.1, 2.5, 1.1),
 	"directional_radar": Vector3(1.0, 2.4, 0.8),
@@ -718,6 +719,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			"rocker_bogie": _build_rocker_bogie(parent_node, base_size, base_color, tweaks)
 			"air_cushion_skirt": _build_air_cushion_skirt(parent_node, base_size, base_color, tweaks)
 			"anti_grav_plate": _build_anti_grav_plate(parent_node, base_size, base_color, tweaks)
+			"plasma_thruster": _build_plasma_thruster(parent_node, base_size, base_color, tweaks)
 		_apply_tweak_deformations(type_id, parent_node, tweaks, base_size)
 
 		return
@@ -7084,6 +7086,12 @@ static func _build_anti_grav_plate(parent_node: Node3D, base_size: Vector3, base
 	glow.omni_range = 3.4 * HEAD_SCALE * (0.7 + 0.3 * field)
 	glow.omni_attenuation = 1.6
 	glow.shadow_enabled = false
+	# Distance-fade the under-vehicle glow. The unit's omni_range already
+	# kills it past a few metres; this lets the cluster grid stop allocating
+	# a slot for off-screen units without waiting for light_cap.gd to do it.
+	glow.distance_fade_enabled = true
+	glow.distance_fade_begin = glow.omni_range * 0.7
+	glow.distance_fade_length = glow.omni_range * 0.3
 	parent_node.add_child(glow)
 
 	# 2. The lens. A disc lying flat under the plates carrying
@@ -7109,6 +7117,203 @@ static func _build_anti_grav_plate(parent_node: Node3D, base_size: Vector3, base
 		# but its own small quad is not.
 		lens.extra_cull_margin = 4.0
 		parent_node.add_child(lens)
+
+
+static func _build_plasma_thruster(parent_node: Node3D, base_size: Vector3, base_color: Color = Color(0.3, 0.45, 0.95), tweaks: Dictionary = {}):
+	var nozzle_w: float = float(tweaks.get("nozzle_width", 1.0))
+	var afterburner: bool = bool(tweaks.get("afterburner", false))
+	var struct_color := Color(0.22, 0.25, 0.28).lerp(base_color, 0.10)
+	var armor_color := Color(0.26, 0.28, 0.32)
+	var plasma_color := Color(0.85, 0.35, 1.0) if afterburner else Color(0.28, 0.72, 1.0)
+	var glow_color := Color(0.75, 0.30, 0.95) if afterburner else Color(0.25, 0.65, 1.0)
+
+	const POD_SCALE := 1.6
+	var pod_radius: float = 0.45 * POD_SCALE * (0.8 + 0.25 * nozzle_w)
+
+	# 1. Structural Outrigger Mounting Arm connecting to hull contact point
+	var anchor := Vector3(
+		float(tweaks.get("kit_anchor_x", tweaks.get("mount_reach_x", 0.0))),
+		float(tweaks.get("kit_anchor_y", tweaks.get("mount_reach_y", 0.0))),
+		float(tweaks.get("kit_anchor_z", tweaks.get("mount_reach_z", 0.0)))
+	)
+	var station := MountReachScript.station_from(tweaks)
+	var surface := MountReachScript.surface_for(parent_node)
+
+	var dir_to_hull := anchor.normalized() if anchor.length_squared() > 0.001 else (-station).normalized()
+	var span_vec := dir_to_hull * (anchor.length() if anchor.length() > 0.05 else pod_radius)
+	var hull_normal := -dir_to_hull
+
+	if not surface.is_empty():
+		var eff_station := station
+		var hit: Dictionary = HullProjectionScript.raycast(surface, eff_station, dir_to_hull)
+		if hit.get("hit", false):
+			span_vec = hit["position"] - eff_station
+			hull_normal = hit["normal"]
+		else:
+			for pitch_deg in [-10.0, 10.0, -20.0, 20.0, -35.0, 35.0]:
+				var test_axis := Vector3.UP.cross(dir_to_hull)
+				if test_axis.length_squared() > 0.001:
+					test_axis = test_axis.normalized()
+					var test_dir := dir_to_hull.rotated(test_axis, deg_to_rad(pitch_deg))
+					var hit2: Dictionary = HullProjectionScript.raycast(surface, eff_station, test_dir)
+					if hit2.get("hit", false):
+						span_vec = hit2["position"] - eff_station
+						hull_normal = hit2["normal"]
+						break
+
+	var span_len: float = span_vec.length()
+	if span_len > 0.05:
+		var arm := Node3D.new()
+		arm.name = "MountArm"
+		parent_node.add_child(arm)
+		arm.look_at_from_position(Vector3.ZERO, span_vec, Vector3.UP)
+
+		var beam_thick: float = 0.20
+		var beam_reach: float = span_len + 0.08
+		var beam := BoxMesh.new()
+		beam.size = Vector3(beam_thick * 1.5, beam_thick * 1.0, 1.0)
+		var beam_inst := _mesh_inst(beam, struct_color)
+		beam_inst.position = Vector3(0, 0, -beam_reach * 0.5)
+		beam_inst.scale = Vector3(1, 1, beam_reach)
+		arm.add_child(beam_inst)
+
+		# Diagonal reinforcement strut
+		var diag_strut := BoxMesh.new()
+		diag_strut.size = Vector3(beam_thick * 1.1, beam_thick * 0.7, 1.0)
+		var diag_inst := _mesh_inst(diag_strut, struct_color.darkened(0.15))
+		diag_inst.position = Vector3(0, beam_thick * 0.4, -beam_reach * 0.5)
+		diag_inst.scale = Vector3(1, 1, beam_reach * 0.88)
+		diag_inst.rotation = Vector3(deg_to_rad(-10.0), 0, 0)
+		arm.add_child(diag_inst)
+
+		# Heavy hull flange bracket
+		var bracket := BoxMesh.new()
+		bracket.size = Vector3(beam_thick * 2.5, beam_thick * 2.2, beam_thick * 0.9)
+		var bracket_inst := _mesh_inst(bracket, struct_color.darkened(0.2))
+		bracket_inst.position = Vector3(span_vec.x, span_vec.y, span_vec.z)
+		var b_norm := hull_normal.normalized()
+		if absf(b_norm.dot(Vector3.UP)) < 0.95:
+			var b_forward := -b_norm
+			var b_right := b_forward.cross(Vector3.UP).normalized()
+			var b_up := b_right.cross(b_forward).normalized()
+			bracket_inst.transform.basis = Basis(b_right, b_up, -b_forward)
+		parent_node.add_child(bracket_inst)
+
+	# 2. Main Thruster Pod Body (Elongated aerodynamic nacelle)
+	var pod_root := Node3D.new()
+	pod_root.name = "PodRoot"
+	parent_node.add_child(pod_root)
+
+	var body_len: float = 0.95 * POD_SCALE
+	var body_w: float = 0.42 * POD_SCALE * nozzle_w
+	var body_h: float = 0.38 * POD_SCALE
+
+	var nacelle_mesh := BoxMesh.new()
+	nacelle_mesh.size = Vector3(body_w, body_h, body_len)
+	var nacelle := _mesh_inst(nacelle_mesh, armor_color)
+	nacelle.name = "NacelleBody"
+	nacelle.position = Vector3(0, 0.05 * POD_SCALE, 0)
+	pod_root.add_child(nacelle)
+
+	# Top radiator cooling fins
+	for f in [-1.0, 1.0]:
+		var fin := BoxMesh.new()
+		fin.size = Vector3(0.04 * POD_SCALE, 0.16 * POD_SCALE, body_len * 0.7)
+		var fin_inst := _mesh_inst(fin, struct_color.darkened(0.1))
+		fin_inst.position = Vector3(f * body_w * 0.32, body_h * 0.5 + 0.08 * POD_SCALE, 0)
+		pod_root.add_child(fin_inst)
+
+	# Forward intake shroud
+	var intake := CylinderMesh.new()
+	intake.top_radius = body_w * 0.46
+	intake.bottom_radius = body_w * 0.52
+	intake.height = 0.22 * POD_SCALE
+	intake.radial_segments = 12
+	var intake_inst := _mesh_inst(intake, struct_color.lightened(0.1))
+	intake_inst.rotation = Vector3(PI * 0.5, 0, 0)
+	intake_inst.position = Vector3(0, 0.05 * POD_SCALE, -body_len * 0.52)
+	pod_root.add_child(intake_inst)
+
+	# 3. Magnetic Confinement Nozzle & Plasma Discharge Chamber
+	var nozzle_ring := TorusMesh.new()
+	nozzle_ring.outer_radius = body_w * 0.54
+	nozzle_ring.inner_radius = body_w * 0.38
+	nozzle_ring.rings = 16
+	nozzle_ring.ring_segments = 8
+	var nozzle_inst := _mesh_inst(nozzle_ring, struct_color.darkened(0.2))
+	nozzle_inst.rotation = Vector3(PI * 0.5, 0, 0)
+	nozzle_inst.position = Vector3(0, 0.05 * POD_SCALE, body_len * 0.50)
+	pod_root.add_child(nozzle_inst)
+
+	# Ventral Plasma Emitter Ring (Downwards thrust for ground-cushion hover)
+	var ventral_nozzle := TorusMesh.new()
+	ventral_nozzle.outer_radius = body_w * 0.48
+	ventral_nozzle.inner_radius = body_w * 0.32
+	ventral_nozzle.rings = 16
+	ventral_nozzle.ring_segments = 8
+	var ventral_inst := _mesh_inst(ventral_nozzle, struct_color.darkened(0.15))
+	ventral_inst.position = Vector3(0, -body_h * 0.48, 0)
+	pod_root.add_child(ventral_inst)
+
+	# 4. Emissive Plasma Core (Ventral & Aft)
+	var plasma_mat := StandardMaterial3D.new()
+	plasma_mat.albedo_color = plasma_color
+	plasma_mat.emission_enabled = true
+	plasma_mat.emission = plasma_color
+	plasma_mat.emission_energy_multiplier = 2.4 if afterburner else 1.8
+	plasma_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+
+	var aft_plasma := CylinderMesh.new()
+	aft_plasma.top_radius = body_w * 0.36
+	aft_plasma.bottom_radius = body_w * 0.20
+	aft_plasma.height = 0.30 * POD_SCALE
+	aft_plasma.radial_segments = 10
+	var aft_plasma_inst := MeshInstance3D.new()
+	aft_plasma_inst.mesh = aft_plasma
+	aft_plasma_inst.material_override = plasma_mat
+	aft_plasma_inst.rotation = Vector3(PI * 0.5, 0, 0)
+	aft_plasma_inst.position = Vector3(0, 0.05 * POD_SCALE, body_len * 0.58)
+	pod_root.add_child(aft_plasma_inst)
+
+	var ventral_plasma := CylinderMesh.new()
+	ventral_plasma.top_radius = body_w * 0.32
+	ventral_plasma.bottom_radius = body_w * 0.16
+	ventral_plasma.height = 0.24 * POD_SCALE
+	ventral_plasma.radial_segments = 10
+	var ventral_plasma_inst := MeshInstance3D.new()
+	ventral_plasma_inst.mesh = ventral_plasma
+	ventral_plasma_inst.material_override = plasma_mat
+	ventral_plasma_inst.position = Vector3(0, -body_h * 0.55, 0)
+	pod_root.add_child(ventral_plasma_inst)
+
+	# 5. Spinning Magnetic Induction Ring (for runtime animation)
+	var spin_pivot := Node3D.new()
+	spin_pivot.name = "PlasmaRing"
+	spin_pivot.position = Vector3(0, 0.05 * POD_SCALE, body_len * 0.38)
+	pod_root.add_child(spin_pivot)
+
+	var rotor_mesh := CylinderMesh.new()
+	rotor_mesh.top_radius = body_w * 0.42
+	rotor_mesh.bottom_radius = body_w * 0.42
+	rotor_mesh.height = 0.06 * POD_SCALE
+	rotor_mesh.radial_segments = 8
+	var rotor_inst := _mesh_inst(rotor_mesh, Color(0.18, 0.20, 0.24), plasma_color, 0.6)
+	rotor_inst.rotation = Vector3(PI * 0.5, 0, 0)
+	spin_pivot.add_child(rotor_inst)
+
+	# 6. Real Downward Dynamic OmniLight for Ground Glow
+	var glow := OmniLight3D.new()
+	glow.name = "PlasmaGlow"
+	glow.position = Vector3(0, -body_h * 0.8, 0)
+	glow.light_color = glow_color
+	glow.light_energy = 1.6 * nozzle_w
+	glow.omni_range = 3.6 * POD_SCALE
+	glow.omni_attenuation = 1.5
+	glow.shadow_enabled = false
+	glow.distance_fade_enabled = true
+	glow.distance_fade_begin = glow.omni_range * 0.7
+	glow.distance_fade_length = glow.omni_range * 0.3
+	parent_node.add_child(glow)
 
 
 # ===========================================================================

@@ -4,7 +4,6 @@ extends SceneTree
 # specific files I edited in this turn still parse.
 
 const FILES := [
-	"res://_test_canyon_ford.gd",
 	"res://_test_cliff_spawn.gd",
 	"res://_test_cliff_y_offset.gd",
 	"res://_test_existing_maps.gd",
@@ -14,7 +13,6 @@ const FILES := [
 	"res://_test_nonsquare_smoke.gd",
 	"res://_test_slope_class_call.gd",
 	"res://_test_slope_speed.gd",
-	"res://_test_twin_streams.gd",
 	"res://scripts/ambient_scatter.gd",
 	"res://scripts/armor_paint.gd",
 	"res://scripts/armor_station_panel.gd",
@@ -58,6 +56,9 @@ const FILES := [
 	"res://scripts/terrain_visual_scatter.gd",
 	"res://scripts/ui_tokens.gd",
 	"res://scripts/visual_builder.gd",
+	"res://scripts/locomotion_layout.gd",
+	"res://scripts/locomotion_mount.gd",
+	"res://scripts/tweak_callout_manager.gd",
 	"res://tools/build_ui_theme.gd",
 	"res://tools/generate_terrain_textures.gd",
 	"res://tools/probe_armor_slab.gd",

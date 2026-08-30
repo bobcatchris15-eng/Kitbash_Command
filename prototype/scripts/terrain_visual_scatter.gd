@@ -325,6 +325,12 @@ func _add_multimesh_batch(mesh: Mesh, material: Material, transforms: Array[Tran
 	if material != null:
 		mmi.material_override = material
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Scatter meshes don't meaningfully contribute to bounce light.
+	# GI_MODE_DISABLED skips them in the SDFGI / voxel-GI bake and the
+	# per-frame scattering pass; the visible result is identical for
+	# foliage / pebble / clutter, and the bake is much cheaper at 200+
+	# instances per MultiMesh.
+	mmi.gi_mode = MultiMeshInstance3D.GI_MODE_DISABLED
 	if vis_end > 0.0:
 		mmi.visibility_range_begin = vis_begin
 		mmi.visibility_range_end = vis_end
@@ -343,7 +349,7 @@ func _add_gltf_variant_batches(model_template_path: String, pool_size: int, vari
 			continue
 		await _scatter_slice(ticker, gate)
 		var col_list: Array = variant_colors.get(var_idx, [])
-		var glb_path = model_template_path % var_idx
+		var glb_path: String = model_template_path % var_idx if ("%d" in model_template_path or "%s" in model_template_path) else model_template_path
 		var parts = _load_gltf_parts(glb_path)
 		if parts.is_empty():
 			if fallback_mesh != null:
@@ -386,6 +392,8 @@ func _spawn_authored_props(props: Array, prop_scale: float = 1.0, ticker: Node =
 	var shrub_colors: Dictionary = {}
 	var cliff_xforms: Dictionary = {}
 	var cliff_colors: Dictionary = {}
+	var building_xforms: Dictionary = {}
+	var building_colors: Dictionary = {}
 
 	for prop in props:
 		var ptype: String = str(prop.get("type", "tree"))
@@ -400,7 +408,15 @@ func _spawn_authored_props(props: Array, prop_scale: float = 1.0, ticker: Node =
 		var basis := Basis(Vector3.UP, yaw).scaled(Vector3.ONE * s)
 		var xf := Transform3D(basis, pos)
 
-		if ptype.begins_with("tree") or ptype.begins_with("ambient_tree"):
+		if ptype == "building" or ptype.begins_with("bld_") or prop.has("building_id"):
+			var b_id: String = str(prop.get("building_id", prop.get("model", "")))
+			if b_id != "":
+				if not building_xforms.has(b_id):
+					building_xforms[b_id] = []
+					building_colors[b_id] = []
+				building_xforms[b_id].append(xf)
+				building_colors[b_id].append(col)
+		elif ptype.begins_with("tree") or ptype.begins_with("ambient_tree"):
 			var v := var_id % AMBIENT_TREE_POOL_SIZE
 			if not tree_xforms.has(v): tree_xforms[v] = []; tree_colors[v] = []
 			tree_xforms[v].append(xf)
@@ -428,6 +444,14 @@ func _spawn_authored_props(props: Array, prop_scale: float = 1.0, ticker: Node =
 			cliff_colors[v].append(col)
 
 	var gate := {"t": Time.get_ticks_usec() + int(TerrainBuilderScript.BUILD_FRAME_BUDGET_MS * 1000.0)}
+
+	if not building_xforms.is_empty():
+		for b_id in building_xforms.keys():
+			var glb_path := "res://assets/models/buildings/civic/%s.glb" % b_id
+			var single_batch: Dictionary = {0: building_xforms[b_id]}
+			var single_col: Dictionary = {0: building_colors[b_id]}
+			var fb_mat := _get_material(Color(0.55, 0.52, 0.48))
+			await _add_gltf_variant_batches(glb_path, 1, single_batch, single_col, null, fb_mat, "Authored_Bld_" + b_id, 0.0, 3000.0, ticker, gate)
 
 	if not tree_xforms.is_empty():
 		var fb_mat := _get_material(Color(0.24, 0.40, 0.20))
@@ -980,4 +1004,3 @@ static func _has_marsh_zones(surface_zones: Array) -> bool:
 		if z.get("surface_type", "") == "marsh":
 			return true
 	return false
-

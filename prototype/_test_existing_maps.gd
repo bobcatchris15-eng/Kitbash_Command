@@ -12,12 +12,11 @@ const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
 
 func _init() -> void:
 	MapCatalogScript.reset_cache_for_tests()
-	# open_plains is a square map (no map_half_extents_z).
-	var map_def: Dictionary = MapCatalogScript.get_map("open_plains")
+	var map_def: Dictionary = MapCatalogScript.get_map("test_range")
 	if map_def.is_empty():
-		print("[FAIL] open_plains failed to load")
+		print("[FAIL] test_range failed to load")
 		quit(1); return
-	print("[PASS] open_plains loaded")
+	print("[PASS] test_range loaded")
 	var he: Vector2 = MapCatalogScript.half_extents(map_def)
 	# open_plains has world_scale=4.0, so the post-scale half_extents
 	# is 840, not 210. The test pins "both axes equal AND map stayed

@@ -260,6 +260,10 @@ const TWEAK_RESPONSE := {
 		{"keys": ["drum_diameter", "drum_width", "size"], "ref": 1.0, "thrust": 0.5, "capacity": 1.0},
 		{"keys": ["helix_depth"], "ref": 1.0, "thrust": 0.6, "capacity": 0.0},
 	],
+	"plasma_thruster": [
+		{"keys": ["thruster_count", "count"], "ref": 4.0, "thrust": 0.35, "capacity": 0.65},
+		{"keys": ["nozzle_width", "size"], "ref": 1.0, "thrust": 0.4, "capacity": 0.6},
+	],
 }
 
 ## Resolves one locomotor's tweak settings into multiplicative (thrust,

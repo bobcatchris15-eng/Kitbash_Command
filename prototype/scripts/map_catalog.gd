@@ -57,7 +57,7 @@ const WorldScaleScript = preload("res://scripts/world_scale.gd")
 #     reserved for B4's Python heightmap generator - the field exists in
 #     the schema now so B4 doesn't need a schema_version bump later.
 
-const DEFAULT_MAP_ID: String = "lake_crossing"
+const DEFAULT_MAP_ID: String = "delta_blues"
 const MAPS_DIR: String = "res://data/maps"
 
 # Lazy scan-and-cache (hull_loader.gd's own established pattern) - the
@@ -703,6 +703,12 @@ const FIELD_SPEC: Dictionary = {
 		# map changes.
 		"prop_scale": {"type": "number", "required": false, "min": 0.05, "max": 32.0},
 		"sculpt_grid": {"type": "dictionary", "required": false},
+		"rock_pattern": {"type": "number", "required": false},
+		"rock_strata_strength": {"type": "number", "required": false},
+		"rock_bump_strength": {"type": "number", "required": false},
+		"rock_strata_scale": {"type": "number", "required": false},
+		"rock_joint_scale": {"type": "number", "required": false},
+		"rock_albedo_gain": {"type": "number", "required": false},
 	}},
 	"environment": {"type": "dictionary", "required": false, "item": {
 		"sky_color": {"type": "color", "required": false},

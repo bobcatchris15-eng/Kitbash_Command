@@ -537,6 +537,9 @@ func _apply_tweaks():
 	elif type_id == "heavy_quad_tracks":
 		settings["tread_width"] = size_slider.value
 		settings["track_count"] = int(count_slider.value)
+	elif type_id == "plasma_thruster":
+		settings["nozzle_width"] = size_slider.value
+		settings["thruster_count"] = int(count_slider.value)
 
 	root.update_locomotion(type_id, settings)
 	lab.update_stats(hull)

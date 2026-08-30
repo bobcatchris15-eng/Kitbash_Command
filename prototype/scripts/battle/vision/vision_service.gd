@@ -127,7 +127,14 @@ var _grid_obstacles: PackedFloat32Array = PackedFloat32Array()
 # _update_shroud scan. The shroud image is 120x120 -> 80x80 on lake_crossing;
 # the minimap re-samples it (its own texture, see hud_minimap.gd) so the
 # change is invisible to the player.
-const GRID_CELL := 2.0
+#
+# 2026-08-26 (canyon_ford PR1) regressed this to 2.0 m for cliff fidelity.
+# Measured: lake_crossing 240 half at 2.0 = 240x240 = 57.6k cells vs 80x80 = 6.4k
+# at 6.0. Dry_ambition 600 half at 2.0 = 600x600 = 360k cells, 56x more than
+# lake_crossing at 6.0. Skirmish 2026-08-29T01-00-26: vision.pump mean 14.96ms
+# / 34x vs the prior 0.43ms baseline, p95 148ms vs 45ms, 1544 hitches vs 10.
+# Reverting to 6.0 restores the amortized-disc budget (3 ms) on large maps.
+const GRID_CELL := 6.0
 const EXPLORED_ALPHA := 0.38
 const UNEXPLORED_ALPHA := 1.0
 
@@ -725,7 +732,7 @@ func _get_terrain_y(x: float, z: float) -> float:
 	return 0.0
 
 
-func _has_cell_los(from_eye: Vector3, to_target: Vector3, is_flying: bool = false) -> bool:
+func _has_cell_los(from_eye: Vector3, to_target: Vector3, is_flying: bool = false, self_radius: float = 0.0) -> bool:
 	if is_flying:
 		return true
 	var dx := to_target.x - from_eye.x
@@ -761,7 +768,13 @@ func _has_cell_los(from_eye: Vector3, to_target: Vector3, is_flying: bool = fals
 
 		# 2. Obstacle / structure bounding occlusion
 		var obs_y := _grid_obstacles[idx] if _grid_obstacles.size() == _dim * _dim else -9999.0
-		if obs_y > ray_y:
+		# A viewer must not be occluded by obstacles sitting at its own
+		# location (a building writes its own tall bounding box into
+		# _grid_obstacles, which would otherwise block its own LOS at the
+		# first sample). Skip the obstacle check within the viewer's own
+		# footprint; terrain occlusion still applies everywhere.
+		var within_self := self_radius > 0.0 and ((sx - from_eye.x) * (sx - from_eye.x) + (sz - from_eye.z) * (sz - from_eye.z)) < self_radius * self_radius
+		if obs_y > ray_y and not within_self:
 			return false
 
 	return true
@@ -996,12 +1009,21 @@ func _rebuild_viewer_disc(o) -> void:
 	var dir_sensors = _get_prop(o, "directional_sensors")
 	var has_dir: bool = dir_sensors is Array and not (dir_sensors as Array).is_empty()
 
+	# A building is written into _grid_obstacles at its own footprint, which
+	# would block its own LOS. Tell the scan to ignore obstacles within that
+	# radius so the structure can actually see out. The radius must cover the
+	# whole obstacle footprint (plus a cell of margin) or the footprint edge
+	# cells still clip every line of sight.
+	var self_radius: float = 0.0
+	if o is StaticBody3D and "footprint" in o and o.footprint is Vector3:
+		self_radius = maxf(o.footprint.x, o.footprint.z) * 0.5 + _cell_size()
+
 	var disc: Dictionary = _viewer_discs.get(oid, {})
 	if not disc.is_empty():
 		_release_cells(disc.cells)
 	var cells := {}
 	if v > 0.0:
-		cells = _scan_viewer_cells(o_pos, v, o_flying)
+		cells = _scan_viewer_cells(o_pos, v, o_flying, Vector2.ZERO, TAU, self_radius)
 	if has_dir:
 		# Directional sensors add sector-clipped discs on top of the omni
 		# one; both land in the same refcounted cell set.
@@ -1010,7 +1032,7 @@ func _rebuild_viewer_disc(o) -> void:
 			var ds_r: float = float(ds.get("range", 0.0))
 			if ds_r > 0.0:
 				var sub := _scan_viewer_cells(
-					o_pos, ds_r, o_flying, fwd_2d, float(ds.get("arc_rad", PI / 3.0)))
+					o_pos, ds_r, o_flying, fwd_2d, float(ds.get("arc_rad", PI / 3.0)), self_radius)
 				for k in sub:
 					cells[k] = true
 	_viewer_discs[oid] = {
@@ -1075,7 +1097,7 @@ var _shroud_dirty: bool = false
 # arc to clip to their sensor sector. Pure w.r.t. world state, which is what
 # makes caching the result sound.
 func _scan_viewer_cells(pos: Vector3, reach: float, is_flying: bool,
-		fwd_2d: Vector2 = Vector2.ZERO, arc_rad: float = TAU) -> Dictionary:
+		fwd_2d: Vector2 = Vector2.ZERO, arc_rad: float = TAU, self_radius: float = 0.0) -> Dictionary:
 	var out := {}
 	var cell_size := _cell_size()
 	var eye_y := pos.y + (0.0 if is_flying else EYE_HEIGHT)
@@ -1105,7 +1127,7 @@ func _scan_viewer_cells(pos: Vector3, reach: float, is_flying: bool,
 					continue
 			var target_y: float = _grid_heights[gz * _dim + gx] if _grid_heights.size() == _dim * _dim else _get_terrain_y(wx, wz)
 			var to_target := Vector3(wx, target_y + EYE_HEIGHT, wz)
-			if not _has_cell_los(from_eye, to_target, is_flying):
+			if not _has_cell_los(from_eye, to_target, is_flying, self_radius):
 				continue
 			out[Vector2i(gx, gz)] = true
 	return out

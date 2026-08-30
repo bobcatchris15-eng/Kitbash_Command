@@ -134,7 +134,22 @@ func _vec3_to_dict(v: Vector3) -> Dictionary:
 # whatever facet inherited the number.
 func _serialize_armor(hull: Node3D) -> Dictionary:
 	var hull_type := str(hull.get_meta("type_id", "")) if hull.has_meta("type_id") else ""
-	var table := HullFacetsScript.load_map(hull_type)
+
+	# Prefer the live mesh's bake over the sidecar. The sidecar (load_map) is
+	# only written for hulls that went through a one-time SDF bake pass and
+	# shipped with the repo. SDF hulls (the default for the Lab and Test Range)
+	# generate geometry at runtime and have no sidecar on disk, so load_map
+	# returned {} for them and every assignment was silently dropped on save
+	# because the fid >= normals.size() check at the bottom failed. The
+	# deserialize path already prefers cached_segment() over load_map (see
+	# _deserialize_armor); this matches it on the save side.
+	var table := {}
+	var live_mesh: Mesh = _find_hull_mesh(hull)
+	if live_mesh != null:
+		table = HullFacetsScript.cached_segment(live_mesh)
+	if table.is_empty():
+		table = HullFacetsScript.load_map(hull_type)
+
 	var out := {
 		"hull_type": hull_type,
 		"hull_tri_count": int(table.get("tri_count", 0)),
@@ -149,27 +164,52 @@ func _serialize_armor(hull: Node3D) -> Dictionary:
 	var areas: PackedFloat32Array = table.get("area", PackedFloat32Array())
 	var side_names = table.get("side", [])
 
+	# If the bake is genuinely missing for this hull, fall back to writing
+	# the assignments without the per-facet geometry. They still round-trip
+	# (the deserialize path can re-resolve them when the bake is available),
+	# and silently dropping them is worse than writing them whole - the
+	# user painted, the user expects them saved.
+	var have_bake: bool = normals.size() > 0
+	var dropped := 0
 	var rows := []
 	for a in hull.get_meta("armor_assignments", []):
 		if not (a is Dictionary):
 			continue
 		var fid := int(a.get("facet_id", -1))
-		if fid < 0 or fid >= normals.size():
+		if have_bake and (fid < 0 or fid >= normals.size()):
+			dropped += 1
 			continue
-		rows.append({
+		var row := {
 			"facet_id": fid,
-			"side": str(side_names[fid]) if fid < side_names.size() else "",
+			"side": str(side_names[fid]) if have_bake and fid < side_names.size() else str(a.get("side", "")),
 			"type_id": str(a.get("type_id", "")),
 			"material": str(a.get("material", "hardened_steel")),
 			"thickness": float(a.get("thickness", 1.0)),
-			"normal": _vec3_to_dict(normals[fid]),
-			"centroid": _vec3_to_dict(centroids[fid]) if fid < centroids.size() else _vec3_to_dict(Vector3.ZERO),
-			"area": float(areas[fid]) if fid < areas.size() else 0.0,
-		})
+			"normal": _vec3_to_dict(normals[fid]) if have_bake and fid < normals.size() else _vec3_to_dict(a.get("normal", {})),
+			"centroid": _vec3_to_dict(centroids[fid]) if have_bake and fid < centroids.size() else _vec3_to_dict(a.get("centroid", {})),
+			"area": float(areas[fid]) if have_bake and fid < areas.size() else float(a.get("area", 0.0)),
+		}
+		rows.append(row)
 	# Sorted so the on-disk file is stable and diffable across saves.
 	rows.sort_custom(func(x, y): return int(x["facet_id"]) < int(y["facet_id"]))
 	out["assignments"] = rows
+	if dropped > 0:
+		push_warning("Armor: %d of %d painted facets on '%s' fell outside the current bake (facet id out of range)." % [
+			dropped, hull.get_meta("armor_assignments", []).size() if hull.get_meta("armor_assignments") is Array else 0, hull_type])
 	return out
+
+
+# First MeshInstance3D child of the hull (skips the PhysicsMesh collider).
+# Same rule armor_station_panel.gd's _find_hull_mesh() uses to identify the
+# renderable mesh for paint raycasts. Returns null when the hull has no
+# renderable mesh yet (e.g. mid-rebuild) so callers can fall back gracefully.
+func _find_hull_mesh(hull: Node3D) -> Mesh:
+	if hull == null:
+		return null
+	for c in hull.get_children():
+		if c is MeshInstance3D and c.name != "PhysicsMesh" and (c as MeshInstance3D).mesh != null:
+			return (c as MeshInstance3D).mesh
+	return null
 
 
 # Reads the armor block back, re-resolving facet ids against the CURRENT bake
@@ -177,6 +217,8 @@ func _serialize_armor(hull: Node3D) -> Dictionary:
 func _deserialize_armor(blueprint_data: Dictionary, hull_type: String, mesh: Mesh = null) -> Array:
 	var block = blueprint_data.get("armor", {})
 	if not (block is Dictionary):
+		# Common: an older save predates the armor block, OR the user saved the
+		# design before painting anything. Either way: nothing to load.
 		return []
 	var saved: Array = block.get("assignments", [])
 	if saved.is_empty():
@@ -202,6 +244,12 @@ func _deserialize_armor(blueprint_data: Dictionary, hull_type: String, mesh: Mes
 		for a in saved:
 			if a is Dictionary and int(a.get("facet_id", -1)) < count:
 				kept.append(a)
+		if kept.size() != saved.size():
+			# Some assignments landed out of range for the current bake. The
+			# _reresolve_armor path would also drop them, but at least here we
+			# know the saved data wasn't stale - just the bake shrunk.
+			push_warning("Armor: %d of %d painted facets on '%s' fell outside the current bake (facet id out of range)." % [
+				saved.size() - kept.size(), saved.size(), hull_type])
 		return kept
 	return _reresolve_armor(saved, table, count, hull_type)
 

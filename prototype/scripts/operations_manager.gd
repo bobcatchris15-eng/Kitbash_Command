@@ -48,7 +48,7 @@ static func default_itinerary(count: int, base_difficulty: String = "normal") ->
 	var n: int = clampi(count, MIN_ENGAGEMENTS, MAX_ENGAGEMENTS)
 	for i in range(n):
 		out.append({
-			"map_id": str(maps[i % maps.size()]) if not maps.is_empty() else "open_plains",
+			"map_id": str(maps[i % maps.size()]) if not maps.is_empty() else "delta_blues",
 			"ai_difficulty": ramped_difficulty(i, n, base_difficulty),
 			"title": "Engagement %d" % (i + 1),
 		})

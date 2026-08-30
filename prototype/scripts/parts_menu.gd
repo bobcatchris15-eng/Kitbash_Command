@@ -1029,10 +1029,10 @@ func get_dock() -> Control:
 #
 # THIS WAS RETURNING AN EMPTY RECT ON EVERY CALL. It walked _family_widgets,
 # a dictionary the abandoned bottom-toolbox build populated and this one never
-# writes to, so `_family_widgets.is_empty()` was always true. tutorial_overlay
-# treats an empty rect as "target not resolvable, draw no hole at all"
-# (tutorial_overlay.gd:33-35), so the failure was silent: the tutorial step that
-# points at the parts bin simply pointed at nothing.
+# writes to, so `_family_widgets.is_empty()` was always true. The two-phase
+# tutorial's overlay treats an empty rect as "target not resolvable, draw no
+# hole at all" (two_phase_tutorial_overlay.gd:36), so the failure was silent:
+# the tutorial step that points at the parts bin simply pointed at nothing.
 #
 # The dock is one rect, so it is now read straight off the outer positioner
 # rather than reconstructed from per-family plates that no longer exist.

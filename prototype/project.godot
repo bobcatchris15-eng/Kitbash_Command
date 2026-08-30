@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Kitbash Command Prototype"
-config/version="1.6.4"
+config/version="1.6.5"
 run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
@@ -24,7 +24,6 @@ config/icon="res://icon.svg"
 
 WindowFit="*res://scripts/window_fit.gd"
 SceneRouter="*res://scripts/scene_router.gd"
-TutorialManager="*res://scripts/tutorial/tutorial_manager.gd"
 TwoPhaseTutorialManager="*res://scripts/tutorial_two_phase/two_phase_tutorial_manager.gd"
 MatchConfig="*res://scripts/match_config.gd"
 OperationsManager="*res://scripts/operations_manager.gd"
@@ -61,5 +60,10 @@ theme/custom="res://resources/bomber_theme.tres"
 [rendering]
 
 textures/vram_compression/import_etc2_astc=true
-anti_aliasing/quality/screen_space_aa=1
+# 4.7: `use_taa` overrides `screen_space_aa` when both are set (TAA is the
+# primary AA; FXAA on top would double the cost for no visible quality
+# gain at the 1080p target res). Battle.tscn:114-119's comment about
+# `anti_aliasing/quality/screen_space_aa` is historical; the line was
+# removed 2026-08-29 when this section was re-checked against the
+# 4.7.1 release notes.
 anti_aliasing/quality/use_taa=true

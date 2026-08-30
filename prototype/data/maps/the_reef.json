@@ -1,0 +1,721 @@
+{
+  "schema_version": 1.0,
+  "name": "The Reef",
+  "description": "Tall rock spires cover the center of the map in a maze of line-of-sight blockers - movement passes freely, but vision doesn't. Lumber and oil fill the gaps; a single high-yield metal and crystal cluster sits dead center. Bring scouts, bring sensors, and never stop moving.",
+  "map_half_extents": 400.0,
+  "ground_color": [
+    0.52,
+    0.45,
+    0.32
+  ],
+  "spawns": [
+    {
+      "id": "player",
+      "hq": [
+        -300.0,
+        0.0,
+        0.0
+      ],
+      "factory": [
+        -315.0,
+        0.0,
+        0.0
+      ],
+      "refinery": [
+        -285.0,
+        0.0,
+        0.0
+      ],
+      "harvester": [
+        -300.0,
+        0.0,
+        15.0
+      ]
+    },
+    {
+      "id": "enemy",
+      "hq": [
+        300.0,
+        0.0,
+        0.0
+      ],
+      "factory": [
+        285.0,
+        0.0,
+        0.0
+      ],
+      "refinery": [
+        315.0,
+        0.0,
+        0.0
+      ],
+      "harvester": [
+        300.0,
+        0.0,
+        15.0
+      ]
+    }
+  ],
+  "base_zones": [
+    {
+      "id": "player",
+      "center": [
+        -300.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ]
+    },
+    {
+      "id": "enemy",
+      "center": [
+        300.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ]
+    }
+  ],
+  "resource_nodes": [
+    {
+      "type": "metal",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "amount": 2200
+    },
+    {
+      "type": "crystal",
+      "position": [
+        0.0,
+        0.0,
+        -90.0
+      ],
+      "amount": 1600
+    },
+    {
+      "type": "crystal",
+      "position": [
+        0.0,
+        0.0,
+        90.0
+      ],
+      "amount": 1600
+    },
+    {
+      "type": "oil",
+      "position": [
+        -22.48004545557498,
+        0.0,
+        118.89950207855742
+      ],
+      "amount": 800
+    },
+    {
+      "type": "oil",
+      "position": [
+        -42.35129805734958,
+        0.0,
+        183.1512031682566
+      ],
+      "amount": 1000
+    },
+    {
+      "type": "oil",
+      "position": [
+        -36.472121066792255,
+        0.0,
+        -181.97538187280927
+      ],
+      "amount": 600
+    },
+    {
+      "type": "oil",
+      "position": [
+        -11.293276671983875,
+        0.0,
+        -19.701364243099903
+      ],
+      "amount": 600
+    },
+    {
+      "type": "oil",
+      "position": [
+        4.856599788730989,
+        0.0,
+        -17.62910918939096
+      ],
+      "amount": 600
+    },
+    {
+      "type": "oil",
+      "position": [
+        89.38082829332066,
+        0.0,
+        125.08151578244855
+      ],
+      "amount": 600
+    },
+    {
+      "type": "lumber",
+      "position": [
+        5.851555756710866,
+        0.0,
+        -201.41202400319298
+      ],
+      "amount": 800
+    },
+    {
+      "type": "lumber",
+      "position": [
+        -70.94877789199464,
+        0.0,
+        5.45316733474391
+      ],
+      "amount": 1000
+    },
+    {
+      "type": "lumber",
+      "position": [
+        97.94965270342291,
+        0.0,
+        -132.24448520673553
+      ],
+      "amount": 1000
+    },
+    {
+      "type": "lumber",
+      "position": [
+        -112.64336479608134,
+        0.0,
+        42.79302106455299
+      ],
+      "amount": 1200
+    },
+    {
+      "type": "lumber",
+      "position": [
+        -63.73235207458896,
+        0.0,
+        -148.1000673375085
+      ],
+      "amount": 1200
+    },
+    {
+      "type": "lumber",
+      "position": [
+        102.03233405292355,
+        0.0,
+        26.648012972728225
+      ],
+      "amount": 1200
+    },
+    {
+      "type": "lumber",
+      "position": [
+        -128.55399890398292,
+        0.0,
+        -39.44878944284048
+      ],
+      "amount": 1200
+    },
+    {
+      "type": "lumber",
+      "position": [
+        30.501712652412238,
+        0.0,
+        -118.1543515973983
+      ],
+      "amount": 1000
+    },
+    {
+      "type": "metal",
+      "position": [
+        -300.0,
+        0.0,
+        150.0
+      ],
+      "amount": 800
+    },
+    {
+      "type": "crystal",
+      "position": [
+        -300.0,
+        0.0,
+        -150.0
+      ],
+      "amount": 600
+    },
+    {
+      "type": "metal",
+      "position": [
+        300.0,
+        0.0,
+        -150.0
+      ],
+      "amount": 800
+    },
+    {
+      "type": "crystal",
+      "position": [
+        300.0,
+        0.0,
+        150.0
+      ],
+      "amount": 600
+    }
+  ],
+  "water_areas": [],
+  "water_blobs": [],
+  "shallow_water_areas": [],
+  "cliffs": [],
+  "surface_zones": [
+    {
+      "center": [
+        -300.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        100.0,
+        380.0
+      ],
+      "surface_type": "sand"
+    },
+    {
+      "center": [
+        300.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        100.0,
+        380.0
+      ],
+      "surface_type": "sand"
+    },
+    {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        200.0,
+        380.0
+      ],
+      "surface_type": "dirt"
+    }
+  ],
+  "obstacles": [],
+  "bridges": [],
+  "props": [
+    {
+      "type": "spire",
+      "pos": [
+        -37.5,
+        0.0,
+        -222.85714285714286
+      ],
+      "scale": 3.3815923097661926,
+      "variant": 1,
+      "yaw": 4.427033290422005
+    },
+    {
+      "type": "spire",
+      "pos": [
+        37.5,
+        0.0,
+        -222.85714285714286
+      ],
+      "scale": 3.591861757221853,
+      "variant": 2,
+      "yaw": 5.060683865848466
+    },
+    {
+      "type": "spire",
+      "pos": [
+        112.5,
+        0.0,
+        -222.85714285714286
+      ],
+      "scale": 3.0038968531875154,
+      "variant": 2,
+      "yaw": 5.756804071001651
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -112.5,
+        0.0,
+        -148.57142857142856
+      ],
+      "scale": 4.652454756827919,
+      "variant": 2,
+      "yaw": 3.504543570486134
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -37.5,
+        0.0,
+        -148.57142857142856
+      ],
+      "scale": 4.201889906778552,
+      "variant": 0,
+      "yaw": 2.4488560811417934
+    },
+    {
+      "type": "spire",
+      "pos": [
+        112.5,
+        0.0,
+        -148.57142857142856
+      ],
+      "scale": 3.6238857022721502,
+      "variant": 0,
+      "yaw": 5.218223244469716
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -112.5,
+        0.0,
+        -74.28571428571428
+      ],
+      "scale": 3.2488574979463274,
+      "variant": 0,
+      "yaw": 3.798791381223836
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -37.5,
+        0.0,
+        -74.28571428571428
+      ],
+      "scale": 3.122775546473402,
+      "variant": 0,
+      "yaw": 1.2988171626784872
+    },
+    {
+      "type": "spire",
+      "pos": [
+        37.5,
+        0.0,
+        -74.28571428571428
+      ],
+      "scale": 3.7481911000266255,
+      "variant": 3,
+      "yaw": 5.620786327962055
+    },
+    {
+      "type": "spire",
+      "pos": [
+        112.5,
+        0.0,
+        -74.28571428571428
+      ],
+      "scale": 3.6516353769238292,
+      "variant": 0,
+      "yaw": 3.886396146481383
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -37.5,
+        0.0,
+        0.0
+      ],
+      "scale": 3.6210324208627114,
+      "variant": 2,
+      "yaw": 5.186876763362899
+    },
+    {
+      "type": "spire",
+      "pos": [
+        37.5,
+        0.0,
+        0.0
+      ],
+      "scale": 3.46081089414292,
+      "variant": 0,
+      "yaw": 3.921233050849058
+    },
+    {
+      "type": "spire",
+      "pos": [
+        112.5,
+        0.0,
+        0.0
+      ],
+      "scale": 3.856415322402764,
+      "variant": 1,
+      "yaw": 0.021925896420039833
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -112.5,
+        0.0,
+        74.28571428571428
+      ],
+      "scale": 3.4325723324628292,
+      "variant": 2,
+      "yaw": 3.3009335491579352
+    },
+    {
+      "type": "spire",
+      "pos": [
+        37.5,
+        0.0,
+        74.28571428571428
+      ],
+      "scale": 4.324773015703865,
+      "variant": 1,
+      "yaw": 5.65903684887434
+    },
+    {
+      "type": "spire",
+      "pos": [
+        112.5,
+        0.0,
+        74.28571428571428
+      ],
+      "scale": 4.552285531094627,
+      "variant": 2,
+      "yaw": 0.3514333296102181
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -112.5,
+        0.0,
+        148.57142857142856
+      ],
+      "scale": 3.8408341001973234,
+      "variant": 2,
+      "yaw": 1.7750208483203191
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -37.5,
+        0.0,
+        148.57142857142856
+      ],
+      "scale": 3.0181273441819085,
+      "variant": 0,
+      "yaw": 0.017513065750124613
+    },
+    {
+      "type": "spire",
+      "pos": [
+        37.5,
+        0.0,
+        148.57142857142856
+      ],
+      "scale": 3.086000306611668,
+      "variant": 3,
+      "yaw": 3.6534001509909633
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -112.5,
+        0.0,
+        222.85714285714283
+      ],
+      "scale": 4.6774810860082585,
+      "variant": 3,
+      "yaw": 2.689241363645631
+    },
+    {
+      "type": "spire",
+      "pos": [
+        37.5,
+        0.0,
+        222.85714285714283
+      ],
+      "scale": 3.3780206870925955,
+      "variant": 0,
+      "yaw": 5.60879990989075
+    },
+    {
+      "type": "spire",
+      "pos": [
+        112.5,
+        0.0,
+        222.85714285714283
+      ],
+      "scale": 3.4382950682242894,
+      "variant": 3,
+      "yaw": 0.9915663340713091
+    }
+  ],
+  "roads": [],
+  "world_scale": 1.0,
+  "terrain": {
+    "generator": "v2",
+    "height_scale": 30.0,
+    "pixels_per_unit": 1.0,
+    "features": [
+      {
+        "type": "lake",
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 220.0,
+        "depth": 18.0,
+        "shoreline_falloff": 20.0,
+        "half_extents": [
+          170.0,
+          270.0
+        ]
+      },
+      {
+        "type": "ridge",
+        "points": [
+          [
+            -180.0,
+            -280.0
+          ],
+          [
+            180.0,
+            -280.0
+          ]
+        ],
+        "width": 60.0,
+        "height": 20.0,
+        "falloff": 40.0
+      },
+      {
+        "type": "ridge",
+        "points": [
+          [
+            -180.0,
+            280.0
+          ],
+          [
+            180.0,
+            280.0
+          ]
+        ],
+        "width": 60.0,
+        "height": 20.0,
+        "falloff": 40.0
+      },
+      {
+        "type": "ridge",
+        "points": [
+          [
+            -200.0,
+            -300.0
+          ],
+          [
+            -200.0,
+            300.0
+          ]
+        ],
+        "width": 60.0,
+        "height": 20.0,
+        "falloff": 40.0
+      },
+      {
+        "type": "ridge",
+        "points": [
+          [
+            200.0,
+            -300.0
+          ],
+          [
+            200.0,
+            300.0
+          ]
+        ],
+        "width": 60.0,
+        "height": 20.0,
+        "falloff": 40.0
+      },
+      {
+        "type": "plateau",
+        "center": [
+          -80.0,
+          0.0
+        ],
+        "half_extents": [
+          35.0,
+          35.0
+        ],
+        "height": 8.0,
+        "wall_falloff": 4.0
+      },
+      {
+        "type": "plateau",
+        "center": [
+          80.0,
+          0.0
+        ],
+        "half_extents": [
+          35.0,
+          35.0
+        ],
+        "height": 8.0,
+        "wall_falloff": 4.0
+      }
+    ],
+    "post_pass": {
+      "noise": {
+        "frequency": 0.011,
+        "amplitude": 3.0,
+        "octaves": 3
+      }
+    },
+    "surfacemap": "res://data/maps/the_reef_surface.png",
+    "heightmap": "res://data/maps/the_reef_height.png"
+  },
+  "environment": {
+    "sky_color": [
+      0.2,
+      0.22,
+      0.3
+    ],
+    "horizon_color": [
+      0.55,
+      0.5,
+      0.4
+    ],
+    "sun_color": [
+      1.0,
+      0.95,
+      0.85
+    ],
+    "sun_energy": 1.8,
+    "ambient_light_energy": 0.7,
+    "ambient_light_color": [
+      0.45,
+      0.4,
+      0.35
+    ],
+    "tonemap_exposure": 1.5,
+    "sun_elevation_deg": 45.0,
+    "sun_azimuth_deg": 80.0,
+    "fog_enabled": false,
+    "fog_density": 0.0,
+    "fog_aerial_perspective": 0.0,
+    "volumetric_fog_enabled": false,
+    "volumetric_fog_density": 0.0,
+    "dof_blur_far_enabled": false,
+    "dof_blur_far_distance": 260.0
+  }
+}

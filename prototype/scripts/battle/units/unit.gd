@@ -840,6 +840,10 @@ func _animate_locomotion(delta: float) -> void:
 				var inner_ring = child.get_node_or_null("HoverRingInner")
 				if inner_ring:
 					inner_ring.rotate_y(18.0 * powered_rate * delta)
+			"plasma_thruster":
+				var ring = child.get_node_or_null("PlasmaRing")
+				if ring:
+					ring.rotate_z(18.0 * powered_rate * delta)
 			"legs":
 				var phase: float = child.get_meta("leg_phase") if child.has_meta("leg_phase") else 0.0
 				VisualBuilderScript.pose_leg(child, now_sec, phase, ground_rate, delta)

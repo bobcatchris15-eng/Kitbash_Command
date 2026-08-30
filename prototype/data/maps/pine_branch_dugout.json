@@ -1,0 +1,134 @@
+{
+  "base_zones": [
+    {
+      "center": [
+        -240.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ],
+      "id": "player"
+    },
+    {
+      "center": [
+        240.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ],
+      "id": "enemy"
+    }
+  ],
+  "bridges": [],
+  "description": "Custom authored battlefield created in TerrainSculpt.",
+  "ground_color": [
+    0.360000014305115,
+    0.319999992847443,
+    0.219999998807907
+  ],
+  "map_half_extents": 400.0,
+  "name": "Pine Branch Dugout",
+  "obstacles": [],
+  "props": [],
+  "resource_nodes": [
+    {
+      "amount": 6000,
+      "position": [
+        -180.0,
+        0.0,
+        20.0
+      ],
+      "type": "metal"
+    },
+    {
+      "amount": 4000,
+      "position": [
+        -180.0,
+        0.0,
+        -20.0
+      ],
+      "type": "crystal"
+    },
+    {
+      "amount": 6000,
+      "position": [
+        180.0,
+        0.0,
+        -20.0
+      ],
+      "type": "metal"
+    },
+    {
+      "amount": 4000,
+      "position": [
+        180.0,
+        0.0,
+        20.0
+      ],
+      "type": "crystal"
+    }
+  ],
+  "roads": [],
+  "schema_version": 1.0,
+  "spawns": [
+    {
+      "factory": [
+        -255.0,
+        0.0,
+        -10.0
+      ],
+      "harvester": [
+        -240.0,
+        0.0,
+        15.0
+      ],
+      "hq": [
+        -240.0,
+        0.0,
+        0.0
+      ],
+      "id": "player",
+      "refinery": [
+        -225.0,
+        0.0,
+        -10.0
+      ]
+    },
+    {
+      "factory": [
+        255.0,
+        0.0,
+        10.0
+      ],
+      "harvester": [
+        240.0,
+        0.0,
+        -15.0
+      ],
+      "hq": [
+        240.0,
+        0.0,
+        0.0
+      ],
+      "id": "enemy",
+      "refinery": [
+        225.0,
+        0.0,
+        10.0
+      ]
+    }
+  ],
+  "surface_zones": [],
+  "terrain": {
+    "features": [],
+    "generator": "v2"
+  },
+  "water_areas": [],
+  "world_scale": 1.0
+}

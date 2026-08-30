@@ -25,7 +25,13 @@ uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform sampler2D roughness_tex : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform float texture_scale : hint_range(0.02, 1.0) = 0.12;
 uniform vec3 mesh_scale = vec3(1.0, 1.0, 1.0);
-uniform float normal_strength : hint_range(0.0, 2.0) = 0.45;
+uniform float normal_strength : hint_range(0.0, 2.0) = 1.0;
+// Procedural micro-surface (carbon-fibre weave, hammered dimples, etc.):
+// layered ON TOP of the shared panel/bolts normal. Kept separate from
+// normal_strength so the shared texture can be at full lab-equivalent
+// strength while the procedural detail stays dialed. Defaults to a
+// moderate level so the shared normal still reads.
+uniform float micro_surface_strength : hint_range(0.0, 1.0) = 0.35;
 
 // Armor & damage uniforms
 uniform float shield_mode : hint_range(0.0, 1.0) = 0.0;
@@ -405,9 +411,17 @@ void fragment() {
 	float rough_floor = mix(0.15, 0.40, livery_mix);
 	ROUGHNESS = clamp(base_roughness + roughness_bias + (tex_roughness - 0.5) * 0.65, rough_floor, 1.0);
 
-	// Combined normal
+	// Combined normal: shared panel/bolts texture at normal_strength, plus
+	// the procedural micro-surface layer scaled independently. Splitting the
+	// two (instead of adding micro_pert into the mix) is what lets the test
+	// range show the same shared normal at full strength that the lab's
+	// StandardMaterial3D already shows - the lab doesn't have a micro-surface
+	// at all, so a viewer expecting the lab's "square and bolts" read was
+	// previously getting a 45%-strong shared normal + a 45%-strong micro layer
+	// on top, which read as a different surface.
 	vec3 tex_world_normal = triplanar_normal(normal_tex, tex_pos, geo_normal, tri_w);
-	vec3 final_world_normal = normalize(mix(geo_normal, tex_world_normal + micro_pert, normal_strength));
+	vec3 base_normal = mix(geo_normal, tex_world_normal, normal_strength);
+	vec3 final_world_normal = normalize(base_normal + micro_pert * micro_surface_strength);
 	NORMAL = normalize((VIEW_MATRIX * vec4(final_world_normal, 0.0)).xyz);
 
 	ALPHA = alpha_base;

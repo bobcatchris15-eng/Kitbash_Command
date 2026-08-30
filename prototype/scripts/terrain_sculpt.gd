@@ -1,5 +1,35 @@
 extends Node3D
 class_name TerrainSculpt
+## In-engine high-performance terrain authoring workbench for v2 maps.
+##
+## Public API (the rest is private state). All functions return [code]void[/code]
+## or a small read-only value; nothing is emitted via signals today. If you
+## wire an external system (e.g. a tutorial overlay) that needs to react to
+## terrain changes, prefer polling the listed properties / calling the listed
+## getters over threading a signal bus through a 3800-line script with ten
+## suites already driving it. (Mirrors the same tradeoff the legacy tutorial
+## made at tutorial_manager.gd:8-15 - which is why this script has no
+## [code]signal[/code] declarations.)
+##
+## [b]State getters (read-only, safe to call from any UI):[/b]
+## [br]- [code]current_mode: Mode[/code] - the active authoring tab (sculpt / paint / roads / greebles / buildings / features / spawns / settings).
+## [br]- [code]current_brush_radius: float[/code] / [code]current_brush_strength: float[/code] - sculpt tool params.
+## [br]- [code]current_splat_layer: int[/code] - which of {grass, rock, forest, sand, mud} is being painted.
+## [br]- [code]has_unsaved_changes: bool[/code] - true between edits and the last save.
+## [br]- [code]undo_depth: int[/code] - [code]undo_stack.size()[/code]; the Ctrl+Z / UI button is a 1-deep consumer of this.
+## [br]- [code]is_build_in_progress: bool[/code] - true while a chunked build is running (tutorial / UI should not inspect mid-build state).
+##
+## [b]Side effects (call only from input handlers; may run for several seconds):[/b]
+## [br]- [code]_build_world()[/code] - rebuilds the working mesh + navmesh + scatter from the current edit buffer. Idempotent.
+## [br]- [code]_push_undo()[/code] / [code]_undo()[/code] - undo stack ops; the latter consumes the former's snapshot.
+## [br]- [code]_handle_click()[/code] / [code]_handle_drag()[/code] - the input-driven entry points for all mode-specific behaviour.
+## [br]- [code]save_map_to_disk(path: String)[/code] - public; clears [code]has_unsaved_changes[/code] on success.
+##
+## [b]Why no signals:[/b] this script is a 3800-line workbench. Wiring a signal bus through it means
+## every test suite that drives it has to mock or ignore the bus. Polling the four getters above is
+## what the rest of the codebase does, and matches the documented intent at the top of the legacy
+## tutorial_manager.gd. Revisit if a downstream consumer needs a <1-frame reaction time.
+
 # In-engine high-performance terrain authoring workbench for v2 maps.
 #
 # Features:
@@ -15,15 +45,17 @@ class_name TerrainSculpt
 const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
 const MapCatalogScript = preload("res://scripts/map_catalog.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
+const BuildingPropCatalogScript = preload("res://scripts/building_prop_catalog.gd")
 
 enum Mode {
 	SCULPT = 0,
 	PAINT = 1,
 	ROADS_BRIDGES = 2,
 	GREEBLES = 3,
-	FEATURES = 4,
-	SPAWNS = 5,
-	SETTINGS = 6,
+	BUILDINGS = 4,
+	FEATURES = 5,
+	SPAWNS = 6,
+	SETTINGS = 7,
 }
 
 enum SculptTool {
@@ -173,6 +205,8 @@ var _water_paint_level: float = 0.0
 var _water_level_follow_ground: bool = true
 var _water_paint_erase: bool = false
 var _painted_water_node: MeshInstance3D = null
+var _map_wt_spinbox: SpinBox = null
+var _paint_wt_spinbox: SpinBox = null
 var _paint_brush_size: float = 35.0
 var _paint_strength: float = 0.75
 
@@ -214,6 +248,20 @@ var _ring_material: StandardMaterial3D = null
 var _last_ring_radius: float = -1.0
 var _cursor_dirty: bool = true
 var _last_flat_stamp_pos: Vector3 = Vector3(INF, INF, INF)
+
+# 3D Building Authoring & Placement
+var _selected_building_id: String = "hospital_main_complex"
+var _selected_building_cat: String = "all"
+var _building_yaw_deg: float = 0.0
+var _building_scale: float = 1.0
+var _building_embed_offset: float = -0.2
+var _building_eraser_mode: bool = false
+var _building_ghost_node: MeshInstance3D = null
+var _building_yaw_spinbox: SpinBox = null
+var _building_grid_container: GridContainer = null
+var _building_buttons: Dictionary = {}
+var _building_count_lbl: Label = null
+
 
 
 func _ready() -> void:
@@ -357,6 +405,16 @@ func _build_world() -> void:
 	_cam.far = 14000.0
 	_cam_pivot.add_child(_cam)
 	_update_camera()
+
+	_building_ghost_node = MeshInstance3D.new()
+	_building_ghost_node.name = "BuildingGhost"
+	_building_ghost_node.visible = false
+	var g_mat := StandardMaterial3D.new()
+	g_mat.albedo_color = Color(0.2, 0.85, 1.0, 0.55)
+	g_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	g_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_building_ghost_node.material_override = g_mat
+	add_child(_building_ghost_node)
 
 
 func _build_cursor_ring() -> void:
@@ -506,6 +564,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			_set_status("Camera: %s" % ["Top-Down 2D" if _is_topdown else "3D Orbit"], Tokens.TEXT_SECONDARY)
 		elif event.keycode == KEY_F and not event.ctrl_pressed:
 			_toggle_commander_view()
+		elif event.keycode == KEY_R and not event.ctrl_pressed:
+			if _mode == Mode.BUILDINGS:
+				var step: float = -45.0 if event.shift_pressed else 45.0
+				_building_yaw_deg = fmod(_building_yaw_deg + step + 360.0, 360.0)
+				_update_building_ghost()
+				if _building_yaw_spinbox != null: _building_yaw_spinbox.value = _building_yaw_deg
+				_set_status("Building Yaw: %.0f°" % _building_yaw_deg, Tokens.SIGNAL_GO)
 		elif event.keycode == KEY_HOME or event.keycode == KEY_BACKSPACE:
 			_reset_camera_view()
 		elif event.keycode == KEY_ESCAPE:
@@ -703,6 +768,15 @@ func _update_cursor_position(screen_pos: Vector2) -> void:
 				_ring_material.albedo_color = Color(0.5, 0.8, 0.2, 0.95)
 			elif _greeble_tool == GreebleType.ERASER:
 				_ring_material.albedo_color = Color(1.0, 0.2, 0.2, 0.95)
+		elif _mode == Mode.BUILDINGS:
+			if _building_eraser_mode:
+				_cursor_ring.visible = true
+				_update_cursor_ring_mesh(12.0)
+				_ring_material.albedo_color = Color(1.0, 0.2, 0.2, 0.95)
+				if _building_ghost_node != null: _building_ghost_node.visible = false
+			else:
+				_cursor_ring.visible = false
+				_update_building_ghost()
 		elif _mode == Mode.ROADS_BRIDGES:
 			_update_cursor_ring_mesh(_road_width if _road_click_step > 0 else _bridge_width)
 			_ring_material.albedo_color = Color(1.0, 0.85, 0.25, 0.95)
@@ -749,6 +823,17 @@ func _handle_click(screen_pos: Vector2, ctrl: bool, shift: bool) -> void:
 	if _mode == Mode.ROADS_BRIDGES:
 		_handle_roads_bridges_click(_last_hit_point)
 	elif _mode == Mode.GREEBLES:
+		_push_undo()
+		if _greeble_single_click:
+			_place_single_greeble(_last_hit_point)
+		else:
+			_apply_greeble_stroke(_last_hit_point, 0.1)
+	elif _mode == Mode.BUILDINGS:
+		_push_undo()
+		if _building_eraser_mode:
+			_erase_building_at(_last_hit_point)
+		else:
+			_place_single_building(_last_hit_point)
 		_push_undo()
 		if _greeble_single_click:
 			_place_single_greeble(_last_hit_point)
@@ -1151,6 +1236,7 @@ func _refresh_props_multimesh() -> void:
 	var boulder_xforms: Dictionary = {}
 	var spire_xforms: Dictionary = {}
 	var shrub_xforms: Dictionary = {}
+	var building_xforms: Dictionary = {}
 
 	for prop in _props_list:
 		var ptype: String = str(prop.get("type", "tree"))
@@ -1179,12 +1265,22 @@ func _refresh_props_multimesh() -> void:
 			var v := var_id % SHRUB_POOL_SIZE
 			if not shrub_xforms.has(v): shrub_xforms[v] = []
 			shrub_xforms[v].append(xf)
+		elif ptype == "building" or prop.has("building_id"):
+			var bid: String = str(prop.get("building_id", prop.get("model", "")))
+			if bid != "":
+				if not building_xforms.has(bid): building_xforms[bid] = []
+				building_xforms[bid].append(xf)
 
 	# Batch into MultiMeshes
 	_spawn_editor_multimeshes(AMBIENT_TREE_MODEL_DIR, tree_xforms, Color(0.24, 0.40, 0.20))
 	_spawn_editor_multimeshes(BOULDER_MODEL_DIR, boulder_xforms, Color(0.48, 0.44, 0.40))
 	_spawn_editor_multimeshes(ROCK_SPIRE_MODEL_DIR, spire_xforms, Color(0.42, 0.38, 0.35))
 	_spawn_editor_multimeshes(SHRUB_MODEL_DIR, shrub_xforms, Color(0.28, 0.45, 0.22))
+
+	for bid in building_xforms.keys():
+		var b_info: Dictionary = BuildingPropCatalogScript.get_building(bid)
+		var m_path: String = str(b_info.get("model_path", "res://assets/models/buildings/civic/%s.glb" % bid))
+		_spawn_editor_multimeshes(m_path, {0: building_xforms[bid]}, Color(0.6, 0.55, 0.5))
 
 
 func _spawn_editor_multimeshes(template_path: String, xforms_by_variant: Dictionary, fallback_color: Color) -> void:
@@ -1760,6 +1856,20 @@ func _build_painted_water_preview_mesh() -> ArrayMesh:
 	return st.commit()
 
 
+func _set_water_table_level(new_level: float, record_undo: bool = true) -> void:
+	if record_undo:
+		_push_undo()
+	_map["water_level"] = new_level
+	if _water_node != null:
+		_water_node.position.y = new_level
+		_water_node.visible = (new_level > -900.0 and TerrainBuilderScript.has_water_table(_map))
+	if _map_wt_spinbox != null and not is_equal_approx(_map_wt_spinbox.value, new_level):
+		_map_wt_spinbox.value = new_level
+	if _paint_wt_spinbox != null and not is_equal_approx(_paint_wt_spinbox.value, new_level):
+		_paint_wt_spinbox.value = new_level
+	_mark_dirty()
+	_set_status("Water Table set to %.1f m" % new_level, Tokens.SIGNAL_GO)
+
 func _refresh_water_mesh() -> void:
 	if _water_node == null or _map.is_empty():
 		return
@@ -1773,8 +1883,9 @@ func _refresh_water_mesh() -> void:
 	water_mat.set_shader_parameter("water_color", Color(0.12, 0.42, 0.65, 0.85))
 	water_mat.set_shader_parameter("deep_color", Color(0.04, 0.15, 0.32, 0.95))
 	_water_node.material_override = water_mat
-	_water_node.position = Vector3(0.0, 0.05, 0.0)
-	_water_node.visible = true
+	var wl: float = TerrainBuilderScript.water_level_of(_map)
+	_water_node.position = Vector3(0.0, wl, 0.0)
+	_water_node.visible = (wl > -900.0 and TerrainBuilderScript.has_water_table(_map))
 
 
 # ==============================================================================
@@ -2061,6 +2172,11 @@ func load_map(mid: String) -> void:
 	_refresh_bridges_ui()
 	_build_spawns_tab_content()
 	_refresh_spawn_markers()
+	var current_wl: float = TerrainBuilderScript.water_level_of(_map)
+	if _map_wt_spinbox != null:
+		_map_wt_spinbox.value = current_wl
+	if _paint_wt_spinbox != null:
+		_paint_wt_spinbox.value = current_wl
 	_refresh_water_mesh()
 	_refresh_bridges_in_scene()
 	_rebuild_preview()
@@ -2758,7 +2874,14 @@ func _build_ui() -> void:
 	_tab_container.add_child(greeb_tab)
 	_build_greebles_tab(greeb_tab)
 
-	# 5. Shapes Tab
+	# 5. Buildings Tab
+	var bld_tab := VBoxContainer.new()
+	bld_tab.name = "Buildings"
+	bld_tab.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	_tab_container.add_child(bld_tab)
+	_build_buildings_tab(bld_tab)
+
+	# 6. Shapes Tab
 	var feat_tab := VBoxContainer.new()
 	feat_tab.name = "Shapes"
 	feat_tab.add_theme_constant_override("separation", Tokens.SPACE_SM)
@@ -3008,6 +3131,72 @@ Off: every stroke uses the fixed level below, which is what a flat lake needs."
 		wfollow.button_pressed = false
 		_set_status("Water surface set to %.1f m" % _water_paint_level, Tokens.SIGNAL_GO))
 	parent.add_child(wpick)
+
+	var wt_sep := HSeparator.new()
+	parent.add_child(wt_sep)
+
+	var wt_head := Label.new()
+	wt_head.text = "🌊 Global Water Table:"
+	wt_head.theme_type_variation = "StatLabel"
+	parent.add_child(wt_head)
+
+	var wt_row := HBoxContainer.new()
+	parent.add_child(wt_row)
+	var wt_lbl := Label.new()
+	wt_lbl.text = "Water Height"
+	wt_lbl.custom_minimum_size = Vector2(120, 0)
+	wt_row.add_child(wt_lbl)
+
+	var wt_sb := SpinBox.new()
+	wt_sb.min_value = -80.0
+	wt_sb.max_value = 80.0
+	wt_sb.step = 0.5
+	wt_sb.value = TerrainBuilderScript.water_level_of(_map)
+	wt_sb.tooltip_text = "Elevation of the global water plane. Valleys and depressions below this level will be submerged."
+	wt_sb.value_changed.connect(func(v: float):
+		if not is_equal_approx(TerrainBuilderScript.water_level_of(_map), v):
+			_set_water_table_level(v))
+	wt_row.add_child(wt_sb)
+	_paint_wt_spinbox = wt_sb
+
+	var wt_btn_row := HBoxContainer.new()
+	wt_btn_row.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	parent.add_child(wt_btn_row)
+
+	var up_1_btn := Button.new()
+	up_1_btn.text = "⬆️ +1.0m"
+	up_1_btn.pressed.connect(func():
+		_set_water_table_level(TerrainBuilderScript.water_level_of(_map) + 1.0))
+	wt_btn_row.add_child(up_1_btn)
+
+	var up_half_btn := Button.new()
+	up_half_btn.text = "⬆️ +0.5m"
+	up_half_btn.pressed.connect(func():
+		_set_water_table_level(TerrainBuilderScript.water_level_of(_map) + 0.5))
+	wt_btn_row.add_child(up_half_btn)
+
+	var dn_half_btn := Button.new()
+	dn_half_btn.text = "⬇️ -0.5m"
+	dn_half_btn.pressed.connect(func():
+		_set_water_table_level(TerrainBuilderScript.water_level_of(_map) - 0.5))
+	wt_btn_row.add_child(dn_half_btn)
+
+	var dn_1_btn := Button.new()
+	dn_1_btn.text = "⬇️ -1.0m"
+	dn_1_btn.pressed.connect(func():
+		_set_water_table_level(TerrainBuilderScript.water_level_of(_map) - 1.0))
+	wt_btn_row.add_child(dn_1_btn)
+
+	var wt_cursor_btn := Button.new()
+	wt_cursor_btn.text = "🌊 Set Water Table From Cursor Height"
+	wt_cursor_btn.tooltip_text = "Samples the elevation directly under the 3D cursor and sets the global water table to match."
+	wt_cursor_btn.pressed.connect(func():
+		if not _has_valid_hit:
+			_set_status("Point cursor at terrain first.", Tokens.SIGNAL_ALERT)
+			return
+		var h: float = TerrainBuilderScript.height_at(_map, _last_hit_point.x, _last_hit_point.z)
+		_set_water_table_level(snappedf(h, 0.5)))
+	parent.add_child(wt_cursor_btn)
 
 	var pstr_row := HBoxContainer.new()
 	parent.add_child(pstr_row)
@@ -3685,25 +3874,55 @@ func _build_map_tab(parent: VBoxContainer) -> void:
 	# The map-wide water table. Default is negative (see
 	# TerrainBuilder.WATER_LEVEL_DEFAULT); a positive one floods any map whose
 	# terrain averages zero.
-	var wt_row := HBoxContainer.new()
-	parent.add_child(wt_row)
+	var mwt_box := VBoxContainer.new()
+	mwt_box.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	parent.add_child(mwt_box)
+
+	var mwt_row := HBoxContainer.new()
+	mwt_box.add_child(mwt_row)
 	var wt_lbl := Label.new()
 	wt_lbl.text = "Water Table"
 	wt_lbl.custom_minimum_size = Vector2(100, 0)
-	wt_row.add_child(wt_lbl)
+	mwt_row.add_child(wt_lbl)
 	var wt_sb := SpinBox.new()
 	wt_sb.min_value = -80.0
-	wt_sb.max_value = 40.0
+	wt_sb.max_value = 80.0
 	wt_sb.step = 0.5
 	wt_sb.value = TerrainBuilderScript.water_level_of(_map)
 	wt_sb.tooltip_text = "Height of the map-wide water plane. Painted lakes are independent of this and can sit above it."
 	wt_sb.value_changed.connect(func(v: float):
-		_push_undo()
-		_map["water_level"] = v
-		if _water_node != null:
-			_water_node.position.y = v
-		_mark_dirty())
-	wt_row.add_child(wt_sb)
+		if not is_equal_approx(TerrainBuilderScript.water_level_of(_map), v):
+			_set_water_table_level(v))
+	mwt_row.add_child(wt_sb)
+	_map_wt_spinbox = wt_sb
+
+	var mwt_btn_row := HBoxContainer.new()
+	mwt_btn_row.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	mwt_box.add_child(mwt_btn_row)
+
+	var m_up_1_btn := Button.new()
+	m_up_1_btn.text = "⬆️ +1.0m"
+	m_up_1_btn.pressed.connect(func():
+		_set_water_table_level(TerrainBuilderScript.water_level_of(_map) + 1.0))
+	mwt_btn_row.add_child(m_up_1_btn)
+
+	var m_up_half_btn := Button.new()
+	m_up_half_btn.text = "⬆️ +0.5m"
+	m_up_half_btn.pressed.connect(func():
+		_set_water_table_level(TerrainBuilderScript.water_level_of(_map) + 0.5))
+	mwt_btn_row.add_child(m_up_half_btn)
+
+	var m_dn_half_btn := Button.new()
+	m_dn_half_btn.text = "⬇️ -0.5m"
+	m_dn_half_btn.pressed.connect(func():
+		_set_water_table_level(TerrainBuilderScript.water_level_of(_map) - 0.5))
+	mwt_btn_row.add_child(m_dn_half_btn)
+
+	var m_dn_1_btn := Button.new()
+	m_dn_1_btn.text = "⬇️ -1.0m"
+	m_dn_1_btn.pressed.connect(func():
+		_set_water_table_level(TerrainBuilderScript.water_level_of(_map) - 1.0))
+	mwt_btn_row.add_child(m_dn_1_btn)
 
 	var theme_lbl := Label.new()
 	theme_lbl.text = "Theme Palette Preset:"
@@ -3728,3 +3947,346 @@ func _set_status(text: String, colour: Color) -> void:
 		return
 	_status.text = text
 	_status.add_theme_color_override("font_color", colour)
+
+
+# ==============================================================================
+# 3D BUILDING AUTHORING SYSTEM (60 CIVIC/ARCHITECTURAL STRUCTURES)
+# ==============================================================================
+
+func _update_building_ghost() -> void:
+	if _building_ghost_node == null:
+		return
+	if _mode != Mode.BUILDINGS or _building_eraser_mode or not _has_valid_hit or _selected_building_id == "":
+		_building_ghost_node.visible = false
+		return
+	var m: Mesh = BuildingPropCatalogScript.load_mesh(_selected_building_id)
+	if m != null:
+		_building_ghost_node.mesh = m
+		_building_ghost_node.global_position = _last_hit_point + Vector3(0.0, _building_embed_offset, 0.0)
+		_building_ghost_node.rotation = Vector3(0.0, deg_to_rad(_building_yaw_deg), 0.0)
+		_building_ghost_node.scale = Vector3.ONE * _building_scale
+		_building_ghost_node.visible = true
+	else:
+		_building_ghost_node.visible = false
+
+
+func _place_single_building(hit: Vector3) -> void:
+	if _selected_building_id == "":
+		_set_status("Please select a building from the catalog first.", Tokens.SIGNAL_ALERT)
+		return
+	var b_info: Dictionary = BuildingPropCatalogScript.get_building(_selected_building_id)
+	if b_info.is_empty():
+		return
+	var fp: Vector2 = b_info.get("footprint", Vector2(10.0, 10.0)) * _building_scale
+	var yaw_rad := deg_to_rad(_building_yaw_deg)
+	var scale_val := _building_scale
+
+	# Automatically flatten terrain pad directly under the placed building footprint
+	_flatten_terrain_pad_at(hit, fp * 0.5, yaw_rad, hit.y, 4.5)
+
+	var pos := Vector3(hit.x, hit.y + _building_embed_offset, hit.z)
+	_props_list.append({
+		"type": "building",
+		"building_id": _selected_building_id,
+		"model": _selected_building_id,
+		"pos": [pos.x, pos.y, pos.z],
+		"scale": scale_val,
+		"yaw": yaw_rad,
+	})
+	_map["props"] = _props_list
+	_refresh_props_multimesh()
+	_dirty = true
+	_refresh_building_count_label()
+	_set_status("Placed %s & flattened pad at (%.1f, %.1f) with Yaw %.0f°" % [b_info.get("name", _selected_building_id), pos.x, pos.z, _building_yaw_deg], Tokens.SIGNAL_GO)
+
+
+func _flatten_terrain_pad_at(center: Vector3, half_ext: Vector2, yaw: float, target_h: float, falloff: float = 4.5) -> void:
+	if _map.is_empty():
+		return
+	var sg: Dictionary = _get_or_create_sculpt_grid()
+	var data: Array = sg["data"]
+	var dim: int = int(sg["dim"])
+	var half: float = float(sg["half_extents"])
+	var grid_step: float = (half * 2.0) / float(dim - 1)
+
+	var max_r := maxf(half_ext.x, half_ext.y) + falloff + 2.0
+	var i_min_x: int = clampi(int(floor((center.x - max_r + half) / grid_step)), 0, dim - 1)
+	var i_max_x: int = clampi(int(ceil((center.x + max_r + half) / grid_step)), 0, dim - 1)
+	var i_min_z: int = clampi(int(floor((center.z - max_r + half) / grid_step)), 0, dim - 1)
+	var i_max_z: int = clampi(int(ceil((center.z + max_r + half) / grid_step)), 0, dim - 1)
+
+	var cos_y := cos(-yaw)
+	var sin_y := sin(-yaw)
+
+	for iz in range(i_min_z, i_max_z + 1):
+		var cz := -half + float(iz) * grid_step
+		for ix in range(i_min_x, i_max_x + 1):
+			var cx := -half + float(ix) * grid_step
+			var dx := cx - center.x
+			var dz := cz - center.z
+			var lx := dx * cos_y - dz * sin_y
+			var lz := dx * sin_y + dz * cos_y
+			var ox := maxf(0.0, absf(lx) - half_ext.x)
+			var oz := maxf(0.0, absf(lz) - half_ext.y)
+			var dist := sqrt(ox * ox + oz * oz)
+
+			var curr_h: float = TerrainBuilderScript.height_at(_map, cx, cz)
+			if dist <= 0.0:
+				var delta_h := target_h - curr_h
+				data[iz * dim + ix] = float(data[iz * dim + ix]) + delta_h
+			elif dist < falloff:
+				var t := dist / falloff
+				var w := (1.0 - t) * (1.0 - t) * (1.0 + 2.0 * t)
+				var delta_h := (target_h - curr_h) * w
+				data[iz * dim + ix] = float(data[iz * dim + ix]) + delta_h
+
+	_update_local_mesh_region(center, max_r + 16.0)
+
+
+func _erase_building_at(hit: Vector3) -> void:
+	var best_idx := -1
+	var best_dist := 18.0
+	for i in range(_props_list.size()):
+		var p: Dictionary = _props_list[i]
+		var ptype: String = str(p.get("type", ""))
+		if ptype != "building" and not p.has("building_id"):
+			continue
+		var p_pos: Vector3 = TerrainBuilderScript._vec3_of(p.get("pos", [0, 0, 0]))
+		var d := Vector2(hit.x - p_pos.x, hit.z - p_pos.z).length()
+		if d < best_dist:
+			best_dist = d
+			best_idx = i
+	if best_idx >= 0:
+		var removed: Dictionary = _props_list[best_idx]
+		_props_list.remove_at(best_idx)
+		_map["props"] = _props_list
+		_refresh_props_multimesh()
+		_dirty = true
+		_refresh_building_count_label()
+		_set_status("Erased %s" % str(removed.get("building_id", "building")), Tokens.SIGNAL_ALERT)
+	else:
+		_set_status("No building found near click to erase.", Tokens.TEXT_SECONDARY)
+
+
+func _refresh_building_count_label() -> void:
+	if _building_count_lbl == null:
+		return
+	var b_count := 0
+	for p in _props_list:
+		if str(p.get("type", "")) == "building" or p.has("building_id"):
+			b_count += 1
+	_building_count_lbl.text = "Authored Buildings: %d | Total Props: %d" % [b_count, _props_list.size()]
+
+
+func _build_buildings_tab(parent: VBoxContainer) -> void:
+	var head := Label.new()
+	head.text = "🏛️ Authored 3D Buildings (60 Models):"
+	head.theme_type_variation = "HeadingLabel"
+	parent.add_child(head)
+
+	# --- Category Filter Row ---
+	var cat_scroll := ScrollContainer.new()
+	cat_scroll.custom_minimum_size = Vector2(0, 42)
+	cat_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	cat_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	parent.add_child(cat_scroll)
+
+	var cat_row := HBoxContainer.new()
+	cat_row.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	cat_scroll.add_child(cat_row)
+
+	for cat in BuildingPropCatalogScript.get_categories():
+		var cb := Button.new()
+		cb.text = BuildingPropCatalogScript.get_category_name(cat)
+		cb.pressed.connect(func():
+			_selected_building_cat = cat
+			_populate_building_buttons())
+		cat_row.add_child(cb)
+
+	# --- Scrollable Building Picker ---
+	var list_scroll := ScrollContainer.new()
+	list_scroll.custom_minimum_size = Vector2(0, 180)
+	list_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parent.add_child(list_scroll)
+
+	_building_grid_container = GridContainer.new()
+	_building_grid_container.columns = 1
+	_building_grid_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_building_grid_container.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
+	list_scroll.add_child(_building_grid_container)
+
+	_populate_building_buttons()
+
+	# --- Rotation & Orientation Controls ---
+	var rot_sep := HSeparator.new()
+	parent.add_child(rot_sep)
+
+	var rot_head := Label.new()
+	rot_head.text = "Building Rotation & Orientation (Hotkey: R):"
+	rot_head.theme_type_variation = "SubheadingLabel"
+	parent.add_child(rot_head)
+
+	var rot_row := HBoxContainer.new()
+	rot_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	parent.add_child(rot_row)
+
+	var rot_lbl := Label.new()
+	rot_lbl.text = "Yaw Angle:"
+	rot_lbl.theme_type_variation = "StatLabel"
+	rot_row.add_child(rot_lbl)
+
+	_building_yaw_spinbox = SpinBox.new()
+	_building_yaw_spinbox.min_value = 0.0
+	_building_yaw_spinbox.max_value = 360.0
+	_building_yaw_spinbox.step = 5.0
+	_building_yaw_spinbox.value = _building_yaw_deg
+	_building_yaw_spinbox.value_changed.connect(func(v: float):
+		_building_yaw_deg = v
+		_update_building_ghost())
+	rot_row.add_child(_building_yaw_spinbox)
+
+	var rot_btn_grid := HBoxContainer.new()
+	rot_btn_grid.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	parent.add_child(rot_btn_grid)
+
+	var rot_m90 := Button.new()
+	rot_m90.text = "↺ -90°"
+	rot_m90.pressed.connect(func():
+		_building_yaw_deg = fmod(_building_yaw_deg - 90.0 + 360.0, 360.0)
+		_building_yaw_spinbox.value = _building_yaw_deg
+		_update_building_ghost())
+	rot_btn_grid.add_child(rot_m90)
+
+	var rot_m45 := Button.new()
+	rot_m45.text = "↺ -45°"
+	rot_m45.pressed.connect(func():
+		_building_yaw_deg = fmod(_building_yaw_deg - 45.0 + 360.0, 360.0)
+		_building_yaw_spinbox.value = _building_yaw_deg
+		_update_building_ghost())
+	rot_btn_grid.add_child(rot_m45)
+
+	var rot_p45 := Button.new()
+	rot_p45.text = "↻ +45°"
+	rot_p45.pressed.connect(func():
+		_building_yaw_deg = fmod(_building_yaw_deg + 45.0 + 360.0, 360.0)
+		_building_yaw_spinbox.value = _building_yaw_deg
+		_update_building_ghost())
+	rot_btn_grid.add_child(rot_p45)
+
+	var rot_p90 := Button.new()
+	rot_p90.text = "↻ +90°"
+	rot_p90.pressed.connect(func():
+		_building_yaw_deg = fmod(_building_yaw_deg + 90.0 + 360.0, 360.0)
+		_building_yaw_spinbox.value = _building_yaw_deg
+		_update_building_ghost())
+	rot_btn_grid.add_child(rot_p90)
+
+	var rot_rand := Button.new()
+	rot_rand.text = "🎲 Random"
+	rot_rand.pressed.connect(func():
+		_building_yaw_deg = float(randi_range(0, 23) * 15)
+		_building_yaw_spinbox.value = _building_yaw_deg
+		_update_building_ghost())
+	rot_btn_grid.add_child(rot_rand)
+
+	# --- Scale & Foundation Embed ---
+	var scale_row := HBoxContainer.new()
+	scale_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	parent.add_child(scale_row)
+
+	var scale_lbl := Label.new()
+	scale_lbl.text = "Scale:"
+	scale_lbl.custom_minimum_size = Vector2(80, 0)
+	scale_row.add_child(scale_lbl)
+
+	var scale_sb := SpinBox.new()
+	scale_sb.min_value = 0.5
+	scale_sb.max_value = 3.0
+	scale_sb.step = 0.05
+	scale_sb.value = _building_scale
+	scale_sb.value_changed.connect(func(v: float):
+		_building_scale = v
+		_update_building_ghost())
+	scale_row.add_child(scale_sb)
+
+	var embed_row := HBoxContainer.new()
+	embed_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	parent.add_child(embed_row)
+
+	var embed_lbl := Label.new()
+	embed_lbl.text = "Foundation Offset:"
+	embed_lbl.custom_minimum_size = Vector2(130, 0)
+	embed_row.add_child(embed_lbl)
+
+	var embed_sb := SpinBox.new()
+	embed_sb.min_value = -3.0
+	embed_sb.max_value = 2.0
+	embed_sb.step = 0.05
+	embed_sb.value = _building_embed_offset
+	embed_sb.value_changed.connect(func(v: float):
+		_building_embed_offset = v
+		_update_building_ghost())
+	embed_row.add_child(embed_sb)
+
+	# --- Action Buttons (Eraser & Clear) ---
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	parent.add_child(action_row)
+
+	var erase_btn := Button.new()
+	erase_btn.text = "🧹 Eraser Tool"
+	erase_btn.toggle_mode = true
+	erase_btn.toggled.connect(func(t: bool):
+		_building_eraser_mode = t
+		_update_building_ghost()
+		_set_status("Building Eraser Mode: %s" % ["ON - Click building to remove" if t else "OFF"], Tokens.SIGNAL_ALERT if t else Tokens.SIGNAL_GO))
+	action_row.add_child(erase_btn)
+
+	var clear_bld_btn := Button.new()
+	clear_bld_btn.text = "Clear All Buildings"
+	clear_bld_btn.pressed.connect(func():
+		_push_undo()
+		var new_props: Array = []
+		for p in _props_list:
+			if str(p.get("type", "")) != "building" and not p.has("building_id"):
+				new_props.append(p)
+		_props_list = new_props
+		_map["props"] = _props_list
+		_refresh_props_multimesh()
+		_dirty = true
+		_refresh_building_count_label()
+		_set_status("Cleared all authored buildings.", Tokens.SIGNAL_ALERT))
+	action_row.add_child(clear_bld_btn)
+
+	_building_count_lbl = Label.new()
+	_building_count_lbl.theme_type_variation = "StatLabel"
+	parent.add_child(_building_count_lbl)
+	_refresh_building_count_label()
+
+
+func _populate_building_buttons() -> void:
+	if _building_grid_container == null:
+		return
+	for c in _building_grid_container.get_children():
+		c.queue_free()
+	_building_buttons.clear()
+
+	var b_list: Array[Dictionary] = BuildingPropCatalogScript.get_buildings_in_category(_selected_building_cat)
+	for b in b_list:
+		var bid: String = str(b.get("id", ""))
+		var bname: String = str(b.get("name", bid))
+		var fp: Vector2 = b.get("footprint", Vector2(10, 10))
+		var btn := Button.new()
+		btn.text = "%s  (%.0f×%.0fm)" % [bname, fp.x, fp.y]
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		if bid == _selected_building_id:
+			btn.theme_type_variation = "FlatButton"
+		btn.pressed.connect(func():
+			_selected_building_id = bid
+			_building_eraser_mode = false
+			_update_building_ghost()
+			_set_status("Selected Building: %s (Click terrain to place)" % bname, Tokens.SIGNAL_GO)
+			_populate_building_buttons())
+		_building_grid_container.add_child(btn)
+		_building_buttons[bid] = btn

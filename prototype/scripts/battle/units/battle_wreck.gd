@@ -152,6 +152,13 @@ func _setup_fire_and_smoke(pos: Vector3) -> void:
 	firelight.light_energy = 2.0
 	firelight.omni_range = 7.0
 	firelight.omni_attenuation = 1.6
+	# Distance-fade cosmetic firelight. 30-60 simultaneous wrecks have been
+	# measured (light_cap.gd:13-14); fading past 5m so distant wreckage
+	# doesn't pay the cluster-grid tax.
+	firelight.distance_fade_enabled = true
+	firelight.distance_fade_begin = 4.9
+	firelight.distance_fade_length = 2.1
+	firelight.shadow_enabled = false
 	add_child(firelight)
 	firelight.global_position = pos + Vector3(0, 0.8, 0)
 

@@ -111,6 +111,12 @@ func commit() -> void:
 			if part.has("material") and part["material"] != null:
 				mmi.material_override = part["material"]
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			# Scatter meshes don't meaningfully contribute to bounce light.
+			# GI_MODE_DISABLED skips them in the SDFGI / voxel-GI bake and
+			# the per-frame scattering pass; the visible result is identical
+			# for foliage / pebble / clutter, and the bake is much cheaper
+			# at 200+ instances per MultiMesh.
+			mmi.gi_mode = MultiMeshInstance3D.GI_MODE_DISABLED
 			mmi.name = "Scatter_%s_%d" % [path.get_file().get_basename(), made.size()]
 			add_child(mmi)
 			made.append(mmi)

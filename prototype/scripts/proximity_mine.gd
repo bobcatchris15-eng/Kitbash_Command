@@ -78,6 +78,14 @@ func _ready():
 	_light.light_color = Color(1.0, 0.25, 0.15)
 	_light.light_energy = 0.0
 	_light.omni_range = 3.0
+	# Distance-fade cosmetic indicator. 200+ mines in a field is a real
+	# case (mine-spam strategies) and each one currently holds a cluster-
+	# grid slot. Self-cull past 2.1m so a distant mine shows the casing,
+	# not the dot.
+	_light.distance_fade_enabled = true
+	_light.distance_fade_begin = 2.1
+	_light.distance_fade_length = 0.9
+	_light.shadow_enabled = false
 	add_child(_light)
 	_light.position = Vector3(0, 0.25, 0)
 

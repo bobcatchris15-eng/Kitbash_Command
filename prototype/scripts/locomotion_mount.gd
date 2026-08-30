@@ -359,7 +359,7 @@ static func _chine_profile(hull: Node3D) -> Dictionary:
 ## the bilge, while rotors, fixed wings, ornithopter shoulders and envelope pods
 ## mount above or around the hull and have no business being dragged down to it.
 static func _seats_to_chine(type_id: String) -> bool:
-	if type_id in ["hover_engine", "anti_grav_plate", "air_cushion_skirt"]:
+	if type_id in ["hover_engine", "anti_grav_plate", "air_cushion_skirt", "plasma_thruster"]:
 		return false
 	return ModuleCatalog.locomotion_touches_ground(type_id)
 

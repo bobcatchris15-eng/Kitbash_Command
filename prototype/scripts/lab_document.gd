@@ -134,6 +134,7 @@ const LOCOMOTION_SIZE_KEY := {
 	# tweak (envelope_volume / tread_width) had no live control at all.
 	"buoyant_envelope": "envelope_volume",
 	"heavy_quad_tracks": "tread_width",
+	"plasma_thruster": "nozzle_width",
 }
 
 const LOCOMOTION_SECONDARY_SIZE_KEY := {

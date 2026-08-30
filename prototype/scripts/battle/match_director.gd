@@ -41,6 +41,7 @@ const ProductionServiceScript = preload("res://scripts/battle/economy/production
 const BuildingCatalogScript = preload("res://scripts/battle/economy/building_catalog.gd")
 const StructureScript = preload("res://scripts/battle/buildings/structure.gd")
 const PlacementServiceScript = preload("res://scripts/battle/buildings/placement_service.gd")
+const VoidWallScript = preload("res://scripts/battle/void_wall.gd")
 const MatchStatsScript = preload("res://scripts/battle/match_stats.gd")
 const AfterActionReportScript = preload("res://scripts/after_action_report.gd")
 const PerfHUDScript = preload("res://scripts/perf_hud.gd")
@@ -512,6 +513,13 @@ func _ready() -> void:
 			camera.world_scale = WorldScaleScript.for_map(current_map)
 		if "current_map" in camera:
 			camera.current_map = current_map
+		if camera.has_method("set_map_bounds"):
+			camera.set_map_bounds(MapCatalog.half_extents(current_map))
+	if chase_camera and chase_camera.has_method("set_map_bounds"):
+		chase_camera.set_map_bounds(MapCatalog.half_extents(current_map))
+	# Holotable void beyond the map — dark grey with animated green phosphor
+	# grid. Purely visual/horizon, does not affect navmesh or height queries.
+	VoidWallScript.build_for_map(current_map, self)
 	_scale_lighting_to_world()
 
 	orders = OrderServiceScript.new()
@@ -953,6 +961,7 @@ func _build_ticker() -> Node:
 	return self
 
 func _setup_terrain() -> void:
+	current_map["building_pads"] = []
 	# Build visual ground mesh and surrounding terrain skirt first
 	var ground := get_node_or_null("Ground")
 	if ground:
@@ -1771,16 +1780,26 @@ func _place_structure(kind: String, structure_team: int, at: Vector3, under_cons
 	var _t_dust := Profiler.start()
 	VFXEffectsScript.dust_cloud(self, s.position, foot * 0.5)
 	Profiler.stop("place.dust", _t_dust)
+
+	# Automatically flatten terrain under the building footprint
+	var target_h: float = s.position.y
+	var pad_half := Vector2(s.footprint.x * 0.5 + 1.2, s.footprint.z * 0.5 + 1.2)
+	TerrainBuilder.apply_building_pad_flattening(current_map, get_node_or_null("Ground"), at, pad_half, 0.0, target_h, 4.5)
+
 	# Displace overlapping terrain props (greebles, grass, rocks).
 	var _t_props := Profiler.start()
 	_displace_terrain_props(at, foot * 0.5)
 	# Dock bays (refinery harvest pads) extend well past the core footprint.
-	# Displace terrain props under each bay so pads don't sit on grass.
+	# Automatically flatten terrain under outer drive-up bays so harvesters dock on a level apron!
 	var bays: Array = BuildingCatalogScript.dock_bays_for(kind)
 	if not bays.is_empty():
 		var bay_half := Vector2(4.0, 5.0)
 		for bay_off in bays:
-			_displace_terrain_props(at + Vector3(bay_off.x, bay_off.y, bay_off.z), bay_half)
+			var bay_pos := at + Vector3(bay_off.x, 0.0, bay_off.z)
+			var facing_x: bool = absf(bay_off.x) > absf(bay_off.z)
+			var b_pad_half := Vector2(StructureScript.DOCK_PAD_SIZE.z * 0.5 + 1.0, StructureScript.DOCK_PAD_SIZE.x * 0.5 + 1.0) if facing_x else Vector2(StructureScript.DOCK_PAD_SIZE.x * 0.5 + 1.0, StructureScript.DOCK_PAD_SIZE.z * 0.5 + 1.0)
+			TerrainBuilder.apply_building_pad_flattening(current_map, get_node_or_null("Ground"), bay_pos, b_pad_half, 0.0, target_h, 3.5)
+			_displace_terrain_props(bay_pos, bay_half)
 	Profiler.stop("place.displace_props", _t_props)
 	# structure_built is logged on both paths (under construction and
 	# finished) so the post-match report can correlate structure deaths
@@ -3557,6 +3576,10 @@ func _place_defence_impl(blueprint: Dictionary, structure_team: int, at: Vector3
 	# Dust cloud masks terrain intersection at the building's edges.
 	var foot: Vector2 = Vector2(s.footprint.x, s.footprint.z)
 	VFXEffectsScript.dust_cloud(self, s.position, foot * 0.5)
+	# Automatically flatten terrain under the defense turret footprint
+	var def_h: float = s.position.y
+	var def_pad_half := Vector2(s.footprint.x * 0.5 + 1.0, s.footprint.z * 0.5 + 1.0)
+	TerrainBuilder.apply_building_pad_flattening(current_map, get_node_or_null("Ground"), at, def_pad_half, 0.0, def_h, 4.0)
 	# Displace overlapping terrain props (greebles, grass, rocks).
 	_displace_terrain_props(at, foot * 0.5)
 	# Apply distance-based visibility range to defense hull/turret mesh subtree

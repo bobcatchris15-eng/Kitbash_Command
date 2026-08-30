@@ -3222,6 +3222,13 @@ func _spawn_illumination_flare(pos: Vector3):
 	light.light_color = Color(1.0, 0.96, 0.8)
 	light.light_energy = 4.0
 	light.omni_range = ILLUM_RADIUS
+	# Distance-fade cosmetic light. Far-off flares don't pay the per-light
+	# cost in the Forward+ cluster grid. light_cap.gd:1-30 sets the
+	# cluster cap; this is the per-light self-cull that gets it down to it.
+	light.distance_fade_enabled = true
+	light.distance_fade_begin = ILLUM_RADIUS * 0.7
+	light.distance_fade_length = ILLUM_RADIUS * 0.3
+	light.shadow_enabled = false
 	flare.add_child(light)
 
 	# Drifts down under its parachute, then burns out.
@@ -3262,6 +3269,14 @@ func _spawn_explosion_visual(pos: Vector3, custom_scale: float = 0.6, color: Col
 	light.omni_range = 3.0 + scale_e * 4.0
 	light.omni_attenuation = 0.5
 	light.light_bake_mode = Light3D.BAKE_DISABLED
+	# Distance-fade cosmetic flash. Lifetime is 0.15s so this rarely
+	# matters, but a single-frame un-faded light at long range is the
+	# worst case for the per-light cluster-grid cost, and the property is
+	# free to set.
+	light.distance_fade_enabled = true
+	light.distance_fade_begin = light.omni_range * 0.7
+	light.distance_fade_length = light.omni_range * 0.3
+	light.shadow_enabled = false
 	parent.add_child(light)
 	light.position = impact_pos
 	var lt = create_tween()

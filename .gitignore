@@ -176,3 +176,15 @@ prototype/stderr.txt
 *~RF*.TMP
 *.TMP
 twin_streams_crude.png
+
+# One-off dev-scratch from the 2026-08 map/visual sessions: ad-hoc capture
+# probes, normal/team-check scripts, armor-save + heightmap probes, the 34MB
+# screenshot review folder, and the orphaned spawns-tool uid. Each is a hand-
+# run-one-time tool superseded by tools/ probes; kept on disk, never committed.
+prototype/_cap_log.txt
+prototype/_capture_*.gd*
+prototype/_check_*.gd*
+prototype/_probe_*.gd*
+prototype/_test_new_maps.gd*
+prototype/_test_spawns_tool.gd*
+prototype/_visual_review/

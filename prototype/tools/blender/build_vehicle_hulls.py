@@ -139,10 +139,6 @@ MANUFACTURERS = {
         "display": "Brenntal Schwerbau",
         "color": (0.298, 0.302, 0.322, 1.0),
     },
-    "tallow": {
-        "display": "Tallow & Vance",
-        "color": (0.616, 0.482, 0.204, 1.0),
-    },
     "orrin": {
         "display": "Orrin Collective",
         "color": (0.451, 0.341, 0.259, 1.0),
@@ -2058,7 +2054,6 @@ BODIES = {
     "halvorsen": body_halvorsen,
     "kestrel": body_kestrel,
     "brenntal": body_brenntal,
-    "tallow": body_tallow,
     "orrin": body_orrin,
     "rackham": body_rackham,
     "calder": body_calder,
@@ -2498,34 +2493,6 @@ LINEUP = [
     H("brenntal_oddball_a", "brenntal", "oddball", "Brenntal Tandem Casemate",
       (4.3, 1.75, 7.9), [],
       {"casemate_l": 0.30, "casemate_z": -0.44, "glacis_z": 0.22}),
-
-    # -- TALLOW & VANCE: cab + flatbed trucks. Outcrops (collar neck, side
-    #    bosses, bed rail, rear plinth) are grown into the single loft in
-    #    body_tallow - no bolted-on elements. Fewer hulls than before, but
-    #    each bigger one carries more and larger outcrops, so the roster
-    #    reads as distinct vehicles rather than one scaled hull.
-    H("tallow_scout_a", "tallow", "scout", "Tallow Runabout",
-      (2.4, 1.05, 3.9),
-      [], {"cab_l": 0.34, "collar_h": 0.16, "boss_d": 0.05}),
-    H("tallow_light_a", "tallow", "light", "Tallow Pickup",
-      (2.8, 1.15, 4.9),
-      [], {"cab_l": 0.30, "collar_h": 0.22, "boss_d": 0.08, "rail_h": 0.10}),
-    H("tallow_medium_a", "tallow", "medium", "Tallow Flatbed",
-      (3.4, 1.25, 6.3),
-      [], {"cab_l": 0.26, "collar_h": 0.24, "boss_d": 0.10,
-          "rail_h": 0.14, "plinth_h": 0.12}),
-    H("tallow_medium_b", "tallow", "medium", "Tallow Stake Bed",
-      (3.5, 1.60, 6.5),
-      [], {"cab_l": 0.26, "collar_h": 0.26, "boss_d": 0.10,
-          "rail_h": 0.16, "plinth_h": 0.16}),
-    H("tallow_heavy_a", "tallow", "heavy", "Tallow Lowboy",
-      (4.3, 1.40, 8.1),
-      [], {"cab_l": 0.22, "cab_h": 0.90, "collar_h": 0.28, "boss_d": 0.13,
-          "rail_h": 0.18, "plinth_h": 0.20}),
-    H("tallow_transport_a", "tallow", "transport", "Tallow Carrier",
-      (3.9, 1.35, 8.9),
-      [], {"cab_l": 0.22, "collar_h": 0.24, "boss_d": 0.12,
-          "rail_h": 0.18, "plinth_h": 0.22}),
 
     # -- ORRIN COLLECTIVE (8): symmetric salvage -----------------------
     H("orrin_scout_a", "orrin", "scout", "Orrin Skulker",

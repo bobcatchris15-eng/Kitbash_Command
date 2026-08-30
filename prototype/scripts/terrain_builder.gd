@@ -552,11 +552,11 @@ static func _sample_surfacemap(img: Image, half_extents: float, x: float, z: flo
 	return SURFACE_PALETTE[index]
 
 static func _hill_contribution(hill: Dictionary, x: float, z: float) -> float:
-	var c: Vector3 = hill.center
+	var c := _vec3_of(hill.get("center", Vector3.ZERO))
 	var dist = Vector2(x - c.x, z - c.z).length()
-	var radius: float = hill.get("radius", 10.0)
-	var falloff: float = hill.get("falloff", 15.0)
-	var height: float = hill.get("height", 8.0)
+	var radius: float = float(hill.get("radius", 10.0))
+	var falloff: float = float(hill.get("falloff", 15.0))
+	var height: float = float(hill.get("height", 8.0))
 	if dist <= radius:
 		return height
 	if dist >= radius + falloff or falloff <= 0.0:
@@ -827,14 +827,14 @@ static func _water_blob_radius_at_angle(blob: Dictionary, theta: float) -> float
 	return base * (1.0 + irregularity * wobble * 0.5)
 
 static func _point_in_water_blob(blob: Dictionary, x: float, z: float) -> bool:
-	var c: Vector3 = blob.center
+	var c := _vec3_of(blob.get("center", Vector3.ZERO))
 	var dx = x - c.x
 	var dz = z - c.z
 	var theta = atan2(dz, dx)
 	return Vector2(dx, dz).length() <= _water_blob_radius_at_angle(blob, theta)
 
 static func _water_blob_height_contribution(blob: Dictionary, x: float, z: float) -> float:
-	var c: Vector3 = blob.center
+	var c := _vec3_of(blob.get("center", Vector3.ZERO))
 	var dx = x - c.x
 	var dz = z - c.z
 	var dist = Vector2(dx, dz).length()
@@ -959,6 +959,37 @@ static func height_at(map_def: Dictionary, x: float, z: float) -> float:
 				var h11: float = float(s_data[(iz + 1) * s_dim + (ix + 1)])
 				var sh: float = lerpf(lerpf(h00, h10, fx), lerpf(h01, h11, fx), fz)
 				h += sh
+
+	# Dynamic Building Flattening Pads (In-Game base buildings, HQ, Refinery & outer dock bays)
+	if map_def.has("building_pads"):
+		var pads: Array = map_def.get("building_pads", [])
+		for pad in pads:
+			var cx: float = float(pad.get("center_x", 0.0))
+			var cz: float = float(pad.get("center_z", 0.0))
+			var hx: float = float(pad.get("half_x", 5.0))
+			var hz: float = float(pad.get("half_z", 5.0))
+			var yaw: float = float(pad.get("yaw", 0.0))
+			var target_h: float = float(pad.get("target_h", 0.0))
+			var falloff: float = float(pad.get("falloff", 4.0))
+
+			var dx: float = x - cx
+			var dz: float = z - cz
+			var lx: float = dx
+			var lz: float = dz
+			if absf(yaw) > 0.001:
+				var cos_y := cos(-yaw)
+				var sin_y := sin(-yaw)
+				lx = dx * cos_y - dz * sin_y
+				lz = dx * sin_y + dz * cos_y
+			var ox: float = maxf(0.0, absf(lx) - hx)
+			var oz: float = maxf(0.0, absf(lz) - hz)
+			var dist: float = sqrt(ox * ox + oz * oz)
+			if dist <= 0.0:
+				h = target_h
+			elif dist < falloff:
+				var t := dist / falloff
+				var w := (1.0 - t) * (1.0 - t) * (1.0 + 2.0 * t)
+				h = lerpf(h, target_h, w)
 	return h
 
 # v2 feature composition: raised features take the TALLEST, carved features the
@@ -2427,9 +2458,15 @@ static func spawn_visuals(map_def: Dictionary, parent: Node3D, ticker: Node = nu
 	# the gate would fire on every call forever. Mutating the dict's contents
 	# propagates back out.
 	var _slice = func() -> void:
-		if ticker != null and Time.get_ticks_usec() >= deadline_state["t"]:
-			await ticker.get_tree().process_frame
-			deadline_state["t"] = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+		# Headless / probe callers (no SceneTree ticker): fall back to a
+		# busy wait rather than a real await. See _build_conforming_zone_
+		# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+		if Time.get_ticks_usec() >= deadline_state["t"]:
+			if ticker == null:
+				deadline_state["t"] = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+			else:
+				await ticker.get_tree().process_frame
+				deadline_state["t"] = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 
 	# Snapshot children before scatter so we can tag new terrain props with
 	# the "terrain_debris" group. Buildings use this group to find and
@@ -3570,9 +3607,15 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 	# over-resolve Z by 2x).
 	var x = -he.x
 	while x < he.x:
-		if ticker != null and Time.get_ticks_usec() >= deadline:
-			await ticker.get_tree().process_frame
-			deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+		# Headless / probe callers (no SceneTree ticker): fall back to a
+		# busy wait rather than a real await. See _build_conforming_zone_
+		# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+		if Time.get_ticks_usec() >= deadline:
+			if ticker == null:
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+			else:
+				await ticker.get_tree().process_frame
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 		var x1 = min(x + mesh_step_x, he.x)
 		var z = -he.y
 		while z < he.y:
@@ -3627,9 +3670,15 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 			[he.x, outer_max_x, -he.y, he.y]]:
 		var curr_x: float = rect_bounds[0]
 		while curr_x < rect_bounds[1]:
-			if ticker != null and Time.get_ticks_usec() >= deadline:
-				await ticker.get_tree().process_frame
-				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+			# Headless / probe callers (no SceneTree ticker): fall back to a
+			# busy wait rather than a real await. See _build_conforming_zone_
+			# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+			if Time.get_ticks_usec() >= deadline:
+				if ticker == null:
+					deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+				else:
+					await ticker.get_tree().process_frame
+					deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 			var next_x = min(curr_x + skirt_step_x, rect_bounds[1])
 			var curr_z: float = rect_bounds[2]
 			while curr_z < rect_bounds[3]:
@@ -3661,9 +3710,15 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 			normals[i] = (nrm_acc[i] as Vector3).normalized()
 			packed_verts[i] = verts[i]
 			packed_uvs[i] = uvs[i]
-			if ticker != null and Time.get_ticks_usec() >= deadline:
-				await ticker.get_tree().process_frame
-				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+			# Headless / probe callers (no SceneTree ticker): fall back to a
+			# busy wait rather than a real await. See _build_conforming_zone_
+			# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+			if Time.get_ticks_usec() >= deadline:
+				if ticker == null:
+					deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+				else:
+					await ticker.get_tree().process_frame
+					deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = packed_verts
@@ -3684,9 +3739,15 @@ static func build_ground_visual_mesh(map_def: Dictionary, ticker: Node = null) -
 	var height_data = PackedFloat32Array()
 	height_data.resize(samples_x * samples_z)
 	for row in range(samples_z):
-		if ticker != null and Time.get_ticks_usec() >= deadline:
-			await ticker.get_tree().process_frame
-			deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+		# Headless / probe callers (no SceneTree ticker): fall back to a
+		# busy wait rather than a real await. See _build_conforming_zone_
+		# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+		if Time.get_ticks_usec() >= deadline:
+			if ticker == null:
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+			else:
+				await ticker.get_tree().process_frame
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 		var wz = -he.y + row * col_step_z
 		for col in range(samples_x):
 			var wx = -he.x + col * col_step_x
@@ -5255,9 +5316,15 @@ static func _spawn_ambient_trees(map_def: Dictionary, parent: Node3D, prop_scale
 		rng, he, cluster_count, AMBIENT_TREE_CLUSTER_AVOID_RADIUS,
 		avoid_points, bridge_rects, [], map_def)
 	for cluster_center in clusters:
-		if ticker != null and Time.get_ticks_usec() >= deadline:
-			await ticker.get_tree().process_frame
-			deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+		# Headless / probe callers (no SceneTree ticker): fall back to a
+		# busy wait rather than a real await. See _build_conforming_zone_
+		# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+		if Time.get_ticks_usec() >= deadline:
+			if ticker == null:
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+			else:
+				await ticker.get_tree().process_frame
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 		var items := rng.randi_range(items_min, items_max)
 		var placed_in_cluster := _place_in_cluster(
 			rng, cluster_center, AMBIENT_TREE_CLUSTER_RADIUS, items,
@@ -5332,9 +5399,15 @@ static func _spawn_ambient_ores(map_def: Dictionary, parent: Node3D, prop_scale:
 		rng, he, cluster_count, AMBIENT_ORE_CLUSTER_AVOID_RADIUS,
 		avoid_points, bridge_rects, surface_rects, map_def)
 	for cluster_center in clusters:
-		if ticker != null and Time.get_ticks_usec() >= deadline:
-			await ticker.get_tree().process_frame
-			deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+		# Headless / probe callers (no SceneTree ticker): fall back to a
+		# busy wait rather than a real await. See _build_conforming_zone_
+		# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+		if Time.get_ticks_usec() >= deadline:
+			if ticker == null:
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+			else:
+				await ticker.get_tree().process_frame
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 		var items := rng.randi_range(items_min, items_max)
 		var placed_in_cluster := _place_in_cluster(
 			rng, cluster_center, AMBIENT_ORE_CLUSTER_RADIUS, items,
@@ -5454,9 +5527,15 @@ static func _spawn_slope_rocks(map_def: Dictionary, parent: Node3D, ticker: Node
 	var candidates: Array = []
 	var y := -half + step * 0.5
 	while y < half:
-		if ticker != null and Time.get_ticks_usec() >= deadline:
-			await ticker.get_tree().process_frame
-			deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+		# Headless / probe callers (no SceneTree ticker): fall back to a
+		# busy wait rather than a real await. See _build_conforming_zone_
+		# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+		if Time.get_ticks_usec() >= deadline:
+			if ticker == null:
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
+			else:
+				await ticker.get_tree().process_frame
+				deadline = Time.get_ticks_usec() + int(BUILD_FRAME_BUDGET_MS * 1000.0)
 		var x := -half + step * 0.5
 		while x < half:
 			var px: float = x + rng.randf_range(-step * 0.4, step * 0.4)
@@ -5693,6 +5772,15 @@ static func is_position_blocked(map_def: Dictionary, pos: Vector3) -> bool:
 	for c in map_def.get("cliffs", []):
 		if _point_in_rect(pos, _rect_from(c.center, c.half_extents)):
 			return true
+	for prop in map_def.get("props", []):
+		var ptype: String = str(prop.get("type", ""))
+		if ptype == "building" or prop.has("building_id"):
+			var p_pos = _vec3_of(prop.get("pos", [0, 0, 0]))
+			var s: float = float(prop.get("scale", 1.0))
+			var rad: float = 6.0 * s
+			var d_sq: float = (pos.x - p_pos.x) * (pos.x - p_pos.x) + (pos.z - p_pos.z) * (pos.z - p_pos.z)
+			if d_sq < (rad * rad):
+				return true
 	# RTS_CORE_ROADMAP.md B4: a heightmap makes slope-blocking meaningful
 	# everywhere, not just near authored hills (_slope_at() calls
 	# height_at(), which already checks the heightmap first internally).
@@ -5899,3 +5987,74 @@ static func is_position_blocked_in_dict(
 		if Vector2(pos.x - a.x, pos.z - a.z).length() < extra_radius:
 			return true
 	return false
+
+
+# ==============================================================================
+# IN-GAME DYNAMIC BUILDING & DOCK BAY TERRAIN FLATTENING
+# ==============================================================================
+
+static func apply_building_pad_flattening(map_def: Dictionary, ground_node: Node, center: Vector3, half_extents: Vector2, yaw: float, target_h: float, falloff: float = 4.0) -> void:
+	if not map_def.has("building_pads"):
+		map_def["building_pads"] = []
+	var pad_entry := {
+		"center_x": center.x,
+		"center_z": center.z,
+		"half_x": half_extents.x,
+		"half_z": half_extents.y,
+		"yaw": yaw,
+		"target_h": target_h,
+		"falloff": falloff
+	}
+	(map_def["building_pads"] as Array).append(pad_entry)
+
+	if ground_node == null:
+		return
+
+	var max_radius: float = maxf(half_extents.x, half_extents.y) + falloff + 6.0
+	var max_rad_sq: float = max_radius * max_radius
+
+	# 1. Deform visual ground ArrayMesh vertices
+	var mesh_inst: MeshInstance3D = ground_node.get_node_or_null("MeshInstance3D") as MeshInstance3D
+	if mesh_inst != null and mesh_inst.mesh is ArrayMesh:
+		var arr_mesh: ArrayMesh = mesh_inst.mesh as ArrayMesh
+		if arr_mesh.get_surface_count() > 0:
+			var arrays: Array = arr_mesh.surface_get_arrays(0)
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var updated := false
+			for i in range(verts.size()):
+				var v: Vector3 = verts[i]
+				var d2: float = (v.x - center.x) * (v.x - center.x) + (v.z - center.z) * (v.z - center.z)
+				if d2 <= max_rad_sq:
+					var new_y := height_at(map_def, v.x, v.z)
+					if absf(v.y - new_y) > 0.001:
+						v.y = new_y
+						verts[i] = v
+						updated = true
+			if updated:
+				arrays[Mesh.ARRAY_VERTEX] = verts
+				arr_mesh.clear_surfaces()
+				arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+	# 2. Deform physics collision HeightMapShape3D
+	var col_shape_node: CollisionShape3D = ground_node.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if col_shape_node != null and col_shape_node.shape is HeightMapShape3D:
+		var hm: HeightMapShape3D = col_shape_node.shape as HeightMapShape3D
+		var he: Vector2 = MapCatalogScript.half_extents(map_def)
+		var span: Vector2 = he * 2.0
+		var col_step_x: float = maxf(COLLISION_HEIGHTMAP_STEP, span.x / 180.0)
+		var col_step_z: float = maxf(COLLISION_HEIGHTMAP_STEP, span.y / 180.0)
+		var sx: int = hm.map_width
+		var sz: int = hm.map_depth
+		var data: PackedFloat32Array = hm.map_data
+		var col_min: int = clampi(int(floor((center.x - max_radius + he.x) / col_step_x)), 0, sx - 1)
+		var col_max: int = clampi(int(ceil((center.x + max_radius + he.x) / col_step_x)), 0, sx - 1)
+		var row_min: int = clampi(int(floor((center.z - max_radius + he.y) / col_step_z)), 0, sz - 1)
+		var row_max: int = clampi(int(ceil((center.z + max_radius + he.y) / col_step_z)), 0, sz - 1)
+		for r in range(row_min, row_max + 1):
+			var wz: float = -he.y + float(r) * col_step_z
+			for c in range(col_min, col_max + 1):
+				var wx: float = -he.x + float(c) * col_step_x
+				var d2: float = (wx - center.x) * (wx - center.x) + (wz - center.z) * (wz - center.z)
+				if d2 <= max_rad_sq:
+					data[r * sx + c] = height_at(map_def, wx, wz)
+		hm.map_data = data

@@ -25,6 +25,7 @@ extends RefCounted
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const MeshAssetLoader = preload("res://scripts/mesh_asset_loader.gd")
 const PowerBudgetScript = preload("res://scripts/power_budget.gd")
+const MatchDirectorScript = preload("res://scripts/battle/match_director.gd")
 # BattleLayers declares class_name, so it resolves globally with no preload here.
 
 # How much bigger the collider gets per point of armour thickness. Armour is
@@ -524,10 +525,19 @@ static func _apply_team_visuals(body: CharacterBody3D, hull_node: Node3D,
 		team: int, _facts: Dictionary) -> void:
 	if hull_node == null:
 		return
-	if team == 0:
-		_apply_enemy_outline(hull_node)
-	else:
+	# Route through PLAYER_TEAM / ENEMY_TEAM rather than bare 0/1. The bare-number
+	# version of this check (`if team == 0`) read PLAYER as "enemy" - correct in
+	# some battles but wrong here: PLAYER_TEAM is 0 (match_director.gd:76) and
+	# ENEMY_TEAM is 1, so every player unit ended up wearing the inverted-hull
+	# enemy outline (solid black, cull_front, vertices pushed 0.025m along
+	# normals) - a duplicate of every hull mesh rendered as a black shell.
+	# Friendlies also got the rim-light uniforms set, which is harmless but
+	# pointless. Swapping the conditions and naming the constants keeps the two
+	# branches from drifting again.
+	if team == MatchDirectorScript.PLAYER_TEAM:
 		_apply_friendly_rim(hull_node)
+	else:
+		_apply_enemy_outline(hull_node)
 
 
 static func _apply_enemy_outline(hull_node: Node3D) -> void:

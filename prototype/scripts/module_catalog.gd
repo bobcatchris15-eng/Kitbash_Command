@@ -1782,6 +1782,23 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color(0.32, 0.3, 0.24),
 			"traits": ["ground_contact", "amphibious"]
 		},
+		"plasma_thruster": {
+			"name": "Vectored Plasma Thruster",
+			"category": "locomotion",
+			"required_building": "exotics_lab",
+			"description": "Magnetoplasmadynamic (MPD) thruster pods with magnetic nozzle vectoring for extreme hover skimming velocities over land and water.",
+			"hp": 75.0,
+			"weight": 35.0,
+			"metal": 30,
+			"crystal": 60,
+			"dps": 0.0,
+			"base_weight_capacity": 300.0,
+			"base_top_speed": 21.0,
+			"thrust_coefficient": 160.0,
+			"size": Vector3(0.9, 0.5, 1.2),
+			"color": Color(0.3, 0.45, 0.95),
+			"traits": ["hovering", "high_speed", "amphibious"]
+		},
 	}
 
 	# Fold the fire profiles in so `get_module_data(id).fire_rate` works
@@ -1882,6 +1899,7 @@ const MODULE_FLAVOR = {
 	"ornithopter_wing": "Flaps. Reviewed twice by engineering. Approved twice. Nobody is entirely sure why.",
 	"buoyant_envelope": "Lighter than air, slower than everything, and a generously sized target.",
 	"screw_drive": "Amphibious augers. Crosses land and water equally badly, which counts as versatility.",
+	"plasma_thruster": "Direct-drive magnetoplasmadynamic thruster array. Speed records are routinely set; braking distance is measured in postcodes.",
 }
 
 # Empty string when a module has no authored line - callers append
@@ -3291,20 +3309,20 @@ static func _leg_stat_mult(type_id: String, tweaks: Dictionary, key: String) -> 
 # it now ignores what a wheel sinks into (marsh, snow, sand) and hates what a
 # skirt catches on (rocky, forest).
 const TERRAIN_SPEED_MULTIPLIERS = {
-	"marsh":        {"wheels": 0.25, "tracked_treads": 0.45, "legs": 0.6,  "screw_drive": 1.1,  "hover_engine": 1.15, "half_track": 0.4,  "rocker_bogie": 0.5,  "air_cushion_skirt": 1.2,  "anti_grav_plate": 1.0},
-	"rocky":        {"wheels": 0.35, "tracked_treads": 0.75, "legs": 1.1,  "screw_drive": 0.5,  "hover_engine": 0.55, "half_track": 0.5,  "rocker_bogie": 1.15, "air_cushion_skirt": 0.4,  "anti_grav_plate": 1.0},
-	"snow_mud":     {"wheels": 0.2,  "tracked_treads": 0.8,  "legs": 0.75, "screw_drive": 0.7,  "hover_engine": 1.1,  "half_track": 0.6,  "rocker_bogie": 0.6,  "air_cushion_skirt": 1.15, "anti_grav_plate": 1.0},
-	"sand":         {"wheels": 0.3,  "tracked_treads": 0.85, "legs": 0.8,  "screw_drive": 0.6,  "hover_engine": 1.15, "half_track": 0.55, "rocker_bogie": 0.7,  "air_cushion_skirt": 1.1,  "anti_grav_plate": 1.0},
-	"gravel":       {"wheels": 1.25, "tracked_treads": 1.1,  "legs": 1.02, "screw_drive": 1.0,  "hover_engine": 0.95, "half_track": 1.1,  "rocker_bogie": 0.8,  "air_cushion_skirt": 0.85, "anti_grav_plate": 1.0},
-	"forest":       {"wheels": 0.3,  "tracked_treads": 0.65, "legs": 0.95, "screw_drive": 0.55, "hover_engine": 0.45, "half_track": 0.5,  "rocker_bogie": 1.0,  "air_cushion_skirt": 0.35, "anti_grav_plate": 1.0},
-	"ice":          {"wheels": 0.45, "tracked_treads": 0.5,  "legs": 0.4,  "screw_drive": 0.75, "hover_engine": 1.2,  "half_track": 0.5,  "rocker_bogie": 0.55, "air_cushion_skirt": 1.25, "anti_grav_plate": 1.0},
-	"dirt":         {"wheels": 1.05, "tracked_treads": 1.0,  "legs": 1.0,  "screw_drive": 0.9,  "hover_engine": 1.0,  "half_track": 1.0,  "rocker_bogie": 1.0,  "air_cushion_skirt": 1.0,  "anti_grav_plate": 1.0},
-	"steppe_grass": {"wheels": 1.0,  "tracked_treads": 1.0,  "legs": 1.0,  "screw_drive": 0.95, "hover_engine": 1.0,  "half_track": 1.0,  "rocker_bogie": 1.0,  "air_cushion_skirt": 1.0,  "anti_grav_plate": 1.0},
-	"dry_grass":    {"wheels": 1.02, "tracked_treads": 1.0,  "legs": 1.0,  "screw_drive": 0.95, "hover_engine": 1.0,  "half_track": 1.0,  "rocker_bogie": 1.0,  "air_cushion_skirt": 1.0,  "anti_grav_plate": 1.0},
-	"mud":          {"wheels": 0.25, "tracked_treads": 0.6,  "legs": 0.65, "screw_drive": 1.05, "hover_engine": 1.15, "half_track": 0.45, "rocker_bogie": 0.55, "air_cushion_skirt": 1.15, "anti_grav_plate": 1.0},
-	"cobble":       {"wheels": 1.3,  "tracked_treads": 1.15, "legs": 1.05, "screw_drive": 0.9,  "hover_engine": 0.9,  "half_track": 1.15, "rocker_bogie": 0.9,  "air_cushion_skirt": 0.8,  "anti_grav_plate": 1.0},
-	"scree":        {"wheels": 0.35, "tracked_treads": 0.7,  "legs": 0.95, "screw_drive": 0.5,  "hover_engine": 0.6,  "half_track": 0.5,  "rocker_bogie": 1.1,  "air_cushion_skirt": 0.4,  "anti_grav_plate": 1.0},
-	"volcanic":     {"wheels": 0.4,  "tracked_treads": 0.75, "legs": 1.0,  "screw_drive": 0.6,  "hover_engine": 0.7,  "half_track": 0.55, "rocker_bogie": 1.05, "air_cushion_skirt": 0.5,  "anti_grav_plate": 1.0},
+	"marsh":        {"wheels": 0.25, "tracked_treads": 0.45, "legs": 0.6,  "screw_drive": 1.1,  "hover_engine": 1.15, "half_track": 0.4,  "rocker_bogie": 0.5,  "air_cushion_skirt": 1.2,  "anti_grav_plate": 1.0, "plasma_thruster": 1.15},
+	"rocky":        {"wheels": 0.35, "tracked_treads": 0.75, "legs": 1.1,  "screw_drive": 0.5,  "hover_engine": 0.55, "half_track": 0.5,  "rocker_bogie": 1.15, "air_cushion_skirt": 0.4,  "anti_grav_plate": 1.0, "plasma_thruster": 0.65},
+	"snow_mud":     {"wheels": 0.2,  "tracked_treads": 0.8,  "legs": 0.75, "screw_drive": 0.7,  "hover_engine": 1.1,  "half_track": 0.6,  "rocker_bogie": 0.6,  "air_cushion_skirt": 1.15, "anti_grav_plate": 1.0, "plasma_thruster": 1.10},
+	"sand":         {"wheels": 0.3,  "tracked_treads": 0.85, "legs": 0.8,  "screw_drive": 0.6,  "hover_engine": 1.15, "half_track": 0.55, "rocker_bogie": 0.7,  "air_cushion_skirt": 1.1,  "anti_grav_plate": 1.0, "plasma_thruster": 1.15},
+	"gravel":       {"wheels": 1.25, "tracked_treads": 1.1,  "legs": 1.02, "screw_drive": 1.0,  "hover_engine": 0.95, "half_track": 1.1,  "rocker_bogie": 0.8,  "air_cushion_skirt": 0.85, "anti_grav_plate": 1.0, "plasma_thruster": 1.0},
+	"forest":       {"wheels": 0.3,  "tracked_treads": 0.65, "legs": 0.95, "screw_drive": 0.55, "hover_engine": 0.45, "half_track": 0.5,  "rocker_bogie": 1.0,  "air_cushion_skirt": 0.35, "anti_grav_plate": 1.0, "plasma_thruster": 0.45},
+	"ice":          {"wheels": 0.45, "tracked_treads": 0.5,  "legs": 0.4,  "screw_drive": 0.75, "hover_engine": 1.2,  "half_track": 0.5,  "rocker_bogie": 0.55, "air_cushion_skirt": 1.25, "anti_grav_plate": 1.0, "plasma_thruster": 1.20},
+	"dirt":         {"wheels": 1.05, "tracked_treads": 1.0,  "legs": 1.0,  "screw_drive": 0.9,  "hover_engine": 1.0,  "half_track": 1.0,  "rocker_bogie": 1.0,  "air_cushion_skirt": 1.0,  "anti_grav_plate": 1.0, "plasma_thruster": 1.0},
+	"steppe_grass": {"wheels": 1.0,  "tracked_treads": 1.0,  "legs": 1.0,  "screw_drive": 0.95, "hover_engine": 1.0,  "half_track": 1.0,  "rocker_bogie": 1.0,  "air_cushion_skirt": 1.0,  "anti_grav_plate": 1.0, "plasma_thruster": 1.0},
+	"dry_grass":    {"wheels": 1.02, "tracked_treads": 1.0,  "legs": 1.0,  "screw_drive": 0.95, "hover_engine": 1.0,  "half_track": 1.0,  "rocker_bogie": 1.0,  "air_cushion_skirt": 1.0,  "anti_grav_plate": 1.0, "plasma_thruster": 1.0},
+	"mud":          {"wheels": 0.25, "tracked_treads": 0.6,  "legs": 0.65, "screw_drive": 1.05, "hover_engine": 1.15, "half_track": 0.45, "rocker_bogie": 0.55, "air_cushion_skirt": 1.15, "anti_grav_plate": 1.0, "plasma_thruster": 1.15},
+	"cobble":       {"wheels": 1.3,  "tracked_treads": 1.15, "legs": 1.05, "screw_drive": 0.9,  "hover_engine": 0.9,  "half_track": 1.15, "rocker_bogie": 0.9,  "air_cushion_skirt": 0.8,  "anti_grav_plate": 1.0, "plasma_thruster": 0.95},
+	"scree":        {"wheels": 0.35, "tracked_treads": 0.7,  "legs": 0.95, "screw_drive": 0.5,  "hover_engine": 0.6,  "half_track": 0.5,  "rocker_bogie": 1.1,  "air_cushion_skirt": 0.4,  "anti_grav_plate": 1.0, "plasma_thruster": 0.60},
+	"volcanic":     {"wheels": 0.4,  "tracked_treads": 0.75, "legs": 1.0,  "screw_drive": 0.6,  "hover_engine": 0.7,  "half_track": 0.55, "rocker_bogie": 1.05, "air_cushion_skirt": 0.5,  "anti_grav_plate": 1.0, "plasma_thruster": 0.70},
 }
 
 # A locomotion type carrying any of these never touches a ground surface, so it
@@ -3357,6 +3375,7 @@ const SLOPE_SPEED_MULTIPLIERS = {
 	"hover_engine":        {"walkable": 1.0, "walkable_slow": 1.0,  "impassable": 0.0},
 	"air_cushion_skirt":   {"walkable": 1.0, "walkable_slow": 1.0,  "impassable": 0.0},
 	"anti_grav_plate":     {"walkable": 1.0, "walkable_slow": 1.0,  "impassable": 0.0},
+	"plasma_thruster":     {"walkable": 1.0, "walkable_slow": 1.0,  "impassable": 0.0},
 }
 
 # Compose-friendly: takes the locomotion id and the slope class
@@ -3566,6 +3585,11 @@ const LOCOMOTION_TWEAK_SPECS = {
 	"screw_drive": [
 		{"name": "drum_diameter", "label": "Drum Diameter", "min": 0.5, "max": 2.0, "step": 0.1, "default": 1.0},
 		{"name": "helix_depth", "label": "Helix Depth", "min": 0.5, "max": 1.5, "step": 0.1, "default": 1.0}
+	],
+	"plasma_thruster": [
+		{"name": "thruster_count", "label": "Thruster Count", "min": 2.0, "max": 8.0, "step": 2.0, "default": 4.0},
+		{"name": "nozzle_width", "label": "Nozzle Bore Width", "min": 0.5, "max": 2.2, "step": 0.1, "default": 1.0},
+		{"name": "afterburner", "label": "Overcharged Ion Injector", "type": "bool", "default": false}
 	]
 }
 
@@ -3623,6 +3647,7 @@ const COUNT_TWEAK_DEFAULTS := {
 	"capacitor_bank":           {"bank_capacity": 4.0},
 	"solid_state_battery":      {"cell_layers": 4.0},
 	"booster_rack":             {"nozzle_count": 3.0},
+	"plasma_thruster":          {"thruster_count": 4.0},
 }
 
 # Which tweak names are counts at all, mapped to the literal divisor
@@ -3651,6 +3676,7 @@ const COUNT_TWEAK_LEGACY_DIVISORS := {
 	"rotor_units": 4.0,
 	"leg_count": 4.0,
 	"pad_count": 4.0,
+	"thruster_count": 4.0,
 	"coil_count": 4.0,
 	"bank_capacity": 4.0,
 	"bogie_count": 4.0,
@@ -3809,6 +3835,12 @@ static func get_locomotion_contribs(type_id: String, settings: Dictionary) -> Di
 			# more of it along. Cosmetic until now.
 			thrust = diameter * (0.80 + 0.24 * depth)
 			capacity = diameter * 160.0 * (1.08 - 0.10 * depth)
+		"plasma_thruster":
+			var thrusters = settings.get("thruster_count", 4.0)
+			var bore = settings.get("nozzle_width", 1.0)
+			var ab = settings.get("afterburner", false)
+			thrust = (thrusters / 4.0) * bore * (1.35 if ab else 1.0)
+			capacity = (thrusters / 4.0) * (bore * 85.0) * (0.85 if ab else 1.0)
 	return {"thrust": thrust, "capacity": capacity}
 
 # Per-axis scale of the running-gear slab relative to the hull footprint.

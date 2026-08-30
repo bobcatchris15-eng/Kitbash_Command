@@ -204,6 +204,10 @@ func _process(delta: float):
 				# rings; a second, slower one about Z makes it tumble, which is
 				# what sells the gimbal.
 				inner_ring.rotate_z(7.0 * delta)
+		elif type_id == "plasma_thruster":
+			var ring = child.get_node_or_null("PlasmaRing")
+			if ring:
+				ring.rotate_z(18.0 * delta)
 
 func set_mirror_enabled(enabled: bool):
 	mirror_enabled = enabled

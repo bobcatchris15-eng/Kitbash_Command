@@ -59,7 +59,7 @@ const STRONG_ENEMY_ROSTER := [
 ]
 
 # The map to use for the tutorial skirmish (needs base_zones for HQ placement)
-const TUTORIAL_MAP_ID := "lake_crossing"  # Has base zones for HQ placement
+const TUTORIAL_MAP_ID := "delta_blues"  # Has base zones for HQ placement
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS

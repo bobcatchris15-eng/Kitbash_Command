@@ -34,7 +34,15 @@ const PARAMS = {
 	"ink_width": {"label": "Ink Width", "min": 0.05, "max": 0.9, "step": 0.01, "default": 0.32},
 	"ink_curvature_gain": {"label": "Ink Curvature", "min": 0.005, "max": 1.0, "step": 0.005, "default": 0.06},
 	"ink_rim_strength": {"label": "Ink Rim", "min": 0.0, "max": 1.0, "step": 0.05, "default": 0.55},
-	"normal_strength": {"label": "Normal Depth", "min": 0.0, "max": 2.0, "step": 0.05, "default": 0.45},
+	"normal_strength": {"label": "Normal Depth", "min": 0.0, "max": 2.0, "step": 0.05, "default": 1.0},
+	# Micro-surface (carbon-fibre weave, hammered dimples, etc.) is the
+	# procedural detail layered ON TOP of the shared panel/bolts normal. Kept
+	# separate from normal_strength so the two can be tuned independently -
+	# the lab's StandardMaterial3D has no micro-surface at all (it just shows
+	# the shared normal), so a viewer expecting the lab's "square and bolts"
+	# read in the test range was getting a 45%-strong shared normal plus a
+	# 45%-strong procedural layer, which looked like a different surface.
+	"micro_surface_strength": {"label": "Micro Surface", "min": 0.0, "max": 1.0, "step": 0.05, "default": 0.35},
 }
 
 # Current live values. Static so every caller shares one set - there is

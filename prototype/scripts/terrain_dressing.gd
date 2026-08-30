@@ -200,9 +200,15 @@ static func scatter(map_def: Dictionary, parent: Node3D, prop_scale: float = 1.0
 		var gz := -half.y
 		var row := 0
 		while gz < half.y and count < max_count:
-			if ticker != null and Time.get_ticks_usec() >= deadline:
-				await ticker.get_tree().process_frame
-				deadline = Time.get_ticks_usec() + 8000
+			# Headless / probe callers (no SceneTree ticker): fall back to a
+			# busy wait rather than a real await. See _build_conforming_zone_
+			# mesh_stepwise (terrain_builder.gd:3843+) for the same fix.
+			if Time.get_ticks_usec() >= deadline:
+				if ticker == null:
+					deadline = Time.get_ticks_usec() + 8000
+				else:
+					await ticker.get_tree().process_frame
+					deadline = Time.get_ticks_usec() + 8000
 			var col := 0
 			var gx := -half.x
 			while gx < half.x and count < max_count:

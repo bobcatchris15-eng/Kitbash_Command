@@ -281,6 +281,15 @@ const LAYOUTS := {
 		"scale_mode": ScaleMode.FIXED,
 		"node_scale": Vector3.ONE,
 	},
+	"plasma_thruster": {
+		"pattern": Pattern.SIDE_PAIRS,
+		"count_key": "thruster_count", "count_default": 4, "count_min": 2, "count_max": 8, "count_even": true,
+		"geo_keys": {"nozzle_width": 1.0, "afterburner": false},
+		"normal": Vector3.UP, "reach_keys": ReachKeys.XYZ,
+		"scale_mode": ScaleMode.FIXED,
+		"node_scale": Vector3.ONE,
+		"mirror": false,
+	},
 }
 
 ## Per-pattern geometry. Kept out of LAYOUTS because these are the numbers a
@@ -338,6 +347,7 @@ const GEOMETRY := {
 	# hull footprint rather than outboard of it like hover_engine's pads.
 	"air_cushion_skirt": {"pad_from_catalog": false, "y": "underside"},
 	"anti_grav_plate":   {"pad_from_catalog": true, "y": "underside"},
+	"plasma_thruster":   {"x_pad": 0.25, "y": "underside", "z_span": 0.38},
 }
 
 ## MOUNT KITS - the structural interface between a hull and its running gear.
@@ -382,6 +392,7 @@ const MOUNT_KITS := {
 	"hover_engine":      {"kit": Kit.HARDPOINT_PAD, "drop": 0.16, "stations": 4},
 	"air_cushion_skirt": {"kit": Kit.HARDPOINT_PAD, "drop": 0.14, "stations": 4},
 	"anti_grav_plate":   {"kit": Kit.HARDPOINT_PAD, "drop": 0.12, "stations": 3},
+	"plasma_thruster":   {"kit": Kit.HARDPOINT_PAD, "drop": 0.16, "stations": 4},
 	# An ornithopter's wing root IS its structure - a shoulder joint, not a
 	# bolted-on mount. Declared NONE rather than left out, so the absence is a
 	# decision and not an omission.
@@ -433,6 +444,7 @@ const MAX_WIDTH_FACTOR := {
 	# measured 0.018 bulk after the size-up, LOWER than the 0.107 it had
 	# before it.
 	"hover_engine": 0.0, "air_cushion_skirt": 0.0, "anti_grav_plate": 0.0,
+	"plasma_thruster": 0.0,
 	# Air: span is the point. Rotors and engine clusters overhang by design.
 	# Setting to 0.0 disables width clamping so pylons and mounting struts
 	# maintain true physical reach to the hull on small hulls without shrinking.

@@ -96,6 +96,23 @@ var _target_position: Vector3 = Vector3.ZERO
 # half a second to catch up."
 var _initialized: bool = false
 
+var _map_half: Vector2 = Vector2.ZERO
+var _clamp_enabled: bool = false
+const CHASE_VOID_MARGIN: float = 6.0
+
+func set_map_bounds(half: Vector2) -> void:
+	_map_half = half
+	_clamp_enabled = half.x > 0.0 and half.y > 0.0
+
+func _clamp_target(pos: Vector3) -> Vector3:
+	if not _clamp_enabled:
+		return pos
+	var lim_x: float = _map_half.x + CHASE_VOID_MARGIN
+	var lim_z: float = _map_half.y + CHASE_VOID_MARGIN
+	pos.x = clampf(pos.x, -lim_x, lim_x)
+	pos.z = clampf(pos.z, -lim_z, lim_z)
+	return pos
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if focus_unit == null or not is_instance_valid(focus_unit):
@@ -134,16 +151,15 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if focus_unit == null or not is_instance_valid(focus_unit):
 		return
-	# Spherical mount: (yaw, pitch, distance) around the focus unit's
-	# world position. The unit's own motion (roll, yaw, bob) is
-	# intentionally ignored - the mount is rigid in world space.
 	var sp := _spherical_to_cartesian(_yaw, _pitch, _distance)
 	_target_position = focus_unit.global_position + sp
+	_target_position = _clamp_target(_target_position)
 	if not _initialized:
 		global_position = _target_position
 		_initialized = true
 	else:
 		global_position = global_position.lerp(_target_position, FOLLOW_SMOOTHING)
+		global_position = _clamp_target(global_position)
 	# Always look at the subject's centre, so as the unit moves the
 	# camera also reorients. lerp at FOLLOW_SMOOTHING would feel laggy
 	# on a fast yaw, so this is a hard look_at - the camera is

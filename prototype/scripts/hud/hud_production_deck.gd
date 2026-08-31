@@ -566,11 +566,25 @@ func _make_card(item: Dictionary) -> Button:
 		var names: Array = []
 		for k in missing:
 			names.append(str(k).replace("_", " ").capitalize())
-		b.tooltip_text = "Requires: %s" % ", ".join(names)
+		b.tooltip_text = "%s (LOCKED)\nRequires: %s\nCost: %d cr | Build Time: %ds" % [
+			str(item["label"]), ", ".join(names), int(item["cost"]), int(item["time"])]
 		v.add_child(Style.label("LOCKED", Style.SZ_MICRO, Style.BAD))
 	else:
-		b.tooltip_text = "%s\n%d credits, %ds\nClick to queue one, Shift+Click for five" % [
-			str(item["label"]), int(item["cost"]), int(item["time"])]
+		var tip_lines = [str(item["label"])]
+		tip_lines.append("Cost: %d credits | Build Time: %ds" % [int(item["cost"]), int(item["time"])])
+		if item.get("structure", false):
+			var kind: String = item.get("kind", "")
+			if BuildingCatalog.has_kind(kind):
+				var stats: Dictionary = BuildingCatalog.get_stats(kind)
+				tip_lines.append("HP: %.0f | Sight Range: %.0fm" % [
+					stats.get("hp", 0.0), stats.get("vision_range", 0.0)])
+		elif item.has("blueprint"):
+			var bp: Dictionary = item["blueprint"]
+			var hull: String = bp.get("hull_type", "")
+			if not hull.is_empty():
+				tip_lines.append("Chassis: %s" % hull.replace("_", " ").capitalize())
+		tip_lines.append("Click to queue one | Shift+Click for five")
+		b.tooltip_text = "\n".join(tip_lines)
 		b.pressed.connect(_on_card_pressed.bind(item))
 	return b
 

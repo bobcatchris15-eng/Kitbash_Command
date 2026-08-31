@@ -1104,18 +1104,52 @@ func _stat_tooltip(data: Dictionary, type_id: String = "") -> String:
 	lines.append("HP: %.0f | Weight: %.0f kg" % [data.get("hp", 0.0), data.get("weight", 0.0)])
 	lines.append("Cost: %d Metal, %d Crystal" % [data.get("metal", 0), data.get("crystal", 0)])
 
-	var dps = float(data.get("dps", 0.0))
-	if dps > 0.0:
-		var fp = ModuleCatalog.get_fire_profile(type_id)
-		var reach = float(fp.get("fire_range", 0.0))
-		var tier = ModuleCatalog.get_range_tier_label(reach)
-		lines.append("DPS: %.0f | Range: %.0fm (%s)" % [dps, reach, tier])
+	var category: String = data.get("category", "")
 
+	# Weapons & Projectiles
+	var dps = float(data.get("dps", 0.0))
+	var fp = ModuleCatalog.get_fire_profile(type_id)
+	var reach = float(fp.get("fire_range", 0.0))
+	var fire_rate = float(fp.get("fire_rate", 0.0))
+	if dps > 0.0:
+		var tier = ModuleCatalog.get_range_tier_label(reach)
+		var dmg_per_shot = dps * fire_rate
+		lines.append("DPS: %.0f | Dmg/Shot: %.0f" % [dps, dmg_per_shot])
+		lines.append("Cycle: %.2fs | Range: %.0fm (%s)" % [fire_rate, reach, tier])
+	elif category == "weapon" and reach > 0.0:
+		var tier = ModuleCatalog.get_range_tier_label(reach)
+		lines.append("Range: %.0fm (%s) | Cycle: %.2fs" % [reach, tier, fire_rate])
+
+	# Locomotion stats
+	if category == "locomotion":
+		var speed = float(data.get("base_top_speed", 0.0))
+		var capacity = float(data.get("base_weight_capacity", 0.0))
+		if speed > 0.0 or capacity > 0.0:
+			lines.append("Top Speed: %.1f m/s | Capacity: %.0f kg" % [speed, capacity])
+		var traits: Array = data.get("traits", [])
+		if not traits.is_empty():
+			var trait_strs: Array = []
+			for t in traits:
+				trait_strs.append(str(t).replace("_", " ").capitalize())
+			lines.append("Mobility: %s" % ", ".join(trait_strs))
+
+	# Support & Repair
 	var heal_rate = float(data.get("heal_rate", 0.0))
 	if heal_rate > 0.0:
-		lines.append("Heal Rate: %.1f/s" % heal_rate)
+		lines.append("Repair Rate: +%.1f HP/s" % heal_rate)
 
+	# Sensors & Recon
+	var vision = float(data.get("vision_bonus", 0.0))
+	if vision > 0.0:
+		lines.append("Vision Bonus: +%.0fm" % vision)
+	var scan_arc = float(data.get("scan_arc", 0.0))
+	if scan_arc > 0.0:
+		lines.append("Scan Sector: %.0f° Forward" % scan_arc)
+
+	# Power & Energy
 	var gen = float(data.get("energy_regen", 0.0))
+	if gen <= 0.0:
+		gen = float(data.get("power_output", 0.0))
 	if gen > 0.0:
 		lines.append("Power Gen: +%.1f kW" % gen)
 
@@ -1126,5 +1160,19 @@ func _stat_tooltip(data: Dictionary, type_id: String = "") -> String:
 	var p_draw = float(data.get("power_draw", 0.0))
 	if p_draw > 0.0:
 		lines.append("Power Draw: -%.1f kW" % p_draw)
+
+	# Rocket Boosters
+	if data.has("boost"):
+		var b: Dictionary = data["boost"]
+		var mult = float(b.get("speed_mult", 1.0))
+		var dur = float(b.get("duration", 0.0))
+		var cd = float(b.get("cooldown", 0.0))
+		lines.append("Sprint Boost: +%.0f%% Speed (%.1fs duration, %.0fs cd)" % [(mult - 1.0) * 100.0, dur, cd])
+
+	# Shields & Forcefields
+	if data.has("default_tweaks"):
+		var tweaks: Dictionary = data["default_tweaks"]
+		if tweaks.has("barrier_capacity"):
+			lines.append("Energy Barrier: Absorbs incoming projectile/beam damage")
 
 	return "\n".join(lines)

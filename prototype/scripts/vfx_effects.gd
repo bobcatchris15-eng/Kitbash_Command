@@ -234,18 +234,60 @@ static func make_flame_smoke_emitter(parent: Node3D, length: float = 8.0) -> GPU
 static func make_missile_trail(parent: Node3D) -> GPUParticles3D:
 	var p = GPUParticles3D.new()
 	p.name = "MissileTrail"
-	p.amount = 10
-	p.lifetime = 0.25
+	p.amount = 120    # Increased for dense cloud
+	p.lifetime = 1.0  # Increased for longer trail
 	p.emitting = false
 	p.local_coords = false
 	p.draw_pass_1 = _get_quad()
-	p.material_override = _billboard_material(SMOKE_TEX, false, Color(0.6, 0.6, 0.6, 0.5))
+	p.material_override = _billboard_material(SMOKE_TEX, false, Color(0.8, 0.8, 0.8, 0.7)) # brighter thicker smoke
 	p.process_material = _process_material(
-		"missile_trail",
-		Vector3(0, 0, 1), 18.0, 1.2, 2.8,
-		Vector3(0, 1.0, 0), 0.12, 0.28, 3.5, 1.8, 1.0)
+		"missile_trail_thick",
+		Vector3(0, 0, 1), 10.0, 0.5, 1.5,
+		Vector3(0, 0.5, 0), 0.3, 0.8, 1.0, 1.5, 1.0)
 	parent.add_child(p)
 	p.emitting = true
+	return p
+
+
+# Directional muzzle flash using textured flame flipbooks (stabbing tongue of flame)
+static func muzzle_flash(parent: Node3D, local_pos: Vector3, forward_dir: Vector3, radius: float = 1.0, tint: Color = Color(1, 0.8, 0.3, 1), light_color: Color = Color(0, 0, 0, 0), light_range: float = 4.0, light_energy: float = 5.0) -> GPUParticles3D:
+	var p = GPUParticles3D.new()
+	p.name = "MuzzleFlash"
+	p.amount = int(clampf(radius * 20.0, 12, 36))
+	p.lifetime = 0.15
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.emitting = false
+	p.local_coords = true
+	p.draw_pass_1 = _get_quad()
+	p.material_override = _billboard_material(FLAME_TEX, true, tint)
+	
+	# Narrow spread, high speed forward to create a "stabbing tongue"
+	p.process_material = _process_material(
+		"muzzleflash|%.1f" % radius,
+		forward_dir.normalized(), 12.0, radius * 12.0, radius * 22.0,
+		Vector3(0, 0, 0), radius * 0.4, radius * 1.5, 2.0, 0.0, 0.0)
+	
+	parent.add_child(p)
+	p.position = local_pos
+	p.emitting = true
+	p.finished.connect(func():
+		if is_instance_valid(p):
+			p.queue_free())
+
+	if light_color.a > 0.0:
+		var light = OmniLight3D.new()
+		light.light_color = Color(light_color.r, light_color.g, light_color.b)
+		light.light_energy = light_energy
+		light.omni_range = light_range
+		light.omni_attenuation = 0.5
+		light.light_bake_mode = Light3D.BAKE_DISABLED
+		parent.add_child(light)
+		light.position = local_pos
+		var lt = parent.create_tween()
+		lt.tween_property(light, "light_energy", 0.0, 0.12)
+		lt.finished.connect(func(): if is_instance_valid(light): light.queue_free())
+
 	return p
 
 

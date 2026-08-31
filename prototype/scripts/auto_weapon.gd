@@ -1458,12 +1458,9 @@ func _fire_at_target():
 	# OmniLight pop is sized by caliber for visibility at RTS zoom.
 	if not type_id in ["heavy_laser", "pd_laser", "resource_harvester", "repair_array"]:
 		var flash_pos = muzzle_offset * Vector3(_caliber, _caliber, _caliber)
-		var particle_count = int(8.0 + _caliber * 6.0)
-		var flash_spread = 20.0 + _caliber * 8.0
-		var flash_speed_max = 5.0 + _caliber * 2.0
 		var light_r = 3.0 + _caliber * 3.0
 		var light_e = 4.0 + _caliber * 3.0
-		VFXBurstScript.spawn(self, flash_pos, laser_color, particle_count, 0.1, flash_spread, 2.0, flash_speed_max, Vector3.ZERO, 0.4, 0.9, null, -global_transform.basis.z, laser_color, light_r, light_e)
+		VFXEffects.muzzle_flash(self, flash_pos, -global_transform.basis.z, _caliber, laser_color, laser_color, light_r, light_e)
 
 	# Each weapon family gets its own vocalised ordnance report. Empty string
 	# means a non-firing module (sensor, booster) - no report at all. Keys map
@@ -2668,18 +2665,11 @@ func _fire_anti_materiel_rifle():
 	var muzzle_right = global_transform.basis.x.normalized()
 	var muzzle_pos = global_position + muzzle_forward * MUZZLE_STANDOFF
 
-	# Brake blast: two flat side jets, which is exactly what a big muzzle
+	# Brake blast: two side jets, which is exactly what a big muzzle
 	# brake does and what makes it read as one at a glance.
 	for side in [-1.0, 1.0]:
-		var jet = MeshInstance3D.new()
-		jet.mesh = MunitionPool.unit_sphere()
-		jet.material_override = MunitionPool.emissive(Color(1.0, 0.86, 0.55), Color(1.0, 0.72, 0.35))
-		parent.add_child(jet)
-		jet.global_position = muzzle_pos + muzzle_right * side * 0.22
-		jet.scale = Vector3(0.42, 0.14, 0.20)
-		var jt = create_tween()
-		jt.tween_property(jet, "scale", Vector3.ZERO, 0.12)
-		jt.finished.connect(func(): if is_instance_valid(jet): jet.queue_free())
+		var brake_pos = muzzle_pos + muzzle_right * side * 0.22
+		VFXEffects.muzzle_flash(parent, brake_pos, muzzle_right * side, 1.5, Color(1.0, 0.86, 0.55))
 
 	# Dust ring under the muzzle - the tell that something very large just
 	# went off close to the ground.

@@ -61,6 +61,7 @@ const MANUFACTORY_KINDS: Array[String] = [
 
 const STATS := {
 	"hq": {
+		"name": "Headquarters",
 		# 2026-08-26 22:14 playtest: bumped from 85 -> 120. A base
 		# command building sees furthest - it is the one structure a
 		# team always has, so its reach is what stops a match opening
@@ -77,6 +78,7 @@ const STATS := {
 		"adjacent_m": DEFAULT_ADJACENT_M,
 	},
 	"refinery": {
+		"name": "Refinery",
 		"vision_range": 90.0,
 		# A grain elevator, not a shed. The refinery is where the economy is
 		# visibly happening, so it reads as the largest thing in the base and
@@ -88,6 +90,7 @@ const STATS := {
 		"dock_bays": [],
 	},
 	"light_manufactory": {
+		"name": "Light Manufactory",
 		"vision_range": 80.0,
 		"hp": 1400.0, "size": Vector3(5, 2.4, 6), "color": Color(0.68, 0.6, 0.42),
 		"cost_metal": 150, "cost_crystal": 30, "build_time": 16.0,
@@ -96,6 +99,7 @@ const STATS := {
 		"exit_offset": Vector3(0, 0.5, 6.0), "exit_facing": Vector3(0, 0, 1),
 	},
 	"medium_manufactory": {
+		"name": "Medium Manufactory",
 		"vision_range": 85.0,
 		"hp": 1800.0, "size": Vector3(6, 3, 8), "color": Color(0.72, 0.55, 0.42),
 		"cost_metal": 220, "cost_crystal": 55, "build_time": 22.0,
@@ -104,6 +108,7 @@ const STATS := {
 		"exit_offset": Vector3(0, 0.5, 7.0), "exit_facing": Vector3(0, 0, 1),
 	},
 	"heavy_manufactory": {
+		"name": "Heavy Manufactory",
 		"vision_range": 95.0,
 		"hp": 2400.0, "size": Vector3(7.5, 3.8, 10), "color": Color(0.6, 0.42, 0.35),
 		"cost_metal": 320, "cost_crystal": 85, "build_time": 30.0,
@@ -112,6 +117,7 @@ const STATS := {
 		"exit_offset": Vector3(0, 0.5, 8.0), "exit_facing": Vector3(0, 0, 1),
 	},
 	"power_plant": {
+		"name": "Power Plant",
 		"vision_range": 75.0,
 		"hp": 1000.0, "size": Vector3(4.5, 4.2, 4.5), "color": Color(0.85, 0.65, 0.2),
 		"cost_metal": 180, "cost_crystal": 40, "build_time": 12.0,
@@ -122,6 +128,7 @@ const STATS := {
 
 	# THE TECH TREE.
 	"tech_lab": {
+		"name": "Tech Lab",
 		"vision_range": 90.0,
 		"hp": 900.0, "size": Vector3(4.4, 2.9, 4.4), "color": Color(0.42, 0.55, 0.58),
 		"cost_metal": 200, "cost_crystal": 60, "build_time": 18.0,
@@ -129,6 +136,7 @@ const STATS := {
 		"adjacent_m": DEFAULT_ADJACENT_M,
 	},
 	"physics_lab": {
+		"name": "Physics Lab",
 		"vision_range": 100.0,
 		"hp": 1100.0, "size": Vector3(4.8, 3.8, 4.8), "color": Color(0.45, 0.48, 0.62),
 		"cost_metal": 280, "cost_crystal": 110, "build_time": 26.0,
@@ -136,6 +144,7 @@ const STATS := {
 		"adjacent_m": DEFAULT_ADJACENT_M,
 	},
 	"exotics_lab": {
+		"name": "Exotics Lab",
 		"vision_range": 110.0,
 		"hp": 1300.0, "size": Vector3(5.4, 4.5, 5.4), "color": Color(0.55, 0.38, 0.58),
 		"cost_metal": 340, "cost_crystal": 180, "build_time": 34.0,
@@ -161,6 +170,13 @@ static func has_kind(kind: String) -> bool:
 
 static func get_stats(kind: String) -> Dictionary:
 	return STATS.get(kind, {})
+
+
+static func get_display_name(kind: String) -> String:
+	var s: Dictionary = STATS.get(kind, {})
+	if s.has("name"):
+		return s["name"]
+	return kind.replace("_", " ").capitalize()
 
 
 static func get_stat(kind: String, key: String, fallback = null):

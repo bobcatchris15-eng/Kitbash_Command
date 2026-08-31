@@ -792,9 +792,13 @@
       }
     },
     "lab": {
-      "loop": true,
+      "loop": false,
       "stems": {
-        "bed": "res://assets/audio/music/music_lab_bed.mp3"
+        "bed": [
+          "res://assets/audio/music/music_lab_bed.mp3",
+          "res://assets/audio/music/music_lab_steel_mandate.mp3",
+          "res://assets/audio/music/music_lab_parallel_assembly.mp3"
+        ]
       }
     },
     "operations": {

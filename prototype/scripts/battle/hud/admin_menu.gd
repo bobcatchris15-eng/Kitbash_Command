@@ -83,6 +83,7 @@ func _build() -> void:
 	_header = Button.new()
 	_header.name = "MenuHeader"
 	_header.text = "MENU"
+	_header.tooltip_text = "Pause match & open session menu (Esc)"
 	_header.toggle_mode = true
 	_header.custom_minimum_size = Vector2(0, HEADER_HEIGHT)
 	Style.style_button(_header)
@@ -98,20 +99,22 @@ func _build() -> void:
 	_body.add_theme_constant_override("separation", Style.SP_XS)
 	_panel.add_child(_body)
 
-	_add_action("RESUME", _close)
+	_add_action("RESUME", _close, "Resume match", Style.TEAM_FRIENDLY)
 	# The two that have nothing to call. The reason rides on the tooltip AND the
 	# label, because a disabled button with no explanation reads as a bug.
 	_add_disabled("SAVE - UNAVAILABLE", "No save system exists in this build.")
 	_add_disabled("LOAD - UNAVAILABLE", "No save system exists in this build.")
-	_add_action("ABANDON MATCH", func(): _leave(main_menu_requested))
+	_add_action("ABANDON MATCH", func(): _leave(main_menu_requested), "Surrender match and return to Main Menu")
 	# The only destructive row, so it is the only one that carries the warning
 	# accent - a red MENU list would make every option look dangerous.
-	_add_action("EXIT TO DESKTOP", func(): _leave(quit_requested), Style.BAD)
+	_add_action("EXIT TO DESKTOP", func(): _leave(quit_requested), "Quit Kitbash Command to desktop", Style.BAD)
 
 
-func _add_action(label: String, action: Callable, accent: Color = Style.TEAM_FRIENDLY) -> void:
+func _add_action(label: String, action: Callable, tip: String = "", accent: Color = Style.TEAM_FRIENDLY) -> void:
 	var btn := Style.button(label, accent)
 	btn.custom_minimum_size = Vector2(0, ROW_HEIGHT)
+	if not tip.is_empty():
+		btn.tooltip_text = tip
 	_body.add_child(btn)
 	btn.pressed.connect(action)
 

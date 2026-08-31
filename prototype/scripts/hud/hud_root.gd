@@ -73,6 +73,10 @@ var _band: HBoxContainer = null
 var _hint_panel: Panel = null
 var _hint_age: float = 0.0
 
+var _hover_tooltip: PanelContainer = null
+var _hover_tooltip_title: Label = null
+var _hover_tooltip_subtitle: Label = null
+
 var _map_accum: float = 0.0
 var _panel_accum: float = 0.0
 
@@ -170,6 +174,70 @@ func _build_layout() -> void:
 	hint_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint_panel.add_child(hint_label)
+
+	# --- Floating hover tooltip for world entities (buildings, units, resource nodes) ---
+	_hover_tooltip = PanelContainer.new()
+	_hover_tooltip.name = "HoverTooltip"
+	_hover_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hover_tooltip.visible = false
+
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Style.PANEL
+	sb.set_border_width_all(1)
+	sb.border_color = Style.EDGE_BRIGHT
+	sb.set_corner_radius_all(Style.RADIUS)
+	sb.content_margin_left = Style.SP_MD
+	sb.content_margin_right = Style.SP_MD
+	sb.content_margin_top = Style.SP_XS
+	sb.content_margin_bottom = Style.SP_XS
+	_hover_tooltip.add_theme_stylebox_override("panel", sb)
+
+	var tt_vbox := VBoxContainer.new()
+	tt_vbox.add_theme_constant_override("separation", 1)
+	tt_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hover_tooltip.add_child(tt_vbox)
+
+	_hover_tooltip_title = Style.heading("")
+	_hover_tooltip_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tt_vbox.add_child(_hover_tooltip_title)
+
+	_hover_tooltip_subtitle = Style.label("", Style.SZ_MICRO, Style.TEXT_DIM)
+	_hover_tooltip_subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tt_vbox.add_child(_hover_tooltip_subtitle)
+
+	add_child(_hover_tooltip)
+
+
+func show_entity_tooltip(title: String, subtitle: String = "", screen_pos: Vector2 = Vector2.ZERO) -> void:
+	if _hover_tooltip == null:
+		return
+	if title.is_empty():
+		hide_entity_tooltip()
+		return
+	_hover_tooltip_title.text = title
+	if not subtitle.is_empty():
+		_hover_tooltip_subtitle.text = subtitle
+		_hover_tooltip_subtitle.visible = true
+	else:
+		_hover_tooltip_subtitle.visible = false
+	_hover_tooltip.visible = true
+	_hover_tooltip.reset_size()
+
+	var offset := Vector2(16, 16)
+	var pos := screen_pos + offset
+	var vp := get_viewport()
+	if vp != null:
+		var vp_size := vp.get_visible_rect().size
+		if pos.x + _hover_tooltip.size.x > vp_size.x - 10:
+			pos.x = maxf(10, screen_pos.x - _hover_tooltip.size.x - 10)
+		if pos.y + _hover_tooltip.size.y > vp_size.y - 10:
+			pos.y = maxf(10, screen_pos.y - _hover_tooltip.size.y - 10)
+	_hover_tooltip.position = pos
+
+
+func hide_entity_tooltip() -> void:
+	if _hover_tooltip != null:
+		_hover_tooltip.visible = false
 
 
 func setup(director: Node, local_team: int, current_map: Dictionary) -> void:

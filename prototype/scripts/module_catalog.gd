@@ -360,7 +360,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.SLATE_GRAY
 		},
 		"rotary_cannon": {
-			"name": "Rotary Gatling",
+			"name": "Rotary Cannon",
 			"category": "weapon",
 			"required_building": "tech_lab",
 			"hp": 80.0,
@@ -378,7 +378,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color(0.2, 0.2, 0.2) # Charcoal
 		},
 		"gauss_railgun": {
-			"name": "Gauss Railgun",
+			"name": "Railgun",
 			"category": "weapon",
 			"required_building": "physics_lab",
 			"hp": 120.0,
@@ -397,7 +397,7 @@ static func _build_catalog_literal() -> Dictionary:
 
 		# --- INDIRECT FIRE ---
 		"artillery": {
-			"name": "Artillery",
+			"name": "Heavy Artillery",
 			"category": "weapon",
 			"required_building": "tech_lab",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
@@ -441,7 +441,7 @@ static func _build_catalog_literal() -> Dictionary:
 
 		# --- MISSILES & DRONES ---
 		"guided_missile": {
-			"name": "Guided Missile TOW",
+			"name": "Guided Missile Launcher",
 			"category": "weapon",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
 			# face but never enclosed in a sponson housing. See
@@ -463,7 +463,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.GOLD
 		},
 		"missile_pod": {
-			"name": "Swarm Missile Pod",
+			"name": "Rocket Pod",
 			"category": "weapon",
 			"required_building": "tech_lab",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
@@ -502,7 +502,7 @@ static func _build_catalog_literal() -> Dictionary:
 
 		# --- AOE & AREA DENIAL ---
 		"cluster_dispenser": {
-			"name": "Cluster Dispenser",
+			"name": "Cluster Bomb Dispenser",
 			"category": "weapon",
 			"required_building": "tech_lab",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
@@ -526,7 +526,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.CHOCOLATE
 		},
 		"flamethrower": {
-			"name": "Flamethrower Emitter",
+			"name": "Flamethrower",
 			"category": "weapon",
 			"hp": 70.0,
 			"weight": 50.0,
@@ -585,7 +585,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# the projectile slides over a rod. Enormous splash, derisory range -
 		# a demolition tool that has to be driven up to what it demolishes.
 		"spigot_mortar": {
-			"name": "Spigot Mortar",
+			"name": "Demolition Mortar",
 			"category": "weapon",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
 			# face but never enclosed in a sponson housing. See
@@ -625,7 +625,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# and fast enough that point defence struggles, which is what it buys
 		# with its short reach and its need to hold a designator on target.
 		"hypervelocity_missile": {
-			"name": "Hypervelocity Missile",
+			"name": "Hypervelocity Missile Launcher",
 			"category": "weapon",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
 			# face but never enclosed in a sponson housing. See
@@ -644,7 +644,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# Air only. Useless against anything on the ground, and the longest
 		# reach against anything that isn't.
 		"sam_launcher": {
-			"name": "SAM Launcher",
+			"name": "Surface-to-Air Missile Launcher",
 			"category": "weapon",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
 			# face but never enclosed in a sponson housing. See
@@ -663,7 +663,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# Launches, circles, then dives. The longest reach in the roster,
 		# bought with a long flight time before anything happens at all.
 		"loitering_munition": {
-			"name": "Loitering Munition",
+			"name": "Loitering Munition Launcher",
 			"category": "weapon",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
 			# face but never enclosed in a sponson housing. See
@@ -683,7 +683,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# liability and makes it the one weapon whose usefulness depends
 		# entirely on what the enemy chose to build.
 		"anti_radiation_missile": {
-			"name": "Anti-Radiation Missile",
+			"name": "Anti-Radiation Missile Launcher",
 			"category": "weapon",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
 			# face but never enclosed in a sponson housing. See
@@ -702,7 +702,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# Top-attack anti-structure. Heavily biased toward buildings, and
 		# clumsy against anything that moves.
 		"bunker_buster": {
-			"name": "Bunker Buster",
+			"name": "Bunker Buster Launcher",
 			"category": "weapon",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
 			# face but never enclosed in a sponson housing. See
@@ -721,7 +721,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# Long range, slow, big warhead, and very interceptable - the missile
 		# point defence exists to eat. Ships in a sealed container.
 		"cruise_missile": {
-			"name": "Cruise Missile",
+			"name": "Cruise Missile Launcher",
 			"category": "weapon",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
 			# face but never enclosed in a sponson housing. See
@@ -741,7 +741,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# Dedicated flak. Engages AIRCRAFT, not just incoming munitions,
 		# which is the gap between the CIWS and having no answer to air.
 		"aa_autocannon": {
-			"name": "AA Autocannon",
+			"name": "Anti-Air Autocannon",
 			"category": "weapon",
 			"hp": 80.0,
 			"weight": 125.0,
@@ -775,7 +775,7 @@ static func _build_catalog_literal() -> Dictionary:
 		},
 
 		"arc_projector": {
-			"name": "Arc Projector",
+			"name": "EMP Arc Projector",
 			"category": "weapon",
 			"required_building": "tech_lab",
 			"hp": 70.0,
@@ -792,7 +792,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# Area denial by cooking electronics. The counter to energy-hungry
 		# designs specifically, which nothing else in the roster targets.
 		"microwave_emitter": {
-			"name": "Microwave Emitter",
+			"name": "Microwave Beam Emitter",
 			"category": "weapon",
 			"required_building": "tech_lab",
 			"hp": 65.0,
@@ -822,7 +822,7 @@ static func _build_catalog_literal() -> Dictionary:
 		},
 
 		"heavy_laser": {
-			"name": "Continuous Laser",
+			"name": "Beam Laser",
 			"category": "weapon",
 			"hp": 75.0,
 			"weight": 60.0,
@@ -840,7 +840,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.DARK_RED
 		},
 		"plasma_lobber": {
-			"name": "Plasma Lobber",
+			"name": "Plasma Mortar",
 			"category": "weapon",
 			"required_building": "exotics_lab",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
@@ -864,7 +864,7 @@ static func _build_catalog_literal() -> Dictionary:
 
 		# --- POINT DEFENSE ---
 		"ciws": {
-			"name": "CIWS Gatling PD",
+			"name": "Point-Defense Rotary Cannon",
 			"category": "weapon",
 			"hp": 80.0,
 			"weight": 90.0,
@@ -881,7 +881,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.WHITE_SMOKE
 		},
 		"pd_laser": {
-			"name": "Point Defense Laser",
+			"name": "Point-Defense Laser",
 			"category": "weapon",
 			"hp": 50.0,
 			"weight": 35.0,
@@ -898,7 +898,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.LIGHT_CORAL
 		},
 		"flak_cannon": {
-			"name": "Flak Cannon PD",
+			"name": "Point-Defense Flak Cannon",
 			"category": "weapon",
 			"required_building": "tech_lab",
 			"hp": 90.0,
@@ -928,7 +928,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# heavy_machine_gun (fast, flat, no splash): belt-fed rapid-fire
 		# grenades. Small blast per round, but a lot of rounds.
 		"mk19_grenade_launcher": {
-			"name": "MK19 Grenade Launcher",
+			"name": "Automatic Grenade Launcher",
 			"category": "weapon",
 			"hp": 70.0,
 			"weight": 55.0,
@@ -972,7 +972,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# and far cheaper on crystal. Gives a mid-tier design a way into
 		# hitscan kinetic without committing a whole hull to a fixed rail.
 		"coil_gun": {
-			"name": "Coil Gun",
+			"name": "Coilgun",
 			"category": "weapon",
 			"required_building": "physics_lab",
 			"hp": 90.0,
@@ -1026,7 +1026,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# damage, but it leaves a large, long-lived burning pool that
 		# makes ground genuinely expensive to stand on.
 		"napalm_mortar": {
-			"name": "Napalm Mortar",
+			"name": "Incendiary Mortar",
 			"category": "weapon",
 			"required_building": "tech_lab",
 			# Indirect fire - needs open sky, so it is levelled on a vertical
@@ -1122,7 +1122,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# chassis" is a shape question the Lab is already good at asking. A
 		# slider on the harvester could not express any of that.
 		"resource_bay": {
-			"name": "Resource Bay",
+			"name": "Resource Cargo Bay",
 			"category": "module",
 			"hp": 120.0,
 			"weight": 90.0,
@@ -1133,7 +1133,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.DARK_GOLDENROD
 		},
 		"repair_array": {
-			"name": "Repair Welder Array",
+			"name": "Repair Array",
 			"category": "module",
 			"required_building": "tech_lab",
 			"hp": 100.0,
@@ -1153,7 +1153,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.DARK_TURQUOISE
 		},
 		"sensor_suite": {
-			"name": "Standard Sensor Mast",
+			"name": "Sensor Mast",
 			"category": "module",
 			"hp": 60.0,
 			"weight": 45.0,
@@ -1165,7 +1165,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.MEDIUM_PURPLE
 		},
 		"heavy_sensor_suite": {
-			"name": "Advanced Sensor Array",
+			"name": "Heavy Sensor Array",
 			"category": "module",
 			"required_building": "tech_lab",
 			"hp": 120.0,
@@ -1178,7 +1178,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.ROYAL_BLUE
 		},
 		"directional_radar": {
-			"name": "Directional Phased Array",
+			"name": "Directional Phased Radar",
 			"category": "module",
 			"required_building": "tech_lab",
 			"hp": 100.0,
@@ -1192,7 +1192,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.DEEP_SKY_BLUE
 		},
 		"energy_barrier_projector": {
-			"name": "Energy Barrier Projector",
+			"name": "Directional Shield Projector",
 			"category": "armor",
 			"description": "Directional facet barrier projector. Projects an energy arc forcefield across the mounted hull facet that absorbs incoming damage until depleted.",
 			"required_building": "exotics_lab",
@@ -1226,7 +1226,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.DEEP_SKY_BLUE
 		},
 		"heavy_barrier_projector": {
-			"name": "Heavy Barrier Projector",
+			"name": "Heavy Shield Projector",
 			"category": "weapon",
 			"description": "Turreted Aegis barrier emitter. Automatically pivots to track incoming threats and projects a wide, terrain-conforming forcefield 20-30m ahead to shelter the vehicle and all friendly units within its zone.",
 			"required_building": "exotics_lab",
@@ -1304,7 +1304,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.SLATE_GRAY
 		},
 		"thermo_generator": {
-			"name": "Stirling Generator",
+			"name": "Thermoelectric Generator",
 			"category": "generator",
 			"hp": 70.0,
 			"weight": 55.0,
@@ -1330,7 +1330,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color.GOLD
 		},
 		"flywheel_storage": {
-			"name": "Flywheel Battery",
+			"name": "Flywheel Energy Storage",
 			"category": "generator",
 			"hp": 130.0,
 			"weight": 140.0,
@@ -1372,7 +1372,7 @@ static func _build_catalog_literal() -> Dictionary:
 		# Adding more boosters shortens recharge, making them longer extends boost duration,
 		# and making them wider increases boost speed multiplier.
 		"booster_rack": {
-			"name": "Solid-Fuel Rocket Booster",
+			"name": "Rocket Booster",
 			"category": "module",
 			"description": "Strap-on solid rocket booster system. Grants a burst sprint ability followed by a recharge cooldown. Making them longer increases boost duration, wider increases boost speed, and fitting additional boosters accelerates recharge.",
 			"hp": 40.0,
@@ -1497,7 +1497,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"traits": ["airborne", "rotary_wing", "hovering"]
 		},
 		"hover_engine": {
-			"name": "Hover Pad",
+			"name": "Hover Engine",
 			"category": "locomotion",
 			"required_building": "tech_lab",
 			"hp": 50.0,
@@ -1550,7 +1550,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"traits": ["ground_contact"]
 		},
 		"ornithopter_wing": {
-			"name": "Ornithopter Wing",
+			"name": "Ornithopter Wings",
 			"category": "locomotion",
 			"required_building": "tech_lab",
 			"hp": 65.0,
@@ -1567,10 +1567,10 @@ static func _build_catalog_literal() -> Dictionary:
 			"traits": ["airborne", "flapping_wing"]
 		},
 		"buoyant_envelope": {
-			"name": "Blimp",
+			"name": "Aerostat Envelope",
 			"category": "locomotion",
 			"required_building": "tech_lab",
-			"description": "Blimp - Buoyant lighter-than-air envelope with outrigger propulsion nacelles for heavy payload transport.",
+			"description": "Buoyant lighter-than-air envelope with outrigger propulsion nacelles for heavy payload transport.",
 			"hp": 40.0,
 			"weight": 35.0,
 			"metal": 25,
@@ -1732,7 +1732,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"traits": ["hovering"]
 		},
 		"screw_drive": {
-			"name": "Amphibious Screw Drive",
+			"name": "Screw Drive",
 			"category": "locomotion",
 			"required_building": "tech_lab",
 			# Real historical "screw-propelled vehicle" (SPV) locomotion -
@@ -1783,7 +1783,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"traits": ["ground_contact", "amphibious"]
 		},
 		"plasma_thruster": {
-			"name": "Vectored Plasma Thruster",
+			"name": "Plasma Thruster",
 			"category": "locomotion",
 			"required_building": "exotics_lab",
 			"description": "Magnetoplasmadynamic (MPD) thruster pods with magnetic nozzle vectoring for extreme hover skimming velocities over land and water.",
@@ -1834,72 +1834,89 @@ static func _build_catalog_literal() -> Dictionary:
 # the 40 catalog literals above: one contiguous, reviewable place to tune
 # voice, and it can't perturb the stat data the sim reads.
 const MODULE_FLAVOR = {
-	# Ballistic
-	"basic_cannon": "Standard issue. Accurate, dependable, and entirely unremarkable in every after-action report.",
-	"heavy_machine_gun": "Suppression rated. Barrel life is measured in engagements, not rounds. Spares are your problem.",
-	"rotary_cannon": "Sustained fire well past the point the crew compartment remains habitable.",
-	"gauss_railgun": "Capacitor discharge may interfere with nearby avionics, radios, and crew fillings.",
-	"artillery": "Indirect fire. Observer required. Do not attempt to observe from the impact area.",
-	"mortar_array": "Cheap, arcing, and imprecise. Effectiveness scales with quantity rather than skill.",
-	# Guided
-	"guided_missile": "Operator must maintain line of sight until impact. Operator discomfort is anticipated.",
-	"missile_pod": "Fires everything at once. There is no partial-salvo setting. This was a design decision.",
-	"drone_carrier": "Drones are considered expendable. Recovery is not a supported operation.",
-	"cluster_dispenser": "Wide dispersal pattern. Confirm no friendly units are downrange, or thereabouts.",
-	# Energy / exotic
-	"flamethrower": "Short range by design. Crews are advised to be certain about wind direction.",
-	"ion_cannon": "Draws heavily from base power. Scheduling with the generator crew is recommended.",
-	"heavy_laser": "Continuous beam. Performance degrades in dust, smoke, rain, and general atmosphere.",
-	"arc_projector": "Empties capacitors at range. Does almost no damage and is almost never forgiven.",
-	"microwave_emitter": "Cooks electronics through armour. Crews report the taste of metal beforehand.",
-	"particle_lance": "Five seconds of charging for one second of consequence. Do not be interrupted.",
-	"spigot_mortar": "The bomb is larger than the launcher. Range is measured generously and still disappoints.",
-	"rocket_artillery": "Empties in seconds. Reloads in considerably more than seconds.",
-	"hypervelocity_missile": "No warhead. At this speed a warhead would be an affectation.",
-	"sam_launcher": "Excellent against aircraft. Perfectly useless against everything else, including infantry standing still.",
-	"loitering_munition": "Launches, circles, considers its options, then commits. Patience is a munition now.",
-	"anti_radiation_missile": "Homes on anyone using a radar. Encourages the enemy to switch theirs off, which is also a win.",
-	"bunker_buster": "Arrives from directly above. Structures were not consulted about this.",
-	"cruise_missile": "Long ranged, generously proportioned, and entirely visible on approach.",
-	"aa_autocannon": "For aircraft. Will engage ground targets only under protest and with poor grace.",
-	"sensor_beacon_launcher": "Throws an eye over the hill. Retrieval was not part of the design brief.",
-	"plasma_lobber": "Containment is temporary by design. Everything downrange is briefly reclassified.",
-	# Point defense
-	"ciws": "Engages incoming ordnance automatically. Do not walk in front of it while powered.",
-	"pd_laser": "Silent, precise, and invisible. Confirming that it is working is an ongoing challenge.",
-	"flak_cannon": "Fills the sky with fragments. Aircraft are discouraged from entering that sky.",
-	"smoke_discharger": "Produces concealment. Conceals friendly and hostile forces with equal diligence.",
-	# Roster expansion
-	"mk19_grenade_launcher": "Belt-fed grenades. Sustained fire is possible. Sustained resupply is not.",
-	"recoilless_rifle": "Recoilless by design. The recoil is instead emitted rearward. Stand elsewhere.",
-	"coil_gun": "Staged magnetic acceleration. Quieter than the rail. Everything else is unchanged.",
-	"autocannon": "Intermediate calibre. Chosen because neither adjacent option was satisfactory either.",
-	"anti_materiel_rifle": "One round, correctly placed, at considerable expense. The sight costs more than the gun.",
-	"napalm_mortar": "Deploys thickened fuel. The affected area remains affected for some time.",
-	"mine_layer": "Emplaces area denial. Minefield records are maintained to the extent practicable.",
-	# Support
-	"resource_harvester": "Extracts and hauls. Slow, unarmed, and statistically the first thing shot at.",
-	"repair_array": "Field repair. Restores structure. Does not restore crews, morale, or paperwork.",
-	"sensor_suite": "Standard 360-degree radar mast. Doubles base hull detection range with active pulse scanning.",
-	"heavy_sensor_suite": "Heavy multispectrum sensor array. Quadruples base detection range across a 360-degree sphere.",
-	"directional_radar": "High-gain phased sector array. Exceptional reach forward in a focused sector cone; blind behind.",
-	# Power
-	"fusion_generator": "Supplies heavy base power. Rated safe. Rating issued by the manufacturer.",
-	"diesel_generator": "Internal combustion turbine. Rugged, thirsty, and loud enough to mask minor engineering errors.",
-	"thermo_generator": "Thermoelectric Stirling generator. Compact trickle output scavenged from core temperature differential.",
-	"capacitor_bank": "Stores surplus power for demand spikes. Discharges spectacularly when destroyed.",
-	"flywheel_storage": "High-velocity kinetic storage rotor. Armored containment ring doubles as structural ballistic reinforcement.",
-	"solid_state_battery": "Matrix energy cell array. Flat hull-conforming profile with modular cell banks.",
+	# Ballistic & Kinetic
+	"basic_cannon": "Direct-fire kinetic cannon. Fires high-velocity armor-piercing shells with balanced fire rate and range.",
+	"heavy_machine_gun": "Rapid-fire ballistic weapon. High rate of fire effective against unarmored targets and light armor.",
+	"rotary_cannon": "Motorized multi-barrel rotary cannon delivering extreme sustained ballistic DPS at medium range.",
+	"gauss_railgun": "Long-range electromagnetic accelerator firing hypervelocity kinetic slugs with extreme armor penetration.",
+	"artillery": "Long-range indirect artillery cannon firing heavy explosive shells in high-arching trajectories.",
+	"mortar_array": "Multi-tube indirect ballistic mortar firing arcing high-explosive volleys across medium distances.",
+	
+	# Missiles & Drones
+	"guided_missile": "Wire/laser-guided anti-tank missile with active target tracking and heavy single-hit damage.",
+	"missile_pod": "Rapid-salvo unguided rocket pod saturation launcher for medium-range bombardment.",
+	"drone_carrier": "Automated drone bay deploying autonomous attack, scout, or repair drones to support the battlefield.",
+	"cluster_dispenser": "Area-denial launcher dispersing a wide spread of explosive submunitions over hostile formations.",
+	
+	# Energy & Exotic
+	"flamethrower": "Short-range incendiary projector spraying liquid fire to burn targets and ignite the ground.",
+	"ion_cannon": "Heavy pulsed ion beam that inflicts structural damage while rapidly depleting target energy reserves.",
+	"spigot_mortar": "Short-range heavy demolition mortar lobbing massive siege warheads with enormous blast radii.",
+	"rocket_artillery": "Long-range multiple launch rocket system (MLRS) unleashing destructive saturation barrages.",
+	"hypervelocity_missile": "Kinetic dart missile traveling at extreme velocities to bypass point defense interception.",
+	"sam_launcher": "Dedicated surface-to-air guided missile launcher providing long-range anti-aircraft defense.",
+	"loitering_munition": "Reconnaissance drone missile that orbits target airspace before diving onto high-value targets.",
+	"anti_radiation_missile": "Homing missile that automatically tracks active hostile radar and electronic emissions.",
+	"bunker_buster": "Top-attack heavy penetrator missile engineered to pierce and demolish reinforced structures.",
+	"cruise_missile": "Ultra-long-range strategic cruise missile delivering a high-yield warhead to distant coordinates.",
+	"aa_autocannon": "High-elevation dual autocannon specialized in shredding low-altitude aircraft and drones.",
+	"sensor_beacon_launcher": "Lobbed reconnaissance beacon launcher that deploys temporary vision sensors into the fog of war.",
+	"arc_projector": "Short-range electromagnetic arc projector that chains disabling high-voltage current into targets.",
+	"microwave_emitter": "Directed microwave beam that penetrates armor plating to scramble electronics and drain power.",
+	"particle_lance": "Heavy charged particle beam cannon that fires a devastating continuous beam after a power spin-up.",
+	"heavy_laser": "Continuous direct-fire laser beam delivering focused thermal cutting damage with instant hitscan delivery.",
+	"plasma_lobber": "Heavy plasma containment mortar firing arcing superheated plasma globes with wide thermal splash.",
+	
+	# Point Defense & Tactical
+	"ciws": "Automated high-speed rotary point-defense gun that intercepts incoming missiles, artillery, and mortar shells.",
+	"pd_laser": "Rapid-cycling point-defense laser designed to instantly burn down incoming guided ordnance.",
+	"flak_cannon": "Flak point-defense cannon detonating shrapnel clouds to intercept ordnance and damage aircraft.",
+	"smoke_discharger": "Tactical aerosol grenade discharger creating dense smoke screens that block line of sight.",
+	"mk19_grenade_launcher": "Belt-fed automatic grenade launcher firing continuous high-explosive fragmentation grenades.",
+	"recoilless_rifle": "Lightweight high-caliber anti-tank gun with massive per-shot HEAT impact and significant rear backblast.",
+	"coil_gun": "Turreted multi-stage magnetic coilgun providing rapid hitscan kinetic fire at medium-long reach.",
+	"autocannon": "Intermediate-caliber rapid autocannon offering high per-shot kinetic impact against armored vehicles.",
+	"anti_materiel_rifle": "High-precision heavy sniper rifle delivering massive single-shot kinetic damage at extreme range.",
+	"napalm_mortar": "Incendiary mortar launching persistent chemical fire shells that ignite large ground areas.",
+	"mine_layer": "Mine dispenser deploying persistent proximity explosives to deny chokepoints and access routes.",
+	
+	# Utility & Support
+	"resource_harvester": "Automated harvesting arm and hopper assembly for extracting raw metal and crystal resource deposits.",
+	"resource_bay": "Reinforced cargo container expanding vehicle raw material haul capacity for harvesting runs.",
+	"repair_array": "Automated arc-welding repair array that projects restorative repair beams onto damaged friendly hulls.",
+	"sensor_suite": "Active omnidirectional sensor mast expanding baseline vehicle visual and radar detection range.",
+	"heavy_sensor_suite": "Heavy multispectrum sensor array providing superior long-range 360-degree battlefield vision.",
+	"directional_radar": "High-gain phased sector radar concentrating extreme detection reach in a 60-degree forward cone.",
+	"booster_rack": "Solid-fuel rocket booster providing an on-demand burst sprint speed boost with cooldown recharge.",
+	
+	# Defensive Barriers & Shields
+	"energy_barrier_projector": "Directional facet barrier projector forming an energy arc shield over the mounted hull face.",
+	"bubble_shield_projector": "Omnidirectional shield emitter generating a protective spherical forcefield around the hull.",
+	"heavy_barrier_projector": "Turreted Aegis projector projecting an expansive forward shield wall to protect friendly units.",
+	
+	# Power & Energy Storage
+	"fusion_generator": "Compact magnetic confinement fusion reactor generating high continuous electrical power output.",
+	"diesel_generator": "Gas turbine internal combustion generator supplying reliable continuous electrical power.",
+	"thermo_generator": "Thermoelectric core generator trickling electrical power harvested from waste thermal differentials.",
+	"capacitor_bank": "High-density capacitor bank storing electrical energy to buffer burst power consumption demands.",
+	"flywheel_storage": "High-velocity kinetic flywheel energy storage unit with reinforced structural containment.",
+	"solid_state_battery": "Modular solid-state chemical battery bank providing balanced power storage capacity.",
+	
 	# Locomotion
-	"wheels": "Fast on hard ground. Enthusiasm for soft ground is not shared by the wheels.",
-	"tracked_treads": "Slow, heavy, and indifferent to terrain. Throws a track at the worst opportunity.",
-	"helicopter_rotors": "Vertical lift. Loud enough to announce arrival well ahead of arrival.",
-	"hover_engine": "Ignores ground conditions entirely. Also ignores most attempts at braking.",
-	"legs": "Walks over what others drive around. Complexity per kilometre is considerable.",
-	"ornithopter_wing": "Flaps. Reviewed twice by engineering. Approved twice. Nobody is entirely sure why.",
-	"buoyant_envelope": "Lighter than air, slower than everything, and a generously sized target.",
-	"screw_drive": "Amphibious augers. Crosses land and water equally badly, which counts as versatility.",
-	"plasma_thruster": "Direct-drive magnetoplasmadynamic thruster array. Speed records are routinely set; braking distance is measured in postcodes.",
+	"wheels": "High-speed wheeled drivetrain offering exceptional speed and agility across paved roads and firm ground.",
+	"tracked_treads": "Heavy continuous tank tracks delivering superior load capacity and traction across rough terrain.",
+	"heavy_quad_tracks": "Four independent heavy continuous track pods designed for extreme armor and weapon payloads.",
+	"helicopter_rotors": "Rotary-wing helicopter lift assembly allowing full vertical flight, hovering, and terrain traversal.",
+	"hover_engine": "Ground-effect hover thruster providing high-speed frictionless skimming over land and water.",
+	"legs": "Articulated mechanical walking legs providing steady footing, hill climbing, and broken terrain traversal.",
+	"ornithopter_wing": "Biomimetic flapping wing propulsion providing agile low-altitude airborne flight.",
+	"buoyant_envelope": "Lighter-than-air aerostat gas envelope providing immense payload capacity at low cruise speeds.",
+	"half_track": "Hybrid drivetrain combining steerable front wheels with rear track bogies for mixed terrain agility.",
+	"rocker_bogie": "Articulated rocker-bogie suspension system engineered to crawl over boulder fields and steep inclines.",
+	"air_cushion_skirt": "Amphibious hovercraft skirt and lift fan system designed for smooth high-speed transit across water and marsh.",
+	"anti_grav_plate": "Advanced graviton repulsor plates providing uniform frictionless hover lift across all surfaces.",
+	"screw_drive": "Amphibious twin helical auger drive that claws through mud, swamps, snow, and water.",
+	"plasma_thruster": "Magnetoplasmadynamic vectored plasma thruster delivering maximum hover skimming velocities.",
 }
 
 # Empty string when a module has no authored line - callers append

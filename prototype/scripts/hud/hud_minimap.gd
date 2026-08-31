@@ -107,6 +107,7 @@ func _init() -> void:
 	name = "TacticalMap"
 	custom_minimum_size = Vector2(Style.MAP_SIZE, Style.MAP_SIZE)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	tooltip_text = "Tactical Minimap\nLeft-click: Move camera\nRight-click: Issue move/attack order"
 	Style.apply_panel(self, false, Style.EDGE_BRIGHT)
 	_build()
 

@@ -4654,19 +4654,80 @@ func _resolve_left_release(at: Vector2, additive: bool) -> void:
 # selection the order path uses, rather than from a parallel guess.
 func _update_hover_cursor(screen_pos: Vector2) -> void:
 	var cm = get_node_or_null("/root/CursorManager")
-	if cm == null or camera == null:
+	if camera == null:
+		if hud != null and hud.has_method("hide_entity_tooltip"):
+			hud.hide_entity_tooltip()
 		return
 
 	# Placing a building overrides everything: the only thing a click does here is
 	# site it, and whether the site is legal is the one fact worth showing.
-	if is_placing():
-		var hit := _raycast(screen_pos, LayersScript.GROUND_PICK_MASK, false)
-		var ok := false
-		if not hit.is_empty():
-			var at: Vector3 = hit.position
-			at.y = terrain_height_at(at)
-			ok = placement_validity(at)["valid"]
-		cm.set_cursor(cm.CursorType.BUILD if ok else cm.CursorType.INVALID)
+	if is_placing() or is_placing_hq():
+		if hud != null and hud.has_method("hide_entity_tooltip"):
+			hud.hide_entity_tooltip()
+		if is_placing():
+			var hit := _raycast(screen_pos, LayersScript.GROUND_PICK_MASK, false)
+			var ok := false
+			if not hit.is_empty():
+				var at: Vector3 = hit.position
+				at.y = terrain_height_at(at)
+				ok = placement_validity(at)["valid"]
+			if cm != null:
+				cm.set_cursor(cm.CursorType.BUILD if ok else cm.CursorType.INVALID)
+		return
+
+	# Check for world entities under cursor to display hover tooltips
+	var hovered_entity: bool = false
+	var sel_hit := _raycast(screen_pos, LayersScript.SELECTION_QUERY_MASK, true)
+	if not sel_hit.is_empty():
+		if sel_hit.collider.has_meta("structure"):
+			var s = sel_hit.collider.get_meta("structure")
+			if is_instance_valid(s) and not s.is_dead:
+				var visible_to_player = (s.team == PLAYER_TEAM or vision == null or not vision.has_method("is_visible_to_team") or vision.is_visible_to_team(s, PLAYER_TEAM))
+				if visible_to_player:
+					var s_name: String = s.get_display_name() if s.has_method("get_display_name") else str(s.kind).capitalize()
+					var status := ""
+					if s.build_incomplete or s.is_under_construction:
+						status = "Under Construction (%d%%)" % int(round(s.construction_progress * 100.0))
+					elif s.team != PLAYER_TEAM:
+						status = "Hostile Structure"
+					else:
+						status = "Friendly Structure"
+					if hud != null and hud.has_method("show_entity_tooltip"):
+						hud.show_entity_tooltip(s_name, status, screen_pos)
+					hovered_entity = true
+		elif not hovered_entity and sel_hit.collider.has_meta("unit"):
+			var u = sel_hit.collider.get_meta("unit")
+			if is_instance_valid(u) and not u.is_dead:
+				var visible_to_player = (u.team == PLAYER_TEAM or vision == null or not vision.has_method("is_visible_to_team") or vision.is_visible_to_team(u, PLAYER_TEAM))
+				if visible_to_player:
+					var u_name: String = u.display_name if ("display_name" in u and not str(u.display_name).is_empty()) else ("Unit" if not ("design_name" in u) else str(u.design_name))
+					var status: String = "Friendly Unit" if u.team == PLAYER_TEAM else "Hostile Unit"
+					if hud != null and hud.has_method("show_entity_tooltip"):
+						hud.show_entity_tooltip(u_name, status, screen_pos)
+					hovered_entity = true
+
+	if not hovered_entity:
+		var node_hit_tip := _raycast(screen_pos, LayersScript.RESOURCE_NODES, false)
+		if not node_hit_tip.is_empty() and node_hit_tip.collider.is_in_group("resource_nodes"):
+			var node_obj = node_hit_tip.collider
+			var node_name := "Resource Deposit"
+			if node_obj.has_meta("resource_type"):
+				node_name = "%s Deposit" % str(node_obj.get_meta("resource_type")).capitalize()
+			elif "resource_type" in node_obj:
+				node_name = "%s Deposit" % str(node_obj.resource_type).capitalize()
+			var yield_str := ""
+			if node_obj.has_meta("remaining_amount"):
+				yield_str = "%d units remaining" % int(node_obj.get_meta("remaining_amount"))
+			elif "remaining_amount" in node_obj:
+				yield_str = "%d units remaining" % int(node_obj.remaining_amount)
+			if hud != null and hud.has_method("show_entity_tooltip"):
+				hud.show_entity_tooltip(node_name, yield_str, screen_pos)
+			hovered_entity = true
+
+	if not hovered_entity and hud != null and hud.has_method("hide_entity_tooltip"):
+		hud.hide_entity_tooltip()
+
+	if cm == null:
 		return
 
 	# Our own structures raise a production ring on click, not an order.

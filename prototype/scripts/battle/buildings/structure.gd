@@ -29,6 +29,7 @@ var max_hp: float = 1000.0
 var hp: float = 1000.0
 var is_dead: bool = false
 var footprint := Vector3(5, 3, 5)
+var display_name: String = ""
 
 # Construction lifecycle
 var build_incomplete: bool = false
@@ -79,9 +80,16 @@ func _ready() -> void:
 	add_to_group("damageable")
 
 
+func get_display_name() -> String:
+	if not display_name.is_empty():
+		return display_name
+	return BuildingCatalogScript.get_display_name(kind)
+
+
 func setup(structure_kind: String, structure_team: int) -> void:
 	kind = structure_kind
 	team = structure_team
+	display_name = BuildingCatalogScript.get_display_name(kind)
 	set_meta("team", team)
 	collision_layer = LayersScript.BUILDINGS
 	collision_mask = 0
@@ -142,6 +150,7 @@ func setup(structure_kind: String, structure_team: int) -> void:
 func setup_from_blueprint(blueprint: Dictionary, structure_team: int, bp_manager: Node) -> bool:
 	kind = "defense"
 	team = structure_team
+	display_name = str(blueprint.get("name", "Defense Turret"))
 	set_meta("team", team)
 	collision_layer = LayersScript.BUILDINGS
 	collision_mask = 0

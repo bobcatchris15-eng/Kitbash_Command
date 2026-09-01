@@ -29,6 +29,8 @@
 
 const HullFacets = preload("res://scripts/hull_facets.gd")
 const LiveryScript = preload("res://scripts/livery.gd")
+const ModuleCatalog = preload("res://scripts/module_catalog.gd")
+const MeshAssetLoader = preload("res://scripts/mesh_asset_loader.gd")
 
 # The paintable armor types: Steel Plate, Ceramic Ablative, Ballistic Nylon, Composite Plate.
 const PAINT_TYPE_IDS := [
@@ -226,6 +228,47 @@ static func build_plan(hull_type_id: String, assignments: Array,
 	# triangle belongs to, without needing the mesh at resolve time.
 	plan["tri_map"] = seg.get("map", PackedInt32Array())
 	return plan
+
+
+# Full exterior area of a hull's plating, for the drivetrain to charge the
+# material/thickness the design declares - compute_hull_weight() scales the
+# hull's structural mass by volume and ignores both sliders, so an ablative
+# 3.0 hull used to weigh exactly what hardened 1.0 did. Mirrors build_plan's
+# per-facet area math (|det(S)| * |S^-T n|) so a scaled hull is charged the
+# same factor its painted facets would be. Falls back to the baked sidecar
+# total_area when normals are absent, and to a bounding-box area when there
+# is no facet bake at all (foundation/procedural hulls).
+static func hull_total_area(hull_type_id: String, hull_scale: Vector3 = Vector3.ONE) -> float:
+	var seg := HullFacets.load_map(hull_type_id)
+	var count := int(seg.get("facet_count", seg.get("count", 0)))
+	var normals: PackedVector3Array = seg.get("normal", PackedVector3Array())
+	var areas: PackedFloat32Array = seg.get("area", PackedFloat32Array())
+	if count <= 0 or normals.size() < count or areas.size() < count:
+		# Only the foundation hulls ship a baked facet sidecar; the ship
+		# roster resolves facets live off the mesh, exactly as build_plan()
+		# does when given one. The mesh path is cached per-RID, so the first
+		# call for a hull is the expensive one, same as anywhere else.
+		seg = HullFacets.cached_segment(MeshAssetLoader.get_hull_mesh(hull_type_id))
+		count = int(seg.get("facet_count", seg.get("count", 0)))
+		normals = seg.get("normal", PackedVector3Array())
+		areas = seg.get("area", PackedFloat32Array())
+	if count <= 0 or normals.size() < count or areas.size() < count:
+		# No facet bake and no resolvable mesh (foundation/procedural):
+		# fall back to the sidecar box.
+		var dims: Variant = ModuleCatalog.get_module_data(hull_type_id).get("size", null)
+		if not (dims is Array) or dims.size() < 3:
+			return 0.0
+		var s := Vector3(float(dims[0]), float(dims[1]), float(dims[2])) * hull_scale
+		return 2.0 * (s.x * s.y + s.x * s.z + s.y * s.z)
+	var basis := Basis().scaled(hull_scale)
+	var normal_xf := basis.inverse().transposed()
+	var det: float = absf(basis.determinant())
+	var total := 0.0
+	for f in range(count):
+		var raw: Vector3 = normal_xf * normals[f]
+		var len_raw := raw.length()
+		total += areas[f] * det * (len_raw if len_raw > 1e-9 else 1.0)
+	return total
 
 
 static func _empty_plan(hull_type_id: String) -> Dictionary:

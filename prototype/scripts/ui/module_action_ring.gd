@@ -3,7 +3,9 @@ extends Control
 
 # Module action ring & radial tweak console for Design Lab parts manipulation.
 # Sized ONCE, at open, to clear the module's projected silhouette - then fixed.
-# Combines inner verb wedges with outer clock-face tweak stations and a docked 6:00 spec plate.
+# Combines inner verb wedges with outer clock-face tweak dials. No centre hub
+# and no spec plate: the module inspector (bottom-right) already carries the
+# designation and stats.
 
 const RingDraw = preload("res://scripts/ui/ring_draw.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
@@ -23,8 +25,6 @@ const STATION_TIER_OFFSET := 76.0
 const ORBIT_MARGIN := 200.0
 
 var target_node: Node3D = null
-var subject_label: String = ""
-var spec_stats_text: String = ""
 var max_zoom_distance: float = 40.0
 
 var inner_radius: float = FIXED_INNER_RADIUS
@@ -36,7 +36,6 @@ var _hovered: int = -1
 var _is_open: bool = false
 var _target_screen_center: Vector2 = Vector2.ZERO
 var _station_container: Control = null
-var _spec_card: PanelContainer = null
 
 
 func _init() -> void:
@@ -82,48 +81,19 @@ func set_action_enabled(id: String, enabled: bool) -> void:
 			break
 
 
-func add_tweak_station(tweak_name: String, label: String, control: Control, angle: float = -1.0) -> void:
-	if angle < 0.0:
-		angle = TweakStations.angle_for(tweak_name)
-		if angle < 0.0:
-			angle = TweakStations.CLOCK_1
-
-	# Station claim order: the tweak's canonical clock angle when free, then
-	# the nearest free FIRST-LAYER station (the eight outer-band clocks), then
-	# - only once all eight are taken - a new outward tier stacked over the
-	# canonical angle. Two of one module's tweaks can share an angle (the
-	# rotary cannon's Barrel Count and Motor Size both live at 11 o'clock);
-	# the ring used to build outward immediately, leaving half the first
-	# layer empty while a second dial orbited out past it.
-	var claimed := {}
-	for st in _tweak_stations:
-		var a := float(st.get("angle", -1.0))
-		claimed[a] = int(claimed.get(a, 0)) + 1
-
-	var tier := 0
-	if claimed.has(angle):
-		var best_dist := INF
-		var free_angle := -1.0
-		for cand: float in TweakStations.OUTER_STATIONS:
-			if claimed.has(cand):
-				continue
-			var dist := absf(cand - angle)
-			dist = minf(dist, 1.0 - dist)
-			if dist < best_dist:
-				best_dist = dist
-				free_angle = cand
-		if free_angle >= 0.0:
-			angle = free_angle
-		else:
-			# All eight first-layer stations taken: build outward.
-			tier = int(claimed.get(angle, 0))
-
+func add_tweak_station(tweak_name: String, label: String, control: Control) -> void:
+	# Sequential claim alternating sides: 12, 1, 11, 2, 10, ... 6 o'clock, so
+	# dials fan evenly rather than hugging one side. No tweak owns a position -
+	# a dial's place is its authoring order. A thirteenth dial opens a second
+	# radial tier back at 12 o'clock (tier = flat index / 12).
+	var n := TweakStations.OUTER_STATIONS.size()
+	var slot := _tweak_stations.size()
 	_tweak_stations.append({
 		"name": tweak_name,
 		"label": label,
 		"control": control,
-		"angle": angle,
-		"tier": tier,
+		"angle": TweakStations.OUTER_STATIONS[slot % n],
+		"tier": slot / n,
 	})
 	_station_container.add_child(control)
 	_update_station_positions()
@@ -137,49 +107,8 @@ func clear_tweak_stations() -> void:
 	_tweak_stations.clear()
 
 
-func set_spec_info(stats_text: String) -> void:
-	spec_stats_text = stats_text
-	_update_spec_card()
-
-
-func _update_spec_card() -> void:
-	if spec_stats_text == "":
-		if is_instance_valid(_spec_card):
-			_spec_card.visible = false
-		return
-	
-	if _spec_card == null or not is_instance_valid(_spec_card):
-		_spec_card = PanelContainer.new()
-		_spec_card.name = "SpecPlate"
-		_spec_card.theme_type_variation = "CalloutPanel"
-		_station_container.add_child(_spec_card)
-		
-		var vbox = VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 2)
-		_spec_card.add_child(vbox)
-		
-		var title_lbl = Label.new()
-		title_lbl.name = "TitleLabel"
-		title_lbl.theme_type_variation = "HintLabel"
-		vbox.add_child(title_lbl)
-		
-		var stats_lbl = Label.new()
-		stats_lbl.name = "StatsLabel"
-		stats_lbl.theme_type_variation = "HUDValueLabel"
-		vbox.add_child(stats_lbl)
-	
-	_spec_card.visible = true
-	var title_lbl = _spec_card.find_child("TitleLabel", true, false) as Label
-	if title_lbl:
-		title_lbl.text = subject_label
-	var stats_lbl = _spec_card.find_child("StatsLabel", true, false) as Label
-	if stats_lbl:
-		stats_lbl.text = spec_stats_text
-
-
-func open_for_module(module: Node3D, label_text: String = "") -> void:
+func open_for_module(module: Node3D) -> void:
 	target_node = module
-	subject_label = label_text
 	_is_open = true
 	visible = true
 	_update_canvas_size()
@@ -256,11 +185,6 @@ func _update_station_positions() -> void:
 		var station_r: float = outer_radius + STATION_RADIAL_OFFSET + float(st.get("tier", 0)) * STATION_TIER_OFFSET
 		ctrl.position = center + dir * station_r - ctrl.size * 0.5
 
-	if is_instance_valid(_spec_card) and _spec_card.visible:
-		# Docked at 6:00 (bottom)
-		var spec_pos := center + Vector2(-_spec_card.size.x * 0.5, outer_radius + 18.0)
-		_spec_card.position = spec_pos
-
 
 func _has_point(point: Vector2) -> bool:
 	var offset := point - size * 0.5
@@ -273,9 +197,6 @@ func _has_point(point: Vector2) -> bool:
 		var ctrl: Control = st.get("control")
 		if is_instance_valid(ctrl) and ctrl.get_rect().has_point(point):
 			return true
-	
-	if is_instance_valid(_spec_card) and _spec_card.visible and _spec_card.get_rect().has_point(point):
-		return true
 
 	return false
 
@@ -338,6 +259,7 @@ func _draw() -> void:
 		HUB_RADIUS,
 		_actions,
 		_hovered,
-		subject_label if (_spec_card == null or not _spec_card.visible) else "",
-		font
+		"",
+		font,
+		false
 	)

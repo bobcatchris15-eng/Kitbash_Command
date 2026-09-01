@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c32yc5amxewfj"
-path="res://.godot/imported/ledger_combine_albedo.png-f8c7e10579b2d8efe2461b994fc5a372.ctex"
+path.s3tc="res://.godot/imported/ledger_combine_albedo.png-f8c7e10579b2d8efe2461b994fc5a372.s3tc.ctex"
+path.etc2="res://.godot/imported/ledger_combine_albedo.png-f8c7e10579b2d8efe2461b994fc5a372.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/factions/ledger_combine_albedo.png"
-dest_files=["res://.godot/imported/ledger_combine_albedo.png-f8c7e10579b2d8efe2461b994fc5a372.ctex"]
+dest_files=["res://.godot/imported/ledger_combine_albedo.png-f8c7e10579b2d8efe2461b994fc5a372.s3tc.ctex", "res://.godot/imported/ledger_combine_albedo.png-f8c7e10579b2d8efe2461b994fc5a372.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

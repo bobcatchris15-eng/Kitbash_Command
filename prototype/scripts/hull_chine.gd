@@ -84,6 +84,11 @@ const MIN_SECTION_POINTS: int = 3
 
 ## Degenerate-section guard. A section thinner or shallower than this (in hull
 ## units) has no meaningful corner to find.
+# Fractional port/starboard width difference under which a section is treated
+# as mirror-symmetric and solved as one folded candidate set. Well above the
+# float/triangulation noise of a symmetric bake (measured under 1e-3 on this
+# roster) and well below any deliberate one-sided sponson.
+const SECTION_SYMMETRY_TOL := 0.05
 const MIN_SECTION_EXTENT: float = 0.001
 
 ## Radius of the tangent-fit neighbourhood at the chine, as a fraction of the
@@ -273,9 +278,40 @@ static func chine_at(profile: Dictionary, z: float, side: float) -> Dictionary:
 	# symmetric (an asymmetric sponson, a bake that drifted), and using the full
 	# section width would normalise the port side against the starboard side's
 	# widest point.
+	# Reassigned below when the section folds - see SIDE FOLDING.
 	var half_width: float = (sec["right"] if s > 0.0 else -sec["left"])
 	if height < MIN_SECTION_EXTENT or half_width < MIN_SECTION_EXTENT:
 		return fallback
+
+	# SIDE FOLDING - the fix for asymmetric locomotion stations.
+	#
+	# The corner metric below picks the best DISCRETE VERTEX of the section, and
+	# section() returns an unordered point cloud harvested per triangle. A hull
+	# mesh that is mirror-symmetric in SHAPE is not necessarily mirror-symmetric
+	# in TRIANGULATION, so the two sides offer different candidate vertices at a
+	# given z, and the argmin lands in different places. On a hull with long
+	# flat chamfer faces the nearest candidates sit at opposite ENDS of the same
+	# face, so the error is the size of the face, not of the noise.
+	#
+	# Measured with tools/probe_chine_symmetry.gd: 78 of 98 hulls in the roster
+	# had a port/starboard chine mismatch over 20 mm, worst 0.89 m, and every
+	# hexton hull was between 0.24 m and 0.78 m - which is the visible
+	# "wheels and legs are not attached symmetrically" report.
+	#
+	# So when the section is symmetric to within SECTION_SYMMETRY_TOL, both
+	# sides are solved from ONE candidate set built in |x| space, which makes
+	# the two answers mirror images by construction rather than by luck. A
+	# genuinely asymmetric section (an authored one-sided sponson) falls back to
+	# the old per-side solve, so the original intent recorded above half_width
+	# is preserved where it actually applies.
+	var right_w: float = sec["right"]
+	var left_w: float = -sec["left"]
+	var widest: float = maxf(right_w, left_w)
+	var folded: bool = widest > MIN_SECTION_EXTENT and absf(right_w - left_w) / widest <= SECTION_SYMMETRY_TOL
+	if folded:
+		# One shared half-width, or the normalisation itself stays per-side and
+		# reintroduces the very asymmetry the folding removes.
+		half_width = widest
 
 	# THE CORNER METRIC.
 	#
@@ -288,35 +324,47 @@ static func chine_at(profile: Dictionary, z: float, side: float) -> Dictionary:
 	# a linear (u - v) score because the linear form ties across an entire
 	# 45-degree chamfer face and needs an arbitrary tie-break; squared distance
 	# picks the middle of that face, which is where the bracket should sit.
-	var best := -1
+	#
+	# Candidates are held in |x| (outboard-positive) space so a folded solve and
+	# a per-side solve run through identical code; the winner is mapped back
+	# onto the requested side at the end.
+	var best_out := -INF   # outboard distance of the winner
+	var best_y := 0.0
 	var best_cost := INF
-	# Centroid of this side's points, accumulated in the same pass. This is the
-	# interior reference the normal fit is oriented against - see _fit_normal().
+	# Centroid of THIS SIDE's real points, accumulated in the same pass. Stays
+	# per-side even when folded: it is the interior reference the normal fit is
+	# oriented against, and that fit reads real geometry on the side being
+	# solved - see _fit_normal().
 	var interior := Vector2.ZERO
 	var interior_n := 0
 	for j in pts.size():
 		var p := pts[j]
 		var sx := p.x * s
-		if sx <= 0.0:
-			continue  # other side of the keel, or dead on centreline
-		interior += p
-		interior_n += 1
-		var u := sx / half_width
+		if sx > 0.0:
+			interior += p
+			interior_n += 1
+		var out_x: float = sx
+		if out_x <= 0.0:
+			if not folded or absf(p.x) <= 0.0:
+				continue  # other side of the keel, and not folding it in
+			out_x = -sx   # mirror the far-side point onto this side
+		var u := out_x / half_width
 		var v := (p.y - low) / height
 		var du := 1.0 - u
 		var cost := du * du + v * v
 		if cost < best_cost:
 			best_cost = cost
-			best = j
-	if best < 0 or interior_n == 0:
+			best_out = out_x
+			best_y = p.y
+	if best_out == -INF or interior_n == 0:
 		return fallback
 	interior /= float(interior_n)
 
-	var chine := pts[best]
+	var chine := Vector2(best_out * s, best_y)
 	return {
 		"found": true,
 		"position": Vector3(chine.x, chine.y, z),
-		"normal": _fit_normal(pts, best, s, half_width, height, interior),
+		"normal": _fit_normal(pts, chine, s, half_width, height, interior),
 		"half_width": half_width,
 		"low": low,
 		"high": high,
@@ -331,9 +379,13 @@ static func chine_at(profile: Dictionary, z: float, side: float) -> Dictionary:
 ## normal is a stair-step rather than the surface direction. A short local fit
 ## averages that out and, on a rounded bilge, returns the true tangent normal
 ## instead of one facet's approximation of it.
-static func _fit_normal(pts: Array[Vector2], idx: int, s: float,
+## `origin` is a POINT rather than an index into `pts`, because a folded chine
+## solve (see SIDE FOLDING in chine_at) can win on a position mirrored in from
+## the far side, which is not a vertex of this side. The neighbourhood scan
+## below still reads real points, so the fitted normal is real local geometry on
+## the side being solved either way.
+static func _fit_normal(pts: Array[Vector2], origin: Vector2, s: float,
 		half_width: float, height: float, interior: Vector2) -> Vector3:
-	var origin := pts[idx]
 	var radius := minf(half_width, height) * NORMAL_FIT_RADIUS_FRAC
 	var r2 := radius * radius
 

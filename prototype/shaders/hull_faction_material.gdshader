@@ -46,7 +46,15 @@ uniform float flash_amount : hint_range(0.0, 1.0) = 0.0;
 // Added as EMISSION so it stacks on top of the PBR diffuse without
 // interfering with the diffuse_lambert_wrap model; for the front face
 // the PBR already gives full diffuse, and the EMISSION clamps to 1.0.
-uniform float indirect_lift : hint_range(0.0, 1.0) = 0.25;
+// 2026-08-31: 0.25 -> 0.06. At 0.25 every unit and building in the game
+// self-illuminated at a quarter of its own albedo, which flattened the
+// lighting (shadowed sides glowed), removed the dark end of the value
+// range, and made saturated paint read as backlit plastic. It was a
+// workaround for "the livery is unreadable on a face pointing away from the
+// sun", and that problem is now solved properly: Battle.tscn's ambient
+// source is the sky (was a flat colour), so an unlit face gets real sky
+// fill. A small residual is kept so the read never fully collapses.
+uniform float indirect_lift : hint_range(0.0, 1.0) = 0.06;
 uniform float edge_ink_strength : hint_range(0.0, 1.0) = 0.95;
 uniform float ink_width : hint_range(0.05, 0.9) = 0.32;
 uniform vec3 ink_color : source_color = vec3(0.04, 0.035, 0.05);
@@ -73,6 +81,36 @@ uniform int zone_upper_surface : hint_range(0, 9) = 0;
 uniform float zone_stripe_metallic : hint_range(0.0, 1.0) = 1.0;
 uniform float zone_stripe_roughness : hint_range(0.0, 1.0) = 0.85;
 uniform int zone_stripe_surface : hint_range(0, 9) = 0;
+
+// ACCENT EMISSIVE - marker lights, and the new home of team identity.
+//
+// Team colour used to be applied as PAINT, over whole objects: a fully
+// saturated hull plus a ~50%-coverage camo/hazard pattern in a second
+// saturated tone. When most of the frame is saturated, none of it reads, and
+// the objects look like toys. Reference RTS frames run a desaturated base and
+// spend chroma on a few percent of pixels - almost always as small bright
+// lights.
+//
+// So the paint is now a desaturated camo pair (see livery.gd's PRESETS) and
+// the saturated faction hue moved here. The mask is deliberately tiny: a
+// sparse scatter of cells off the panel grid, biased to the upper hull, which
+// reads as running lights on a vehicle and lit windows on a building.
+//
+// Applied ADDITIVELY and after the existing emissive branch, so it composes
+// with the indirect lift and the shield/flash overrides instead of replacing
+// them - a glowing shield still wins, but a shielded unit keeps its marker
+// lights.
+uniform vec4 accent_emissive_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform float accent_emissive_strength : hint_range(0.0, 8.0) = 0.0;
+// Half-length of a lamp along the hull, in normalised hull space. 0.035 makes
+// each station about 7% of the hull's length - a fitting, not a stripe.
+// Height up the hull, in normalised hull space, at which the marker lights sit -
+// on the shoulder, just below the deck line.
+const float ACCENT_LIGHT_HEIGHT = 0.62;
+uniform float accent_light_length : hint_range(0.005, 0.2) = 0.045;
+// Cells per world unit for the light scatter. Independent of texture_scale so
+// light SIZE stays physical even where the panel texture does not (see the
+// texel-density note in hull_material_builder.gd).
 
 uniform float livery_mix : hint_range(0.0, 1.0) = 0.0;
 uniform float zone_split : hint_range(0.0, 1.0) = 0.45;
@@ -438,6 +476,52 @@ void fragment() {
 		EMISSION = base_color.rgb * 0.12;
 	} else if (emissive_strength > 0.0) {
 		EMISSION = emissive_color.rgb * emissive_strength;
+	}
+
+	// Marker lights. See accent_emissive_color's note above for why team
+	// identity lives here rather than in the paint.
+	if (accent_emissive_strength > 0.0) {
+		// DELIBERATE STATIONS, not a hashed scatter.
+		//
+		// The first version picked a sparse set of cells off a hashed grid,
+		// which is random by construction: the lamps landed wherever the hash
+		// said, in different places on the two flanks, and read as arbitrary
+		// glowing blobs rather than as fittings. Chris, on seeing them: "they
+		// seem to just be randomly placed".
+		//
+		// Now they sit at three fixed stations along the length, on the
+		// shoulder line, MIRRORED across the centreline by construction
+		// (`flank` uses abs, so port and starboard are identical). Six lamps on
+		// a vehicle, in the places a real machine carries marker lights.
+		//
+		// Normalised hull space rather than physical: a lamp scaling with the
+		// vehicle is correct here - a bigger machine carries bigger lights -
+		// and it keeps the stations at the same proportional positions on every
+		// hull in the roster.
+		// COMPACT IN BOTH AXES. The first station attempt gated only Z
+		// narrowly and used a broad smoothstep over flank and height, so each
+		// "lamp" was a thin band that wrapped the entire shoulder contour and
+		// rendered as a glowing racing stripe. A lamp has to be small in every
+		// direction: a point in (height, length) on the outboard flank.
+		float flank = abs(zone_x - 0.5) * 2.0;
+		// Outboard only. A lamp on the belly glows into the mud, one on the
+		// centreline is a sunroof.
+		float outboard = smoothstep(0.68, 0.88, flank);
+		float lamp = 0.0;
+		for (int i = 0; i < 3; i++) {
+			float zc = 0.22 + 0.28 * float(i);
+			float dz = (zone_z - zc) / accent_light_length;
+			float dh = (zone_h - ACCENT_LIGHT_HEIGHT) / accent_light_length;
+			float r = sqrt(dz * dz + dh * dh);
+			lamp = max(lamp, (1.0 - smoothstep(0.55, 1.0, r)) * outboard);
+		}
+		// Mud drowns a lamp; a chipped-through panel no longer has one.
+		lamp *= (1.0 - mud_mask) * (1.0 - chip_mask);
+		if (lamp > 0.001) {
+			EMISSION += accent_emissive_color.rgb * accent_emissive_strength * lamp;
+			// A lamp is not painted metal.
+			ALBEDO = mix(ALBEDO, accent_emissive_color.rgb * 0.35, lamp * 0.8);
+		}
 	}
 
 	// Friendly rim-light: brightens silhouette edges on friendly units so

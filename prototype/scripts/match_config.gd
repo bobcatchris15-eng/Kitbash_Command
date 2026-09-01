@@ -4,8 +4,8 @@ extends Node
 # into the next match, plus selected_map_id for any caller that still
 # wants it for display purposes.
 #
-# 2026-08-10: the seven legacy pre-match fields (player_faction /
-# enemy_faction / selected_blueprint_paths / ai_difficulty /
+# 2026-08-10: the seven legacy pre-match fields (player_livery /
+# enemy_livery / selected_blueprint_paths / ai_difficulty /
 # starting_credits, plus the redundant selected_map_id mirror) are
 # retired. Phase 2 of the battle-system unification (June 2026) made
 # match_director.gd read the rule set field-by-field, with each one

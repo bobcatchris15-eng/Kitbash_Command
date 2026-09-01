@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c262uy051lmbd"
-path="res://.godot/imported/hull_surface_roughness.png-d5b52a3d26f081327f0b1a7c0c346354.ctex"
+path.s3tc="res://.godot/imported/hull_surface_roughness.png-d5b52a3d26f081327f0b1a7c0c346354.s3tc.ctex"
+path.etc2="res://.godot/imported/hull_surface_roughness.png-d5b52a3d26f081327f0b1a7c0c346354.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/hull/hull_surface_roughness.png"
-dest_files=["res://.godot/imported/hull_surface_roughness.png-d5b52a3d26f081327f0b1a7c0c346354.ctex"]
+dest_files=["res://.godot/imported/hull_surface_roughness.png-d5b52a3d26f081327f0b1a7c0c346354.s3tc.ctex", "res://.godot/imported/hull_surface_roughness.png-d5b52a3d26f081327f0b1a7c0c346354.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

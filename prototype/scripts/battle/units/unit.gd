@@ -197,6 +197,55 @@ var _selection_ring: MeshInstance3D = null
 # and valleys, accounting for true terrain relief and 2.5D heightmap line-of-sight.
 var _targetable_overlay: Decal = null
 var _visible_overlay: Decal = null
+
+# RIDE HEIGHT CORRECTION.
+#
+# _apply_vertical() writes global_position.y = terrain_height_at(...), i.e. it
+# puts the BODY ORIGIN on the ground. That is only correct if the vehicle's
+# lowest visible point is also at body-local y = 0, and it is not.
+#
+# blueprint_manager.reconstruct_vehicle() lifts the hull by the formula
+# `hull_size.y / 2 + running_gear_size.y` and hangs the running-gear chassis
+# below it, which puts the CHASSIS BOX bottom at exactly local y = 0. But the
+# wheel/tread meshes visual_builder.build_running_gear() draws inside that
+# chassis protrude below the box. Measured on the shipped roster
+# (tools/probe_wheel_contact.gd) that overhang is 0.23-0.26 m, so every ground
+# unit in the game drove with a quarter-metre of its wheels underground.
+#
+# Rather than correct the formula - which would have to predict the geometry of
+# ten locomotion builders across three hull sizes - this measures the assembled
+# vehicle once and carries the residual. It is therefore correct for any
+# locomotion type, hull scale or module loadout, including ones added later.
+var _ground_offset: float = 0.0
+var _ground_offset_measured: bool = false
+var _ground_offset_samples: int = 0
+# Re-measured for the first few ticks rather than latched on the first one.
+# Measuring once on tick 1 read 0.015 m against a true 0.19 m on the shipped
+# roster, because the lowest geometry is a mesh under a `WheelSpin` node that
+# the locomotion builder has not parented yet at that point - so the walk found
+# the running-gear chassis box (whose bottom is at exactly local y = 0 by
+# construction) and nothing below it. Sampling a short window and keeping the
+# deepest result is robust to whatever order the wheel, tread and leg builders
+# happen to finish in, now and after they change.
+const GROUND_OFFSET_SAMPLE_TICKS: int = 24
+
+# Contact shadow. A soft dark ellipse projected straight down onto the terrain
+# under the vehicle. The directional light already casts a real shadow, but at
+# a tactical top-down camera with a high sun that shadow falls mostly UNDER the
+# hull where it cannot be seen, so a unit reads as composited onto the ground
+# rather than resting on it. This is the contact cue that fixes that.
+var _contact_shadow: Decal = null
+var _footprint_extent: float = 2.0
+static var _contact_shadow_texture: GradientTexture2D = null
+
+# How far past the vehicle's own silhouette the blob spreads. Slightly wider
+# than 1.0 because a hard-edged shadow exactly the size of the chassis reads as
+# a decal; the overspill is what makes it read as occlusion.
+const CONTACT_SHADOW_SPREAD := 1.35
+# Peak opacity at the centre of the blob. Kept well below 1.0 - this is
+# supplementing a real cast shadow, not replacing it, and a black disc under
+# every unit is its own kind of wrong.
+const CONTACT_SHADOW_STRENGTH := 0.5
 # Stash the last position we rebuilt the overlay at. A unit that hasn't
 # moved more than ~0.5 m since the last rebuild can skip the calculation
 # entirely - a selected unit idling pays zero cost.
@@ -1680,6 +1729,147 @@ func _resolve_terrain_collision() -> void:
 		collision_mask |= BattleLayers.TERRAIN
 
 
+# Lowest point of the assembled vehicle's visible geometry, in BODY-LOCAL
+# space. Walks with accumulated local transforms rather than reading
+# global_transform, so it is valid before the body has been placed and does not
+# depend on the order setup() and the first physics tick happen in.
+#
+# Deliberately measures EVERY visible mesh, not just things named like wheels:
+# "the lowest part of the vehicle rests on the ground" is the rule we want, and
+# it holds for treads, legs, skirts and a hull with a dropped keel alike,
+# without this function needing to know the naming convention of ten
+# locomotion builders.
+func _measure_ground_offset() -> void:
+	_ground_offset_samples += 1
+	if _ground_offset_samples >= GROUND_OFFSET_SAMPLE_TICKS:
+		_ground_offset_measured = true
+	if not is_instance_valid(hull_node):
+		return
+	var lowest := INF
+	var min_x := INF
+	var max_x := -INF
+	var min_z := INF
+	var max_z := -INF
+	# (node, transform relative to this body)
+	var stack: Array = [[hull_node as Node3D, (hull_node as Node3D).transform]]
+	while not stack.is_empty():
+		var entry: Array = stack.pop_back()
+		var node: Node = entry[0]
+		var xf: Transform3D = entry[1]
+		for child in node.get_children():
+			if child is Node3D:
+				stack.append([child, xf * (child as Node3D).transform])
+		if node is MeshInstance3D:
+			var mi := node as MeshInstance3D
+			# The EnemyOutline subtree is a shadow-off duplicate of the hull
+			# meshes (unit_assembly._add_outline_passes); it would measure the
+			# same geometry twice, which is harmless, but a hidden mesh should
+			# not be able to set the ride height at all.
+			if mi.mesh == null or not mi.visible:
+				continue
+			var ab: AABB = mi.mesh.get_aabb()
+			for i in range(8):
+				var pt: Vector3 = xf * ab.get_endpoint(i)
+				lowest = minf(lowest, pt.y)
+				min_x = minf(min_x, pt.x)
+				max_x = maxf(max_x, pt.x)
+				min_z = minf(min_z, pt.z)
+				max_z = maxf(max_z, pt.z)
+	if lowest == INF:
+		return
+	# Footprint for the contact shadow, from the same walk - the vehicle's
+	# widest horizontal span including running gear and sponsons, which is the
+	# silhouette whose shadow a player expects to see.
+	_footprint_extent = maxf(_footprint_extent, maxf(max_x - min_x, max_z - min_z))
+	# maxf, not assignment: the deepest sample in the window wins, so a wheel
+	# that only appears on tick 3 still sets the ride height.
+	if lowest < 0.0:
+		_ground_offset = maxf(_ground_offset, -lowest)
+
+
+# The contact shadow is created lazily and only for units that actually sit on
+# the ground - a flyer's shadow belongs at its own altitude, not welded to its
+# hull, and a naval hull's waterline is not a contact edge.
+func _ensure_contact_shadow() -> void:
+	if is_flying or is_fixed_wing or is_naval:
+		return
+	if is_instance_valid(_contact_shadow):
+		return
+	if not is_instance_valid(hull_node):
+		return
+	if _contact_shadow_texture == null:
+		# Radial black-to-transparent, generated once and shared by every unit.
+		# GradientTexture2D with FILL_RADIAL means no image asset and no
+		# per-unit texture allocation.
+		var grad := Gradient.new()
+		grad.set_offset(0, 0.0)
+		grad.set_color(0, Color(0, 0, 0, 1))
+		grad.set_offset(1, 1.0)
+		grad.set_color(1, Color(0, 0, 0, 0))
+		# A linear ramp reads as a fuzzy disc; biasing the midpoint keeps a
+		# denser core under the chassis with a soft falloff at the edge, which
+		# is what an occlusion contact actually looks like.
+		grad.add_point(0.55, Color(0, 0, 0, 0.5))
+		var tex := GradientTexture2D.new()
+		tex.gradient = grad
+		tex.width = 128
+		tex.height = 128
+		tex.fill = GradientTexture2D.FILL_RADIAL
+		tex.fill_from = Vector2(0.5, 0.5)
+		tex.fill_to = Vector2(1.0, 0.5)
+		_contact_shadow_texture = tex
+
+	var d := Decal.new()
+	d.name = "ContactShadow"
+	d.texture_albedo = _contact_shadow_texture
+	d.albedo_mix = 1.0
+	d.modulate = Color(1, 1, 1, CONTACT_SHADOW_STRENGTH)
+	# Only project onto the terrain and other structures, never treat the sky
+	# or a unit above it as a receiver. Same mask the range overlays use.
+	d.cull_mask = BattleLayers.TERRAIN | BattleLayers.BUILDINGS
+	# Visual layer 1 is the default for every MeshInstance3D in this project,
+	# so the mask above cannot exclude the vehicle's own meshes. normal_fade
+	# does the job instead: it fades the projection out on surfaces whose
+	# normal turns away from the decal's own -Y, so a near-horizontal patch of
+	# ground takes the full blob and the vertical flank of a tyre takes almost
+	# none. Without this the decal paints a hard dark band across the wheels.
+	d.normal_fade = 0.9
+	# top_level so the blob never rolls, pitches or yaws with the hull - a
+	# contact shadow is cast by a light, not glued to the chassis.
+	d.top_level = true
+	d.distance_fade_enabled = true
+	d.distance_fade_begin = UNIT_VISIBILITY_END * 0.6
+	d.distance_fade_length = UNIT_VISIBILITY_END * 0.3
+	add_child(d)
+	_contact_shadow = d
+	_resize_contact_shadow()
+
+
+# Footprint measured by _measure_ground_offset(), which refines it over the
+# first GROUND_OFFSET_SAMPLE_TICKS ticks - so this is called across that window
+# rather than once, or a scout and a heavy tank get the same blob.
+func _resize_contact_shadow() -> void:
+	if not is_instance_valid(_contact_shadow):
+		return
+	var extent := clampf(_footprint_extent * CONTACT_SHADOW_SPREAD, 1.5, 24.0)
+	# Vertical depth has to span the slope the footprint sits on, or the
+	# downhill half of the blob falls outside the box and clips off square.
+	_contact_shadow.size = Vector3(extent, maxf(2.0, extent * 0.6), extent)
+
+
+# Keeps the contact shadow flat, unrotated and centred on the vehicle's ground
+# point. Cheap enough to run every tick: three property writes, no allocation.
+func _update_contact_shadow() -> void:
+	if not is_instance_valid(_contact_shadow):
+		return
+	var p := global_position
+	# Sit the decal box centre at the contact plane, i.e. the vehicle's lowest
+	# point, which after the ride-height correction is the terrain surface.
+	_contact_shadow.global_position = Vector3(p.x, p.y - _ground_offset, p.z)
+	_contact_shadow.rotation = Vector3.ZERO
+	_contact_shadow.visible = not fog_hidden
+
+
 # Gravity is the fallback for when no controller can answer.
 func _apply_vertical(delta: float) -> void:
 	if is_flying or is_fixed_wing:
@@ -1714,8 +1904,20 @@ func _apply_vertical(delta: float) -> void:
 		return
 	if _controller != null and _controller.has_method("terrain_height_at"):
 		var target_y: float = _controller.terrain_height_at(global_position)
-		global_position.y = target_y
+		# Measured once, on the first tick that has a built hull - setup() runs
+		# before the module/armor spawns finish, so measuring there would miss
+		# whatever hangs lowest.
+		if not _ground_offset_measured:
+			_measure_ground_offset()
+			_ensure_contact_shadow()
+			_resize_contact_shadow()
+		# + _ground_offset puts the vehicle's LOWEST VISIBLE POINT on the
+		# terrain rather than its origin. is_naval is excluded because a hull's
+		# lowest point is below its waterline by design and lifting it by the
+		# draught would float the boat on top of the water.
+		global_position.y = target_y + (0.0 if is_naval else _ground_offset)
 		velocity.y = 0.0
+		_update_contact_shadow()
 		return
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta

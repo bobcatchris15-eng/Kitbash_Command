@@ -5,7 +5,7 @@ extends RefCounted
 # by the setup screen, read by the match director and (later) by OrderService.
 #
 # WHAT THIS REPLACES. Today MatchConfig (scripts/match_config.gd) carries seven
-# loose fields: selected_map_id, player_faction, enemy_faction,
+# loose fields: selected_map_id, player_livery, enemy_livery,
 # selected_blueprint_paths, ai_difficulty, starting_credits, plus a "roster"
 # implied by the order. match_director.gd:220-280 reads them individually and
 # makes per-mode decisions inline. The problem is that "which mode is this" is
@@ -79,8 +79,18 @@ var mode: Mode = Mode.SKIRMISH
 
 # Map + sides
 var map_id: String = ""
-var player_faction: String = "industrialists"
-var enemy_faction: String = "technocrats"
+# LIVERY IDS, not faction ids - the ten premade factions are gone
+# (faction_catalog.gd deleted 2026-08-31). The player wears the livery they
+# authored in the Livery Workshop; the opponent wears one generated for the
+# match. Defaults are the safe fallbacks for a rule set built by hand in a
+# test: PLAYER_ID resolves to user://livery.json, and an empty enemy id is
+# filled in by whichever factory runs.
+#
+# These were "industrialists" / "technocrats" - ids that no longer resolve to
+# anything, so they fell through to a hash-derived random livery that was
+# nonetheless identical in every match.
+var player_livery: String = LiveryScript.PLAYER_ID
+var enemy_livery: String = ""
 
 # Roster. The "blueprint paths" form is for Skirmish/Operations; the
 # "player_blueprint_path" form is the Test Range case where exactly one
@@ -234,14 +244,17 @@ func is_order_legal(_unit: Node, order_type: int) -> bool:
 # default of the rule set, so the factory exists mostly to enforce the
 # shape (required map_id) and to give the call site a sentence to read.
 # All the per-mode flags stay at their default values.
-static func skirmish(map_id: String, player_faction: String,
-		enemy_faction: String, blueprint_paths: Array,
+static func skirmish(map_id: String, player_livery: String,
+		enemy_livery: String, blueprint_paths: Array,
 		difficulty: String = "normal") -> MatchRuleSet:
 	var rs := MatchRuleSet.new()
 	rs.mode = Mode.SKIRMISH
 	rs.map_id = map_id
-	rs.player_faction = player_faction
-	rs.enemy_faction = enemy_faction
+	rs.player_livery = player_livery
+	# A FRESH livery every skirmish - see new_ai_livery_id() in livery.gd. Filled
+	# here rather than trusting each caller, so a hand-built rule set in a test
+	# gets a valid opponent paint scheme too.
+	rs.enemy_livery = enemy_livery if enemy_livery != "" else LiveryScript.new_ai_livery_id()
 	rs.selected_blueprint_paths = blueprint_paths.duplicate()
 	rs.ai_difficulty = difficulty
 	rs.physics_ticks_per_second = 30   # Fix A: double the unit ceiling
@@ -260,15 +273,17 @@ static func skirmish(map_id: String, player_faction: String,
 # fields; the operations_manager autoload holds the campaign state across
 # stages. The factory takes the minimal per-stage data; the campaign
 # operations_id is the join key with the saved campaign file.
-static func operations(map_id: String, player_faction: String,
-		enemy_faction: String, blueprint_paths: Array,
+static func operations(map_id: String, player_livery: String,
+		enemy_livery: String, blueprint_paths: Array,
 		difficulty: String, operation_id: String,
 		stage_index: int) -> MatchRuleSet:
 	var rs := MatchRuleSet.new()
 	rs.mode = Mode.OPERATIONS
 	rs.map_id = map_id
-	rs.player_faction = player_faction
-	rs.enemy_faction = enemy_faction
+	rs.player_livery = player_livery
+	# ONE opponent identity for the whole campaign, keyed off operation_id, so
+	# the enemy does not repaint between stages of the same operation.
+	rs.enemy_livery = enemy_livery if enemy_livery != "" else LiveryScript.ai_livery_id_for(operation_id)
 	rs.selected_blueprint_paths = blueprint_paths.duplicate()
 	rs.ai_difficulty = difficulty
 	rs.operation_id = operation_id
@@ -301,12 +316,15 @@ static func test_range(player_blueprint_path: String,
 	var rs := MatchRuleSet.new()
 	rs.mode = Mode.TEST_RANGE
 	rs.map_id = map_id
-	# The player's faction is PLAYER_ID so reconstruct_vehicle reads the
-	# authored livery from user://livery.json rather than rolling a
-	# deterministic random; the dummies are forced to team=1 in the
-	# launcher.
-	rs.player_faction = LiveryScript.PLAYER_ID
-	rs.enemy_faction = "technocrats"
+	# PLAYER_ID so reconstruct_vehicle reads the authored livery from
+	# user://livery.json rather than rolling a random one; the dummies are
+	# forced to team=1 in the launcher.
+	#
+	# The dummies' livery is stable per proving-ground session rather than fresh
+	# per trip: this screen exists to judge YOUR design, and a target that
+	# repaints itself every time you re-enter is a distraction.
+	rs.player_livery = LiveryScript.PLAYER_ID
+	rs.enemy_livery = LiveryScript.ai_livery_id_for("test_range")
 	rs.player_blueprint_path = player_blueprint_path
 	rs.enemy_blueprint_paths = enemy_blueprint_paths.duplicate()
 	# Economy off. The player's harvester (if the design has one) is
@@ -355,8 +373,8 @@ func to_dict() -> Dictionary:
 	return {
 		"mode": mode,
 		"map_id": map_id,
-		"player_faction": player_faction,
-		"enemy_faction": enemy_faction,
+		"player_livery": player_livery,
+		"enemy_livery": enemy_livery,
 		"selected_blueprint_paths": selected_blueprint_paths.duplicate(),
 		"player_blueprint_path": player_blueprint_path,
 		"enemy_blueprint_paths": enemy_blueprint_paths.duplicate(),

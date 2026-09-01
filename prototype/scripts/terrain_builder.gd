@@ -1379,6 +1379,22 @@ static func _corner_heights(map_def: Dictionary, half: Vector2, cell: float) -> 
 # accepted its move order, turned to face it, and then circled forever with
 # no valid path start.
 const HOLE_SUBDIVISION_CELL: float = 1.0
+# Shoreline cells subdivide too (see _build_ground_faces), but NOT at the hole
+# resolution. A building edge is a hard line a metre matters on; a waterline is
+# not, and the difference is measured in seconds of load time.
+#
+# _emit_subdivided_ground_quad() calls terrain_height_at() four times per
+# sub-quad, so the cost of this constant is quadratic in 1/sub_cell. At 1.0 m
+# the ground-face build on delta_blues went 175 ms -> 2421 ms and
+# saltpan_crossing 461 ms -> 4640 ms, for a final navmesh Recast voxelises back
+# down to almost the same polygon count (delta_blues 1308 -> 1344). Those
+# triangles were bought and then thrown away.
+#
+# 3.0 m still resolves a channel inside a ~5.8 m nav cell, which is the whole
+# point, at a fraction of the build cost. Raise it if load time regresses;
+# lower it only with a tools/probe_water_blocks_ground.gd number in hand
+# showing it bought something.
+const WATERLINE_SUBDIVISION_CELL: float = 3.0
 
 # PR-2 cleanup (2026-08-19). Hole spatial index for the face-build cell
 # walk.
@@ -1547,8 +1563,41 @@ static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], gr
 				# Tested against the HIGHEST corner, so a cell is carved only
 				# when the whole of it is under - which leaves the shoreline
 				# cells walkable instead of eating a ring of beach.
+				var surf_c: float = water_surface_at(map_def, (x + x1) * 0.5, (z + z1) * 0.5)
 				var top: float = max(max(h00, h10), max(h01, h11))
-				var submerged: bool = top < water_surface_at(map_def, (x + x1) * 0.5, (z + z1) * 0.5) - SUBMERGED_MIN_DEPTH
+				var low: float = min(min(h00, h10), min(h01, h11))
+				var waterline: float = surf_c - SUBMERGED_MIN_DEPTH
+				# A CELL THAT STRADDLES THE WATERLINE HAS TO BE RESOLVED FINER
+				# THAN THE CELL.
+				# The highest-corner test below is deliberate and stays - it is
+				# what keeps a wet beach walkable instead of carving a ragged
+				# fringe of holes along every shore. But applied to a whole nav
+				# cell it also means ANY dry corner saves the entire cell, and
+				# `cell` is max(GRID_CELL, half/75) - about 5.8 m on
+				# delta_blues. A braided delta channel is narrower than that, so
+				# every channel kept a dry bank corner and stayed fully
+				# walkable: measured 2026-09-01 with
+				# tools/probe_water_blocks_ground.gd, 45.4% of delta_blues'
+				# submerged area was on the ground surface, up to 6.6 m deep,
+				# and wheeled units drove the riverbed.
+				#
+				# The fix is not to change the corner rule, it is to stop asking
+				# it a question at the wrong scale. A straddling cell goes
+				# through the same subdivider the building holes already use,
+				# which re-runs exactly this test per 1 m sub-quad
+				# (water_mode "block"). Beach stays, channel goes.
+				#
+				# Only STRADDLING cells pay for this. Fully dry and fully
+				# drowned cells still resolve in one test at cell resolution,
+				# so the extra triangles are a one-cell-wide band along the
+				# shoreline rather than a global refinement.
+				if surf_c > NO_WATER * 0.5 and low < waterline and top >= waterline 						and cell > WATERLINE_SUBDIVISION_CELL:
+					var cell_water_s: Array = water_buckets[cell_key] if water_buckets.has(cell_key) else []
+					_emit_subdivided_ground_quad(verts, x, x1, z, z1, [], cell_water_s, bridges, has_blobs, map_def, true, "block", WATERLINE_SUBDIVISION_CELL)
+					z = z1
+					zi += 1
+					continue
+				var submerged: bool = top < waterline
 				if submerged and _cell_on_bridge(x, x1, z, z1, bridges):
 					submerged = false
 				if max_slope > MAX_WALKABLE_SLOPE or submerged:
@@ -1576,8 +1625,10 @@ static func _build_ground_faces(map_def: Dictionary, extra_holes: Array = [], gr
 # lakebed walkable, and amphibious sank a patch to the bed.
 static func _emit_subdivided_ground_quad(verts: PackedVector3Array, x0: float, x1: float, z0: float, z1: float,
 		hard_holes: Array, water_holes: Array, bridges: Array, has_blobs: bool, map_def: Dictionary, has_heightmap: bool = true,
-		water_mode: String = "") -> void:
-	var sub = HOLE_SUBDIVISION_CELL
+		water_mode: String = "", sub_cell: float = -1.0) -> void:
+	# sub_cell defaults to the building-hole resolution. The waterline pass
+	# overrides it - see WATERLINE_SUBDIVISION_CELL for why they differ.
+	var sub: float = sub_cell if sub_cell > 0.0 else HOLE_SUBDIVISION_CELL
 	var sx = x0
 	while sx < x1:
 		var sx1 = minf(sx + sub, x1)
@@ -1696,7 +1747,35 @@ static func _build_amphibious_faces(map_def: Dictionary, extra_holes: Array = []
 					h10 = maxf(h10, surface)
 					h01 = maxf(h01, surface)
 					h11 = maxf(h11, surface)
-				_add_nav_quad(verts, Vector3(x, h00, z), Vector3(x1, h10, z), Vector3(x1, h11, z1), Vector3(x, h01, z1))
+				# A CLIFF IS A CLIFF FOR A HOVER PAD TOO.
+				# This test was missing and it was the only thing separating
+				# this surface from _build_ground_faces() - which meant every
+				# `hovering` locomotor (hover_engine, anti_grav_plate,
+				# air_cushion_skirt, plasma_thruster; unit_assembly routes them
+				# all here) could path straight up a vertical rock face. A pad
+				# that floats a metre off the deck is not a helicopter; the
+				# things that genuinely ignore terrain carry the `airborne`
+				# trait, get no NavigationAgent3D at all, and never reach this
+				# mesh. Note _emit_subdivided_ground_quad() below has always
+				# applied exactly this test on its own water_mode == "float"
+				# path, so the two halves of this very function disagreed.
+				#
+				# Deliberately computed AFTER the water-surface raise above,
+				# which is what makes one test do the right thing everywhere:
+				#   open water   - corners all pinned to a flat surface, slope
+				#                  ~0, stays passable however deep the bed is
+				#   dry land     - real terrain slope, gated like any wheel
+				#   shoreline    - only the exposed part of the bank counts,
+				#                  so a hovercraft still drives up a beach
+				# Same MAX_WALKABLE_SLOPE as the ground mesh, per the design
+				# call that hover should read "similar to wheels" rather than
+				# get a bespoke allowance.
+				var max_slope: float = maxf(
+					maxf(absf(h10 - h00), absf(h01 - h00)),
+					maxf(absf(h11 - h10), absf(h11 - h01))
+				) / maxf(cell, 0.001)
+				if max_slope <= MAX_WALKABLE_SLOPE:
+					_add_nav_quad(verts, Vector3(x, h00, z), Vector3(x1, h10, z), Vector3(x1, h11, z1), Vector3(x, h01, z1))
 			z = z1
 			zi += 1
 		x = x1
@@ -2658,6 +2737,33 @@ static func _tag_terrain_debris(parent: Node3D, pre_ids: Dictionary) -> void:
 # PNGs for every zone that shares a surface_type). Every zone plus the
 # shallow_water marker also gets non-collidable ground clutter scattered by
 # TerrainGreebles - see that file for why real 3D props, not flat cards.
+# EVERY PNG UNDER HERE MUST IMPORT AS "VRAM Compressed" WITH MIPMAPS ON.
+# ---------------------------------------------------------------------------
+# 2026-09-01: all 220 of them were importing as `compress/mode=0` (Lossless)
+# with `mipmaps/generate=false`, which put 2048x2048 RGBA8 plates in VRAM with
+# no mip chain. terrain_ground_v2.gdshader takes ~30 taps per fragment across
+# four of those layers, so a ground plane at a grazing angle sampled full-res
+# 2K textures for every pixel of the screen. Measured with
+# tools/probe_terrain_fillrate.gd on delta_blues at 1080p:
+#
+#                              before      after
+#   ground mesh, flat mat      +5.83 ms    +7.37 ms
+#   the terrain material     +250.21 ms    +6.36 ms      <- 39x
+#   whole scene               259.02 ms   19.88 ms
+#
+# That 250 ms was the skirmish frame rate. Nothing about the shader, the mesh,
+# the grass carpet or the sim was wrong; the textures were being fed to the GPU
+# in the most expensive form available.
+#
+# HOW IT HAPPENED, so it does not happen again. These .import files carry
+# `detect_3d/compress_to=1`, which is Godot re-importing a texture as VRAM
+# compressed the first time it sees it used on 3D geometry - and that detection
+# runs in the EDITOR, on materials it can see in a scene. These plates are never
+# in a scene: they are `load()`ed here and pushed into a ShaderMaterial
+# parameter at runtime, so the editor never witnessed the 3D use and the
+# fallback never fired. Any texture assigned this way needs its import settings
+# set by hand. The same was true of assets/textures/factions and
+# assets/textures/hull, fixed at the same time.
 const TERRAIN_TEXTURE_DIR = "res://assets/textures/terrain/"
 # Texture repeats once per this many world units - fixed, not derived from
 # zone size, since (unlike a Design Lab hull) these zones are static map
@@ -3083,6 +3189,30 @@ const GRASS_SHELL_SHADER = preload("res://shaders/terrain_grass_shells.gdshader"
 # its AABB is the map. Chunking it is what lets the carpet cost nothing at
 # battle altitude, and the chunk has to be small enough that a chunk near the
 # camera does not drag in geometry 500 m away.
+#
+# 2026-09-01, MEASURED, because this carpet has twice now been blamed for the
+# skirmish frame rate on the strength of a plausible story rather than a
+# number. tools/probe_terrain_fillrate.gd, delta_blues, camera at the real
+# 26 m default, 1080p:
+#
+#                            before tex fix   after
+#   control (sky only)          2.98 ms GPU    2.71 ms
+#   + ground mesh, flat mat     8.81 ms GPU   10.08 ms
+#   + real terrain material   259.02 ms GPU   16.45 ms
+#   + grass carpet            259.19 ms GPU   19.88 ms
+#
+# The carpet is 0.17 ms of a 259 ms frame, or 3.4 ms of a 20 ms one. It was
+# never the cost - the ground material was, see TERRAIN_TEXTURE_DIR - and
+# tuning these four numbers down buys a few milliseconds at best while
+# visibly shortening the grass.
+#
+# One thing the shader's own header gets wrong, though, and it is worth
+# knowing: it claims the battle camera sits ~150 m up so every chunk
+# range-culls and the carpet costs nothing. RTSCamera.height defaults to 26 m.
+# The carpet DOES draw at the default zoom. It is simply cheap when it does,
+# which is the opposite of the reason the header gives.
+#
+# Re-run the probe before changing any of these four numbers.
 const GRASS_CHUNK_SIZE: float = 96.0
 const GRASS_MESH_STEP: float = 4.0     # carpet follows terrain, not blades
 const GRASS_SHELL_COUNT: int = 8

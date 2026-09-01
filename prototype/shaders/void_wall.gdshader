@@ -1,5 +1,10 @@
 shader_type spatial;
-render_mode unshaded, cull_disabled, depth_draw_opaque;
+// fog_disabled: this is the MAP BORDER, a UI affordance drawn as geometry.
+// Depth fog is a cue about distance through air; applying it to the border
+// only bleaches the one element that has to stay legible at max zoom-out.
+// The fog-of-war shroud in vision_service.gd declares the same for the same
+// reason.
+render_mode unshaded, cull_disabled, depth_draw_opaque, fog_disabled;
 
 // Dark void of the holotable outside the map.
 // Green phosphor grid drifts slowly; occasional brighter scan sweep.

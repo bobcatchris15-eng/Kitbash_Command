@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bvqepvm8g05kg"
-path="res://.godot/imported/aerodrome_cartel_albedo.png-7d443dca4a34247eafb7b48fa45edb5e.ctex"
+path.s3tc="res://.godot/imported/aerodrome_cartel_albedo.png-7d443dca4a34247eafb7b48fa45edb5e.s3tc.ctex"
+path.etc2="res://.godot/imported/aerodrome_cartel_albedo.png-7d443dca4a34247eafb7b48fa45edb5e.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/factions/aerodrome_cartel_albedo.png"
-dest_files=["res://.godot/imported/aerodrome_cartel_albedo.png-7d443dca4a34247eafb7b48fa45edb5e.ctex"]
+dest_files=["res://.godot/imported/aerodrome_cartel_albedo.png-7d443dca4a34247eafb7b48fa45edb5e.s3tc.ctex", "res://.godot/imported/aerodrome_cartel_albedo.png-7d443dca4a34247eafb7b48fa45edb5e.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

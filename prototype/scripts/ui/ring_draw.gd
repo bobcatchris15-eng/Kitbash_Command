@@ -42,7 +42,8 @@ static func draw_ring(
 	actions: Array,
 	hovered: int,
 	subject_label: String,
-	font: Font
+	font: Font,
+	show_hub: bool = true
 ) -> void:
 	if canvas == null:
 		return
@@ -81,11 +82,12 @@ static func draw_ring(
 			canvas.draw_line(center + dir * inner_r, center + dir * outer_r, Tokens.BASE_500, 1.0, true)
 
 	# --- Hub ---
-	canvas.draw_circle(center, hub_r, Color(Tokens.BASE_900, 0.45))
-	canvas.draw_arc(center, hub_r, 0.0, TAU, 48, Tokens.BASE_500, 1.0, true)
+	if show_hub:
+		canvas.draw_circle(center, hub_r, Color(Tokens.BASE_900, 0.45))
+		canvas.draw_arc(center, hub_r, 0.0, TAU, 48, Tokens.BASE_500, 1.0, true)
 
 	# --- Hub text ---
-	if hovered >= 0 and hovered < actions.size():
+	if show_hub and hovered >= 0 and hovered < actions.size():
 		var hub_text: String = actions[hovered].get("label", "")
 		var hub_size := font.get_string_size(hub_text, HORIZONTAL_ALIGNMENT_LEFT, -1, Tokens.FONT_MICRO)
 		canvas.draw_string(

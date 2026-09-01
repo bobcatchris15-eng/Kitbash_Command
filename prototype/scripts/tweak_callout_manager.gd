@@ -2,11 +2,9 @@ class_name TweakCalloutManager
 extends RefCounted
 
 const ModuleDataResource = preload("res://scripts/module_data.gd")
-const ResourceCatalogScript = preload("res://scripts/battle/economy/resource_catalog.gd")
 const ModuleActionRingScript = preload("res://scripts/ui/module_action_ring.gd")
 const RadialDialScript = preload("res://scripts/ui/radial_dial.gd")
 const RadialAmmoSelectorScript = preload("res://scripts/ui/radial_ammo_selector.gd")
-const TweakStations = preload("res://scripts/ui/tweak_stations.gd")
 const VisualBuilderScript = preload("res://scripts/visual_builder.gd")
 const LocomotionLayoutScript = preload("res://scripts/locomotion_layout.gd")
 
@@ -42,7 +40,7 @@ var size_label_base := "Size"
 var count_label_base := "Count"
 
 
-func _open_action_ring(module: Node3D, designation: String) -> void:
+func _open_action_ring(module: Node3D) -> void:
 	_close_action_ring()
 	if tweak_canvas == null or module == null:
 		return
@@ -54,7 +52,7 @@ func _open_action_ring(module: Node3D, designation: String) -> void:
 	ring.add_action("discard", "Discard")
 	ring.action_invoked.connect(_on_ring_action)
 	tweak_canvas.add_child(ring)
-	ring.open_for_module(module, designation)
+	ring.open_for_module(module)
 	_action_ring = ring
 
 
@@ -99,10 +97,7 @@ func _add_callout(module: Node3D, title: String, control: Control):
 	if not tweak_canvas or not popup_tweaks_container or control == null:
 		return
 	if is_instance_valid(_action_ring):
-		var angle := TweakStations.angle_for(title.to_lower().replace(" ", "_"))
-		if angle < 0.0:
-			angle = TweakStations.CLOCK_1
-		_action_ring.add_tweak_station(title.to_lower(), title, control, angle)
+		_action_ring.add_tweak_station(title.to_lower(), title, control)
 		return
 	if control.get_parent():
 		control.reparent(tweak_canvas)
@@ -175,19 +170,7 @@ func on_module_selected(module: Node3D):
 	if lab.has_method("update_inspector"):
 		lab.update_inspector(module, data)
 
-	_open_action_ring(module, data.module_name.to_upper())
-
-	var hp := data.get_hp()
-	var wt := data.get_weight()
-	var cost := data.get_cost()
-	var dps := data.get_dps()
-	var heal := data.get_heal_rate()
-	var last_line := "Heal Rate: %.1f/s" % heal if heal > 0.0 else "DPS: %.1f" % dps
-	var mount_line := _mount_style_line(module.get_meta("mount_style", ""))
-	var spec_text := "HP: %.1f | WT: %.1f kg | %d cr\n%s%s" % [hp, wt, ResourceCatalogScript.credits_from_materials(cost), last_line, mount_line]
-	
-	if is_instance_valid(_action_ring):
-		_action_ring.set_spec_info(spec_text)
+	_open_action_ring(module)
 
 	if data.category != "locomotion":
 		_generate_custom_tweaks(module, data)
@@ -224,9 +207,6 @@ func _generate_locomotion_radial_tweaks(module: Node3D, data: ModuleDataResource
 		if s_name == "":
 			continue
 		var s_label: String = str(spec.get("label", s_name))
-		var angle: float = TweakStations.angle_for(s_name)
-		if angle < 0.0:
-			angle = TweakStations.CLOCK_1
 
 		if spec.get("type", "") == "bool":
 			var cur_b := bool(settings.get(s_name, spec.get("default", false)))
@@ -242,7 +222,7 @@ func _generate_locomotion_radial_tweaks(module: Node3D, data: ModuleDataResource
 				else:
 					root.update_locomotion_geometry_tweak(type_id, s_name, pressed)
 			)
-			_action_ring.add_tweak_station(s_name, s_label, check, angle)
+			_action_ring.add_tweak_station(s_name, s_label, check)
 			_sync_persistent_widget(type_id, s_name, cur_b)
 			continue
 
@@ -289,7 +269,7 @@ func _generate_locomotion_radial_tweaks(module: Node3D, data: ModuleDataResource
 				_sync_persistent_widget(type_id, s_name, v)
 				root.update_locomotion_geometry_tweak(type_id, s_name, v)
 			)
-		_action_ring.add_tweak_station(s_name, s_label, dial, angle)
+		_action_ring.add_tweak_station(s_name, s_label, dial)
 
 	# Leg profile selector - a preset picker, not a numeric/bool spec entry.
 	if type_id == "legs":
@@ -300,7 +280,7 @@ func _generate_locomotion_radial_tweaks(module: Node3D, data: ModuleDataResource
 		leg_selector.ammo_selected.connect(func(picked: String):
 			_on_leg_picked(picked)
 		)
-		_action_ring.add_tweak_station(ModuleCatalog.LEG_TWEAK_KEY, "Leg Profile", leg_selector, TweakStations.CLOCK_12)
+		_action_ring.add_tweak_station(ModuleCatalog.LEG_TWEAK_KEY, "Leg Profile", leg_selector)
 
 	lab.is_updating_sliders = false
 
@@ -576,27 +556,6 @@ func _on_tweak_changed():
 	
 	# 4. Update stats in the telemetry rail
 	lab.update_stats(hull)
-	
-	# 5. Update the spec placard text on the ring
-	var hp = data.get_hp()
-	var wt = data.get_weight()
-	var cost = data.get_cost()
-	var dps = data.get_dps()
-	var heal = data.get_heal_rate()
-	var last_line = "Heal Rate: %.1f/s" % heal if heal > 0.0 else "DPS: %.1f" % dps
-	var mount_line = _mount_style_line(module.get_meta("mount_style", ""))
-	var spec_text := "HP: %.1f | WT: %.1f kg | %d cr\n%s%s" % [hp, wt, ResourceCatalogScript.credits_from_materials(cost), last_line, mount_line]
-	if is_instance_valid(_action_ring):
-		_action_ring.set_spec_info(spec_text)
-
-
-func _mount_style_line(style: String) -> String:
-	var desc := ""
-	match style:
-		"turret": desc = "Turret mount (full traverse)"
-		"frame_built": desc = "Frame-built (fixed - whole vehicle aims)"
-		"pintle": desc = "Pintle mount (full traverse)"
-	return "\n%s" % desc if desc != "" else ""
 
 
 func _generate_custom_tweaks(module: Node3D, data: ModuleDataResource):
@@ -604,7 +563,7 @@ func _generate_custom_tweaks(module: Node3D, data: ModuleDataResource):
 	if not is_instance_valid(_action_ring):
 		return
 
-	# 1. Ammo Selector at 12:00
+	# 1. Ammo selector - first station, so it takes the top slot (12 o'clock)
 	if ModuleCatalog.is_ammo_capable(type_id):
 		var ammo_options = ModuleCatalog.get_ammo_options(type_id)
 		var current_ammo = ModuleCatalog.get_ammo(type_id, data.tweaks)
@@ -615,10 +574,10 @@ func _generate_custom_tweaks(module: Node3D, data: ModuleDataResource):
 			data.tweaks[ModuleCatalog.AMMO_TWEAK_KEY] = picked
 			_on_tweak_changed()
 		)
-		_action_ring.add_tweak_station(ModuleCatalog.AMMO_TWEAK_KEY, "Ammo", ammo_selector, TweakStations.CLOCK_12)
+		_action_ring.add_tweak_station(ModuleCatalog.AMMO_TWEAK_KEY, "Ammo", ammo_selector)
 
-	# drone_carrier's drone_type selector at 12:00 (sits above ammo if both exist).
-	# Placed after the ammo branch so both can occupy CLOCK_12; the ring stacks them.
+	# drone_carrier's drone_type selector. Added after ammo, so it claims the
+	# next free slot rather than sharing one.
 	if type_id == "drone_carrier":
 		var drone_options = ModuleCatalog.get_drone_options()
 		var current_drone = data.tweaks.get("drone_type", "attack")
@@ -629,19 +588,16 @@ func _generate_custom_tweaks(module: Node3D, data: ModuleDataResource):
 			data.tweaks["drone_type"] = picked
 			_on_tweak_changed()
 		)
-		_action_ring.add_tweak_station("drone_type", "Drone Type", drone_selector, TweakStations.CLOCK_12)
+		_action_ring.add_tweak_station("drone_type", "Drone Type", drone_selector)
 
 	if not LabDocument.TWEAK_SPECS.has(type_id):
 		return
 
-	# 2. Parametric Tweaks at fixed clock stations
+	# 2. Parametric tweaks fill the remaining outer stations in spec order
 	var specs = LabDocument.TWEAK_SPECS[type_id]
 	for spec in specs:
 		var spec_name: String = spec["name"]
 		var spec_label: String = spec["label"]
-		var angle: float = TweakStations.angle_for(spec_name)
-		if angle < 0.0:
-			angle = TweakStations.CLOCK_1
 
 		if spec.get("type", "") == "bool":
 			var check = CheckBox.new()
@@ -652,7 +608,7 @@ func _generate_custom_tweaks(module: Node3D, data: ModuleDataResource):
 				data.tweaks[spec_name] = pressed
 				_on_tweak_changed()
 			)
-			_action_ring.add_tweak_station(spec_name, spec_label, check, angle)
+			_action_ring.add_tweak_station(spec_name, spec_label, check)
 		else:
 			var min_v: float = spec.get("min", 0.5)
 			var max_v: float = spec.get("max", 2.0)
@@ -667,4 +623,4 @@ func _generate_custom_tweaks(module: Node3D, data: ModuleDataResource):
 				data.tweaks[spec_name] = val
 				_on_tweak_changed()
 			)
-			_action_ring.add_tweak_station(spec_name, spec_label, dial, angle)
+			_action_ring.add_tweak_station(spec_name, spec_label, dial)

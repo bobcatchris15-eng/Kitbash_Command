@@ -608,22 +608,25 @@
       0.98,
       0.92
     ],
-    "sun_energy": 1.5,
+    "sun_energy": 1.0,
     "ambient_light_energy": 1.1,
     "ambient_light_color": [
       0.65,
       0.7,
       0.78
     ],
-    "tonemap_exposure": 1.4,
+    "tonemap_exposure": 0.952,
     "sun_elevation_deg": 25.0,
     "sun_azimuth_deg": 200.0,
     "fog_enabled": true,
-    "fog_density": 0.0001,
-    "fog_aerial_perspective": 0.04,
+    "fog_density": 0.0007,
+    "fog_aerial_perspective": 0.6,
     "volumetric_fog_enabled": false,
     "volumetric_fog_density": 0.0,
     "dof_blur_far_enabled": false,
-    "dof_blur_far_distance": 260.0
+    "dof_blur_far_distance": 260.0,
+    "fog_sky_affect": 0.3,
+    "fog_height_density": 0.01,
+    "fog_sun_scatter": 0.15
   }
 }

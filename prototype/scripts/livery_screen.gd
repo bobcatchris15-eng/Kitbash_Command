@@ -27,12 +27,34 @@ var _preview_hull: Node3D = null
 var _preview_cam: Camera3D = null
 var _bp_manager: Node = null
 
+# PREVIEW SUBJECTS. The turntable used to show four hand-written blueprints
+# (a medium tank, a heavy, a scout, a bare chassis) that no player ever built.
+# Judging a paint scheme on a vehicle you do not own is the wrong test: the
+# whole point of a livery is how it sits on YOUR silhouette, with your armor
+# plates, your weapon mix and your ride height.
+#
+# So the list is now the player's own saved designs, most recently saved first,
+# with the built-in reference chassis kept after them - both as a fallback for
+# a player who has saved nothing yet, and because a neutral hull is genuinely
+# useful for judging a pattern in isolation.
+#
+# Each entry is {"label": String} plus EITHER "path" (load it) or "builtin"
+# (an index into _builtin_blueprint).
+var _subjects: Array = []
+
 # Turntable state
 var _spin: float = 0.0
 var _auto_spin: bool = true
 var _cam_yaw: float = 0.65
 var _cam_pitch: float = 0.38
 var _cam_dist: float = 8.5
+
+# Orbit range. Was a hardcoded 3.5-16 in three places, tuned for the four
+# hand-written reference vehicles; a real saved design is often larger and
+# _frame_camera_to_subject was pinning at the old 16 ceiling, so framing failed
+# on exactly the subjects this screen now exists to show.
+const CAM_DIST_MIN := 2.5
+const CAM_DIST_MAX := 44.0
 var _is_dragging: bool = false
 var _last_mouse_pos: Vector2 = Vector2.ZERO
 
@@ -152,12 +174,18 @@ func _ready() -> void:
 	subj_label.theme_type_variation = "HeadingLabel"
 	preview_top_bar.add_child(subj_label)
 
+	# _bp_manager is created here rather than in _build_preview_scene (which
+	# runs later, at the viewport) because populating this dropdown needs to
+	# list the player's saved designs first.
+	_bp_manager = BlueprintManagerScript.new()
+	add_child(_bp_manager)
+	_build_subject_list()
+
 	_subject_btn = OptionButton.new()
-	_subject_btn.add_item("Medium Assault Tank", 0)
-	_subject_btn.add_item("Heavy Combat Brawler", 1)
-	_subject_btn.add_item("Interceptor Scout", 2)
-	_subject_btn.add_item("Clean Chassis", 3)
+	for i in range(_subjects.size()):
+		_subject_btn.add_item(str(_subjects[i]["label"]), i)
 	_subject_btn.selected = 0
+	_current_subject = 0
 	_subject_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UIFeedbackScript.wire(_subject_btn)
 	_subject_btn.item_selected.connect(_on_subject_selected)
@@ -264,7 +292,11 @@ func _build_tab_colors() -> void:
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_tab_colors_node.add_child(grid)
 
-	for zone in LiveryScript.ZONES:
+	# EDITABLE_ZONES, not ZONES: the two weapon zones no longer drive any
+	# geometry, so their pickers are omitted. See the note on EDITABLE_ZONES in
+	# livery.gd. _sync_all_controls() still walks the full ZONES list and is
+	# already guarded on _pickers.has()/_finish_btns.has(), so it is unaffected.
+	for zone in LiveryScript.EDITABLE_ZONES:
 		var zid: String = zone["id"]
 		var label := Label.new()
 		label.text = zone["name"]
@@ -649,8 +681,7 @@ func _build_preview_scene(vp: SubViewport) -> void:
 	env.environment = e
 	_preview_root.add_child(env)
 
-	_bp_manager = BlueprintManagerScript.new()
-	add_child(_bp_manager)
+	# _bp_manager was already created when the subject dropdown was populated.
 	_apply_live()
 
 func _update_camera_transform() -> void:
@@ -664,11 +695,20 @@ func _update_camera_transform() -> void:
 	_preview_cam.position = cp
 	_preview_cam.look_at_from_position(cp, Vector3(0.0, 0.35, 0.0), Vector3.UP)
 
+# Proportional, because a fixed 0.5 m step is a sensible nudge at 8 m orbit and
+# uselessly slow at 40 m.
+func _zoom_step() -> float:
+	return clampf(_cam_dist * 0.12, 0.25, 4.0)
+
+
 func _reset_camera() -> void:
 	_cam_yaw = 0.65
 	_cam_pitch = 0.38
+	# Re-frame to the current subject rather than restoring the old fixed 8.5,
+	# which on a large design would put the camera inside the hull.
 	_cam_dist = 8.5
 	_update_camera_transform()
+	_frame_camera_to_subject()
 
 func _on_preview_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -676,10 +716,10 @@ func _on_preview_gui_input(event: InputEvent) -> void:
 			_is_dragging = event.pressed
 			_last_mouse_pos = event.position
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_cam_dist = clampf(_cam_dist - 0.5, 3.5, 16.0)
+			_cam_dist = clampf(_cam_dist - _zoom_step(), CAM_DIST_MIN, CAM_DIST_MAX)
 			_update_camera_transform()
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_cam_dist = clampf(_cam_dist + 0.5, 3.5, 16.0)
+			_cam_dist = clampf(_cam_dist + _zoom_step(), CAM_DIST_MIN, CAM_DIST_MAX)
 			_update_camera_transform()
 	elif event is InputEventMouseMotion and _is_dragging:
 		var delta: Vector2 = event.position - _last_mouse_pos
@@ -705,8 +745,58 @@ func _rebuild_preview() -> void:
 	if _bp_manager == null:
 		return
 
+	var subj: Dictionary = _subjects[_current_subject] if _current_subject < _subjects.size() else {}
+	var blueprint: Dictionary = {}
+	if subj.has("path"):
+		blueprint = _bp_manager.load_blueprint(str(subj["path"]))
+		# A design can be deleted or corrupted between the dropdown being
+		# populated and being clicked; fall back rather than showing nothing.
+		if blueprint.is_empty():
+			push_warning("LIVERY: could not load design '%s'; showing reference chassis." % subj.get("label", "?"))
+			blueprint = _builtin_blueprint(0)
+	else:
+		blueprint = _builtin_blueprint(int(subj.get("builtin", 0)))
+
+	# The 4th argument overrides the blueprint's own saved `faction`, which is
+	# what makes a real design show the livery being EDITED rather than
+	# whatever it happened to be saved wearing.
+	_preview_hull = _bp_manager.reconstruct_vehicle(blueprint, _preview_root, false, LiveryScript.PLAYER_ID)
+	_spin = 0.0
+	_frame_camera_to_subject()
+
+# Most recently SAVED first. `modified_unix` is written by
+# blueprint_manager.save_blueprint(); the Design Lab's scratch file is not a
+# save and deliberately does not appear here (see the scratch-vs-saved note in
+# blueprint_manager.gd).
+#
+# read_only entries are the built-in default roster shipped in
+# res://assets/blueprints/default_roster. They are not the player's designs, so
+# they are excluded here and the reference chassis below serve that purpose.
+func _build_subject_list() -> void:
+	_subjects.clear()
+	var mine: Array = []
+	for entry in _bp_manager.list_blueprints():
+		if bool(entry.get("read_only", false)):
+			continue
+		mine.append(entry)
+	mine.sort_custom(func(a, b): return int(a.get("modified_unix", 0)) > int(b.get("modified_unix", 0)))
+	for entry in mine:
+		_subjects.append({
+			"label": str(entry.get("name", "Untitled Design")),
+			"path": str(entry.get("path", "")),
+		})
+	var builtin_labels := ["Reference: Medium Chassis", "Reference: Heavy Chassis",
+		"Reference: Scout Chassis", "Reference: Bare Hull"]
+	for i in range(builtin_labels.size()):
+		_subjects.append({"label": builtin_labels[i], "builtin": i})
+
+
+# The hand-written reference vehicles. Kept because a player with no saves yet
+# still needs something on the turntable, and because a neutral hull is the
+# right subject for judging a pattern's scale without a loadout in the way.
+func _builtin_blueprint(which: int) -> Dictionary:
 	var blueprint: Dictionary
-	match _current_subject:
+	match which:
 		0:
 			# Medium Assault Tank with Turret & Wheels
 			blueprint = {
@@ -736,7 +826,7 @@ func _rebuild_preview() -> void:
 			# Heavy Combat Brawler
 			blueprint = {
 				"version": 2.0,
-				"hull_type": "saxon_heavy_a",
+				"hull_type": "brenntal_heavy_a",
 				"hull_scale": {"x": 1.0, "y": 1.0, "z": 1.0},
 				"armor_material": "hardened_steel",
 				"faction": LiveryScript.PLAYER_ID,
@@ -754,7 +844,7 @@ func _rebuild_preview() -> void:
 			# Interceptor Scout
 			blueprint = {
 				"version": 2.0,
-				"hull_type": "interceptor_scout_a",
+				"hull_type": "brenntal_scout_a",
 				"hull_scale": {"x": 1.0, "y": 1.0, "z": 1.0},
 				"armor_material": "hardened_steel",
 				"faction": LiveryScript.PLAYER_ID,
@@ -779,8 +869,48 @@ func _rebuild_preview() -> void:
 				"modules": [],
 			}
 
-	_preview_hull = _bp_manager.reconstruct_vehicle(blueprint, _preview_root, false, LiveryScript.PLAYER_ID)
-	_spin = 0.0
+	return blueprint
+
+
+# A real design can be anything from a scout to a heavy with sponsons, so the
+# fixed 8.5 m orbit the hand-written subjects were tuned for would clip a large
+# hull and leave a small one as a dot. Frames to the assembled silhouette.
+func _frame_camera_to_subject() -> void:
+	if not is_instance_valid(_preview_hull):
+		return
+	var span := 0.0
+	var stack: Array = [[_preview_hull as Node3D, Transform3D.IDENTITY]]
+	while not stack.is_empty():
+		var entry: Array = stack.pop_back()
+		var node: Node = entry[0]
+		var xf: Transform3D = entry[1]
+		for child in node.get_children():
+			if child is Node3D:
+				stack.append([child, xf * (child as Node3D).transform])
+		if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
+			var ab: AABB = (node as MeshInstance3D).mesh.get_aabb()
+			for i in range(8):
+				span = maxf(span, (xf * ab.get_endpoint(i)).length())
+	if span <= 0.0:
+		return
+	# Solve the fit from the camera's real FOV rather than a guessed multiplier.
+	# A guessed 2.6x radius put a saved design at about 60% too far - a dot in
+	# the middle of the viewport - because for Godot's default 75 deg vertical
+	# FOV the distance needed to just contain a sphere of radius r is
+	# r / tan(fov/2), which is ~1.3r, not 2.6r.
+	#
+	# `span` is the bounding-sphere radius about the hull ORIGIN, not about the
+	# mesh centre, which is deliberate: the origin is what the turntable
+	# rotates around, so a sphere about it is the volume the subject sweeps
+	# through while spinning. Framing to the mesh centre instead would let a
+	# vehicle whose origin sits off-centre swing out of shot mid-rotation.
+	var fov_rad: float = deg_to_rad(_preview_cam.fov if _preview_cam != null else 75.0)
+	var fit: float = span / maxf(tan(fov_rad * 0.5), 0.01)
+	# 1.15 leaves a little air around the silhouette rather than pressing it
+	# against the frame edge.
+	_cam_dist = clampf(fit * 1.15, CAM_DIST_MIN, CAM_DIST_MAX)
+	_update_camera_transform()
+
 
 func _apply_live() -> void:
 	LiveryScript._cache[LiveryScript.PLAYER_ID] = _livery.duplicate(true)
@@ -846,29 +976,12 @@ func _update_weathering_label(val: float) -> void:
 		_weathering_label.text = "Scavenged Relic (%d%%)" % int(val * 100)
 
 func _apply_preset(preset_key: String) -> void:
-	var p: Dictionary = LiveryScript.PRESETS.get(preset_key, {})
-	if p.is_empty():
+	if not LiveryScript.PRESETS.has(preset_key):
 		return
-	_livery = {
-		"pattern": {
-			"type": p.get("pattern_type", "stripe"),
-			"scale": p.get("pattern_scale", 1.0),
-			"angle": p.get("pattern_angle", 0.0),
-			"softness": p.get("pattern_softness", 0.015),
-		},
-		"weathering": p.get("weathering", 0.2),
-		"decal": {
-			"icon": p.get("decal_icon", "gear"),
-			"badge": p.get("decal_badge", "circle"),
-			"serial": "101",
-			"show_hazard": true,
-		},
-		"hull_upper": p.get("hull_upper", {}).duplicate(),
-		"hull_lower": p.get("hull_lower", {}).duplicate(),
-		"hull_stripe": p.get("hull_stripe", {}).duplicate(),
-		"weapon_action": p.get("weapon_action", {}).duplicate(),
-		"weapon_barrel": p.get("weapon_barrel", {}).duplicate(),
-	}
+	# The flat-preset -> runtime-shape conversion lives in
+	# LiveryScript.from_preset so that this screen and for_id() (which is what
+	# a battle goes through) cannot disagree about what a preset means.
+	_livery = LiveryScript.from_preset(preset_key)
 	_sync_all_controls()
 	_apply_live()
 

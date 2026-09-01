@@ -380,7 +380,7 @@ func _on_start_operation_pressed() -> void:
 #
 # 2026-08-10: writes only the rule set and the display-only selected_map_id.
 # The seven legacy pre-match fields on MatchConfig are retired; everything
-# match_director needs (player_faction, enemy_faction, blueprint paths,
+# match_director needs (player_livery, enemy_livery, blueprint paths,
 # ai_difficulty) now lives on the rule set. selected_map_id stays on
 # MatchConfig itself because battle_hud's minimap title and the
 # after-action report read it for display purposes - it is not a

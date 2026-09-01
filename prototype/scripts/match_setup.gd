@@ -25,12 +25,17 @@ const UIShell = preload("res://scripts/ui_shell.gd")
 
 var bg_rect: ColorRect
 
-# WAS a 10-entry faction picker built from FactionCatalog.get_ids(). The
-# premade factions are gone: the player authors ONE livery of their own
-# (livery.gd), it is a persistent profile setting rather than a per-match
-# choice, and it carries no mechanical bonus - so there is nothing left for
-# this screen to ask. Enemy teams roll their own livery deterministically from
-# their team id.
+# WAS a 10-entry faction picker built from FactionCatalog.get_ids() - a file
+# that no longer exists (scripts/faction_catalog.gd, deleted 2026-08-31 once
+# nothing referenced it). The premade factions are gone: the player authors ONE
+# livery of their own (livery.gd), it is a persistent profile setting rather
+# than a per-match choice, and it carries no mechanical bonus - so there is
+# nothing left for this screen to ask.
+#
+# The opponent's livery is GENERATED PER MATCH (LiveryScript.new_ai_livery_id()
+# in _on_start_pressed). It used to be the fixed string "enemy", which hashed to
+# a single livery, so every AI army in every match ever played wore the same
+# colours.
 #
 # The two ids below are what the match still needs to plumb through, and they
 # are constants now rather than dropdown state.
@@ -41,7 +46,7 @@ const DIFFICULTY_LABELS = ["Easy", "Normal", "Hard"]
 # were converted at the 2x crystal rate: 250/75 -> 400, 900/400 -> 1700.
 const RESOURCE_PRESETS = [-1, 400, 1700]
 const RESOURCE_LABELS = ["Standard", "Low (tight economy)", "High (build fast, fight fast)"]
-# AI Opponent. WHAT THIS REPLACES, AND WHY: a hardcoded `enemy_faction = "enemy"`
+# AI Opponent. WHAT THIS REPLACES, AND WHY: a hardcoded `enemy_livery = "enemy"`
 # in _on_start_pressed() that left the player no way to play the map without an
 # AI commander. The infrastructure for "no AI" already exists - MatchRuleSet
 # has carried an enable_ai field since the test_range factory was added
@@ -311,8 +316,11 @@ func _on_start_pressed():
 		# this file. LiveryScript resolves PLAYER_ID to the player's authored
 		# scheme and any other id to a deterministic roll, so "enemy" is a
 		# stable, distinct look with nothing to persist.
-		var player_faction: String = LiveryScript.PLAYER_ID
-		var enemy_faction: String = "enemy"
+		var player_livery: String = LiveryScript.PLAYER_ID
+		# A FRESH opponent paint scheme every skirmish. Was the fixed string
+		# "enemy", which hashed to one livery, so every AI army in every match
+		# ever played wore identical colours.
+		var enemy_livery: String = LiveryScript.new_ai_livery_id()
 		var ai_difficulty: String = DIFFICULTIES[difficulty_btn.selected]
 		var starting_credits: int = RESOURCE_PRESETS[resources_btn.selected]
 		# The AI Opponent dropdown writes through to MatchRuleSet.enable_ai
@@ -332,13 +340,13 @@ func _on_start_pressed():
 
 		# Battle-system unification (Phase 1, now Phase 5 final form). The
 		# per-mode rule set is the single source of truth; the seven
-		# legacy pre-match fields (player_faction / enemy_faction /
+		# legacy pre-match fields (player_livery / enemy_livery /
 		# selected_blueprint_paths / ai_difficulty / starting_credits) are
 		# retired. Everything below is what MatchConfig now carries.
 		match_config.rule_set = MatchRuleSetScript.skirmish(
 			match_config.selected_map_id,
-			player_faction,
-			enemy_faction,
+			player_livery,
+			enemy_livery,
 			paths,
 			ai_difficulty,
 		)

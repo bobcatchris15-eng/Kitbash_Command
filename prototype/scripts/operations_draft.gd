@@ -294,8 +294,11 @@ func write_match_config() -> void:
 	# Factions were chosen once for the whole operation (operations_setup.gd
 	# writes them into the rule set) and stay stable per operation. Same
 	# shape as the pre-Phase-5 code: no per-stage rewrite.
-	var player_faction: String = LiveryScript.PLAYER_ID
-	var enemy_faction: String = "enemy"
+	var player_livery: String = LiveryScript.PLAYER_ID
+	# ONE opponent identity for the whole campaign, keyed off the operation id,
+	# so the enemy does not repaint between stages. Was the fixed string
+	# "enemy", identical in every campaign and every skirmish alike.
+	var enemy_livery: String = LiveryScript.ai_livery_id_for(str(_ops.operation_id))
 	var paths: Array = roster_picker.ordered_paths()
 	# selected_map_id is still on MatchConfig (battle_hud / after-action
 	# report read it for display) - not part of the rule set.
@@ -306,8 +309,8 @@ func write_match_config() -> void:
 	# legacy pre-match fields are retired.
 	match_config.rule_set = MatchRuleSetScript.operations(
 		map_id,
-		player_faction,
-		enemy_faction,
+		player_livery,
+		enemy_livery,
 		paths,
 		ai_difficulty,
 		_ops.operation_id,

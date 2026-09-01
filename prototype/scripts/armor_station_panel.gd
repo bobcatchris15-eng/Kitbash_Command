@@ -659,7 +659,7 @@ func _apply_and_refresh(status: String = "") -> void:
 	if mesh_instance:
 		_hull.set_meta("armor_assignments", rows)
 		_hull.set_meta("armor_plan", ArmorPaint.build_plan(
-			"", rows, mesh, xform, str(_bp_manager.get_meta("player_faction", LiveryScript.PLAYER_ID) if _bp_manager else LiveryScript.PLAYER_ID)))
+			"", rows, mesh, xform, LiveryScript.PLAYER_ID))
 		ArmorPaintVisual.rebuild(_hull, mesh_instance)
 	_persist_assignments()
 	_refresh_readout()

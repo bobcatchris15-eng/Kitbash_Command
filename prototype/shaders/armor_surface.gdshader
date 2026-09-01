@@ -45,7 +45,32 @@ uniform float normal_strength : hint_range(0.0, 2.0) = 0.45;
 uniform float shield_mode : hint_range(0.0, 1.0) = 0.0;
 uniform float alpha_base : hint_range(0.0, 1.0) = 1.0;
 uniform float flash_amount : hint_range(0.0, 1.0) = 0.0;
-uniform float indirect_lift : hint_range(0.0, 1.0) = 0.25;
+// 2026-08-31: 0.25 -> 0.06. At 0.25 every unit and building in the game
+// self-illuminated at a quarter of its own albedo, which flattened the
+// lighting (shadowed sides glowed), removed the dark end of the value
+// range, and made saturated paint read as backlit plastic. It was a
+// workaround for "the livery is unreadable on a face pointing away from the
+// sun", and that problem is now solved properly: Battle.tscn's ambient
+// source is the sky (was a flat colour), so an unlit face gets real sky
+// fill. A small residual is kept so the read never fully collapses.
+uniform float indirect_lift : hint_range(0.0, 1.0) = 0.06;
+
+// ACCENT EMISSIVE - marker lights, and the new home of team identity.
+// Mirrors the block of the same name in hull_faction_material.gdshader; these
+// two shaders already duplicate evaluate_pattern, hash2d and the whole
+// weathering stack, and this follows that existing structure rather than
+// introducing an include for one feature.
+//
+// This file is the one that matters most for the effect: armor facets are the
+// large visible plates on a built vehicle, and setting these uniforms on the
+// hull shader alone was a silent no-op here (Godot drops unknown shader
+// params), which is why the first attempt produced no lights at all.
+uniform vec4 accent_emissive_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform float accent_emissive_strength : hint_range(0.0, 8.0) = 0.0;
+// Height up the hull, in normalised hull space, at which the marker lights sit -
+// on the shoulder, just below the deck line.
+const float ACCENT_LIGHT_HEIGHT = 0.62;
+uniform float accent_light_length : hint_range(0.005, 0.2) = 0.045;
 
 // --- Livery Zones ---
 uniform vec4 zone_lower_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
@@ -408,6 +433,34 @@ void fragment() {
 			EMISSION = base_color.rgb * 0.12;
 		} else if (emissive_strength > 0.0) {
 			EMISSION = emissive_color.rgb * emissive_strength;
+		}
+
+		// Marker lights - DELIBERATE STATIONS, mirroring the block of the same
+		// name in hull_faction_material.gdshader. See that file for why the
+		// original hashed-cell scatter was replaced.
+		if (accent_emissive_strength > 0.0) {
+			// COMPACT IN BOTH AXES. The first station attempt gated only Z
+			// narrowly and used a broad smoothstep over flank and height, so each
+			// "lamp" was a thin band that wrapped the entire shoulder contour and
+			// rendered as a glowing racing stripe. A lamp has to be small in every
+			// direction: a point in (height, length) on the outboard flank.
+			float flank = abs(zone_x - 0.5) * 2.0;
+			// Outboard only. A lamp on the belly glows into the mud, one on the
+			// centreline is a sunroof.
+			float outboard = smoothstep(0.68, 0.88, flank);
+			float lamp = 0.0;
+			for (int i = 0; i < 3; i++) {
+				float zc = 0.22 + 0.28 * float(i);
+				float dz = (zone_z - zc) / accent_light_length;
+				float dh = (zone_h - ACCENT_LIGHT_HEIGHT) / accent_light_length;
+				float r = sqrt(dz * dz + dh * dh);
+				lamp = max(lamp, (1.0 - smoothstep(0.55, 1.0, r)) * outboard);
+			}
+			lamp *= (1.0 - mud_mask) * (1.0 - chip_mask);
+			if (lamp > 0.001) {
+				EMISSION += accent_emissive_color.rgb * accent_emissive_strength * lamp;
+				ALBEDO = mix(ALBEDO, accent_emissive_color.rgb * 0.35, lamp * 0.8);
+			}
 		}
 	}
 }

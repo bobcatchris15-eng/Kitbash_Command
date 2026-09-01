@@ -47,6 +47,14 @@ static func apply_livery_zones(mat: ShaderMaterial, livery_id: String) -> void:
 	mat.set_shader_parameter("pattern_softness", LiveryScript.pattern_softness(livery_id))
 	mat.set_shader_parameter("weathering", LiveryScript.weathering(livery_id))
 
+	# Marker lights. The saturated half of a livery's identity - see the colour
+	# rule above PRESETS in livery.gd and accent_emissive_color in
+	# hull_faction_material.gdshader.
+	mat.set_shader_parameter("accent_emissive_color",
+		LiveryScript.accent_emissive_color(livery_id))
+	mat.set_shader_parameter("accent_emissive_strength",
+		LiveryScript.accent_emissive_strength(livery_id))
+
 	mat.set_shader_parameter("livery_mix", 1.0)
 	mat.set_shader_parameter("stripe_enabled", 1.0)
 

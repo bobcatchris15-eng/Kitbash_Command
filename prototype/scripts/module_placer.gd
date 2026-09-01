@@ -186,7 +186,10 @@ func _apply_armor_snapshot(snapshot: Dictionary):
 	var LiveryScript = preload("res://scripts/livery.gd")
 	var ArmorPaint = preload("res://scripts/armor_paint.gd")
 	var ArmorPaintVisual = preload("res://scripts/armor_paint_visual.gd")
-	var faction = bm.get_meta("player_faction", LiveryScript.PLAYER_ID) if bm else LiveryScript.PLAYER_ID
+	# Always the player: this is a Design Lab path, and nothing has ever set a
+	# "player_livery" meta on the blueprint manager (the get_meta this replaces
+	# always fell through to its default).
+	var faction = LiveryScript.PLAYER_ID
 	
 	hull.set_meta("armor_plan", ArmorPaint.build_plan("", armor_assignments, mesh_inst.mesh, mesh_inst.transform, str(faction)))
 	ArmorPaintVisual.rebuild(hull, mesh_inst)

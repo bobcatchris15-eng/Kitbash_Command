@@ -25,6 +25,7 @@ extends Node3D
 
 const BlueprintManagerScript = preload("res://scripts/blueprint_manager.gd")
 const MapCatalog = preload("res://scripts/map_catalog.gd")
+const LiveryScript = preload("res://scripts/livery.gd")
 const TerrainBuilder = preload("res://scripts/terrain_builder.gd")
 const WorldScaleScript = preload("res://scripts/world_scale.gd")
 const UnitScript = preload("res://scripts/battle/units/unit.gd")
@@ -100,8 +101,12 @@ const PICK_RAY_LENGTH := 4000.0
 
 var map_id: String = MapCatalog.DEFAULT_MAP_ID
 var current_map: Dictionary = {}
-var player_faction: String = "industrialists"
-var enemy_faction: String = "technocrats"
+# LIVERY IDS. The premade factions are gone (faction_catalog.gd deleted
+# 2026-08-31); these were "industrialists" / "technocrats", ids that no longer
+# resolve to anything. Overwritten from the rule set during boot; the values
+# here only apply to a scene loaded outside a match.
+var player_livery: String = LiveryScript.PLAYER_ID
+var enemy_livery: String = ""
 
 var bp_manager: Node = null
 var camera: Camera3D = null
@@ -471,8 +476,8 @@ func _ready() -> void:
 				camera.current = true
 
 	# Battle-system unification (Phase 5, 2026-08-10). The seven legacy
-	# pre-match fields on MatchConfig (selected_map_id, player_faction,
-	# enemy_faction, selected_blueprint_paths, ai_difficulty, starting_credits)
+	# pre-match fields on MatchConfig (selected_map_id, player_livery,
+	# enemy_livery, selected_blueprint_paths, ai_difficulty, starting_credits)
 	# are retired. The per-mode rule set written by match_setup.gd /
 	# operations_draft.gd / test_range_launcher.gd is the single source
 	# of truth; its fields are read here, with the rule set's own defaults
@@ -487,10 +492,10 @@ func _ready() -> void:
 	if _match_rule_set != null:
 		if _match_rule_set.map_id != "":
 			map_id = _match_rule_set.map_id
-		if _match_rule_set.player_faction != "":
-			player_faction = _match_rule_set.player_faction
-		if _match_rule_set.enemy_faction != "":
-			enemy_faction = _match_rule_set.enemy_faction
+		if _match_rule_set.player_livery != "":
+			player_livery = _match_rule_set.player_livery
+		if _match_rule_set.enemy_livery != "":
+			enemy_livery = _match_rule_set.enemy_livery
 
 	# SEED THE SIMULATION STREAM HERE, and nowhere else. This has to happen
 	# after the rule set is resolved (it carries sim_seed) and BEFORE anything
@@ -864,6 +869,28 @@ func _on_vision_tick() -> void:
 const SHADOW_DISTANCE_BASE: float = 320.0
 const SSAO_RADIUS_BASE: float = 0.8
 
+# Aerial-perspective defaults, applied to every map that does not override
+# them. See the block in _scale_lighting_to_world for why these are defaults
+# rather than per-map opt-in.
+#
+# FOG_DENSITY_DEFAULT is deliberately small, and the first value tried here
+# (0.0055) was ~8x too strong. fog_density is exponential per world unit, and
+# this camera sits 150-350 units from what it is looking at, so 0.0055 reached
+# ~56% opacity at 150 m: the entire playfield went to sky colour and the
+# semi-transparent fog-of-war shroud turned pale grey over it. At 0.0007 the
+# figures are ~10% at 150 m and ~30% at 500 m - a gradient across the map
+# rather than a wash over it.
+const FOG_DENSITY_DEFAULT: float = 0.0007
+# 0-1. How far distant geometry is tinted toward the SKY colour rather than a
+# flat fog grey. This is the actual depth cue; the shipped maps had 0.04-0.10.
+const FOG_AERIAL_DEFAULT: float = 0.60
+# Keeps the sky itself mostly unfogged so the horizon does not turn to mud.
+const FOG_SKY_AFFECT_DEFAULT: float = 0.30
+# Ground-hugging falloff, so the haze sits in the valleys.
+const FOG_HEIGHT_DENSITY_DEFAULT: float = 0.010
+# Forward-scatter toward the sun, so the haze has a direction.
+const FOG_SUN_SCATTER_DEFAULT: float = 0.15
+
 func _scale_lighting_to_world() -> void:
 	var env_data: Dictionary = current_map.get("environment", {})
 	var light := get_node_or_null("DirectionalLight3D") as DirectionalLight3D
@@ -874,7 +901,7 @@ func _scale_lighting_to_world() -> void:
 		if env_data.has("sun_energy"):
 			light.light_energy = float(env_data["sun_energy"])
 		else:
-			light.light_energy = 1.35
+			light.light_energy = 1.15
 		# Per-map time of day. Default matches the ~39 deg elevation baked into
 		# Battle.tscn's own transform, so a map that says nothing is unchanged.
 		if env_data.has("sun_elevation_deg") or env_data.has("sun_azimuth_deg"):
@@ -895,16 +922,50 @@ func _scale_lighting_to_world() -> void:
 		if env_data.has("ambient_light_color"):
 			env.ambient_light_color = env_data["ambient_light_color"]
 		# See map_catalog.gd's FIELD_SPEC entry for why exposure is per-map.
+		#
+		# 2026-08-31: the fallback was 1.25 and the shipped maps carry 1.4-1.8,
+		# on top of sun_energy 1.8-2.2. Through AgX that lifts the whole frame
+		# into a pastel middle band with no dark end for anything to read
+		# against - the "washed out / cheap" complaint. Reference RTS frames
+		# (Shogun 2, Forged Battalion) hold real blacks and spend their
+		# brightness in a few places instead of everywhere.
 		if env_data.has("tonemap_exposure"):
 			env.tonemap_exposure = float(env_data["tonemap_exposure"])
 		else:
-			env.tonemap_exposure = 1.25
-		if env_data.has("fog_enabled"):
-			env.fog_enabled = bool(env_data["fog_enabled"])
-			if env_data.has("fog_density"):
-				env.fog_density = float(env_data["fog_density"])
-			if env_data.has("fog_aerial_perspective"):
-				env.fog_aerial_perspective = float(env_data["fog_aerial_perspective"])
+			env.tonemap_exposure = 1.0
+
+		# AERIAL PERSPECTIVE IS NOW ON BY DEFAULT, and this is the single
+		# biggest perceptual gap against a polished RTS.
+		#
+		# Depth fog is what makes a frame read as air rather than as a
+		# viewport: near geometry dark and saturated, far geometry lifted
+		# toward sky value, in distinct bands. It was previously applied ONLY
+		# when a map's own environment block asked for it - and most maps
+		# either set `fog_enabled: false` or set fog_aerial_perspective to
+		# 0.04-0.10 on a 0-1 scale, which is indistinguishable from off.
+		# `the_great_valley` has no environment block at all, so it got
+		# nothing whatsoever.
+		#
+		# fog_aerial_perspective is the important one: it is what tints distant
+		# geometry toward the SKY colour rather than toward a flat grey, which
+		# is the difference between depth cueing and a haze filter.
+		env.fog_enabled = bool(env_data.get("fog_enabled", true))
+		env.fog_density = float(env_data.get("fog_density", FOG_DENSITY_DEFAULT))
+		env.fog_aerial_perspective = float(env_data.get(
+			"fog_aerial_perspective", FOG_AERIAL_DEFAULT))
+		env.fog_sky_affect = float(env_data.get("fog_sky_affect", FOG_SKY_AFFECT_DEFAULT))
+		# Height fog so the depth cue is strongest along the ground - where the
+		# camera is looking - and thins with altitude, instead of a uniform
+		# grey wash that also flattens the hills against the sky.
+		env.fog_height = float(env_data.get("fog_height", 0.0))
+		env.fog_height_density = float(env_data.get(
+			"fog_height_density", FOG_HEIGHT_DENSITY_DEFAULT))
+		# Sun scatter: fog brightens toward the sun, so the haze has a
+		# direction and the light has a source. A directionless haze is the
+		# main reason the earlier fog attempts read as "washed out".
+		env.fog_sun_scatter = float(env_data.get("fog_sun_scatter", FOG_SUN_SCATTER_DEFAULT))
+		if env_data.has("fog_light_color"):
+			env.fog_light_color = env_data["fog_light_color"]
 		# 2026-08-26 22:45 playtest fix: Battle.tscn's
 		# `volumetric_fog_density = 0.0012` was the actual culprit behind
 		# "the fog is overwhelming even barely zoomed out" - the per-map
@@ -1264,17 +1325,18 @@ func _load_roster() -> void:
 	# Factions: the pre-match choice wins; otherwise the roster's own lead design
 	# decides, which is the old behaviour and keeps a hand-built roster feeling
 	# like it belongs to somebody. Rule set (when set) is the single source
-	# of truth - 2026-08-10: legacy MatchConfig.player_faction fallback gone.
-	if rs != null and rs.player_faction != "":
-		player_faction = rs.player_faction
+	# of truth - 2026-08-10: legacy MatchConfig.player_livery fallback gone.
+	if rs != null and rs.player_livery != "":
+		player_livery = rs.player_livery
 	elif not roster.is_empty() and roster[0].get("faction", "") != "":
-		player_faction = roster[0].get("faction", "")
+		# A design's own saved `faction` field is just a livery id now.
+		player_livery = roster[0].get("faction", "")
 	else:
-		player_faction = "industrialists"
+		player_livery = LiveryScript.PLAYER_ID
 
 	# Test Range's enemy roster comes from the rule set rather than from
 	# the bundled defaults. The legacy code path (Skirmish, Operations)
-	# also reads `enemy_faction` further down and falls back to the
+	# also reads `enemy_livery` further down and falls back to the
 	# enemy_roster lead design - that path is unchanged.
 	if rs != null and rs.mode == MatchRuleSetScript.Mode.TEST_RANGE \
 			and rs.enemy_blueprint_paths.size() > 0:
@@ -1336,12 +1398,14 @@ func _load_roster() -> void:
 			enemy_roster = CounterDraftScript.order_roster(enemy_roster, history)
 			print("[Operations] AI counter-draft: %s" % CounterDraftScript.explain(history))
 
-	if rs != null and rs.enemy_faction != "":
-		enemy_faction = rs.enemy_faction
+	if rs != null and rs.enemy_livery != "":
+		enemy_livery = rs.enemy_livery
 	elif not enemy_roster.is_empty() and enemy_roster[0].get("faction", "") != "":
-		enemy_faction = enemy_roster[0].get("faction", "")
+		enemy_livery = enemy_roster[0].get("faction", "")
 	else:
-		enemy_faction = "technocrats"
+		# No rule set and no roster hint: still give the opponent a real paint
+		# scheme rather than a dead id.
+		enemy_livery = LiveryScript.new_ai_livery_id()
 
 
 # Skips empties rather than making every caller check. reconstruct_vehicle()
@@ -1549,10 +1613,10 @@ func spawn_unit(blueprint: Dictionary, unit_team: int, at: Vector3) -> Node3D:
 	# to reach NavigationServer3D.
 	add_child(unit)
 	unit.global_position = Vector3(at.x, terrain_height_at(at), at.z)
-	# The unit wears its OWN side's faction. Passing player_faction for everything
+	# The unit wears its OWN side's faction. Passing player_livery for everything
 	# gave the AI's army the player's colours and the player's passives, which
 	# reads as a rendering oddity and is really a balance one.
-	var faction: String = player_faction if unit_team == PLAYER_TEAM else enemy_faction
+	var faction: String = player_livery if unit_team == PLAYER_TEAM else enemy_livery
 	if stats != null and unit_team == PLAYER_TEAM:
 		# Player only. The report is the player's own debrief, and mixing the
 		# opponent's designs into it would make every column meaningless.
@@ -1800,6 +1864,15 @@ func _place_structure(kind: String, structure_team: int, at: Vector3, under_cons
 			var b_pad_half := Vector2(StructureScript.DOCK_PAD_SIZE.z * 0.5 + 1.0, StructureScript.DOCK_PAD_SIZE.x * 0.5 + 1.0) if facing_x else Vector2(StructureScript.DOCK_PAD_SIZE.x * 0.5 + 1.0, StructureScript.DOCK_PAD_SIZE.z * 0.5 + 1.0)
 			TerrainBuilder.apply_building_pad_flattening(current_map, get_node_or_null("Ground"), bay_pos, b_pad_half, 0.0, target_h, 3.5)
 			_displace_terrain_props(bay_pos, bay_half)
+		# REBUILD THE PADS NOW THE GROUND HAS MOVED.
+		#
+		# s.setup() above built them already, sampling terrain_height_at() per
+		# bay - but that ran BEFORE the flattening calls in this block, so every
+		# pad was placed against the original slope and then had the ground
+		# flattened out from under it. The bays floated above or sat buried in
+		# the apron by exactly the flattening delta, which is invisible on a
+		# flat map and obvious on any real one.
+		s.refresh_dock_pads()
 	Profiler.stop("place.displace_props", _t_props)
 	# structure_built is logged on both paths (under construction and
 	# finished) so the post-match report can correlate structure deaths
@@ -4524,8 +4597,8 @@ func _evaluate_logging_flags() -> void:
 	if profiling_on:
 		BattleLogger.begin_match(_rule_set_label(), {
 			"map_id": map_id,
-			"player_faction": player_faction,
-			"enemy_faction": enemy_faction,
+			"player_livery": player_livery,
+			"enemy_livery": enemy_livery,
 			"build_path": _match_build_path(),
 			"via": "rule_set" if (_match_rule_set != null and _match_rule_set.log_profiling) else "env",
 		})

@@ -44,17 +44,38 @@ background_mode = 2
 sky = SubResource("Sky_bt")
 tonemap_mode = 4
 tonemap_exposure = 0.9
-; VISUAL polish 2026-08-23: ambient reverted to sky-aware (source 2).
-; Was a flat grey at (0.60, 0.61, 0.62) which over-lit shadowed areas
-; and crushed dynamic range to ~0.4 stops. Sky-aware + the (0.45, 0.50,
-; 0.55) tint picks up the procedural sky's blue-grey, so shadow vs lit
-; reads as "cool sky fill vs warm sun" instead of "bright grey vs
-; slightly-dimmer bright grey". Decoupled sun_energy dropped 0.35 -> 0.20
-; to keep the sun's directionality visible against the ambient fill.
-; Reduced ambient_sun_energy 0.20->0.15 and tonemap_exposure 1.0->0.9
-; on 2026-08-26 to reduce washout at TW camera distances.
-ambient_light_source = 2
+; 2026-08-31: ambient_light_source WAS 2, and the comment this replaces
+; described 2 as "sky-aware". It is not. In Godot 4 the enum is
+; BG=0 / DISABLED=1 / COLOR=2 / SKY=3, so source 2 is a FLAT COLOUR and the
+; intent recorded in that comment was never actually in effect.
+;
+; The consequence was not just flat ambient diffuse. With no sky as an
+; ambient source there is no environment specular either, so every metallic
+; surface in the battle had nothing to reflect - and hull_material_builder.gd
+; authors hardened_steel at metallic 0.65 / roughness 0.42. A metal with no
+; reflection source has no diffuse AND no specular: it renders as dead flat
+; grey. That is why nothing in a battle read as metal, across the whole
+; 127-hull roster and every building, and it is why pushing contrast and
+; bloom in earlier passes never fixed it.
+;
+; Source 3 (SKY) costs nothing extra here - the procedural sky is already
+; built and already being rasterised for the background.
+;
+; sky_contribution is 0.7 rather than the default 1.0 deliberately. 13 of the
+; 22 maps in data/maps set their own `ambient_light_color` (per-map palette;
+; see map_catalog.gd's FIELD_SPEC and the override at
+; match_director.gd:895), and at contribution 1.0 the sky replaces ambient
+; diffuse entirely and that per-map tint goes inert. At 0.7 the sky carries
+; the environment specular and most of the fill, while a map's own colour
+; still tints the remaining 30% - so neither intent is lost.
+;
+; ambient_light_energy is overwritten at runtime by
+; match_director._scale_lighting_to_world (0.75, or the map's own value); the
+; value here only applies to a direct load of this scene outside a match.
+ambient_light_source = 3
+ambient_light_sky_contribution = 0.7
 ambient_light_color = Color(0.45, 0.50, 0.55, 1)
+ambient_light_energy = 0.85
 ambient_light_sun_energy = 0.15
 ; VISUAL polish 2026-08-23 (later same day): SSAO + bloom REVERTED to
 ; PR-1 / pre-session values. The widened SSAO (0.8/1.4) and the bumped
@@ -90,9 +111,21 @@ ssil_enabled = false
 ; performance-wise (one final tonemap pass).
 ; Reduced 1.15/1.08 -> 1.05/1.02 on 2026-08-26 — the old grade was
 ; amplifying the already-wrong textures and making the scene harsh.
+;
+; 2026-08-31: back up to 1.18 contrast, and saturation DOWN to 0.94. The
+; 2026-08-26 walk-back was correct at the time - pushing contrast on top of a
+; 25% whole-surface emissive lift (hull_faction_material's indirect_lift, now
+; 0.06) and per-map exposure of 1.4-1.8 (now ~1.0) could only make the harshness
+; worse. With those two fixed there is a real dark end to push against.
+;
+; Saturation below 1.0 is deliberate and is the global half of the
+; saturation-ratio fix: reference RTS frames run a desaturated base and spend
+; chroma in a few small places. The small places are now the emissive accent
+; lights (accent_emissive_* in hull_faction_material.gdshader), which are added
+; AFTER tonemapping's input and are not touched by this adjustment.
 adjustment_enabled = true
-adjustment_saturation = 1.05
-adjustment_contrast = 1.02
+adjustment_saturation = 0.94
+adjustment_contrast = 1.18
 ; VISUAL polish 2026-08-23: VOLUMETRIC FOG. The single biggest perceptual
 ; change in this pass - adds the "thick air" / atmospheric perspective
 ; that makes a scene read as photographed rather than viewport-previewed.
@@ -102,6 +135,17 @@ adjustment_contrast = 1.02
 ; Length 250 covers the full fog depth without the 64m default cutting
 ; off behind the camera. Albedo integration off (gi_inject=0,
 ; ambient_inject=0) because the sky-aware ambient already does the read.
+; 2026-08-31: depth fog in the base scene. match_director
+; ._scale_lighting_to_world overrides all of these per-map (and now defaults
+; them ON for every map - see FOG_AERIAL_DEFAULT there); these values exist so
+; a direct load of this scene, e.g. tools/capture_battle_look.gd or the editor,
+; shows the same air a match does instead of a vacuum.
+fog_enabled = true
+fog_density = 0.0007
+fog_aerial_perspective = 0.6
+fog_sky_affect = 0.3
+fog_height_density = 0.01
+fog_sun_scatter = 0.15
 volumetric_fog_enabled = true
 volumetric_fog_density = 0.0003
 volumetric_fog_length = 250.0
@@ -150,11 +194,20 @@ transform = Transform3D(-0.75, -0.433013, 0.5, 0.216506, 0.642788, 0.735077, -0.
 shadow_enabled = true
 shadow_bias = 0.04
 shadow_normal_bias = 0.8
-shadow_blur = 1.2
-light_3d_mode = 1
+shadow_blur = 1.0
 light_color = Color(1, 0.97, 0.90, 1)
 light_energy = 0.7
-light_angular_distance = 5.0
+; 2026-08-31: light_angular_distance WAS 5.0. The real sun subtends ~0.53
+; degrees; 5.0 is ten times that, and the property drives both the shadow
+; penumbra and the width of the specular lobe. At 5.0 every highlight is
+; smeared flat and every shadow edge is mush, so even once the environment
+; had something to reflect (see ambient_light_source above) no surface could
+; produce a legible highlight. 1.0 keeps a soft, slightly-hazy sun without
+; dissolving the specular.
+light_angular_distance = 1.0
+; sun_energy is overwritten at runtime by match_director._scale_lighting_to_world
+; (1.35, or the map's own `sun_energy`); the 0.7 above only applies to a
+; direct load of this scene outside a match.
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 26, 26)

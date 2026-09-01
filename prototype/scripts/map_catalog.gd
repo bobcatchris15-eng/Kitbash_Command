@@ -740,6 +740,21 @@ const FIELD_SPEC: Dictionary = {
 		"fog_enabled": {"type": "bool", "required": false},
 		"fog_density": {"type": "number", "required": false, "min": 0.0},
 		"fog_aerial_perspective": {"type": "number", "required": false, "min": 0.0},
+		# 2026-08-31: the three fields below joined the per-map environment when
+		# aerial perspective became a default rather than an opt-in (see
+		# match_director's FOG_AERIAL_DEFAULT). Adding them to the map JSONs
+		# WITHOUT adding them here made all 13 maps that carry them fail schema
+		# validation outright - the validator rejects unknown fields by design,
+		# which is what caught it.
+		#
+		# fog_sky_affect below 1.0 keeps the sky itself mostly unfogged, so the
+		# horizon does not turn to mud; fog_height_density concentrates the haze
+		# near the ground where the camera looks; fog_sun_scatter gives the haze
+		# a direction so it reads as light through air rather than a grey filter.
+		"fog_sky_affect": {"type": "number", "required": false, "min": 0.0, "max": 1.0},
+		"fog_height": {"type": "number", "required": false},
+		"fog_height_density": {"type": "number", "required": false, "min": 0.0},
+		"fog_sun_scatter": {"type": "number", "required": false, "min": 0.0, "max": 1.0},
 		# 2026-08-26 22:45 playtest fix: Battle.tscn's
 		# volumetric_fog_density = 0.0012 was the actual cause of "the
 		# fog is overwhelming even barely zoomed out" - the per-map

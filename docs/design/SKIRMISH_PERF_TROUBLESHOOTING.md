@@ -1163,3 +1163,96 @@ The three remaining open questions, all addressable by one playtest
 each, are: is the renderer's 110 ms/frame a real GPU cost, a
 forward+ lighting cost, or a fillrate cost? The Track E order above
 is ordered to answer them cheapest first.
+
+## 14. RESOLVED (2026-09-01): terrain textures were importing uncompressed and unmipmapped
+
+§13.5 left three open questions, all variants of "is the renderer's 110 ms/frame
+a real GPU cost, a Forward+ lighting cost, or a fillrate cost?" It was a
+fillrate cost, and the cause was not in any shader or scene - it was in the
+texture import settings.
+
+### The measurement
+
+`tools/probe_terrain_fillrate.gd` (new) builds the ground mesh, its material and
+the grass carpet under a Battle-like environment, parks a camera at
+`RTSCamera.height`'s real 26 m default, and times four configurations. It reports
+viewport GPU time, not wall-clock - see "the two false trails" below for why that
+matters. delta_blues, 1080p:
+
+```
+  phase          BEFORE                      AFTER
+  control          2.98 ms  (sky only)        2.71 ms
+  plain            8.81 ms  (+ ground mesh)  10.08 ms
+  shaded         259.02 ms  (+ real mat)     16.45 ms
+  full           259.19 ms  (+ grass)        19.88 ms
+
+  ground mesh    :   +5.83 ms  ->   +7.37 ms
+  terrain shader : +250.21 ms  ->   +6.36 ms      39x
+  grass carpet   :   +0.17 ms  ->   +3.44 ms
+```
+
+Confirmed on the_great_valley (33.79 ms full), sentinel_divide (30.20 ms) and
+the_reef (27.80 ms).
+
+### The cause
+
+All 220 PNGs under `assets/textures/terrain/` imported with `compress/mode=0`
+(Lossless) and `mipmaps/generate=false`. That puts 2048x2048 RGBA8 plates in
+VRAM with no mip chain. `terrain_ground_v2.gdshader` takes ~30 taps per fragment
+across four of those layers, so every pixel of ground at a grazing angle was
+sampling full-resolution 2K textures with no mip selection - the textbook worst
+case for texture cache, on an integrated GPU sharing system memory.
+
+`assets/textures/factions` (30 files, 120 MB of uncompressed VRAM, on the hulls
+themselves) and `assets/textures/hull` (3 files) had the same settings and were
+fixed in the same pass. `assets/textures/ui`, `assets/textures/ui/props` and
+`assets/cursors` are 2D and correctly stay uncompressed.
+
+**Why it happened, which is the part worth remembering.** These `.import` files
+all carry `detect_3d/compress_to=1` - Godot's mechanism for re-importing a
+texture as VRAM compressed the first time it sees it used on 3D geometry. That
+detection runs in the *editor*, over materials it can find in a *scene*. None of
+these textures is ever in a scene: `terrain_builder.gd` and
+`hull_material_builder.gd` `load()` them and push them into `ShaderMaterial`
+parameters at runtime. The editor never witnessed the 3D use, so the safety net
+never fired. **Any texture assigned to a shader parameter from code needs its
+import settings set by hand.**
+
+### The two false trails, both worth knowing about
+
+1. **`7.5 fps` in a `_match.log` is probably not your game.** Every log with
+   `"via":"env"` in `MATCH_BEGIN` is an automated run whose window sits in the
+   background, and Windows throttles an unfocused window's swapchain present.
+   The result is a dead-flat 133.33 ms/frame - exactly 60/8 - that does not
+   move when draw calls change by 11x. Real playtests are `"via":"rule_set"`.
+   The first version of the probe above measured wall-clock time and reported
+   133.34 ms for *every* configuration it was given, including an empty scene.
+   This is why the probe now measures viewport GPU time and why it has a
+   `control` phase: if the empty scene is not near zero, the instrument is
+   measuring the throttle and every other row is noise.
+
+2. **The grass carpet is not the cost, and looks like it is.** It is chunked,
+   range-culled, 8 shells deep with `cull_disabled` and per-fragment `discard`,
+   and `terrain_grass_shells.gdshader`'s header claims it costs nothing at
+   battle altitude because "the camera is ~150 m up". That claim is false -
+   `RTSCamera.height` defaults to 26 m, so the carpet does draw at the default
+   zoom. It is simply cheap when it does: 0.17 ms. Tuning it down was tried and
+   reverted; it bought a few milliseconds and visibly shortened the grass.
+
+### What is still open
+
+The terrain is now 20-34 ms of GPU per frame depending on map, which is a
+different order of problem but not yet a solved one - units, structures, effects
+and the HUD all go on top of it. `the_great_valley` is the heaviest measured.
+The `+7-9 ms` for the bare ground mesh with a flat material is also worth a look;
+that is geometry and overdraw, not shading.
+
+Track E items 1-3 (§13.4) are now moot - the question they were ordered to answer
+has been answered. Item 4 (vision tick rate) and the body-vs-body broadphase work
+from §13.3 are unaffected and still stand.
+
+Note for anyone re-running the vsync experiment: `project.godot` has
+`window/vsync/vsync_mode=0`, but `scripts/core/settings_service.gd` defaults
+`vsync` to `true` and re-applies `VSYNC_ENABLED` at boot. Every log ever captured
+reports `"vsync":true`. Flipping the project setting does nothing; it has to come
+out of the settings service.

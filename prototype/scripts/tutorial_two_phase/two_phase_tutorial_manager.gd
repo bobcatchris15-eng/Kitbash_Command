@@ -18,6 +18,7 @@ extends Node
 const TwoPhaseTutorialSteps = preload("res://scripts/tutorial_two_phase/two_phase_tutorial_steps.gd")
 const TwoPhaseTutorialOverlay = preload("res://scripts/tutorial_two_phase/two_phase_tutorial_overlay.gd")
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
+const LiveryScript = preload("res://scripts/livery.gd")
 const BlueprintManagerScript = preload("res://scripts/blueprint_manager.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
@@ -130,7 +131,9 @@ func _launch_phase_1_skirmish() -> void:
 	rs.starting_credits = 400  # Low resources - "Low (tight economy)" preset
 	# Disable AI so we control when the enemy attacks? No, keep AI enabled for real battle feel
 	# But make enemy roster strong
-	rs.enemy_faction = "technocrats"
+	# Stable per tutorial run, so the demo opponent does not repaint between
+	# restarts of the same lesson.
+	rs.enemy_livery = LiveryScript.ai_livery_id_for("tutorial")
 	
 	# We need to inject the enemy roster. The rule set uses selected_blueprint_paths for player.
 	# For enemy, we need to set it up differently. Let's check how enemy roster works...

@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bf7tqc851n6ar"
-path="res://.godot/imported/crimson_concordat_roughness.png-1d96abd1fa2d46b3a4aa3f8a0150b2ea.ctex"
+path.s3tc="res://.godot/imported/crimson_concordat_roughness.png-1d96abd1fa2d46b3a4aa3f8a0150b2ea.s3tc.ctex"
+path.etc2="res://.godot/imported/crimson_concordat_roughness.png-1d96abd1fa2d46b3a4aa3f8a0150b2ea.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/factions/crimson_concordat_roughness.png"
-dest_files=["res://.godot/imported/crimson_concordat_roughness.png-1d96abd1fa2d46b3a4aa3f8a0150b2ea.ctex"]
+dest_files=["res://.godot/imported/crimson_concordat_roughness.png-1d96abd1fa2d46b3a4aa3f8a0150b2ea.s3tc.ctex", "res://.godot/imported/crimson_concordat_roughness.png-1d96abd1fa2d46b3a4aa3f8a0150b2ea.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

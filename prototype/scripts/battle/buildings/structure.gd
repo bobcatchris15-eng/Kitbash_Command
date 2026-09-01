@@ -208,6 +208,12 @@ func setup_from_blueprint(blueprint: Dictionary, structure_team: int, bp_manager
 # ground, so giving it either would carve away the exact surface the harvester
 # has to stand on to use it.
 const DOCK_PAD_SIZE := Vector3(7.0, 0.08, 9.0)
+# How far the kerb plinth reaches below the pad's driving surface. Has to exceed
+# the worst residual terrain deviation under a flattened pad - measured at
+# 0.07 m on sentinel_divide with tools/probe_dock_pads.gd - with enough margin
+# for a steeper map, while staying shallow enough that the plinth is never
+# visible as a wall on genuinely flat ground.
+const DOCK_PAD_PLINTH_DEPTH := 0.70
 const DOCK_PAD_KERB := 0.6
 
 # PR8 (2026-08-16). The dock pad materials used to be a per-instance
@@ -223,9 +229,39 @@ const DOCK_PAD_KERB := 0.6
 static var _kerb_material: StandardMaterial3D = null
 static var _pad_material: StandardMaterial3D = null
 
+# Name of the node the pads live under, so a rebuild can clear them.
+const DOCK_PAD_CONTAINER := "DockPads"
+
+
+## Rebuilds the dock pads at the CURRENT terrain height.
+##
+## Exists because of an ordering bug: match_director.place_structure() calls
+## setup() - which builds the pads, sampling terrain_height_at() per bay - and
+## only THEN calls apply_building_pad_flattening() for the footprint and for
+## each bay. So the pads were positioned against the original slope and the
+## ground was flattened out from under them afterwards, leaving every bay
+## floating or embedded by exactly the flattening delta. On a flat map they
+## happened to agree, which is why this survived.
+##
+## The director calls this after the flattening. setup() still builds them once
+## so a structure created outside the director (a test fixture, the Design Lab)
+## renders pads at all, and this is idempotent so the rebuild is clean.
+func refresh_dock_pads() -> void:
+	_add_dock_pads()
+
+
 func _add_dock_pads() -> void:
 	if _bay_offsets.is_empty():
 		return
+	# Idempotent: drop any previously-built pads before rebuilding, or a refresh
+	# would stack a second set of kerbs and pads on top of the first.
+	var existing := get_node_or_null(DOCK_PAD_CONTAINER)
+	if existing != null:
+		remove_child(existing)
+		existing.queue_free()
+	var container := Node3D.new()
+	container.name = DOCK_PAD_CONTAINER
+	add_child(container)
 	# Lazy-init the shared materials. Doing it lazily rather than at
 	# class load avoids paying for the materials when no structure
 	# ever builds (e.g. Test Range, which uses defenses not catalog
@@ -242,7 +278,13 @@ func _add_dock_pads() -> void:
 	# which is the parent of this StaticBody3D at setup time. Caching
 	# avoids four tree-walks per refinery (4 bays).
 	var world_map: Dictionary = _resolve_world_map()
+	# Indexed so each bay's two meshes get a unique, readable name. Godot's
+	# add_child() falls back to a generated "@MeshInstance3D@<id>" name on a
+	# sibling collision rather than appending a number, so naming every bay
+	# "Plinth"/"Surface" left only the FIRST bay identifiable.
+	var bay_index := 0
 	for offset in _bay_offsets:
+		bay_index += 1
 		var bay: Vector3 = offset
 		# The pad's long axis points at the building, so it reads as a bay you
 		# reverse into rather than a square patch.
@@ -268,21 +310,45 @@ func _add_dock_pads() -> void:
 			var bay_terrain_y: float = TerrainBuilder.terrain_height_at(world_map, bay_world)
 			pad_y = bay_terrain_y - global_position.y + 0.07
 
+		# THE KERB IS A PLINTH, NOT A TRIM RING.
+		#
+		# It used to be the same 6 cm slab as the pad, sitting 4 cm lower, which
+		# left a visible gap around the edges even once the pad Y was correct.
+		# The reason is that flattening the terrain only moves the ground mesh's
+		# VERTICES: between them the surface interpolates, so a rigid horizontal
+		# slab still lifts off wherever a triangle sags away beneath it, by up
+		# to the terrain step times the residual slope.
+		#
+		# Chasing that with ever-larger flatten margins does not converge -
+		# there is always a triangle edge somewhere. A plinth does: it extends
+		# DOWN into the ground far enough that no residual deviation can show a
+		# gap, with its top flush with the pad's driving surface. This is the
+		# "give them a foundation" half of Chris's original either/or, and it is
+		# doing the job the flattening cannot.
 		var kerb := MeshInstance3D.new()
 		var kerb_mesh := BoxMesh.new()
-		kerb_mesh.size = pad_size + Vector3(DOCK_PAD_KERB * 2.0, -0.02, DOCK_PAD_KERB * 2.0)
+		kerb_mesh.size = Vector3(
+			pad_size.x + DOCK_PAD_KERB * 2.0,
+			DOCK_PAD_PLINTH_DEPTH,
+			pad_size.z + DOCK_PAD_KERB * 2.0)
 		kerb.mesh = kerb_mesh
+		kerb.name = "Plinth_%d" % bay_index
 		kerb.material_override = _kerb_material
-		kerb.position = Vector3(bay.x, pad_y - 0.04, bay.z)
-		add_child(kerb)
+		# Top face flush with the pad's top; the remainder is buried.
+		kerb.position = Vector3(
+			bay.x,
+			pad_y + pad_size.y * 0.5 - DOCK_PAD_PLINTH_DEPTH * 0.5,
+			bay.z)
+		container.add_child(kerb)
 
 		var pad := MeshInstance3D.new()
 		var pad_mesh := BoxMesh.new()
 		pad_mesh.size = pad_size
+		pad.name = "Surface_%d" % bay_index
 		pad.mesh = pad_mesh
 		pad.material_override = _pad_material
 		pad.position = Vector3(bay.x, pad_y, bay.z)
-		add_child(pad)
+		container.add_child(pad)
 
 
 # Find the match director's current_map so _add_dock_pads can sample terrain

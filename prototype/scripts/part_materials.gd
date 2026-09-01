@@ -57,13 +57,29 @@ class_name PartMaterials
 # gunmetal regardless of what colour the rest of the weapon is (0.15) - which
 # is exactly the per-part differentiation the flat-albedo path couldn't
 # express, since there the colour WAS the material.
+# `zone_value` (default 1.0) scales the VALUE of the livery colour before it is
+# blended in, and exists because routing several roles at one zone made a whole
+# vehicle converge on a single brightness - coherent, but monochrome, with no
+# separation between the outer skin and the frame it bolts to.
+#
+# The obvious alternative - pointing structure at the darker `hull_lower` zone -
+# was tried and reverted: hull_lower's finishes are metallic (cast_iron is
+# 0.45), and a dark METAL reads far darker than a dark dielectric of the same
+# albedo, so frames came out near-black. Scaling value while keeping the zone
+# (and therefore the finish) is the control that was actually missing.
 const ROLES := {
 	# Default. Fabricated steel structure: mounts, cradles, frames.
-	"steel": {"metallic": 0.55, "roughness": 0.52, "tint": 0.85, "base": Color(0.30, 0.31, 0.33), "wear": 0.55},
+	# zone_tint (0.55) is well below `tint` (0.85) on purpose, and the reason is
+	# the opposite of gunmetal's. This role is DEFAULT_ROLE: every part whose
+	# name matches no ROLE_HINTS entry arrives here, including modded ones. A
+	# full-weight livery on this role would let a paint job repaint anything
+	# unclassified, so structure takes the body colour about halfway and keeps
+	# its own steel character for the rest.
+	"steel": {"metallic": 0.55, "roughness": 0.52, "tint": 0.85, "zone_tint": 0.55, "base": Color(0.30, 0.31, 0.33), "zone_value": 0.62, "wear": 0.55},
 
 	# Painted sheet: housings, covers, ammo boxes. Holds its colour, and
 	# takes the most paint mottling of anything here.
-	"painted": {"metallic": 0.25, "roughness": 0.62, "tint": 1.0, "base": Color(0.35, 0.35, 0.35), "wear": 0.85},
+	"painted": {"metallic": 0.25, "roughness": 0.62, "tint": 1.0, "base": Color(0.35, 0.35, 0.35), "zone_pattern": true, "wear": 0.85},
 
 	# Bolt-on armor plates (slat, spaced composite, ablative, energy
 	# barrier). Treated as a SKIN of the hull rather than as a separate
@@ -74,7 +90,7 @@ const ROLES := {
 	# bleeds through in the deepest shadow. Wear is higher than steel's
 	# because armor takes hits - the eye expects a plate to look
 	# slightly more lived-in than the frame it bolts onto.
-	"armor": {"metallic": 0.45, "roughness": 0.58, "tint": 0.95, "zone_tint": 1.0, "base": Color(0.35, 0.35, 0.35), "wear": 0.70},
+	"armor": {"metallic": 0.45, "roughness": 0.58, "tint": 0.95, "zone_tint": 1.0, "base": Color(0.35, 0.35, 0.35), "zone_pattern": true, "wear": 0.70},
 
 	# Barrels, rails, tubes, bores. Dark, hard, and almost colour-immune to an
 	# INCIDENTAL tint - a barrel is gunmetal on a red gun and on a green gun
@@ -94,7 +110,7 @@ const ROLES := {
 	# which is what Chris's "two zones per weapon, action and barrel" needs.
 	# ROLE_HINTS already told them apart by part name; they just both landed
 	# on gunmetal before.
-	"action": {"metallic": 0.80, "roughness": 0.34, "tint": 0.15, "zone_tint": 0.78, "base": Color(0.13, 0.135, 0.145), "wear": 0.30},
+	"action": {"metallic": 0.80, "roughness": 0.34, "tint": 0.15, "zone_tint": 0.78, "base": Color(0.13, 0.135, 0.145), "zone_value": 0.80, "zone_pattern": true, "wear": 0.30},
 
 	# The last few inches of a barrel and any muzzle device: heat-scorched,
 	# rougher and browner than the tube behind it. Reads as "this end is the
@@ -162,7 +178,7 @@ const ROLES := {
 	# player's livery accent colour (hull_stripe zone) while the rest of
 	# the module keeps its catalog colour.  Metallic painted finish so it
 	# reads as factory-applied paint on structural steel.
-	"accent": {"metallic": 0.45, "roughness": 0.50, "tint": 1.0, "zone_tint": 0.92, "base": Color(0.32, 0.33, 0.35), "wear": 0.60},
+	"accent": {"metallic": 0.45, "roughness": 0.50, "tint": 1.0, "zone_tint": 0.92, "base": Color(0.32, 0.33, 0.35), "zone_pattern": true, "wear": 0.60},
 }
 
 const DEFAULT_ROLE := "steel"
@@ -187,6 +203,33 @@ const ZONE_BY_ROLE := {
 	# the lower zone is mostly the track skirt / running gear, which the
 	# armor plates don't cover.
 	"armor": "hull_upper",
+
+	# Painted sheet is, definitionally, the part that wears the paint.
+	"painted": "hull_upper",
+
+	# Bare fabricated structure - and DEFAULT_ROLE, so every part whose name
+	# matches no ROLE_HINTS entry arrives here (163 of the 292 authored parts).
+	# Mounts, cradles and frames bolted to the hull reading as the hull's own
+	# colour is right; the breadth is why `zone_value` below pulls it well
+	# down rather than letting a paint job own half the roster outright.
+	"steel": "hull_upper",
+
+	# THE WEAPON SPLIT, revised 2026-08-31 to Chris's spec: the action body
+	# inherits the colour of the hull it is sitting on, and the barrel keeps
+	# its own colour and material.
+	#
+	# So `action` points at hull_upper, NOT at the livery's `weapon_action`
+	# zone - a receiver bolted to a painted hull is painted with the hull, not
+	# in a separate colour of its own.
+	"action": "hull_upper",
+
+	# `gunmetal` and `scorched` are deliberately ABSENT. They were mapped to
+	# weapon_barrel for one iteration, which tinted every barrel with a livery
+	# colour; a barrel is gunmetal on a red gun and on a green gun alike, and
+	# a scorched muzzle is scorched whatever the vehicle is painted. Their
+	# authored `zone_tint` of 0.78 is consequently unused again - left in place
+	# because it is the correct weight if the weapon zones are ever revived as
+	# explicit opt-in overrides (see the note in the summary).
 }
 
 const LiveryScript = preload("res://scripts/livery.gd")
@@ -242,6 +285,25 @@ const ROLE_HINTS := [
 	# substring is the type_id from module_catalog.gd, NOT the rendered
 	# .glb filename - visual_builder hands the catalog id through
 	# role_for_part().
+	# --- Specific weapon bodies, added 2026-08-31 ------------------------
+	# These fifteen part names matched nothing and fell through to
+	# DEFAULT_ROLE, which is why a plain cannon was wearing hull paint at the
+	# full structural weight. Entered as SPECIFIC tokens and placed before the
+	# generic "mount" / "barrel" entries below, because this table is
+	# first-match-wins on substrings: a generic ["cannon", ...] here would also
+	# swallow autocannon_mount, flak_cannon_mount and ion_cannon_mount, which
+	# are correctly mounts.
+	["basic_cannon", "action"],
+	["heavy_barrier_turret", "action"],
+	# Munitions are not the vehicle's bodywork - a round on a rail should not
+	# be repainted by a livery change - so they route to a role with no zone.
+	["missile_body", "gunmetal"],
+	["sam_missile", "gunmetal"],
+	["arm_missile", "gunmetal"],
+	["warhead", "gunmetal"],
+	# Drive sprockets are bare running-gear metal, not painted hull.
+	["drive_sprocket", "gunmetal"],
+
 	["slat_armor", "armor"],
 	["spaced_composite", "armor"],
 	["ablative_foam", "armor"],
@@ -352,6 +414,138 @@ static func role_for_authored_material(material_name: String, fallback_part: Str
 static var _fine_noise: NoiseTexture2D = null
 static var _coarse_noise: NoiseTexture2D = null
 
+# --- Part-space camouflage pattern -----------------------------------------
+#
+# The camo/hazard pattern lives in the two hull SHADERS, computed in hull space
+# from normalised local bounds. Bolt-on parts are StandardMaterial3D and cannot
+# run it, so a livery's pattern stopped at the hull and every module read as
+# flat paint next to a patterned hull.
+#
+# THE DELIBERATE COMPROMISE (Chris, 2026-08-31: "give the part material its own
+# cheap pattern in part space, that's fine if it doesn't match perfectly").
+# The alternative was routing parts through armor_surface.gdshader with a real
+# per-part facet_to_hull transform, which would align the pattern exactly - and
+# would make every part's material unique, defeating the mesh merge that
+# bake_module_visual() does by material IDENTITY and shipping one draw call per
+# bolt. See the SHARING IS LOAD-BEARING note at the top of this file.
+#
+# So: a TILING pattern baked to a small texture and hung on the DETAIL layer as
+# a multiply. Consequences, all accepted:
+#   - the pattern restarts per part rather than flowing across the vehicle;
+#   - it is a VALUE modulation, not a second colour. That is a much closer
+#     approximation than it sounds, because livery.gd's colour rule now holds
+#     hull_stripe within 0.22 value of hull_upper at <= 0.24 saturation - the
+#     camo partner is already mostly a value difference;
+#   - one texture per (pattern, contrast ratio, angle), NOT per part, so
+#     material sharing and the merge are untouched.
+#
+# The detail slot was previously coarse paint mottling. The pattern texture
+# bakes an equivalent mottle into itself so nothing is lost; roles without a
+# pattern keep the plain coarse_noise() path.
+#
+# GATED ON `zone_pattern`, not merely on having a zone. Camouflage is painted
+# on BODYWORK. The first cut applied it to every zoned role, which included
+# `steel` - and `steel` is DEFAULT_ROLE, so every track link, road wheel,
+# bogie, return roller and idler (they all match no ROLE_HINTS entry) came out
+# wearing hazard bands. A plaid rubber track is a very clear tell. Structure
+# still takes the hull COLOUR, just not the pattern.
+const PATTERN_TEX_SIZE := 128
+# Tiles per world unit for the pattern's uv2 triplanar mapping. 1.2 with three
+# stripe periods per tile puts a band at roughly 0.28 m, which is in the range
+# of real hazard striping - and, being in world-ish units, it is the same
+# physical size on a small bolt as on a big cover plate.
+const PATTERN_UV_SCALE := 1.2
+const PATTERN_PERIODS := 3.0
+
+static var _pattern_cache: Dictionary = {}
+
+# Object-scale patterns (a centreline stripe, a dipped nose, a half split, a
+# gradient) describe a whole VEHICLE and are meaningless tiled onto a bolt, so
+# they produce no part pattern at all and the role keeps its plain mottling.
+const PATTERN_TILEABLE := [4, 5, 6, 7, 8, 9]  # chevrons, hazard, hex, digital, splinter, tiger
+
+static func _pattern_mask(pattern_int: int, u: float, v: float) -> float:
+	# Mirrors the intent of evaluate_pattern() in hull_faction_material.gdshader,
+	# re-expressed in tiling 0..1 UV instead of normalised object bounds. Not
+	# bit-identical, and does not need to be - see the note above.
+	match pattern_int:
+		4:  # Chevrons
+			var chev: float = fmod(absf(u - 0.5) * 2.0 * PATTERN_PERIODS - v * PATTERN_PERIODS, 1.0)
+			return 1.0 if absf(chev - 0.5) * 2.0 < 0.42 else 0.0
+		5:  # Hazard caution bands, diagonal
+			return 1.0 if fmod((u + v) * PATTERN_PERIODS, 1.0) < 0.5 else 0.0
+		6:  # Hex grid
+			var hu: float = u * PATTERN_PERIODS * 2.0
+			var hv: float = v * PATTERN_PERIODS * 2.0
+			var gx: float = absf(fmod(hu, 1.0) - 0.5)
+			var gy: float = absf(fmod(hv + (0.5 if int(hu) % 2 == 0 else 0.0), 1.0) - 0.5)
+			return 1.0 if (gx + gy) < 0.42 else 0.0
+		7:  # Digital pixel camo
+			var cx: int = int(u * PATTERN_PERIODS * 5.0)
+			var cy: int = int(v * PATTERN_PERIODS * 5.0)
+			return 1.0 if _hash2i(cx, cy) > 0.52 else 0.0
+		8:  # Splinter dazzle
+			var sx: float = (u * 1.5 + v * 0.8) * PATTERN_PERIODS * 2.0
+			var sy: float = (v * 1.5 - u * 0.8) * PATTERN_PERIODS * 2.0
+			var f1: float = sin(sx * 2.5) + cos(sy * 3.0) + sin((sx + sy) * 2.0)
+			return 1.0 if f1 > 0.2 else 0.0
+		9:  # Tiger wave
+			var wave: float = v * PATTERN_PERIODS * 2.0 + sin(u * PATTERN_PERIODS * 6.0) * 0.75
+			return 1.0 if absf(fmod(wave, 1.0) - 0.5) * 2.0 < 0.40 else 0.0
+	return 0.0
+
+
+static func _hash2i(x: int, y: int) -> float:
+	var h: int = (x * 73856093) ^ (y * 19349663)
+	h = (h ^ (h >> 13)) * 1274126177
+	return float(absi(h) % 65536) / 65536.0
+
+
+# Cheap smooth mottle, replacing what coarse_noise() contributed to the detail
+# layer for these roles. Written out by hand rather than read back from a
+# NoiseTexture2D because that generates on a worker thread and would make this
+# an async call in the middle of a synchronous material build.
+static func _mottle(u: float, v: float) -> float:
+	var a: float = sin(u * 11.0 + 1.7) * cos(v * 9.0 - 0.4)
+	var b: float = sin((u + v) * 17.0) * 0.5
+	return clampf(0.90 + (a + b) * 0.06, 0.78, 1.06)
+
+
+# `ratio` is the stripe zone's value divided by the base zone's, so the part's
+# pattern carries the same contrast the hull's does.
+static func pattern_detail_texture(pattern_int: int, ratio: float, angle_deg: float) -> Texture2D:
+	if not PATTERN_TILEABLE.has(pattern_int):
+		return null
+	var r := snappedf(clampf(ratio, 0.25, 1.6), 0.05)
+	var a := snappedf(angle_deg, 15.0)
+	var key := "%d|%.2f|%.0f" % [pattern_int, r, a]
+	if _pattern_cache.has(key):
+		return _pattern_cache[key]
+
+	var img := Image.create(PATTERN_TEX_SIZE, PATTERN_TEX_SIZE, false, Image.FORMAT_RGB8)
+	var rad := deg_to_rad(a)
+	var cs := cos(rad)
+	var sn := sin(rad)
+	for y in range(PATTERN_TEX_SIZE):
+		var fy := (float(y) + 0.5) / float(PATTERN_TEX_SIZE)
+		for x in range(PATTERN_TEX_SIZE):
+			var fx := (float(x) + 0.5) / float(PATTERN_TEX_SIZE)
+			# Rotate about the tile centre so the part's bands run the same way
+			# the livery's do. Wrapped back into 0..1 to keep the tile seamless
+			# at multiples of 15 deg, which is why `a` is snapped.
+			var ox := fx - 0.5
+			var oy := fy - 0.5
+			var ru := fposmod(ox * cs - oy * sn + 0.5, 1.0)
+			var rv := fposmod(ox * sn + oy * cs + 0.5, 1.0)
+			var mask := _pattern_mask(pattern_int, ru, rv)
+			var val: float = lerpf(1.0, r, mask) * _mottle(fx, fy)
+			val = clampf(val, 0.0, 1.0)
+			img.set_pixel(x, y, Color(val, val, val))
+	var tex := ImageTexture.create_from_image(img)
+	_pattern_cache[key] = tex
+	return tex
+
+
 static func _make_noise(frequency: float, seed_value: int, size: int) -> NoiseTexture2D:
 	var noise := FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
@@ -390,6 +584,18 @@ static var _cache: Dictionary = {}
 static func _quantise(c: Color) -> String:
 	return "%d_%d_%d" % [int(c.r * 32.0), int(c.g * 32.0), int(c.b * 32.0)]
 
+# Value ratio between the livery's stripe zone and the zone this role is
+# wearing, so a part's pattern is as strong or as subtle as the hull's rather
+# than a fixed guess. Clamped away from zero so a black stripe zone cannot
+# multiply a part to pure black.
+static func _pattern_contrast_ratio(livery_id: String, zone: String) -> float:
+	var base_v: float = LiveryScript.zone_color(livery_id, zone).v
+	var stripe_v: float = LiveryScript.zone_color(livery_id, "hull_stripe").v
+	if base_v <= 0.001:
+		return 1.0
+	return clampf(stripe_v / base_v, 0.25, 1.6)
+
+
 static func get_material(role: String, tint: Color, emission: Color = Color(0, 0, 0, 0),
 						 emission_energy: float = 0.0) -> StandardMaterial3D:
 	var spec: Dictionary = ROLES.get(role, ROLES[DEFAULT_ROLE])
@@ -409,6 +615,11 @@ static func get_material(role: String, tint: Color, emission: Color = Color(0, 0
 		# A role may declare a higher tint weight for the livery case than for
 		# an incidental caller tint - see gunmetal's note.
 		tint_weight = float(spec.get("zone_tint", spec["tint"]))
+		# Per-role value scaling - see the zone_value note above ROLES.
+		var zone_value: float = float(spec.get("zone_value", 1.0))
+		if zone_value < 1.0:
+			effective_tint = Color.from_hsv(effective_tint.h, effective_tint.s,
+				clampf(effective_tint.v * zone_value, 0.0, 1.0), effective_tint.a)
 		var finish := LiveryScript.zone_finish(_livery_id, zone)
 		metallic = LiveryScript.finish_metallic(finish)
 		# finish_roughness() is the satin-capped read - never the raw table
@@ -419,6 +630,9 @@ static func get_material(role: String, tint: Color, emission: Color = Color(0, 0
 	# Cache key carries the zone AND the livery id: two liveries paint the same
 	# role differently, and without this the first one built would be handed
 	# out to every subsequent unit on the map.
+	# The livery id is already in the key when a zone applies, which covers the
+	# pattern too (pattern type, angle and the zone contrast ratio are all
+	# functions of the livery), so no extra key component is needed for it.
 	var key := "%s|%s|%s|%.2f|%s|%s" % [role, _quantise(effective_tint), _quantise(emission),
 		emission_energy, zone, _livery_id if zone != "" else ""]
 	if _cache.has(key):
@@ -455,12 +669,28 @@ static func get_material(role: String, tint: Color, emission: Color = Color(0, 0
 		# independent UV channel - so the paint blotching runs at a different
 		# frequency to the micro-roughness and the two don't beat against
 		# each other into a visible plaid.
+		#
+		# When the part is carrying a livery ZONE, the same slot carries the
+		# part-space camo pattern instead (which bakes an equivalent mottle into
+		# itself, so nothing is lost). StandardMaterial3D has exactly one detail
+		# layer, so these two genuinely compete for it - see the
+		# "Part-space camouflage pattern" note above.
+		var pattern_tex: Texture2D = null
+		if zone != "" and bool(spec.get("zone_pattern", false)):
+			pattern_tex = pattern_detail_texture(
+				LiveryScript.pattern_type_int(_livery_id),
+				_pattern_contrast_ratio(_livery_id, zone),
+				LiveryScript.pattern_angle(_livery_id))
 		mat.detail_enabled = true
 		mat.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
 		mat.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
-		mat.detail_albedo = coarse_noise()
 		mat.uv2_triplanar = true
-		mat.uv2_scale = Vector3(0.55, 0.55, 0.55)
+		if pattern_tex != null:
+			mat.detail_albedo = pattern_tex
+			mat.uv2_scale = Vector3(PATTERN_UV_SCALE, PATTERN_UV_SCALE, PATTERN_UV_SCALE)
+		else:
+			mat.detail_albedo = coarse_noise()
+			mat.uv2_scale = Vector3(0.55, 0.55, 0.55)
 
 	if emission_energy > 0.0:
 		mat.emission_enabled = true

@@ -231,19 +231,29 @@ static func make_flame_smoke_emitter(parent: Node3D, length: float = 8.0) -> GPU
 # node with local_coords on so it follows the body; position at the rear
 # end (+Z). Created once in _ready(), emitting toggled off on destruction
 # and the emitter freed once the last particle drains.
-static func make_missile_trail(parent: Node3D) -> GPUParticles3D:
+# `bulk` scales the plume without forking the function: 1.0 is the guided
+# missile_pod rocket, and rocket artillery asks for more. It multiplies count,
+# lifetime and puff size together, because raising any one alone reads wrong -
+# more particles at the same size is grainy, bigger particles at the same count
+# is lumpy, and a longer lifetime alone just leaves a thin streak hanging.
+#
+# The cache key has to carry `bulk`. _process_material() memoises on its key
+# string, so two different bulks under one key silently hand the second caller
+# the first one's material - which is precisely how the artillery ends up with
+# the pod's trail and nothing appears to change.
+static func make_missile_trail(parent: Node3D, bulk: float = 1.0) -> GPUParticles3D:
 	var p = GPUParticles3D.new()
 	p.name = "MissileTrail"
-	p.amount = 120    # Increased for dense cloud
-	p.lifetime = 1.0  # Increased for longer trail
+	p.amount = int(clampf(120.0 * bulk, 24.0, 600.0))
+	p.lifetime = clampf(1.0 * sqrt(bulk), 0.5, 3.0)
 	p.emitting = false
 	p.local_coords = false
 	p.draw_pass_1 = _get_quad()
 	p.material_override = _billboard_material(SMOKE_TEX, false, Color(0.8, 0.8, 0.8, 0.7)) # brighter thicker smoke
 	p.process_material = _process_material(
-		"missile_trail_thick",
+		"missile_trail_thick|%.2f" % bulk,
 		Vector3(0, 0, 1), 10.0, 0.5, 1.5,
-		Vector3(0, 0.5, 0), 0.3, 0.8, 1.0, 1.5, 1.0)
+		Vector3(0, 0.5, 0), 0.3 * bulk, 0.8 * bulk, 1.0, 1.5, 1.0)
 	parent.add_child(p)
 	p.emitting = true
 	return p

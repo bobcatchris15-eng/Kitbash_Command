@@ -2008,6 +2008,26 @@ func _fire_arcing_shell_at(shell_radius: float, arc_height: float, colour: Color
 		shell = ball
 	parent.add_child(shell)
 
+	# TRAIL. `trail_bulk` opts the round into the same GPUParticles3D plume the
+	# guided missiles carry (VFXEffects.make_missile_trail), scaled by that
+	# number. Rounds without it keep the discrete _spawn_flight_mote puffs
+	# below, which cost nothing and suit a small shell.
+	#
+	# Rocket artillery asks for this specifically. It used to emit one mote per
+	# 0.16 of flight - about six puffs for the whole arc - while missile_pod,
+	# the SHORT-range 48 m pod, resolves through weapon_missile.gd and gets the
+	# full 120-particle plume. The heavier, longer-ranged weapon had visibly
+	# the weaker signature, which is backwards: a saturation MLRS salvo should
+	# be the thing that fills the sky.
+	var trail_bulk: float = float(profile.get("trail_bulk", 0.0))
+	if trail_bulk > 0.0:
+		var plume := VFXEffects.make_missile_trail(shell, trail_bulk)
+		# Rear of the round, pointing back down the flight path. The tween
+		# below look_at()s the shell along its velocity every frame, so this
+		# stays behind the nose through the whole arc including the descent.
+		plume.position = Vector3(0.0, 0.0, shell_radius * 0.8)
+		_detach_trail_on_free(shell, plume)
+
 	var start = get_muzzle_world_pos()
 	var end = _aim_point(target) + aim_offset
 
@@ -2049,13 +2069,44 @@ func _fire_arcing_shell_at(shell_radius: float, arc_height: float, colour: Color
 			if profile.get("tumble", false):
 				shell.rotate_object_local(Vector3(0, 0, 1), 0.22)
 		if profile.get("trail", "") == "smoke" and val > puff_mark[0]:
-			puff_mark[0] = val + 0.16
-			_spawn_flight_mote(pos + Vector3(0, -shell_radius * 0.5, 0), Color(0.62, 0.6, 0.58), shell_radius * 0.9, 0.0)
+			# A round carrying a plume gets its motes proportionally closer
+			# together and larger, so the two layers read as one trail rather
+			# than as six puffs sitting inside a separate cloud.
+			puff_mark[0] = val + 0.16 / maxf(trail_bulk, 1.0)
+			_spawn_flight_mote(pos + Vector3(0, -shell_radius * 0.5, 0), Color(0.62, 0.6, 0.58),
+				shell_radius * 0.9 * maxf(trail_bulk, 1.0), 0.0)
 	, 0.0, 1.0, scaled_flight)
 	tween.finished.connect(func():
 		if is_instance_valid(shell):
 			shell.queue_free()
 		_deal_aoe_damage(end, blast_radius, damage)
+	)
+
+
+# A GPUParticles3D parented to the round dies WITH the round, which snips the
+# trail off at the impact point and leaves a clean-edged stub hanging in the
+# air - the one thing that reads unmistakably as a bug rather than as smoke.
+# So on the round's way out the emitter is reparented to the scene, stops
+# emitting, and is freed only once the last particle it already spawned has
+# lived out its lifetime. Same treatment weapon_missile.gd gives its own trail,
+# for the same reason.
+func _detach_trail_on_free(round_node: Node3D, plume: GPUParticles3D) -> void:
+	round_node.tree_exiting.connect(func():
+		if not is_instance_valid(plume) or not plume.is_inside_tree():
+			return
+		var scene := _effects_parent()
+		if scene == null:
+			return
+		var world_pos := plume.global_position
+		plume.get_parent().remove_child(plume)
+		scene.add_child(plume)
+		plume.global_position = world_pos
+		plume.emitting = false
+		var drain := plume.create_tween()
+		drain.tween_interval(plume.lifetime + 0.1)
+		drain.finished.connect(func():
+			if is_instance_valid(plume):
+				plume.queue_free())
 	)
 
 # Spigot mortar: one very large low-velocity bomb, enormous splash, derisory
@@ -2093,8 +2144,12 @@ func _fire_rocket_artillery():
 			# it becomes _fire_arcing_shell_at's aim_offset, which becomes the
 			# `end` that _deal_aoe_damage() detonates on.
 			var scatter = SimRNG.scatter_xz(1.0) * spread * 1.6
+			# trail_bulk 2.6: comfortably heavier than the missile_pod rocket's
+			# 1.0, which is the point of the setting. The mote trail stays on
+			# as well - the plume is the volume, the motes are the bright
+			# flecks of burning propellant inside it.
 			_fire_arcing_shell_at(0.25, 0.45, laser_color, 2.4 * spread, per_rocket, scatter, 0.7,
-				{"body": "rocket", "trail": "smoke"})
+				{"body": "rocket", "trail": "smoke", "trail_bulk": 2.6})
 		)
 
 # The six guided launchers all resolve through weapon_missile.gd, so they are

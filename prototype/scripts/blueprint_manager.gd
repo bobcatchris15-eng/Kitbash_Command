@@ -699,7 +699,7 @@ func list_blueprints(named_only: bool = false) -> Array:
 						"id": data.get("id", file_name.get_basename()),
 						"name": data.get("name", "Untitled Design"),
 						"hull_type": data.get("hull_type", "brenntal_medium_a"),
-						"faction": data.get("faction", "industrialists"),
+						"faction": data.get("faction", LiveryScript.PLAYER_ID),
 						"is_harvester": ModuleCatalogScript.blueprint_is_harvester(data),
 						"has_repair": ModuleCatalogScript.blueprint_has_repair(data),
 						# Which of the roster picker's three libraries this
@@ -732,7 +732,7 @@ func list_blueprints(named_only: bool = false) -> Array:
 						"id": data.get("id", file_name.get_basename()),
 						"name": data.get("name", "Untitled Design"),
 						"hull_type": data.get("hull_type", "brenntal_medium_a"),
-						"faction": data.get("faction", "industrialists"),
+						"faction": data.get("faction", LiveryScript.PLAYER_ID),
 						"is_harvester": ModuleCatalogScript.blueprint_is_harvester(data),
 						"has_repair": ModuleCatalogScript.blueprint_has_repair(data),
 						# Which of the roster picker's three libraries this

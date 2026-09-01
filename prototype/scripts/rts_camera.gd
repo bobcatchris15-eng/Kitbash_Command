@@ -65,8 +65,34 @@ var _middle_drag_last: Vector2 = Vector2.ZERO
 
 var _map_half: Vector2 = Vector2.ZERO
 var _clamp_enabled: bool = false
-const VOID_CAMERA_MARGIN: float = 4.0
-const VOID_CAMERA_EXTRA_VOID: float = 4.0 # wall is the stop — no void cruise
+# THE WALL IS THE STOP, and until 2026-09-01 it was not.
+# ---------------------------------------------------------------------------
+# void_wall.gd places its four panels at exactly +/-half_x and +/-half_z. The
+# hard guard below used to clamp the camera ORIGIN to
+# `half + VOID_CAMERA_MARGIN + VOID_CAMERA_EXTRA_VOID` = half + 8, so the
+# camera was permitted eight metres PAST the wall it was supposed to stop at -
+# the comment already said "wall is the stop", the arithmetic just did not.
+#
+# Why it only showed up at some zooms. `get_focal_ground_pos()` puts the origin
+# `height / tan(pitch)` behind whatever it is looking at: ~11 m at min_height
+# (8 m, -35 deg) and ~140 m at max_height (200 m, -55 deg). Only when zoomed
+# in is the origin close enough to the focal point to be pushed against the
+# outer limit at all, so the overshoot was reachable near the ground and
+# invisible at strategic zoom - which is exactly "in some zooms".
+#
+# Two separate limits, and they are not the same number:
+#   FOCAL   what the player is looking at, clamped to the map proper. Looking
+#           at the void is not a thing to allow.
+#   ORIGIN  the eye, clamped just INSIDE the wall plane. The inset keeps the
+#           near plane from poking through a panel and showing the void
+#           through the back of it.
+#
+# Raising ORIGIN_WALL_INSET past ~4 m starts costing the player the ability to
+# centre the map's own edge at high zoom, because the origin limit and the
+# focal point are `forward_dist` apart and the origin limit wins.
+const VOID_CAMERA_MARGIN: float = 0.0
+const VOID_CAMERA_EXTRA_VOID: float = 0.0 # wall is the stop - no void cruise
+const ORIGIN_WALL_INSET: float = 2.0
 
 func set_map_bounds(half: Vector2) -> void:
 	_map_half = half
@@ -91,9 +117,12 @@ func _clamp_to_void() -> void:
 		global_position.x += dx
 		global_position.z += dz
 
-	# Hard position guard as well (handles MMB drag which moves camera directly)
-	var hard_x := _map_half.x + VOID_CAMERA_MARGIN + VOID_CAMERA_EXTRA_VOID
-	var hard_z := _map_half.y + VOID_CAMERA_MARGIN + VOID_CAMERA_EXTRA_VOID
+	# Hard position guard as well (handles MMB drag, which moves the camera
+	# directly and never consults the focal clamp above). This is the one that
+	# has to land inside the wall - maxf keeps it sane on a map smaller than
+	# the inset, which no shipped map is, but a 4 m test map would be.
+	var hard_x := maxf(_map_half.x - ORIGIN_WALL_INSET, _map_half.x * 0.5)
+	var hard_z := maxf(_map_half.y - ORIGIN_WALL_INSET, _map_half.y * 0.5)
 	global_position.x = clampf(global_position.x, -hard_x, hard_x)
 	global_position.z = clampf(global_position.z, -hard_z, hard_z)
 

@@ -192,6 +192,13 @@ const TWEAK_RESPONSE := {
 	# count at all. That is Chris's "total wheel count, not just axle count".
 	"wheels": [
 		{"keys": ["wheels_per_axle"], "ref": 1.0, "thrust": 1.0, "capacity": 1.0},
+		# wheel_size is GEOMETRY (the node sum already handles num_axles), so
+		# it carries a real exponent here. A bigger tyre covers more ground
+		# per rev (thrust) and spreads the same load over a larger contact
+		# patch (capacity) - this is the tire dial Chris found raising weight
+		# while capacity stayed flat. get_weight()/get_cost() already scale
+		# with it linearly, so compliance stays a weight/cost tradeoff.
+		{"keys": ["wheel_size", "size"], "ref": 1.0, "thrust": 0.35, "capacity": 0.5},
 	],
 	# Wider track = more contact area = real flotation and load spread, paid
 	# for in friction. Always 2 nodes, so this is pure geometry. See also
@@ -208,6 +215,10 @@ const TWEAK_RESPONSE := {
 	# agility, which is now a genuine choice rather than a strict downgrade.
 	"legs": [
 		{"keys": ["leg_count", "count"], "ref": 4.0, "thrust": -0.5, "capacity": 0.0},
+		# foot_size is pad surface, not a count: a bigger pad spreads the
+		# same mass over more ground, so it buys capacity and deliberately
+		# nothing else. get_weight() still charges the extra metal.
+		{"keys": ["foot_size"], "ref": 1.0, "thrust": 0.0, "capacity": 1.0},
 	],
 	# Electron Megavoltage buys capacity and nothing else - Chris's ask,
 	# "increases the weight capacity ... while requiring more resources to
@@ -215,6 +226,16 @@ const TWEAK_RESPONSE := {
 	# count tweak: it is pad size, so it needs its own factor.
 	"hover_engine": [
 		{"keys": ["emv_level", "size"], "ref": 1.0, "thrust": 0.0, "capacity": 1.0},
+	],
+	# Rotors, for rotor-driven flyers. rotor_units is a count (the node sum
+	# already handles one rotor per unit); blade_count is blades-per-rotor,
+	# i.e. sub-parts inside one node, so it needs its own factor exactly like
+	# wheels_per_axle. A longer blade and more blades both raise max-takeoff
+	# weight as well as lift, so both buy capacity - same dial Chris flagged
+	# on tires, now wired for the prop.
+	"helicopter_rotors": [
+		{"keys": ["blade_length", "size"], "ref": 1.0, "thrust": 1.0, "capacity": 1.0},
+		{"keys": ["blade_count"], "ref": 4.0, "thrust": 0.25, "capacity": 0.6},
 	],
 	"ornithopter_wing": [
 		{"keys": ["wingspan", "size"], "ref": 1.0, "thrust": 1.0, "capacity": 1.0},
@@ -227,6 +248,12 @@ const TWEAK_RESPONSE := {
 	"buoyant_envelope": [
 		{"keys": ["prop_count", "count"], "ref": 2.0, "thrust": 0.0, "capacity": -1.0},
 		{"keys": ["blade_pitch"], "ref": 1.0, "thrust": 0.6, "capacity": 0.0},
+		# blade_count is blades-per-prop (sub-parts, not its own nodes), so a
+		# couple of extra blades buy a little thrust authority and some lift.
+		# The gasbag stays the real carrier: envelope_volume is geometry and
+		# near-pure capacity, paid for in drag (negative thrust).
+		{"keys": ["blade_count"], "ref": 3.0, "thrust": 0.2, "capacity": 0.5},
+		{"keys": ["envelope_volume"], "ref": 1.0, "thrust": -0.35, "capacity": 1.0},
 	],
 	# --- Expansion types (LOCOMOTION_EXPANSION_PLAN.md 4) ---
 	# These have no tweak sliders in the Design Lab yet, so today they always
@@ -365,16 +392,32 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	if is_instance_valid(hull_node):
 		armor_weight = float(ArmorPaint.analyze(hull_node).get("weight", 0.0))
 	weight += armor_weight
+	# The hull's own armor plate. compute_hull_weight() scales structural
+	# mass by volume and ignores the material/thickness sliders, so a hull
+	# set to ablative 3.0 used to weigh exactly what hardened 1.0 did. The
+	# declared plating now charges the same per-m2 rate as a painted facet,
+	# over the hull's whole exterior - and counts as CARRIED weight, so a
+	# big hull with thicker armor is genuinely more encumbered.
+	var hull_armor_weight := 0.0
+	if is_instance_valid(hull_node):
+		var plate_area: float = ArmorPaint.hull_total_area(hull_type, hull_scale)
+		if plate_area > 0.0:
+			var plate_density := float(ArmorPaint.MATERIAL_DENSITY.get(material,
+				ArmorPaint.MATERIAL_DENSITY["hardened_steel"]))
+			hull_armor_weight = plate_area * thickness * plate_density
+	weight += hull_armor_weight
 	# The locomotor is treated as a self-contained system "tuned for the
 	# unit" (Chris, 2026-08-16): its carrying capacity is for what it
 	# carries beyond the chassis baseline, not for the chassis itself.
 	# Tracked separately here so `load_ratio` and `power_top_speed` can use
-	# `carried_weight` (= everything except hull + locomotion) while `weight`
-	# still reports the full design mass to the rest of the game.
+	# `carried_weight` (= everything except the hull structure + its
+	# locomotion) while `weight` still reports the full design mass to the
+	# rest of the game.
 	#   `loco_weight`     - one or more locomotion children, summed
-	#   `carried_weight`  - painted armor, weapons/generators/sensors/harvesters/propulsion parts
+	#   `carried_weight`  - painted armor + the hull's own armor plate,
+	#                       weapons/generators/sensors/harvesters/propulsion
 	var loco_weight: float = 0.0
-	var carried_weight: float = armor_weight
+	var carried_weight: float = armor_weight + hull_armor_weight
 
 	var thrust := BASE_THRUST
 	var capacity := 0.0

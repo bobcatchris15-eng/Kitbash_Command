@@ -163,10 +163,12 @@ static func build(body: CharacterBody3D, blueprint_data: Dictionary, team: int,
 		1.0 + (thickness - 1.0) * ARMOR_BULK_PER_THICKNESS,
 		1.0)
 
+	var visual_aabb: AABB = compute_visual_aabb(body, base_size)
+
 	_add_hull_collider(body, hull_node, hull_type, base_size, hull_scale, bulk)
 	if ModuleCatalog.needs_running_gear(locomotion_type):
 		_add_running_gear_collider(body, hull_node, base_size, bulk)
-	_add_selection_proxy(body, hull_node, base_size, bulk)
+	_add_selection_proxy(body, hull_node, base_size, bulk, visual_aabb)
 	_apply_team_visuals(body, hull_node, team, {})
 
 	return {
@@ -186,6 +188,7 @@ static func build(body: CharacterBody3D, blueprint_data: Dictionary, team: int,
 		"is_hovering": "hovering" in traits,
 		"hull_draught": ModuleCatalog.get_hull_draught(hull_type_hint),
 		"base_size": base_size,
+		"visual_aabb": visual_aabb,
 		"max_hp": max_hp,
 		"armor_material": material,
 		"armor_thickness": thickness,
@@ -295,7 +298,7 @@ static func _add_running_gear_collider(body: CharacterBody3D, hull_node: Node3D,
 # Sized WITHOUT the armour bulk multiplier: bulk models plate thickness, and a
 # heavily armoured tank should not be easier to click than a bare one.
 static func _add_selection_proxy(body: CharacterBody3D, hull_node: Node3D,
-		base_size: Vector3, _bulk: Vector3) -> void:
+		base_size: Vector3, _bulk: Vector3, visual_aabb: AABB = AABB()) -> void:
 	var area := Area3D.new()
 	area.name = "SelectionProxy"
 	area.collision_layer = BattleLayers.SELECTION
@@ -311,16 +314,57 @@ static func _add_selection_proxy(body: CharacterBody3D, hull_node: Node3D,
 
 	var col := CollisionShape3D.new()
 	var box := BoxShape3D.new()
+	var target_size := base_size
+	var center_offset := Vector3(0, hull_node.position.y, 0)
+	if visual_aabb.size != Vector3.ZERO:
+		target_size = visual_aabb.size
+		center_offset = visual_aabb.position + visual_aabb.size * 0.5
+
 	# A floor on each axis: a scout hull scaled right down is still something the
 	# player has to be able to hit at full zoom-out.
 	box.size = Vector3(
-		maxf(base_size.x, 1.5),
-		maxf(base_size.y, 1.5),
-		maxf(base_size.z, 1.5))
+		maxf(target_size.x, 1.5),
+		maxf(target_size.y, 1.5),
+		maxf(target_size.z, 1.5))
 	col.shape = box
-	col.position = Vector3(0, hull_node.position.y, 0)
+	col.position = center_offset
 	area.add_child(col)
 	body.add_child(area)
+
+
+# Computes the tight merged AABB of all visible MeshInstance3D nodes under root_node,
+# transformed into root_node's local coordinate space.
+static func compute_visual_aabb(root_node: Node3D, base_size_fallback: Vector3 = Vector3.ONE) -> AABB:
+	var total_aabb := AABB()
+	var has_mesh := false
+
+	var stack: Array[Node] = [root_node]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is MeshInstance3D and is_instance_valid(node) and node.mesh != null and node.visible:
+			var mi := node as MeshInstance3D
+			var xf := _get_relative_transform(root_node, mi)
+			var mi_aabb: AABB = xf * mi.mesh.get_aabb()
+			if not has_mesh:
+				total_aabb = mi_aabb
+				has_mesh = true
+			else:
+				total_aabb = total_aabb.merge(mi_aabb)
+		for child in node.get_children():
+			stack.push_back(child)
+
+	if not has_mesh or total_aabb.size == Vector3.ZERO:
+		total_aabb = AABB(Vector3(-base_size_fallback.x * 0.5, 0, -base_size_fallback.z * 0.5), base_size_fallback)
+	return total_aabb
+
+
+static func _get_relative_transform(ancestor: Node3D, descendant: Node3D) -> Transform3D:
+	var xf := Transform3D.IDENTITY
+	var curr: Node = descendant
+	while curr != null and curr != ancestor and curr is Node3D:
+		xf = (curr as Node3D).transform * xf
+		curr = curr.get_parent()
+	return xf
 
 
 # --- Weapons -----------------------------------------------------------------

@@ -47,11 +47,11 @@ func _init() -> void:
 	else:
 		print("PASS: Tier 3 cost matches Tier 2 cost (", m3_cost, ")")
 
-	# Standard Hull base vision = 20.0 * 1.9 = 38.0m
+	# Standard Hull base vision = 20.0 * 2.28 = 45.6m
 	var standard_base_vision = ModuleCatalog.get_base_vision("ballard_medium_a")
 	print("Standard hull base vision: ", standard_base_vision, "m")
 
-	# Tier 1 total range = 38.0 + 38.0 = 76.0m (Double base vision)
+	# Tier 1 total range = 45.6 + 45.6 = 91.2m (Double base vision)
 	var t1_total = standard_base_vision + m1_data.get("vision_bonus", 0.0)
 	print("Tier 1 total vision range: ", t1_total, "m (approx 2x base vision)")
 	if absf(t1_total - standard_base_vision * 2.0) > 1.0:
@@ -60,7 +60,7 @@ func _init() -> void:
 	else:
 		print("PASS: Tier 1 doubles hull base vision (", standard_base_vision, " -> ", t1_total, "m)")
 
-	# Tier 2 total range = 38.0 + 114.0 = 152.0m (Doubles Tier 1 range again: 2 * 76.0m)
+	# Tier 2 total range = 45.6 + 136.8 = 182.4m (Doubles Tier 1 range again: 2 * 91.2m)
 	var t2_total = standard_base_vision + m2_data.get("vision_bonus", 0.0)
 	print("Tier 2 total vision range: ", t2_total, "m (doubles Tier 1 range again)")
 	if absf(t2_total - t1_total * 2.0) > 1.0:
@@ -72,7 +72,7 @@ func _init() -> void:
 	# Tier 3 directional range
 	var t3_total = standard_base_vision + m3_data.get("vision_bonus", 0.0)
 	print("Tier 3 forward directional reach: ", t3_total, "m (extremely long range)")
-	if t3_total < 250.0:
+	if t3_total < 300.0:
 		print("FAIL: Tier 3 directional reach is not extremely long range!")
 		success = false
 	else:
@@ -82,7 +82,7 @@ func _init() -> void:
 	# Tier 1 tweaks
 	var mod1 = ModuleData.new()
 	mod1.type_id = "sensor_suite"
-	mod1.base_vision_bonus = 38.0
+	mod1.base_vision_bonus = 45.6
 	mod1.tweaks = {"mast_height": 1.0, "dish_aperture": 1.0, "whip_length": 1.0}
 	var b1_base = mod1.get_vision_bonus()
 	mod1.tweaks = {"mast_height": 1.5, "dish_aperture": 1.2, "whip_length": 1.3}
@@ -96,7 +96,7 @@ func _init() -> void:
 	# Tier 2 tweaks
 	var mod2 = ModuleData.new()
 	mod2.type_id = "heavy_sensor_suite"
-	mod2.base_vision_bonus = 114.0
+	mod2.base_vision_bonus = 136.8
 	mod2.tweaks = {"pylon_height": 1.0, "radome_scale": 1.0, "optics_aperture": 1.0}
 	var b2_base = mod2.get_vision_bonus()
 	mod2.tweaks = {"pylon_height": 1.4, "radome_scale": 1.2, "optics_aperture": 1.3}
@@ -110,7 +110,7 @@ func _init() -> void:
 	# Tier 3 tweaks
 	var mod3 = ModuleData.new()
 	mod3.type_id = "directional_radar"
-	mod3.base_vision_bonus = 230.0
+	mod3.base_vision_bonus = 276.0
 	mod3.tweaks = {"scan_arc": 60.0, "mast_height": 1.0, "array_gain": 1.0}
 	var b3_base = mod3.get_vision_bonus()
 	mod3.tweaks = {"scan_arc": 40.0, "mast_height": 1.2, "array_gain": 1.2}
@@ -151,9 +151,9 @@ func _init() -> void:
 	root.add_child(dir_viewer)
 	dir_viewer.position = Vector3.ZERO
 	dir_viewer.set_meta("team", 0)
-	dir_viewer.set_meta("vision_range", 38.0)
+	dir_viewer.set_meta("vision_range", 45.6)
 	dir_viewer.set_meta("directional_sensors", [{
-		"range": 268.0,
+		"range": 321.6,
 		"arc_deg": 60.0,
 		"arc_rad": deg_to_rad(60.0)
 	}])
@@ -164,14 +164,15 @@ func _init() -> void:
 	target_front.position = Vector3(0, 0, -200)
 	target_front.set_meta("team", 1)
 
-	# Target directly behind at 100m (outside cone and past 38m base vision)
+	# Target directly behind at 100m (outside cone and past 45.6m base vision)
 	var target_behind = Node3D.new()
 	root.add_child(target_behind)
 	target_behind.position = Vector3(0, 0, 100)
 	target_behind.set_meta("team", 1)
 
-	var spotted_front = vs._is_spotted(target_front, [dir_viewer], [], false)
-	var spotted_behind = vs._is_spotted(target_behind, [dir_viewer], [], false)
+	var dir_profiles = vs._viewer_profiles([dir_viewer])
+	var spotted_front = vs._is_spotted(target_front, dir_profiles, [], false)
+	var spotted_behind = vs._is_spotted(target_behind, dir_profiles, [], false)
 
 	if not spotted_front:
 		print("FAIL: Directional radar failed to spot long-range target inside forward sector at 200m!")
@@ -190,14 +191,15 @@ func _init() -> void:
 	root.add_child(heavy_viewer)
 	heavy_viewer.position = Vector3.ZERO
 	heavy_viewer.set_meta("team", 0)
-	heavy_viewer.set_meta("vision_range", 152.0)
+	heavy_viewer.set_meta("vision_range", 182.4)
 
 	var target_omni_far = Node3D.new()
 	root.add_child(target_omni_far)
 	target_omni_far.position = Vector3(0, 0, 130.0)
 	target_omni_far.set_meta("team", 1)
 
-	var spotted_omni = vs._is_spotted(target_omni_far, [heavy_viewer], [], false)
+	var heavy_profiles = vs._viewer_profiles([heavy_viewer])
+	var spotted_omni = vs._is_spotted(target_omni_far, heavy_profiles, [], false)
 	if not spotted_omni:
 		print("FAIL: Heavy omni sensor array failed to spot 360-deg target at 130m!")
 		success = false

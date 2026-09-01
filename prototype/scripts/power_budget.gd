@@ -99,6 +99,7 @@ static func analyze(hull_node, hull_type_override: String = "") -> Dictionary:
 	var generation: float = ModuleCatalog.get_base_power(hull_type)
 	var draw := 0.0
 	var burst_draw := 0.0
+	var max_shot_cost := 0.0
 
 	if is_instance_valid(hull_node):
 		for child in hull_node.get_children():
@@ -116,6 +117,7 @@ static func analyze(hull_node, hull_type_override: String = "") -> Dictionary:
 			generation += data.get_power_output()
 			draw += ModuleCatalog.get_power_draw(data.type_id)
 			burst_draw += _sustained_weapon_draw(data)
+			max_shot_cost = maxf(max_shot_cost, _single_shot_cost(data))
 
 	# Only the hull's own storage can be zero-or-less in practice, but guard
 	# anyway: endurance divides by the deficit and load_fraction by storage.
@@ -174,6 +176,7 @@ static func analyze(hull_node, hull_type_override: String = "") -> Dictionary:
 		"firing_deficit_only": net >= 0.0 and firing_net < 0.0,
 		"endurance": endurance,
 		"firing_endurance": firing_endurance,
+		"max_shot_cost": max_shot_cost,
 	}
 
 
@@ -198,6 +201,7 @@ static func _empty() -> Dictionary:
 		"firing_deficit_only": false,
 		"endurance": INF,
 		"firing_endurance": INF,
+		"max_shot_cost": 0.0,
 	}
 
 
@@ -223,6 +227,12 @@ static func _sustained_weapon_draw(data) -> float:
 		return 0.0
 	# dps is already per-second, so cost_per_shot/fire_rate reduces to this.
 	return data.get_dps() * ENERGY_COST_FRACTION
+
+static func _single_shot_cost(data) -> float:
+	if not (data.type_id in ENERGY_WEAPON_TYPES):
+		return 0.0
+	var fire_rate = ModuleCatalog.get_fire_profile(data.type_id).get("fire_rate", 1.0)
+	return data.get_dps() * fire_rate * ENERGY_COST_FRACTION
 
 
 ## Which systems are shed at a given buffer fraction, as an ordered report.

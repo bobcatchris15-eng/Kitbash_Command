@@ -3,6 +3,7 @@
 	"name": "Test Range",
 	"description": "Single-unit test playtest map for the Design Lab's 'Test in Arena' button (battle-system unification Phase 3, 2026-08-10). Tiny 80x80 m world, no ambient clutter, one node of each resource type that regrows in place, a 20m square patch of every surface type so the player can see their unit's per-surface behaviour side by side, and a 3x3 patch of empty ground to baseline on. There is no economy, no production, no AI commander, no fog of war (MatchRuleSet.test_range() flips those off); the map itself is just a stage.",
 	"map_half_extents": 40.0,
+	"world_scale": 4.0,
 	"ground_color": [0.36, 0.34, 0.30],
 	"disable_ambient_scatter": true,
 	"flat_ground_collider": true,

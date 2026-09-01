@@ -57,7 +57,7 @@ var attack_range: float = 0.0
 # is the symptom; a missing property is the cause.
 #
 # 45.0 is well above the typical hull's effective vision (base_vision authored
-# 12-30, scaled by VISION_SCALE=1.9 in module_catalog.gd to ~23-57m, most
+# 12-30, scaled by VISION_SCALE=2.28 in module_catalog.gd to ~27-68m, most
 # hulls landing near the middle of that band) rather than the old runtime's
 # own default of 15.0 - well under hull vision, which is what "buildings
 # never lift fog" looked like.
@@ -632,4 +632,16 @@ func finish_construction() -> void:
 		if is_instance_valid(burst):
 			burst.queue_free()
 	)
+
+
+func get_nearest_surface_point(from_world: Vector3) -> Vector3:
+	var aabb := AABB(Vector3(-footprint.x * 0.5, 0, -footprint.z * 0.5), footprint)
+	var local_p = global_transform.affine_inverse() * from_world
+	var clamped_local = Vector3(
+		clampf(local_p.x, aabb.position.x, aabb.position.x + aabb.size.x),
+		clampf(local_p.y, aabb.position.y, aabb.position.y + aabb.size.y),
+		clampf(local_p.z, aabb.position.z, aabb.position.z + aabb.size.z)
+	)
+	return global_transform * clamped_local
+
 

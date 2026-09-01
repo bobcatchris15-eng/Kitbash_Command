@@ -157,6 +157,20 @@ static func alpha_emissive(albedo: Color, emission: Color, energy: float = 1.0) 
 		_materials[key] = mat
 	return _materials[key]
 
+static func additive_emissive(albedo: Color, emission: Color, energy: float = 1.0) -> StandardMaterial3D:
+	var key := "add|%s|%s|%s" % [albedo, emission, snappedf(energy, 0.01)]
+	if not _materials.has(key):
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = albedo
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		mat.emission_enabled = true
+		mat.emission = emission
+		mat.emission_energy_multiplier = energy
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		_materials[key] = mat
+	return _materials[key]
+
 # --- Beam helper -----------------------------------------------------------
 #
 # Every beam-shaped weapon repeated the same six lines: build a cylinder as

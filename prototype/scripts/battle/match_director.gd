@@ -4009,11 +4009,15 @@ func get_nearby_damageable(pos: Vector3, radius: float) -> Array:
 		for dx in range(-cells, cells + 1):
 			var bucket: Array = _neighbour_grid.get(centre + Vector2i(dx, dz), [])
 			for n in bucket:
-				if is_instance_valid(n) and pos.distance_to(n.global_position) <= radius:
-					out.append(n)
+				if is_instance_valid(n):
+					var p: Vector3 = n.get_nearest_surface_point(pos) if n.has_method("get_nearest_surface_point") else n.global_position
+					if pos.distance_to(p) <= radius:
+						out.append(n)
 	for s in get_tree().get_nodes_in_group("structures"):
-		if is_instance_valid(s) and not s.is_dead and pos.distance_to(s.global_position) <= radius:
-			out.append(s)
+		if is_instance_valid(s) and not s.is_dead:
+			var sp: Vector3 = s.get_nearest_surface_point(pos) if s.has_method("get_nearest_surface_point") else s.global_position
+			if pos.distance_to(sp) <= radius:
+				out.append(s)
 	return out
 
 

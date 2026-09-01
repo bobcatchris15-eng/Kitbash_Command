@@ -695,15 +695,16 @@ func _update_power_readout(pw: Dictionary) -> void:
 	# different fixes. PowerBudget makes them mutually exclusive
 	# (firing_deficit_only is false whenever has_deficit is true), so the order
 	# of these branches does not matter and neither can mask the other.
+	var excessive_peak: bool = float(pw.get("max_shot_cost", 0.0)) > float(pw.get("storage", 0.0))
 	var has_deficit: bool = bool(pw.get("has_deficit", false))
 	var firing_only: bool = bool(pw.get("firing_deficit_only", false))
-	_power_panel.visible = has_deficit or firing_only
-	if has_deficit:
+	
+	_power_panel.visible = has_deficit or firing_only or excessive_peak
+	if excessive_peak:
+		_power_title.text = "!  PEAK DRAW EXCESSIVE"
+		_power_detail.text = "A weapon needs %.1f energy to fire, but capacity is only %.1f. It will never fire. Add a Capacitor Bank." % [float(pw.get("max_shot_cost", 0.0)), float(pw.get("storage", 0.0))]
+	elif has_deficit:
 		_power_title.text = "!  POWER DEFICIT - %.1f /s SHORT" % absf(net)
-		# Names the endurance and what sheds first, because "underpowered" alone
-		# tells the player neither how bad it is nor which way is out. The shed
-		# order matches PowerBudget's thresholds, so the panel cannot describe an
-		# order the runtime does not follow.
 		_power_detail.text = "A full buffer lasts %.0fs with everything running. Shields drop first, then sensors dim, then energy weapons stop. Buildable and fieldable as-is - fit a generator, add storage to ride it out, or drop some electronics." % float(pw.get("endurance", 0.0))
 	elif firing_only:
 		# Fine at rest and short only while shooting. A legitimate build rather

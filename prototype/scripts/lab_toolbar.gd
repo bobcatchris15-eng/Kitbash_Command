@@ -173,9 +173,9 @@ func update_undo_redo_state() -> void:
 	if not root: return
 	var placer = root if root.has_method("undo") else root.get_node_or_null("ModulePlacer")
 	if not placer or not ("undo_stack" in placer) or not ("redo_stack" in placer): return
-	
-	var u_count: int = placer.undo_stack.size()
-	var r_count: int = placer.redo_stack.size()
+	var is_paint = placer.get("paint_mode_active") if "paint_mode_active" in placer else false
+	var u_count: int = placer.armor_undo_stack.size() if is_paint and "armor_undo_stack" in placer else placer.undo_stack.size()
+	var r_count: int = placer.armor_redo_stack.size() if is_paint and "armor_redo_stack" in placer else placer.redo_stack.size()
 	
 	_undo_btn.text = "UNDO" + (" (" + str(u_count) + ")" if u_count > 0 else "")
 	_undo_btn.disabled = u_count == 0
@@ -222,11 +222,14 @@ func _on_armor_station_button_pressed() -> void:
 	var root = lab.get_node_or_null("/root/MainLab")
 	if not root:
 		return
-	var armor_panel: Control = root.get_node_or_null("UI_ArmorStationPanel")
-	if armor_panel and armor_panel.visible:
-		_on_armor_station_back(root)
-	else:
-		_on_paint_station_pressed()
+	var parts_menu = root.get_node_or_null("UI_PartsMenu")
+	if not parts_menu:
+		return
+	if parts_menu.has_method("get_open_family") and parts_menu.get_open_family() == "armor":
+		if parts_menu.has_method("select_family"):
+			parts_menu.select_family("weapons")
+	elif parts_menu.has_method("select_family"):
+		parts_menu.select_family("armor")
 
 func _on_paint_station_pressed():
 	var root = lab.get_node("/root/MainLab")

@@ -205,6 +205,8 @@ var _overlay_last_targetable_range: float = -1.0
 var _overlay_last_visible_range: float = -1.0
 var _is_selected: bool = false
 var _separation_radius: float = 3.0
+var base_size: Vector3 = Vector3.ONE
+var visual_aabb: AABB = AABB()
 
 # Per-match UI preference: should the selection-time range discs be drawn
 # at all? Lives on the unit because that is where the discs are built; the
@@ -399,8 +401,12 @@ func setup(blueprint_data: Dictionary, unit_team: int, bp_manager: Node,
 	_p = Profiler.start()
 	nav_agent = AssemblyScript.build_nav_agent(self, facts, controller)
 	Profiler.stop("spawn.nav_agent", _p)
-	var base_size: Vector3 = facts["base_size"]
-	_separation_radius = maxf(base_size.x, base_size.z) * SEPARATION_RADIUS_MULT
+	base_size = facts["base_size"]
+	if facts.has("visual_aabb"):
+		visual_aabb = facts["visual_aabb"]
+	else:
+		visual_aabb = AABB(Vector3(-base_size.x * 0.5, 0, -base_size.z * 0.5), base_size)
+	_separation_radius = get_visual_radius() * 2.0 * SEPARATION_RADIUS_MULT
 	_sync_nav_radii()
 	_recalculate_move_speed()
 
@@ -442,6 +448,37 @@ func setup(blueprint_data: Dictionary, unit_team: int, bp_manager: Node,
 	if is_instance_valid(hull_node):
 		VisualBuilderScript.ensure_blimp_envelope(self)
 	return true
+
+
+func get_visual_radius() -> float:
+	if visual_aabb.size != Vector3.ZERO:
+		return maxf(visual_aabb.size.x, visual_aabb.size.z) * 0.5
+	return maxf(base_size.x, base_size.z) * 0.5
+
+
+func get_visual_extents() -> Vector3:
+	if visual_aabb.size != Vector3.ZERO:
+		return visual_aabb.size
+	return base_size
+
+
+func get_visual_aabb_world() -> AABB:
+	if visual_aabb.size != Vector3.ZERO:
+		return global_transform * visual_aabb
+	return AABB(global_position - base_size * 0.5, base_size)
+
+
+# Returns the point on the unit's visible boundary closest to from_world.
+func get_nearest_surface_point(from_world: Vector3) -> Vector3:
+	if visual_aabb.size == Vector3.ZERO:
+		return global_position
+	var local_p = global_transform.affine_inverse() * from_world
+	var clamped_local = Vector3(
+		clampf(local_p.x, visual_aabb.position.x, visual_aabb.position.x + visual_aabb.size.x),
+		clampf(local_p.y, visual_aabb.position.y, visual_aabb.position.y + visual_aabb.size.y),
+		clampf(local_p.z, visual_aabb.position.z, visual_aabb.position.z + visual_aabb.size.z)
+	)
+	return global_transform * clamped_local
 
 
 # Walks a node subtree and sets visibility_range_end on every
@@ -1070,7 +1107,7 @@ func _has_line_of_sight_to(candidate: Node3D) -> bool:
 		return true
 
 	var ray_start = global_position + Vector3(0, 1.5, 0)
-	var ray_end = candidate.global_position + Vector3(0, 1.25, 0)
+	var ray_end = candidate.get_nearest_surface_point(ray_start) if candidate.has_method("get_nearest_surface_point") else candidate.global_position + Vector3(0, 1.25, 0)
 
 	var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
 	# Terrain/obstacles (1), Buildings (8)
@@ -1116,7 +1153,8 @@ func _tick_targeting(delta: float) -> void:
 	var current_tgt := get_combat_target()
 	if current_tgt != null:
 		var max_pursuit: float = maxf(attack_range, vision_range) * StanceScript.pursuit_range_multiplier(stance)
-		if max_pursuit <= 0.0 or global_position.distance_to(current_tgt.global_position) > max_pursuit:
+		var tgt_p: Vector3 = current_tgt.get_nearest_surface_point(global_position) if current_tgt.has_method("get_nearest_surface_point") else current_tgt.global_position
+		if max_pursuit <= 0.0 or global_position.distance_to(tgt_p) > max_pursuit:
 			_auto_target = null
 		else:
 			return
@@ -1145,8 +1183,10 @@ func _acquire_auto_target() -> void:
 	elif is_inside_tree():
 		var raw = get_tree().get_nodes_in_group("damageable")
 		for c in raw:
-			if is_instance_valid(c) and global_position.distance_to(c.global_position) <= search_radius:
-				candidates.append(c)
+			if is_instance_valid(c):
+				var c_p: Vector3 = c.get_nearest_surface_point(global_position) if c.has_method("get_nearest_surface_point") else c.global_position
+				if global_position.distance_to(c_p) <= search_radius:
+					candidates.append(c)
 
 	var best: Node3D = null
 	# TERRAIN-AWARE SCORING. Pure distance was always wrong: a half-dead
@@ -1192,7 +1232,8 @@ func _acquire_auto_target() -> void:
 		# Terrain & obstacle line-of-sight check
 		if not _has_line_of_sight_to(c):
 			continue
-		var dist: float = global_position.distance_to(c.global_position)
+		var target_pt: Vector3 = c.get_nearest_surface_point(global_position) if c.has_method("get_nearest_surface_point") else c.global_position
+		var dist: float = global_position.distance_to(target_pt)
 		var score: float = dist
 		# Wound bonus: same magnitude the squad uses, so a unit acting
 		# on its own picks the same wounded target the squad would.
@@ -1280,7 +1321,8 @@ func has_hostile_in_range() -> bool:
 		if e == self:
 			continue
 		if e.team != team and not e.is_dead:
-			if e.global_position.distance_to(global_position) <= attack_range:
+			var e_pos: Vector3 = e.get_nearest_surface_point(global_position) if e.has_method("get_nearest_surface_point") else e.global_position
+			if global_position.distance_to(e_pos) <= attack_range:
 				return true
 	return false
 
@@ -1556,12 +1598,13 @@ func _resolve_attack_station() -> bool:
 	# stay put, which is the entire point of parking artillery.
 	if stance == StanceScript.Kind.HOLD_POSITION:
 		return false
+	var tgt_pos: Vector3 = target.get_nearest_surface_point(global_position) if target.has_method("get_nearest_surface_point") else target.global_position
 	var gap: float = Vector2(
-		target.global_position.x - global_position.x,
-		target.global_position.z - global_position.z).length()
+		tgt_pos.x - global_position.x,
+		tgt_pos.z - global_position.z).length()
 	if gap <= _engagement_distance():
 		return false
-	_internal_destination = target.global_position
+	_internal_destination = tgt_pos
 	return true
 
 
@@ -1758,7 +1801,7 @@ func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = nu
 	if dealt > 0.0 and is_inside_tree() and hit_origin != null:
 		var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
 		var h_pos: Vector3 = hit_origin if hit_origin is Vector3 else (hit_origin.global_position if is_instance_valid(hit_origin) and hit_origin is Node3D else global_position)
-		var contact_pt = global_position.lerp(h_pos, 0.15) + Vector3(0, 0.3, 0)
+		var contact_pt: Vector3 = get_nearest_surface_point(h_pos)
 		VFXBurstScript.spawn(parent, contact_pt, Color(1.0, 0.85, 0.35), 5, 0.12, 60.0, 2.0, 5.0)
 
 	if _controller != null and _controller.has_method("record_combat_damage"):
@@ -2193,12 +2236,14 @@ const CARGO_BAR_HEIGHT: float = 0.16
 func _create_cargo_bar(base_size: Vector3) -> void:
 	if not is_harvester or harvester == null:
 		return
-	var width: float = maxf(base_size.x, base_size.z) * CARGO_BAR_WIDTH_MULT
+	var visual_r: float = get_visual_radius()
+	var width: float = maxf(visual_r * 2.0, maxf(base_size.x, base_size.z)) * CARGO_BAR_WIDTH_MULT
 	var root := Node3D.new()
 	root.name = "CargoBar"
 	# Clear of the hull's own top, not a fixed altitude - hulls differ in height
 	# by a lot across tiers.
-	root.position = Vector3(0, base_size.y * 0.5 + CARGO_BAR_HEIGHT * 3.0, 0)
+	var top_y: float = visual_aabb.position.y + visual_aabb.size.y if visual_aabb.size != Vector3.ZERO else base_size.y * 0.5
+	root.position = Vector3(0, top_y + CARGO_BAR_HEIGHT * 3.0, 0)
 	add_child(root)
 
 	root.add_child(_cargo_bar_quad(width, CARGO_BAR_HEIGHT, Color(0.06, 0.07, 0.08, 0.85), 0.0))
@@ -2295,7 +2340,8 @@ func _create_selection_ring(base_size: Vector3) -> void:
 	var ring := MeshInstance3D.new()
 	ring.name = "SelectionRing"
 	var torus := TorusMesh.new()
-	var radius: float = maxf(base_size.x, base_size.z) * 0.62
+	var visual_r: float = get_visual_radius()
+	var radius: float = maxf(visual_r * 1.24, maxf(base_size.x, base_size.z) * 0.62)
 	torus.inner_radius = radius
 	torus.outer_radius = radius + 0.16
 	ring.mesh = torus

@@ -27,7 +27,7 @@ func _physics_process(delta):
 		return
 
 	# Move towards target
-	var dest = target_node.global_position + Vector3(0, 0.5, 0) # Hit center
+	var dest = target_node.get_nearest_surface_point(global_position) if target_node.has_method("get_nearest_surface_point") else target_node.global_position + Vector3(0, 0.5, 0)
 	look_at(dest, Vector3.UP)
 	var dir = (dest - global_position).normalized()
 	global_position += dir * speed * delta

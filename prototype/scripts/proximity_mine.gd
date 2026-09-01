@@ -128,7 +128,8 @@ func _process(delta):
 		# against a heavily mined approach.
 		if "is_flying" in c and c.is_flying:
 			continue
-		if global_position.distance_to(c.global_position) <= TRIGGER_RADIUS:
+		var c_pos: Vector3 = c.get_nearest_surface_point(global_position) if c.has_method("get_nearest_surface_point") else c.global_position
+		if global_position.distance_to(c_pos) <= TRIGGER_RADIUS:
 			_detonate()
 			Profiler.stop("mines", _p)
 			return
@@ -152,7 +153,8 @@ func _detonate():
 			continue
 		if "is_flying" in c and c.is_flying:
 			continue
-		var dist = my_pos.distance_to(c.global_position)
+		var c_pos: Vector3 = c.get_nearest_surface_point(my_pos) if c.has_method("get_nearest_surface_point") else c.global_position
+		var dist = my_pos.distance_to(c_pos)
 		if dist > BLAST_RADIUS:
 			continue
 		c.take_damage(damage * clamp(1.0 - dist / BLAST_RADIUS, 0.0, 1.0), damage_class, my_pos)

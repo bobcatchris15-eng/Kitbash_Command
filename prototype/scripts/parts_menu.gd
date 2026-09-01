@@ -88,6 +88,7 @@ const TIERS = [
 	{"id": "weapons", "label": "Weapons"},
 	{"id": "support", "label": "Support"},
 	{"id": "locomotion", "label": "Drives"},
+	{"id": "armor", "label": "Armor"},
 ]
 
 # Which module ROLES are weapons. Taken from the catalog's own wording rather
@@ -189,6 +190,7 @@ func _ready() -> void:
 		_family_tabs["hulls"].button_pressed = true
 
 	_apply_filters()
+	call_deferred("_setup_armor_panel")
 
 
 # --- Shell ------------------------------------------------------------------
@@ -358,13 +360,29 @@ func _build_shell() -> void:
 
 	_build_search_widget(layout_vbox)
 
-	# 2×2 grid of tabs — each tab fits its text naturally
-	var tab_row = GridContainer.new()
-	tab_row.name = "FamilyTabs"
-	tab_row.columns = 2
-	tab_row.add_theme_constant_override("h_separation", Tokens.SPACE_XS)
-	tab_row.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
-	layout_vbox.add_child(tab_row)
+	# Tab rows — 2×2 grid for parts + 1 full-width row for Armor
+	var tabs_box = VBoxContainer.new()
+	tabs_box.name = "FamilyTabs"
+	tabs_box.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	layout_vbox.add_child(tabs_box)
+
+	var tab_row1 = HBoxContainer.new()
+	tab_row1.name = "FamilyRow1"
+	tab_row1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tab_row1.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	tabs_box.add_child(tab_row1)
+
+	var tab_row2 = HBoxContainer.new()
+	tab_row2.name = "FamilyRow2"
+	tab_row2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tab_row2.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	tabs_box.add_child(tab_row2)
+
+	var tab_row3 = HBoxContainer.new()
+	tab_row3.name = "FamilyRow3"
+	tab_row3.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tab_row3.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	tabs_box.add_child(tab_row3)
 
 	_dock_scroll = ScrollContainer.new()
 	_dock_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -393,8 +411,7 @@ func _build_shell() -> void:
 		_family_vboxes[tier_id] = tier_vbox
 		
 		var tab_btn = Button.new()
-		tab_btn.custom_minimum_size = Vector2(0, 36)
-		# EXPAND_FILL in both axes so each cell in the 2×2 grid fills equally
+		tab_btn.custom_minimum_size = Vector2(0, 32)
 		tab_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tab_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		tab_btn.toggle_mode = true
@@ -414,7 +431,12 @@ func _build_shell() -> void:
 		stamp.set_anchors_preset(Control.PRESET_FULL_RECT)
 		plate.add_child(stamp)
 		
-		tab_row.add_child(tab_btn)
+		if tier_id == "hulls" or tier_id == "weapons":
+			tab_row1.add_child(tab_btn)
+		elif tier_id == "support" or tier_id == "locomotion":
+			tab_row2.add_child(tab_btn)
+		else:
+			tab_row3.add_child(tab_btn)
 		_family_tabs[tier_id] = tab_btn
 		
 		tab_btn.toggled.connect(func(pressed: bool):
@@ -450,9 +472,34 @@ func _plates_set_defaults(plate: Control) -> void:
 # --- Layout -----------------------------------------------------------------
 
 func _show_family(tier_id: String) -> void:
+	var prev_family = _open_family
 	for id in _family_vboxes.keys():
 		_family_vboxes[id].visible = (id == tier_id)
 	_open_family = tier_id
+
+	var root = get_node_or_null("/root/MainLab")
+	var armor_panel = root.get_node_or_null("UI_ArmorStationPanel") if root else null
+	if tier_id == "armor":
+		if armor_panel and root:
+			var hull = root.hull if ("hull" in root and root.hull) else root.get_node_or_null("Hull")
+			if not armor_panel.is_paint_mode and hull:
+				armor_panel.enter(hull, root)
+	elif prev_family == "armor":
+		if armor_panel and armor_panel.is_paint_mode:
+			armor_panel.exit()
+
+func _setup_armor_panel() -> void:
+	var root = get_node_or_null("/root/MainLab")
+	var armor_panel = root.get_node_or_null("UI_ArmorStationPanel") if root else null
+	if armor_panel and armor_panel.has_method("build_into") and _family_vboxes.has("armor"):
+		armor_panel.build_into(_family_vboxes["armor"])
+
+func select_family(tier_id: String) -> void:
+	if _family_tabs.has(tier_id):
+		_family_tabs[tier_id].button_pressed = true
+
+func get_open_family() -> String:
+	return _open_family
 
 func _open_family_cross(tier_id: String) -> void:
 	if _family_tabs.has(tier_id):

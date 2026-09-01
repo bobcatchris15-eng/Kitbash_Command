@@ -83,8 +83,8 @@ const DRONE_PROFILES = {
 	},
 	"scout": {
 		"label": "Scout Drone",
-		"desc": "High-speed reconnaissance. Orbits target area, reveals fog of war across a wide radius, then returns.",
-		"speed": 18.0,
+		"desc": "High-speed reconnaissance. Continually orbits outside parent unit vision to expand fog-of-war detection radius.",
+		"speed": 22.0,
 	},
 	"repair": {
 		"label": "Repair Drone",
@@ -199,53 +199,73 @@ static func get_fire_profile(type_id: String) -> Dictionary:
 
 # --- Muzzle offsets --------------------------------------------------------
 # Per-weapon muzzle flash position in weapon-local space at default tweaks
-# (caliber=1.0, barrel_length=1.0). Derived from visual_builder.gd's cylinder
-# fallback geometry (muzzle_z = position.z - cylinder_height/2 after PI/2
-# rotation). Y is trunnion height; Z is forward distance to muzzle tip.
-# Weapons with elevation pivots have rotated Y/Z baked in at the pivot angle.
+# (caliber=1.0, barrel_length=1.0). Derived from visual_builder.gd's authored
+# meshes and trunnion geometry. Y is trunnion/bore center height; Z is forward
+# distance to muzzle tip along -Z. Weapons with elevation pivots have rotated
+# Y/Z baked in at their authored pivot angle.
 const DEFAULT_MUZZLE_OFFSET := Vector3(0.0, 0.3, -0.6)
 const MUZZLE_OFFSETS: Dictionary = {
-	"basic_cannon":          Vector3(0.0, 0.26, -1.30),
-	"heavy_machine_gun":     Vector3(0.0, 0.22, -0.85),
+	"basic_cannon":          Vector3(0.0, 0.26, -2.58),
+	"heavy_machine_gun":     Vector3(0.0, 0.22, -0.57),
 	"rotary_cannon":         Vector3(0.0, 0.24, -1.10),
-	"gauss_railgun":         Vector3(0.0, 0.24, -1.40),
-	"artillery":             Vector3(0.0, 1.29, -1.11),  # 35° elev pivot
-	"mortar_array":          Vector3(0.0, 1.11, -0.55),  # 60° elev pivot
-	"flamethrower":          Vector3(0.0, 0.20, -0.55),
-	"ion_cannon":            Vector3(0.0, 0.26, -0.80),
-	"heavy_laser":           Vector3(0.0, 0.25, -0.75),
-	"plasma_lobber":         Vector3(0.0, 0.67, -0.55),  # 35° elev pivot
-	"ciws":                  Vector3(0.0, 0.32, -0.85),
-	"flak_cannon":           Vector3(0.0, 0.86, -0.58),  # 45° elev pivot
-	"pd_laser":              Vector3(0.0, 0.20, -0.28),
-	"mk19_grenade_launcher": Vector3(0.0, 0.25, -0.56),
-	"autocannon":            Vector3(0.0, 0.24, -0.95),
-	"anti_materiel_rifle":   Vector3(0.0, 0.28, -1.12),
-	"recoilless_rifle":      Vector3(0.0, 0.27, -0.85),
-	"coil_gun":              Vector3(0.0, 0.27, -0.88),
-	"spigot_mortar":         Vector3(0.0, 0.45, -0.17),  # 50° elev pivot
-	"arc_projector":         Vector3(0.0, 0.35, -0.04),
-	"microwave_emitter":     Vector3(0.0, 0.26, -0.08),
-	"particle_lance":        Vector3(0.0, 0.32, -0.13),
-	"aa_autocannon":         Vector3(0.0, 0.43, -0.06),  # 38° elev pivot
-	"napalm_mortar":         Vector3(0.0, 0.90, -0.50),  # elevated
-	"rocket_artillery":      Vector3(0.0, 0.30, -0.60),
-	"hypervelocity_missile":  Vector3(0.0, 0.30, -0.60),
-	"sam_launcher":          Vector3(0.0, 0.30, -0.60),
+	"gauss_railgun":         Vector3(0.0, 0.24, -2.20),
+	"artillery":             Vector3(0.0, 4.85, -6.20),  # 35° elev pivot
+	"mortar_array":          Vector3(0.0, 1.23, -0.73),  # 60° elev pivot
+	"flamethrower":          Vector3(0.0, 0.20, -0.47),
+	"ion_cannon":            Vector3(0.0, 0.26, -2.07),
+	"heavy_laser":           Vector3(0.0, 0.25, -1.92),
+	"plasma_lobber":         Vector3(0.0, 0.62, -0.55),  # 35° elev pivot
+	"ciws":                  Vector3(0.0, 0.32, -1.75),
+	"flak_cannon":           Vector3(0.0, 1.00, -0.86),  # 45° elev pivot
+	"pd_laser":              Vector3(0.0, 0.20, -0.89),
+	"mk19_grenade_launcher": Vector3(0.0, 0.25, -0.38),
+	"autocannon":            Vector3(0.0, 0.24, -1.93),
+	"anti_materiel_rifle":   Vector3(0.0, 0.28, -1.45),
+	"recoilless_rifle":      Vector3(0.0, 0.27, -0.58),
+	"coil_gun":              Vector3(0.0, 0.27, -1.80),
+	"spigot_mortar":         Vector3(0.0, 1.16, -0.95),  # 50° elev pivot
+	"arc_projector":         Vector3(0.0, 0.35, -0.96),
+	"microwave_emitter":     Vector3(0.0, 0.26, -0.62),
+	"particle_lance":        Vector3(0.0, 0.32, -2.36),
+	"aa_autocannon":         Vector3(0.0, 1.28, -1.19),  # 38° elev pivot
+	"napalm_mortar":         Vector3(0.0, 0.97, -0.75),  # 55° elev pivot
+	"rocket_artillery":      Vector3(0.0, 1.84, -1.93),  # 32° elev pivot
+	"hypervelocity_missile":  Vector3(0.0, 0.58, -1.25),
+	"sam_launcher":          Vector3(0.0, 1.56, -1.58),  # 45° elev pivot
 	"drone_carrier":         Vector3(0.0, 0.30, -0.60),
-	"cluster_dispenser":     Vector3(0.0, 0.30, -0.60),
-	"guided_missile":        Vector3(0.0, 0.30, -0.60),
-	"missile_pod":           Vector3(0.0, 0.30, -0.60),
-	"loitering_munition":    Vector3(0.0, 0.30, -0.60),
-	"anti_radiation_missile": Vector3(0.0, 0.30, -0.60),
-	"bunker_buster":         Vector3(0.0, 0.30, -0.60),
-	"cruise_missile":        Vector3(0.0, 0.30, -0.60),
-	"smoke_discharger":      Vector3(0.0, 0.30, -0.30),
-	"mine_layer":            Vector3(0.0, 0.30, -0.30),
+	"cluster_dispenser":     Vector3(0.0, 0.30, -0.51),
+	"guided_missile":        Vector3(0.0, 0.24, -1.30),
+	"missile_pod":           Vector3(0.0, 0.36, -0.82),
+	"loitering_munition":    Vector3(0.0, 1.34, -0.62),  # 58° elev pivot
+	"anti_radiation_missile": Vector3(0.0, 0.67, -1.24),
+	"bunker_buster":         Vector3(0.0, 1.47, -1.21),  # 45° elev pivot
+	"cruise_missile":        Vector3(0.0, 0.94, -1.38),
+	"smoke_discharger":      Vector3(0.0, 0.33, -0.37),
+	"mine_layer":            Vector3(0.0, 0.48, -0.42),
 }
 
 static func get_muzzle_offset(type_id: String) -> Vector3:
 	return MUZZLE_OFFSETS.get(type_id, DEFAULT_MUZZLE_OFFSET)
+
+# Direction (in weapon-local space) the muzzle points / fires.
+# For flat-firing weapons, this is Vector3.FORWARD (Vector3(0, 0, -1)).
+# For weapons with fixed elevated pivots, this accounts for the elevation angle.
+const MUZZLE_DIRECTIONS: Dictionary = {
+	"artillery":             Vector3(0.0, 0.5736, -0.8192),  # 35° elev
+	"mortar_array":          Vector3(0.0, 0.8660, -0.5000),  # 60° elev
+	"plasma_lobber":         Vector3(0.0, 0.5736, -0.8192),  # 35° elev
+	"flak_cannon":           Vector3(0.0, 0.7071, -0.7071),  # 45° elev
+	"spigot_mortar":         Vector3(0.0, 0.7660, -0.6428),  # 50° elev
+	"aa_autocannon":         Vector3(0.0, 0.6157, -0.7880),  # 38° elev
+	"napalm_mortar":         Vector3(0.0, 0.8192, -0.5736),  # 55° elev
+	"rocket_artillery":      Vector3(0.0, 0.5299, -0.8480),  # 32° elev
+	"sam_launcher":          Vector3(0.0, 0.7071, -0.7071),  # 45° elev
+	"loitering_munition":    Vector3(0.0, 0.8480, -0.5299),  # 58° elev
+	"bunker_buster":         Vector3(0.0, 0.7071, -0.7071),  # 45° elev
+}
+
+static func get_muzzle_direction(type_id: String) -> Vector3:
+	return MUZZLE_DIRECTIONS.get(type_id, Vector3.FORWARD)
 
 # --- Range tiers -----------------------------------------------------------
 # Chris, 2026-08-03: "even the high range weapons are engaging at about the
@@ -288,7 +308,7 @@ const RANGE_TIERS = {
 # medium_hull's, post-VISION_SCALE. Used for classification and for the Design
 # Lab readout, never for a real unit's actual sight radius (that always comes
 # from its own hull).
-const NOMINAL_VISION: float = 38.0
+const NOMINAL_VISION: float = 45.6
 
 # A weapon's authored reach before any tweak touches it. Same role
 # base_traverse plays for traverse - the one number a design starts from.
@@ -769,7 +789,7 @@ static func _build_catalog_literal() -> Dictionary:
 			# post-scale base_vision, so leaving these on the authoring scale
 			# would quietly shrink every sensor module relative to the band it
 			# is meant to extend.
-			"vision_bonus": 5.5,
+			"vision_bonus": 6.6,
 			"size": Vector3(0.8, 0.6, 1.2),
 			"color": Color(0.34, 0.40, 0.36)
 		},
@@ -1160,7 +1180,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"metal": 25,
 			"crystal": 20,
 			"dps": 0.0,
-			"vision_bonus": 38.0,
+			"vision_bonus": 45.6,
 			"size": Vector3(0.6, 2.2, 0.6),
 			"color": Color.MEDIUM_PURPLE
 		},
@@ -1173,7 +1193,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"metal": 75,
 			"crystal": 60,
 			"dps": 0.0,
-			"vision_bonus": 114.0,
+			"vision_bonus": 136.8,
 			"size": Vector3(1.1, 2.5, 1.1),
 			"color": Color.ROYAL_BLUE
 		},
@@ -1186,7 +1206,7 @@ static func _build_catalog_literal() -> Dictionary:
 			"metal": 75,
 			"crystal": 60,
 			"dps": 0.0,
-			"vision_bonus": 230.0,
+			"vision_bonus": 276.0,
 			"scan_arc": 60.0,
 			"size": Vector3(1.0, 2.4, 0.8),
 			"color": Color.DEEP_SKY_BLUE
@@ -2190,9 +2210,9 @@ static func get_base_power(hull_type_id: String) -> float:
 # So the scale-up is ONE multiplier, here, at the single point every caller
 # already goes through (unit.gd and building.gd both read vision only
 # via this function). The JSON keeps saying 20 and means "20 on the authoring
-# scale"; the game sees 38. Retuning a specific hull still means editing that
+# scale"; the game sees 45.6. Retuning a specific hull still means editing that
 # hull's own base_vision, exactly as before - this only moves the whole band.
-const VISION_SCALE: float = 1.9
+const VISION_SCALE: float = 2.28
 
 static func get_base_vision(hull_type_id: String) -> float:
 	var data = get_module_data(hull_type_id)

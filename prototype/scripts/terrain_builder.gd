@@ -227,7 +227,10 @@ const NAV_TILE_BORDER_CELLS: float = 6.0
 # so no shipped map changes, and revisit if a v2 map ever shows a hitch on
 # placement.
 static func _nav_single_region(map_def: Dictionary) -> bool:
-	return terrain_generator(map_def) == "v2"
+	if terrain_generator(map_def) == "v2":
+		return true
+	var he: Vector2 = MapCatalogScript.half_extents(map_def)
+	return (he.x * 2.0 <= NAV_TILE_SIZE_BASE) and (he.y * 2.0 <= NAV_TILE_SIZE_BASE)
 
 
 static func _nav_tile_size(map_def: Dictionary) -> float:
@@ -868,6 +871,8 @@ static func _water_blob_height_contribution(blob: Dictionary, x: float, z: float
 # Deliberately an upper BOUND rather than a measured maximum: cheap, stable,
 # and erring high only lifts the shroud slightly.
 static func max_height(map_def: Dictionary) -> float:
+	if bool(map_def.get("flat_ground_collider", false)):
+		return 0.0
 	if _get_heightmap_image(map_def):
 		# Heightmap samples are normalized 0..1, so height_scale IS the ceiling.
 		return float(map_def.get("terrain", {}).get("height_scale", 20.0))
@@ -898,6 +903,8 @@ static func nav_vertical_slack(map_def: Dictionary) -> float:
 
 
 static func height_at(map_def: Dictionary, x: float, z: float) -> float:
+	if bool(map_def.get("flat_ground_collider", false)):
+		return 0.0
 	# RTS_CORE_ROADMAP.md B4/B6: a real heightmap FULLY REPLACES the
 	# analytic noise+hills+water_blobs path below (not layered on top of
 	# it - a map authoring real terrain.features doesn't also want
@@ -4009,9 +4016,9 @@ static func _spawn_forest_zone_aabbs(map_def: Dictionary, parent: Node3D, prop_s
 	for z in map_def.get("surface_zones", []):
 		if z.get("surface_type", "") != "forest":
 			continue
-		var body: StaticBody3D = StaticBody3D.new()
-		body.collision_layer = 1  # BattleLayers.TERRAIN
-		body.collision_mask = 0
+		var area: Area3D = Area3D.new()
+		area.collision_layer = 1 << 5  # Bit 5 (32): SMOKE / sensor occlusion layer, queried by vision LOS
+		area.collision_mask = 0
 		var shape: CollisionShape3D = CollisionShape3D.new()
 		var box: BoxShape3D = BoxShape3D.new()
 		# World-space size: zone's XZ footprint × FOREST_LOS_HEIGHT in Y.
@@ -4020,9 +4027,9 @@ static func _spawn_forest_zone_aabbs(map_def: Dictionary, parent: Node3D, prop_s
 		var size: Vector3 = Vector3(z.half_extents.x * 2.0 * prop_scale, FOREST_LOS_HEIGHT * prop_scale, z.half_extents.y * 2.0 * prop_scale)
 		box.size = size
 		shape.shape = box
-		body.add_child(shape)
-		body.position = Vector3(z.center.x, FOREST_LOS_HEIGHT * prop_scale * 0.5, z.center.z)
-		parent.add_child(body)
+		area.add_child(shape)
+		area.position = Vector3(z.center.x, FOREST_LOS_HEIGHT * prop_scale * 0.5, z.center.z)
+		parent.add_child(area)
 
 # A lighter, sandier-toned marker over the shallow sub-area of a water
 # zone (drawn on top of the main water plane, slightly higher Y) - purely

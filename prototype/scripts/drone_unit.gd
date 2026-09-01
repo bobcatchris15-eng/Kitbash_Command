@@ -46,11 +46,12 @@ const RETURN_TIMEOUT: float = 8.0
 const ATTACK_LINGER: float = 0.35   # brief strafing loiter before returning
 
 # --- Scout drone --------------------------------------------------------
-const SCOUT_LOITER: float = 4.0     # seconds to orbit and reveal fog
-const SCOUT_ORBIT_RADIUS: float = 4.0
-const SCOUT_REVEAL_RADIUS: float = 24.0
-const SCOUT_REVEAL_DURATION: float = 18.0
+const SCOUT_REVEAL_RADIUS: float = 75.0
+const SCOUT_REVEAL_DURATION: float = 3.0
 var _scout_orbit_angle: float = 0.0
+var slot_index: int = 0
+var orbit_angle_offset: float = 0.0
+var _fog_reveal_timer: float = 0.0
 
 # --- Repair drone --------------------------------------------------------
 const REPAIR_TETHER: float = 3.0    # seconds of repair channel
@@ -103,18 +104,15 @@ func _do_launch(delta: float):
 	var dest: Vector3
 	match drone_type:
 		"scout":
-			# Scout goes to the area the carrier wanted surveyed; if no target,
-			# drifts forward toward the carrier's facing direction.
-			if is_instance_valid(target):
-				dest = target.global_position
-			else:
-				var carrier_root = carrier if is_instance_valid(carrier) else self
-				dest = carrier_root.global_position - carrier_root.global_transform.basis.z.normalized() * 20.0
+			if _is_carrier_dead():
+				destroy_missile(false)
+				return
+			dest = _get_scout_orbit_dest()
 		"repair":
 			# Repair drone seeks the most-damaged ally in range.
 			_repair_target = _find_damaged_ally()
 			if is_instance_valid(_repair_target):
-				dest = _repair_target.global_position
+				dest = (_repair_target.get_nearest_surface_point(global_position) if _repair_target.has_method("get_nearest_surface_point") else _repair_target.global_position) + Vector3(0, 1.0, 0)
 			else:
 				# No damaged ally found; return immediately.
 				state = State.RETURN
@@ -123,17 +121,16 @@ func _do_launch(delta: float):
 			if not is_instance_valid(target) or ("is_dead" in target and target.is_dead):
 				state = State.RETURN
 				return
-			dest = target.global_position + Vector3(0, 1.0, 0)
+			dest = (target.get_nearest_surface_point(global_position) if target.has_method("get_nearest_surface_point") else target.global_position) + Vector3(0, 1.0, 0)
 
 	_fly_toward(dest, delta)
 
-	var dist_threshold := 2.5 if drone_type == "scout" else 2.0
+	var dist_threshold := 3.0 if drone_type == "scout" else 2.0
 	if global_position.distance_to(dest) < dist_threshold:
 		_state_timer = 0.0
 		match drone_type:
 			"scout":
 				state = State.LOITER
-				_scout_orbit_angle = 0.0
 			"repair":
 				if is_instance_valid(_repair_target):
 					state = State.REPAIR
@@ -145,7 +142,8 @@ func _do_launch(delta: float):
 					target.take_damage(damage_per_hit, damage_class, global_position)
 					if is_inside_tree():
 						var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
-						VFXBurstScript.spawn(parent, target.global_position + Vector3(0, 0.4, 0), Color.CYAN, 8, 0.15, 60.0, 2.0, 5.0)
+						var vfx_pos = target.get_nearest_surface_point(global_position) if target.has_method("get_nearest_surface_point") else target.global_position + Vector3(0, 0.4, 0)
+						VFXBurstScript.spawn(parent, vfx_pos, Color.CYAN, 8, 0.15, 60.0, 2.0, 5.0)
 				state = State.LOITER   # reuse LOITER for attack linger
 
 # ─── LOITER ────────────────────────────────────────────────────────────────
@@ -153,28 +151,22 @@ func _do_loiter(delta: float):
 	_state_timer += delta
 
 	if drone_type == "scout":
-		# Orbit around the target position while revealing fog of war.
-		var orbit_center: Vector3
-		if is_instance_valid(target):
-			orbit_center = target.global_position
-		else:
-			orbit_center = global_position  # already at drift destination
+		if _is_carrier_dead():
+			destroy_missile(false)
+			return
 
-		_scout_orbit_angle += delta * 1.2
-		var orbit_dest = orbit_center + Vector3(
-			cos(_scout_orbit_angle) * SCOUT_ORBIT_RADIUS,
-			1.0,
-			sin(_scout_orbit_angle) * SCOUT_ORBIT_RADIUS
-		)
+		var parent_vision = _get_carrier_vision_range()
+		var orbit_radius = parent_vision + SCOUT_REVEAL_RADIUS
+		var angular_speed = speed / maxf(1.0, orbit_radius)
+		_scout_orbit_angle += angular_speed * delta
+
+		var orbit_dest = _get_scout_orbit_dest()
 		_fly_toward(orbit_dest, delta)
 
-		# Periodically call reveal_area on the vision service.
-		# Check every ~1s to avoid flooding the call.
-		if fmod(_state_timer, 1.0) < delta:
-			_reveal_fog(orbit_center)
-
-		if _state_timer >= SCOUT_LOITER:
-			state = State.RETURN
+		_fog_reveal_timer += delta
+		if _fog_reveal_timer >= 0.5:
+			_fog_reveal_timer = 0.0
+			_reveal_fog(global_position)
 	elif drone_type == "attack":
 		# Brief strafing loiter (visual; damage was dealt on arrival).
 		if _state_timer >= ATTACK_LINGER:
@@ -204,7 +196,7 @@ func _do_repair(delta: float):
 # ─── RETURN ────────────────────────────────────────────────────────────────
 func _do_return(delta: float):
 	_state_timer += delta
-	if not is_instance_valid(carrier) or _state_timer > RETURN_TIMEOUT:
+	if _is_carrier_dead() or _state_timer > RETURN_TIMEOUT:
 		destroy_missile(false)
 		return
 	_fly_toward(carrier.global_position, delta)
@@ -212,11 +204,79 @@ func _do_return(delta: float):
 		destroy_missile(false)
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
+func _is_carrier_dead() -> bool:
+	if not is_instance_valid(carrier):
+		return true
+	if "is_dead" in carrier and bool(carrier.is_dead):
+		return true
+	if carrier.get("is_dead") == true:
+		return true
+	if carrier.has_meta("is_dead") and bool(carrier.get_meta("is_dead")):
+		return true
+	return false
+func _get_carrier_vision_range() -> float:
+	if is_instance_valid(carrier):
+		if "vision_range" in carrier and float(carrier.vision_range) > 0.0:
+			return float(carrier.vision_range)
+		if "_hull_type" in carrier:
+			var base = ModuleCatalog.get_base_vision(carrier._hull_type)
+			if base > 0.0:
+				return base
+		if carrier.has_meta("type_id"):
+			var base = ModuleCatalog.get_base_vision(carrier.get_meta("type_id"))
+			if base > 0.0:
+				return base
+	return 30.0
+
+func _get_carrier_scout_drones() -> Array:
+	if not is_instance_valid(carrier):
+		return [self]
+	var scouts: Array = []
+	if carrier.has_meta("scout_drones"):
+		var raw = carrier.get_meta("scout_drones")
+		if raw is Array:
+			for d in raw:
+				if is_instance_valid(d) and not ("is_destroyed" in d and d.is_destroyed):
+					scouts.append(d)
+	if not scouts.has(self) and not is_destroyed:
+		scouts.append(self)
+	carrier.set_meta("scout_drones", scouts)
+	return scouts
+
+func _get_scout_orbit_dest() -> Vector3:
+	var carrier_node = carrier if is_instance_valid(carrier) else self
+	var carrier_pos = carrier_node.global_position
+	var parent_vision = _get_carrier_vision_range()
+	var orbit_radius = parent_vision + SCOUT_REVEAL_RADIUS
+
+	var scouts = _get_carrier_scout_drones()
+	var total_scouts = max(1, scouts.size())
+	var my_idx = scouts.find(self)
+	if my_idx < 0:
+		my_idx = 0
+	var phase_offset = float(my_idx) * (TAU / float(total_scouts))
+
+	var angle = _scout_orbit_angle + phase_offset
+	var dest = carrier_pos + Vector3(
+		cos(angle) * orbit_radius,
+		0.0,
+		sin(angle) * orbit_radius
+	)
+	var scene = get_tree().current_scene if is_inside_tree() else null
+	var ground_y = carrier_pos.y
+	if scene and scene.has_method("terrain_height_at"):
+		ground_y = scene.terrain_height_at(dest)
+	dest.y = ground_y + 3.0
+	return dest
+
 func _fly_toward(dest: Vector3, delta: float):
 	var dir = dest - global_position
-	if dir.length() > 0.05:
-		look_at(dest, Vector3.UP)
-		global_position += dir.normalized() * speed * delta
+	var dist = dir.length()
+	if dist > 0.05:
+		var norm_dir = dir / dist
+		if absf(norm_dir.dot(Vector3.UP)) < 0.99:
+			look_at(dest, Vector3.UP)
+		global_position += norm_dir * speed * delta
 
 func _find_damaged_ally() -> Node3D:
 	var best: Node3D = null
@@ -256,6 +316,14 @@ func destroy_missile(intercepted: bool):
 	if is_destroyed:
 		return
 	is_destroyed = true
+	if is_instance_valid(carrier) and carrier.has_meta("scout_drones"):
+		var scouts: Array = []
+		var raw = carrier.get_meta("scout_drones")
+		if raw is Array:
+			for d in raw:
+				if is_instance_valid(d) and d != self and not ("is_destroyed" in d and d.is_destroyed):
+					scouts.append(d)
+		carrier.set_meta("scout_drones", scouts)
 	var exp = MeshInstance3D.new()
 	exp.mesh = MunitionPool.unit_sphere()
 	exp.scale = Vector3(0.6, 0.6, 0.6)

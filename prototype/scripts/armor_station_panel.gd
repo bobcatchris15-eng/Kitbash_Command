@@ -127,8 +127,6 @@ var is_paint_mode: bool = false
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_build_header()
-	_build_dock()
 
 
 func enter(hull: Node3D, placer: Node) -> void:
@@ -151,6 +149,9 @@ func enter(hull: Node3D, placer: Node) -> void:
 				_assignments[int(a.get("facet_id", -1))] = a
 	_hover_key = ""
 	_refresh_readout()
+	var toolbar = get_tree().get_first_node_in_group("lab_toolbar")
+	if toolbar and toolbar.has_method("update_undo_redo_state"):
+		toolbar.update_undo_redo_state()
 
 
 func exit() -> void:
@@ -170,6 +171,18 @@ func exit() -> void:
 	_hover_key = ""
 	_hull = null
 	_placer = null
+	var toolbar = get_tree().get_first_node_in_group("lab_toolbar")
+	if toolbar and toolbar.has_method("update_undo_redo_state"):
+		toolbar.update_undo_redo_state()
+
+
+func sync_from_hull() -> void:
+	_assignments.clear()
+	if _hull:
+		for a in _hull.get_meta("armor_assignments", []):
+			if a is Dictionary:
+				_assignments[int(a.get("facet_id", -1))] = a
+	_refresh_readout()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -191,16 +204,32 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # --- Layout -----------------------------------------------------------------
 
-func _build_header() -> void:
-	pass
+var _built: bool = false
+var _standalone_dock: Control = null
+
+
+func build_into(parent: Control) -> void:
+	if _built:
+		return
+	_built = true
+	var inner := VBoxContainer.new()
+	inner.name = "ArmorControls"
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	parent.add_child(inner)
+	_build_inner_controls(inner)
 
 
 func _build_dock() -> void:
+	if _built:
+		return
+	_built = true
 	var dock := PanelContainer.new()
 	dock.theme_type_variation = "WoodPanel"
 	UITheme.apply_material(dock, "wood")
 
 	var dlc := Control.new()
+	dlc.name = "StandaloneArmorDock"
 	dlc.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	dlc.offset_left = 20.0
 	dlc.offset_top = 76.0
@@ -209,18 +238,56 @@ func _build_dock() -> void:
 	dlc.anchor_bottom = 1.0
 	dlc.add_child(dock)
 	add_child(dlc)
+	_standalone_dock = dlc
 
 	var inner := VBoxContainer.new()
 	inner.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	dock.add_child(inner)
+	_build_inner_controls(inner)
 
+
+func _build_inner_controls(inner: VBoxContainer) -> void:
 	# Section: brush mode & erase
 	inner.add_child(_section_label("BRUSH"))
+	var mode_well := PanelContainer.new()
+	mode_well.add_theme_stylebox_override("panel", _stylebox_flat(Tokens.BASE_900, Tokens.BASE_700, 1, 4, 4, 4))
+	inner.add_child(mode_well)
+
 	var mode_row := HBoxContainer.new()
+	mode_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mode_row.add_theme_constant_override("separation", Tokens.SPACE_XS)
-	inner.add_child(mode_row)
-	var side_btn := _toggle(mode_row, "SIDE", not _refine)
-	var facet_btn := _toggle(mode_row, "FACET", _refine)
+	mode_well.add_child(mode_row)
+
+	var side_btn := Button.new()
+	side_btn.text = "SIDE"
+	side_btn.toggle_mode = true
+	side_btn.button_pressed = not _refine
+	side_btn.custom_minimum_size = Vector2(0, 28)
+	side_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_button(side_btn, Tokens.BASE_800, Tokens.BASE_600, Tokens.BASE_600, Tokens.SIGNAL_HAZARD, 12)
+	UIFeedbackScript.wire(side_btn)
+	mode_row.add_child(side_btn)
+
+	var facet_btn := Button.new()
+	facet_btn.text = "FACET"
+	facet_btn.toggle_mode = true
+	facet_btn.button_pressed = _refine
+	facet_btn.custom_minimum_size = Vector2(0, 28)
+	facet_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_button(facet_btn, Tokens.BASE_800, Tokens.BASE_600, Tokens.BASE_600, Tokens.SIGNAL_HAZARD, 12)
+	UIFeedbackScript.wire(facet_btn)
+	mode_row.add_child(facet_btn)
+
+	var erase := Button.new()
+	erase.text = "ERASE"
+	erase.toggle_mode = true
+	erase.button_pressed = _erase
+	erase.custom_minimum_size = Vector2(0, 28)
+	erase.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_button(erase, Tokens.BASE_800, Tokens.BASE_600, Color(0.28, 0.10, 0.08), Tokens.SIGNAL_ALERT, 12)
+	UIFeedbackScript.wire(erase)
+	mode_row.add_child(erase)
+
 	side_btn.pressed.connect(func():
 		_refine = false
 		_hover_key = ""
@@ -231,25 +298,12 @@ func _build_dock() -> void:
 		_hover_key = ""
 		facet_btn.button_pressed = true
 		side_btn.button_pressed = false)
-
-	var erase := Button.new()
-	erase.text = "ERASE"
-	erase.toggle_mode = true
-	erase.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
-	erase.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UIFeedbackScript.wire(erase)
 	erase.toggled.connect(func(p: bool):
 		_erase = p
 		_hover_key = "")
-	mode_row.add_child(erase)
 
-	# Section: armor type (consolidated)
+	# Section: armor type
 	inner.add_child(_section_label("ARMOR TYPE"))
-	_type_hint = Label.new()
-	_type_hint.theme_type_variation = "HintLabel"
-	_type_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_type_hint.text = str(ARMOR_TYPE_HINTS.get(_brush_armor_type, ""))
-
 	inner.add_child(_swatch_grid(ARMOR_TYPES, ARMOR_TYPE_LABELS,
 		func(id: String):
 			_brush_armor_type = id
@@ -257,124 +311,249 @@ func _build_dock() -> void:
 			_hover_key = "",
 		func(): return _brush_armor_type,
 		_type_buttons))
-	inner.add_child(_type_hint)
+		
+	var hint_well := PanelContainer.new()
+	hint_well.add_theme_stylebox_override("panel", _stylebox_flat(Tokens.BASE_900, Tokens.BASE_700, 1, 3, 6, 6))
+	_type_hint = Label.new()
+	_type_hint.add_theme_font_size_override("font_size", 11)
+	_type_hint.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
+	_type_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_type_hint.text = str(ARMOR_TYPE_HINTS.get(_brush_armor_type, ""))
+	hint_well.add_child(_type_hint)
+	inner.add_child(hint_well)
 
 	# Section: thickness
 	inner.add_child(_section_label("THICKNESS"))
+	var thick_well := PanelContainer.new()
+	thick_well.add_theme_stylebox_override("panel", _stylebox_flat(Tokens.BASE_900, Tokens.BASE_700, 1, 4, 6, 4))
+	inner.add_child(thick_well)
+	
 	var thick_row := HBoxContainer.new()
+	thick_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	thick_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
-	inner.add_child(thick_row)
+	thick_well.add_child(thick_row)
+	
 	_thickness_slider = HSlider.new()
 	_thickness_slider.min_value = 0.5
 	_thickness_slider.max_value = 3.0
 	_thickness_slider.step = 0.25
 	_thickness_slider.value = _brush_thickness
 	_thickness_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_thickness_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_thickness_slider.tooltip_text = "Plate thickness - real geometry on the hull and real weight in the drivetrain"
 	thick_row.add_child(_thickness_slider)
+	
+	var thick_badge := PanelContainer.new()
+	thick_badge.add_theme_stylebox_override("panel", _stylebox_flat(Tokens.BASE_800, Tokens.BASE_600, 1, 3, 6, 2))
 	var thick_val := Label.new()
-	thick_val.text = "1.00x"
-	thick_row.add_child(thick_val)
+	thick_val.text = "%.2fx" % _brush_thickness
+	thick_val.add_theme_font_size_override("font_size", 12)
+	thick_val.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	thick_badge.add_child(thick_val)
+	thick_row.add_child(thick_badge)
+	
 	_thickness_slider.value_changed.connect(func(v: float):
 		_brush_thickness = v
 		thick_val.text = "%.2fx" % v
 		_hover_key = "")
 
-	# Section: schemes
+	# Section: schemes (Presets)
 	inner.add_child(_section_label("SCHEMES"))
+	var preset_well := PanelContainer.new()
+	preset_well.add_theme_stylebox_override("panel", _stylebox_flat(Tokens.BASE_900, Tokens.BASE_700, 1, 4, 4, 4))
+	inner.add_child(preset_well)
+
+	var preset_vbox := VBoxContainer.new()
+	preset_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preset_vbox.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	preset_well.add_child(preset_vbox)
+
 	var preset_grid := GridContainer.new()
 	preset_grid.columns = 2
+	preset_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preset_grid.add_theme_constant_override("h_separation", Tokens.SPACE_XS)
 	preset_grid.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
-	inner.add_child(preset_grid)
+	preset_vbox.add_child(preset_grid)
+
+	var preset_buttons: Array = []
 	for name in PRESETS.keys():
 		var b := Button.new()
 		b.text = str(name)
-		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
+		b.custom_minimum_size = Vector2(0, 32)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.theme_type_variation = "ListButton"
+		b.toggle_mode = true
+		_style_button(b, Tokens.BASE_800, Tokens.BASE_500, Tokens.BASE_600, Tokens.SIGNAL_HAZARD, 12)
 		UIFeedbackScript.wire(b)
-		b.pressed.connect(_on_preset.bind(str(name)))
 		preset_grid.add_child(b)
+		preset_buttons.append(b)
+		b.pressed.connect(func():
+			_on_preset(str(name))
+			for other in preset_buttons:
+				other.button_pressed = (other == b))
 
 	var strip_all := Button.new()
 	strip_all.text = "STRIP ALL ARMOR"
-	strip_all.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
+	strip_all.custom_minimum_size = Vector2(0, 30)
+	strip_all.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_button(strip_all, Tokens.BASE_800, Color(0.55, 0.22, 0.18), Color(0.35, 0.12, 0.10), Tokens.SIGNAL_ALERT, 12)
+	strip_all.add_theme_color_override("font_color", Color(0.95, 0.55, 0.50))
 	UIFeedbackScript.wire(strip_all)
 	strip_all.pressed.connect(func():
+		if _placer and _placer.has_method("push_armor_undo_snapshot"):
+			_placer.push_armor_undo_snapshot()
 		_assignments.clear()
+		for b in preset_buttons:
+			b.button_pressed = false
 		_apply_and_refresh("Stripped all armor."))
-	inner.add_child(strip_all)
+	preset_vbox.add_child(strip_all)
 
-	inner.add_child(HSeparator.new())
+	# Section: armor map
 	inner.add_child(_section_label("ARMOR MAP"))
-	_coverage_label = Label.new()
-	_coverage_label.text = "ARMOR 0%"
-	inner.add_child(_coverage_label)
+	var map_well := PanelContainer.new()
+	map_well.add_theme_stylebox_override("panel", _stylebox_flat(Tokens.BASE_900, Tokens.BASE_700, 1, 4, 4, 4))
+	inner.add_child(map_well)
 
-	# Six side buttons, one per hull face. Each shows that side's weighted
-	# coverage, dominant material and mean thickness - the plan at a glance,
-	# including the back and bottom the camera can't see. Clicking applies
-	# the current brush (or erase) to the whole side, same as clicking the
-	# hull with the SIDE brush; the weakest side is marked ">".
+	var map_vbox := VBoxContainer.new()
+	map_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map_vbox.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	map_well.add_child(map_vbox)
+
+	var cov_bar := HBoxContainer.new()
+	cov_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map_vbox.add_child(cov_bar)
+
+	var cov_title := Label.new()
+	cov_title.text = "COVERAGE"
+	cov_title.add_theme_font_size_override("font_size", 11)
+	cov_title.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
+	cov_bar.add_child(cov_title)
+
+	var cov_spacer := Control.new()
+	cov_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cov_bar.add_child(cov_spacer)
+
+	_coverage_label = Label.new()
+	_coverage_label.text = "0%"
+	_coverage_label.add_theme_font_size_override("font_size", 12)
+	_coverage_label.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	cov_bar.add_child(_coverage_label)
+
 	var map_grid := GridContainer.new()
 	map_grid.columns = 2
+	map_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	map_grid.add_theme_constant_override("h_separation", Tokens.SPACE_XS)
 	map_grid.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
-	inner.add_child(map_grid)
+	map_vbox.add_child(map_grid)
+
 	for s in MAP_SIDES:
 		var b := Button.new()
 		b.text = s.to_upper()
-		b.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
+		b.custom_minimum_size = Vector2(0, 36)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_style_button(b, Tokens.BASE_800, Tokens.BASE_600, Tokens.BASE_700, Tokens.SIGNAL_HAZARD, 11)
 		UIFeedbackScript.wire(b)
-		b.tooltip_text = "Apply the current brush to the whole %s." % s
+		b.tooltip_text = "Apply current brush to %s." % s
 		b.pressed.connect(_on_map_side.bind(str(s)))
 		_map_buttons[str(s)] = b
 		map_grid.add_child(b)
 
+	# Footer info
+	var footer_well := PanelContainer.new()
+	footer_well.add_theme_stylebox_override("panel", _stylebox_flat(Tokens.BASE_900, Tokens.BASE_700, 1, 3, 6, 6))
+	inner.add_child(footer_well)
+
+	var footer_vbox := VBoxContainer.new()
+	footer_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	footer_vbox.add_theme_constant_override("separation", 2)
+	footer_well.add_child(footer_vbox)
+
 	_weight_label = Label.new()
-	_weight_label.theme_type_variation = "HintLabel"
-	inner.add_child(_weight_label)
+	_weight_label.add_theme_font_size_override("font_size", 12)
+	_weight_label.add_theme_color_override("font_color", Tokens.SIGNAL_GO)
+	footer_vbox.add_child(_weight_label)
 
 	_status_label = Label.new()
-	_status_label.theme_type_variation = "HintLabel"
+	_status_label.add_theme_font_size_override("font_size", 11)
+	_status_label.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	inner.add_child(_status_label)
+	footer_vbox.add_child(_status_label)
 
 	var controls_hint := Label.new()
-	controls_hint.theme_type_variation = "HintLabel"
+	controls_hint.add_theme_font_size_override("font_size", 10)
+	controls_hint.add_theme_color_override("font_color", Tokens.BASE_400)
 	controls_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	controls_hint.text = "LMB paint. Alt+LMB pick the facet's type and thickness up. RMB orbits."
-	inner.add_child(controls_hint)
+	controls_hint.text = "LMB: Paint • Alt+LMB: Pick • RMB: Orbit"
+	footer_vbox.add_child(controls_hint)
 
 
-func _section_label(text: String) -> Label:
+func _stylebox_flat(bg: Color, border: Color, border_w: int = 1, radius: int = 3, pad_h: int = 6, pad_v: int = 4) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.set_border_width_all(border_w)
+	sb.corner_radius_top_left = radius
+	sb.corner_radius_top_right = radius
+	sb.corner_radius_bottom_left = radius
+	sb.corner_radius_bottom_right = radius
+	sb.content_margin_left = pad_h
+	sb.content_margin_right = pad_h
+	sb.content_margin_top = pad_v
+	sb.content_margin_bottom = pad_v
+	return sb
+
+
+func _style_button(btn: Button, normal_bg: Color = Tokens.BASE_800, normal_border: Color = Tokens.BASE_600,
+		active_bg: Color = Tokens.BASE_700, active_border: Color = Tokens.SIGNAL_HAZARD,
+		font_sz: int = 12) -> void:
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.add_theme_font_size_override("font_size", font_sz)
+	btn.add_theme_color_override("font_color", Tokens.TEXT_PRIMARY)
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_color_override("font_pressed_color", Tokens.SIGNAL_HAZARD)
+	btn.add_theme_color_override("font_focus_color", Tokens.TEXT_PRIMARY)
+	
+	var sb_norm := _stylebox_flat(normal_bg, normal_border, 1, 3, 6, 4)
+	var sb_hover := _stylebox_flat(Tokens.BASE_700, Tokens.BASE_400, 1, 3, 6, 4)
+	var sb_press := _stylebox_flat(active_bg, active_border, 2, 3, 6, 4)
+	var sb_dis := _stylebox_flat(Tokens.BASE_900, Tokens.BASE_700, 1, 3, 6, 4)
+	
+	btn.add_theme_stylebox_override("normal", sb_norm)
+	btn.add_theme_stylebox_override("hover", sb_hover)
+	btn.add_theme_stylebox_override("pressed", sb_press)
+	btn.add_theme_stylebox_override("focus", sb_norm)
+	btn.add_theme_stylebox_override("disabled", sb_dis)
+
+
+func _section_label(text: String) -> Control:
+	var container := HBoxContainer.new()
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	
 	var l := Label.new()
 	l.text = text
-	l.theme_type_variation = "HeadingLabel"
-	return l
-
-
-func _toggle(parent: Control, text: String, on: bool) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.toggle_mode = true
-	b.button_pressed = on
-	b.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UIFeedbackScript.wire(b)
-	parent.add_child(b)
-	return b
+	l.add_theme_font_size_override("font_size", 12)
+	l.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	container.add_child(l)
+	
+	var sep := HSeparator.new()
+	sep.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var sep_style := StyleBoxLine.new()
+	sep_style.color = Tokens.BASE_600
+	sep_style.thickness = 1
+	sep.add_theme_stylebox_override("separator", sep_style)
+	container.add_child(sep)
+	
+	return container
 
 
 func _swatch_grid(ids: Array, labels: Dictionary, on_pick: Callable, get_current: Callable,
 		register: Dictionary = {}) -> Control:
 	var well := PanelContainer.new()
-	well.theme_type_variation = "InsetPanel"
+	well.add_theme_stylebox_override("panel", _stylebox_flat(Tokens.BASE_900, Tokens.BASE_700, 1, 4, 4, 4))
 	var grid := GridContainer.new()
 	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", Tokens.SPACE_XS)
 	grid.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
 	well.add_child(grid)
@@ -384,9 +563,9 @@ func _swatch_grid(ids: Array, labels: Dictionary, on_pick: Callable, get_current
 		b.text = str(labels.get(id, id))
 		b.toggle_mode = true
 		b.button_pressed = (str(id) == str(get_current.call()))
-		b.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
+		b.custom_minimum_size = Vector2(0, 30)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.theme_type_variation = "ListButton"
+		_style_button(b, Tokens.BASE_800, Tokens.BASE_600, Tokens.BASE_600, Tokens.SIGNAL_HAZARD, 11)
 		UIFeedbackScript.wire(b)
 		grid.add_child(b)
 		buttons.append(b)
@@ -409,6 +588,9 @@ func _paint_at_world(screen_pos: Vector2) -> void:
 	var mesh_instance := _find_hull_mesh(_hull)
 	if mesh_instance == null or mesh_instance.mesh == null:
 		return
+
+	if _placer and _placer.has_method("push_armor_undo_snapshot"):
+		_placer.push_armor_undo_snapshot()
 
 	if _refine:
 		_paint_facet(fid)
@@ -459,6 +641,8 @@ func _on_preset(name: String) -> void:
 	if mesh_instance == null or mesh_instance.mesh == null:
 		return
 	var mesh := mesh_instance.mesh
+	if _placer and _placer.has_method("push_armor_undo_snapshot"):
+		_placer.push_armor_undo_snapshot()
 	for side in PRESETS.get(name, []):
 		for fid in HullFacets.facets_for_side_mesh(mesh, str(side)):
 			_paint_facet(int(fid))
@@ -619,6 +803,8 @@ func _on_map_side(side: String) -> void:
 	var mesh_instance := _find_hull_mesh(_hull)
 	if mesh_instance == null or mesh_instance.mesh == null:
 		return
+	if _placer and _placer.has_method("push_armor_undo_snapshot"):
+		_placer.push_armor_undo_snapshot()
 	for fid in HullFacets.facets_for_side_mesh(mesh_instance.mesh, side):
 		_paint_facet(int(fid))
 	_apply_and_refresh("%s the %s." % ["Stripped" if _erase else "Painted", side])
@@ -643,7 +829,8 @@ func _refresh_readout() -> void:
 	if not is_instance_valid(_hull):
 		return
 	var stats: Dictionary = ArmorPaint.analyze(_hull)
-	_coverage_label.text = "ARMOR %d%%" % int(round(float(stats["coverage"]) * 100.0))
+	if _coverage_label:
+		_coverage_label.text = "%d%%" % int(round(float(stats["coverage"]) * 100.0))
 	var plan: Dictionary = _hull.get_meta("armor_plan", {})
 	var plan_sides: Dictionary = plan.get("sides", {})
 	var weakest := str(stats["weakest_side"])
@@ -651,14 +838,20 @@ func _refresh_readout() -> void:
 		var b: Button = _map_buttons[s]
 		var sd: Dictionary = plan_sides.get(s, {})
 		var cov := float(sd.get("coverage", 0.0))
-		var marker := "> " if s == weakest and weakest != "" else ""
+		var is_weakest: bool = (s == weakest and weakest != "")
+		var marker := "> " if is_weakest else ""
 		if cov <= 0.001:
 			b.text = "%s%s\n- bare -" % [marker, s.to_upper()]
 		else:
 			b.text = "%s%s\n%d%% %s %.2fx" % [marker, s.to_upper(), int(round(cov * 100.0)),
 				_mat_abbrev(str(sd.get("material", ""))), float(sd.get("mean_thickness", 0.0))]
-	_weight_label.text = "+%.0f kg   %d metal / %d crystal" % [
-		float(stats["weight"]), int(stats["cost_metal"]), int(stats["cost_crystal"])]
+		if is_weakest:
+			b.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+		else:
+			b.add_theme_color_override("font_color", Tokens.TEXT_PRIMARY)
+	if _weight_label:
+		_weight_label.text = "+%.0f kg   %d metal / %d crystal" % [
+			float(stats["weight"]), int(stats["cost_metal"]), int(stats["cost_crystal"])]
 
 
 func _set_status(msg: String) -> void:

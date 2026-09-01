@@ -60,10 +60,4 @@ theme/custom="res://resources/bomber_theme.tres"
 [rendering]
 
 textures/vram_compression/import_etc2_astc=true
-# 4.7: `use_taa` overrides `screen_space_aa` when both are set (TAA is the
-# primary AA; FXAA on top would double the cost for no visible quality
-# gain at the 1080p target res). Battle.tscn:114-119's comment about
-# `anti_aliasing/quality/screen_space_aa` is historical; the line was
-# removed 2026-08-29 when this section was re-checked against the
-# 4.7.1 release notes.
-anti_aliasing/quality/use_taa=true
+#4.7:`use_taa`overrides`screen_space_aa`whenbothareset(TAAisthe#primaryAA#gainatthe1080ptargetres).Battle.tscn:114-119'scommentabout#`anti_aliasing/quality/screen_space_aa`ishistorical#removed2026-08-29whenthissectionwasre-checkedagainstthe#4.7.1releasenotes.anti_aliasing/quality/use_taa=true

@@ -67,6 +67,9 @@ const MAX_UNDO_HISTORY = 50
 var undo_stack: Array = []
 var redo_stack: Array = []
 
+var armor_undo_stack: Array = []
+var armor_redo_stack: Array = []
+
 func push_undo_snapshot():
 	if not hull:
 		return
@@ -81,13 +84,33 @@ func push_undo_snapshot():
 		undo_stack.pop_front()
 	redo_stack.clear()
 
+func push_armor_undo_snapshot():
+	if not hull: return
+	var bm = get_node_or_null("BlueprintManager")
+	if not bm: return
+	var current = bm._serialize_armor(hull)
+	armor_undo_stack.append(current.duplicate(true))
+	if armor_undo_stack.size() > MAX_UNDO_HISTORY:
+		armor_undo_stack.pop_front()
+	armor_redo_stack.clear()
+	var toolbar = get_tree().get_first_node_in_group("lab_toolbar")
+	if toolbar and toolbar.has_method("update_undo_redo_state"):
+		toolbar.update_undo_redo_state()
+
 func can_undo() -> bool:
+	if paint_mode_active:
+		return armor_undo_stack.size() > 0
 	return undo_stack.size() > 0
 
 func can_redo() -> bool:
+	if paint_mode_active:
+		return armor_redo_stack.size() > 0
 	return redo_stack.size() > 0
 
 func undo():
+	if paint_mode_active:
+		undo_armor()
+		return
 	if undo_stack.is_empty():
 		return
 	var bm = get_node_or_null("BlueprintManager")
@@ -101,6 +124,9 @@ func undo():
 	_log("Undo applied. History remaining: " + str(undo_stack.size()))
 
 func redo():
+	if paint_mode_active:
+		redo_armor()
+		return
 	if redo_stack.is_empty():
 		return
 	var bm = get_node_or_null("BlueprintManager")
@@ -113,10 +139,79 @@ func redo():
 	_reconstruct_from_snapshot(snapshot)
 	_log("Redo applied. Redo remaining: " + str(redo_stack.size()))
 
+func undo_armor():
+	if armor_undo_stack.is_empty(): return
+	var bm = get_node_or_null("BlueprintManager")
+	if not bm: return
+	
+	var current = bm._serialize_armor(hull)
+	armor_redo_stack.append(current.duplicate(true))
+	
+	var snapshot = armor_undo_stack.pop_back()
+	_apply_armor_snapshot(snapshot)
+	_log("Armor Undo applied. History remaining: " + str(armor_undo_stack.size()))
+	var toolbar = get_tree().get_first_node_in_group("lab_toolbar")
+	if toolbar and toolbar.has_method("update_undo_redo_state"):
+		toolbar.update_undo_redo_state()
+
+func redo_armor():
+	if armor_redo_stack.is_empty(): return
+	var bm = get_node_or_null("BlueprintManager")
+	if not bm: return
+	
+	var current = bm._serialize_armor(hull)
+	armor_undo_stack.append(current.duplicate(true))
+	
+	var snapshot = armor_redo_stack.pop_back()
+	_apply_armor_snapshot(snapshot)
+	_log("Armor Redo applied. Redo remaining: " + str(armor_redo_stack.size()))
+	var toolbar = get_tree().get_first_node_in_group("lab_toolbar")
+	if toolbar and toolbar.has_method("update_undo_redo_state"):
+		toolbar.update_undo_redo_state()
+
+func _apply_armor_snapshot(snapshot: Dictionary):
+	var bm = get_node_or_null("BlueprintManager")
+	if not bm: return
+	var mesh_inst = null
+	for c in hull.get_children():
+		if c is MeshInstance3D and c.name != "PhysicsMesh":
+			mesh_inst = c
+			break
+	if not mesh_inst: return
+	
+	var bp_dict = {"armor": snapshot} if not snapshot.has("armor") else snapshot
+	var armor_assignments = bm._deserialize_armor(bp_dict, hull.get_meta("type_id", ""), mesh_inst.mesh)
+	hull.set_meta("armor_assignments", armor_assignments)
+	
+	var LiveryScript = preload("res://scripts/livery.gd")
+	var ArmorPaint = preload("res://scripts/armor_paint.gd")
+	var ArmorPaintVisual = preload("res://scripts/armor_paint_visual.gd")
+	var faction = bm.get_meta("player_faction", LiveryScript.PLAYER_ID) if bm else LiveryScript.PLAYER_ID
+	
+	hull.set_meta("armor_plan", ArmorPaint.build_plan("", armor_assignments, mesh_inst.mesh, mesh_inst.transform, str(faction)))
+	ArmorPaintVisual.rebuild(hull, mesh_inst)
+	
+	var armor_panel = get_node_or_null("UI_ArmorStationPanel")
+	if armor_panel and armor_panel.has_method("sync_from_hull"):
+		armor_panel.sync_from_hull()
+		
+	get_tree().call_group("stat_ui", "update_stats", hull)
+
+
 func _reconstruct_from_snapshot(snapshot: Dictionary):
 	var bm = get_node_or_null("BlueprintManager")
 	if not bm:
 		return
+		
+	var keep_armor = false
+	var current_armor_dict = {}
+	if hull and is_instance_valid(hull):
+		var old_hull_type = hull.get_meta("type_id") if hull.has_meta("type_id") else ""
+		var snap_hull_type = snapshot.get("hull_type", "")
+		if old_hull_type != "" and old_hull_type == snap_hull_type:
+			current_armor_dict = bm._serialize_armor(hull)
+			keep_armor = true
+
 	if selected_module:
 		_select_module(null)
 	if hull and is_instance_valid(hull):
@@ -126,6 +221,10 @@ func _reconstruct_from_snapshot(snapshot: Dictionary):
 		hull.free()
 	hull = null
 	clipping_detected = false
+	
+	if keep_armor:
+		snapshot["armor"] = current_armor_dict
+		
 	hull = bm.reconstruct_vehicle(snapshot, self, true)
 	get_tree().call_group("stat_ui", "update_stats", hull)
 	get_tree().call_group("stat_ui", "sync_hull_ui", hull)

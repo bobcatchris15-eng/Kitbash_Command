@@ -182,7 +182,7 @@ func _missile_tick(delta: float) -> void:
 			_phase = 1
 			return
 	else:
-		dest = target.global_position + Vector3(0, 0.5, 0)
+		dest = target.get_nearest_surface_point(global_position) if target.has_method("get_nearest_surface_point") else target.global_position + Vector3(0, 0.5, 0)
 		if salvo_jitter > 0.0:
 			# A little sinusoidal weave, decaying near impact so it still hits
 			var dist = global_position.distance_to(dest)
@@ -195,14 +195,15 @@ func _missile_tick(delta: float) -> void:
 	var eff_speed = speed * 1.35 if (target and target.has_meta("is_laser_painted") and target.get_meta("is_laser_painted")) else speed
 	global_position += dir * eff_speed * delta
 
-	if _phase == 1 and global_position.distance_to(target.global_position + Vector3(0, 0.5, 0)) < 1.1:
+	var target_surf: Vector3 = target.get_nearest_surface_point(global_position) if (target and target.has_method("get_nearest_surface_point")) else (target.global_position + Vector3(0, 0.5, 0) if is_instance_valid(target) else global_position)
+	if _phase == 1 and global_position.distance_to(target_surf) < 1.1:
 		# Raycast from behind the missile toward the target to find the hull
 		# skin contact point. By the time the distance check triggers the
 		# missile may have penetrated past the outer surface into the mesh
 		# volume, so using the missile's own position would place the
 		# explosion inside the target rather than on its armour.
 		_impact_pos = global_position
-		var target_center = target.global_position + Vector3(0, 0.5, 0)
+		var target_center = target_surf
 		var to_target = target_center - global_position
 		var dist = to_target.length()
 		if dist > 0.01 and is_inside_tree():

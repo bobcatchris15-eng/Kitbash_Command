@@ -109,6 +109,7 @@ var _reacquire_timer: float = 0.0
 const REACQUIRE_INTERVAL: float = 0.2
 var _fog_scan_timer: float = 0.0
 const FOG_SCAN_INTERVAL: float = 1.8   # seconds between fog scans
+var _active_drones: Array = []
 
 # Heavy Barrier Projector (Aegis Field) state
 var barrier_max_hp: float = 600.0
@@ -406,6 +407,42 @@ func _is_light_target(t: Node3D) -> bool:
 		return true
 	return false
 
+func _aim_point(tgt: Node3D) -> Vector3:
+	if not is_instance_valid(tgt):
+		return global_position
+	if tgt.has_method("get_nearest_surface_point"):
+		var muzzle_pos: Vector3 = get_muzzle_world_pos()
+		return tgt.get_nearest_surface_point(muzzle_pos)
+	if "visual_aabb" in tgt and tgt.visual_aabb is AABB and tgt.visual_aabb.size != Vector3.ZERO:
+		var inv_xf: Transform3D = tgt.global_transform.affine_inverse()
+		var local_p: Vector3 = inv_xf * get_muzzle_world_pos()
+		var aabb: AABB = tgt.visual_aabb
+		var clamped_local := Vector3(
+			clampf(local_p.x, aabb.position.x, aabb.position.x + aabb.size.x),
+			clampf(local_p.y, aabb.position.y, aabb.position.y + aabb.size.y),
+			clampf(local_p.z, aabb.position.z, aabb.position.z + aabb.size.z)
+		)
+		return tgt.global_transform * clamped_local
+	return tgt.global_position
+
+func _distance_to_target(tgt: Node3D) -> float:
+	if not is_instance_valid(tgt):
+		return INF
+	if tgt.has_method("get_nearest_surface_point"):
+		var surf_p: Vector3 = tgt.get_nearest_surface_point(global_position)
+		return global_position.distance_to(surf_p)
+	if "visual_aabb" in tgt and tgt.visual_aabb is AABB and tgt.visual_aabb.size != Vector3.ZERO:
+		var inv_xf: Transform3D = tgt.global_transform.affine_inverse()
+		var local_p: Vector3 = inv_xf * global_position
+		var aabb: AABB = tgt.visual_aabb
+		var clamped_local := Vector3(
+			clampf(local_p.x, aabb.position.x, aabb.position.x + aabb.size.x),
+			clampf(local_p.y, aabb.position.y, aabb.position.y + aabb.size.y),
+			clampf(local_p.z, aabb.position.z, aabb.position.z + aabb.size.z)
+		)
+		return global_position.distance_to(tgt.global_transform * clamped_local)
+	return global_position.distance_to(tgt.global_position)
+
 # Real AoE (FABLE_REVIEW.md 2.3) - the other missing leg of the counter-
 # triangle ("AoE beats swarm"). A shared radius query around an impact
 # point, called from the explosive weapons' hit callbacks instead of their
@@ -437,7 +474,8 @@ func _deal_aoe_damage(center: Vector3, radius: float, amount: float):
 		var c_team = c.get_meta("team") if c.has_meta("team") else -1
 		if my_team >= 0 and c_team == my_team:
 			continue
-		var dist = center.distance_to(c.global_position)
+		var target_pt: Vector3 = c.get_nearest_surface_point(center) if c.has_method("get_nearest_surface_point") else c.global_position
+		var dist = center.distance_to(target_pt)
 		if dist > radius:
 			continue
 		var falloff = clamp(1.0 - (dist / radius), 0.0, 1.0)
@@ -521,6 +559,20 @@ func get_vehicle_root() -> Node3D:
 		p = p.get_parent()
 	return null
 
+func get_muzzle_local_pos() -> Vector3:
+	var b_len := 1.0
+	if has_meta("module_data"):
+		var m_data = get_meta("module_data")
+		if m_data and m_data.tweaks:
+			b_len = float(m_data.tweaks.get("barrel_length", 1.0))
+	return Vector3(muzzle_offset.x * _caliber, muzzle_offset.y * _caliber, muzzle_offset.z * _caliber * b_len)
+
+func get_muzzle_world_pos() -> Vector3:
+	return global_transform * get_muzzle_local_pos()
+
+func get_muzzle_local_dir() -> Vector3:
+	return ModuleCatalog.get_muzzle_direction(type_id)
+
 # Team of the construct this weapon is mounted on (-1 = legacy test range, no team)
 func get_team() -> int:
 	var root_vehicle = get_vehicle_root()
@@ -598,7 +650,7 @@ func _is_los_blocked_to(candidate: Node3D) -> bool:
 	# bolted to.
 	var muzzle_up = global_transform.basis.y.normalized()
 	var ray_start = global_position + muzzle_up * _los_height_offset + muzzle_forward * 0.8
-	var ray_end = candidate.global_position + Vector3(0, 1.25, 0) # target center (elevated to match hull center and avoid ground grazing)
+	var ray_end = _aim_point(candidate)
 
 	var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
 	# Ground/obstacles (1), Modules (2), Buildings (8), Smoke (32) - not
@@ -993,11 +1045,7 @@ func _tick_weapon(delta):
 	_update_flame_jet()
 
 	if target and is_instance_valid(target):
-		var target_pos = target.global_position
-		# Target center height
-		if target.is_in_group("targets") or target.is_in_group("player_vehicle"):
-			target_pos += Vector3(0, 0.5, 0)
-			
+		var target_pos = _aim_point(target)
 		var dir_to_target = (target_pos - global_position).normalized()
 
 		# frame_built (traverse_limit_angle == 0): the barrel is fixed
@@ -1161,9 +1209,9 @@ func _is_current_target_still_valid(resting_forward: Vector3) -> bool:
 				return false
 			if not _team_can_see(target):
 				return false
-	if global_position.distance_to(target.global_position) > fire_range:
+	if _distance_to_target(target) > fire_range:
 		return false
-	var dir = (target.global_position - global_position).normalized()
+	var dir = (_aim_point(target) - global_position).normalized()
 	if not _can_aim_at(resting_forward, dir):
 		return false
 	# Stop clinging to something our own hull is standing in front of -
@@ -1182,9 +1230,9 @@ func _is_current_target_still_valid(resting_forward: Vector3) -> bool:
 		elif "target" in root_vehicle and root_vehicle.target is Node3D:
 			unit_target = root_vehicle.target
 		if is_instance_valid(unit_target) and target != unit_target and not ("is_dead" in unit_target and unit_target.is_dead):
-			var u_dist := global_position.distance_to(unit_target.global_position)
+			var u_dist := _distance_to_target(unit_target)
 			if u_dist <= fire_range and _team_can_see(unit_target):
-				var u_dir := (unit_target.global_position - global_position).normalized()
+				var u_dir := (_aim_point(unit_target) - global_position).normalized()
 				if _can_aim_at(resting_forward, u_dir) and not _is_los_blocked_cached(unit_target):
 					return false
 
@@ -1277,6 +1325,16 @@ func _find_nearest_target(delta: float = -1.0):
 		_scan_fog_and_fire_beacon(delta)
 		return
 
+	# drone_carrier in scout mode continuously deploys and orbits scout drones
+	# around the carrier unit without requiring combat targets.
+	if type_id == "drone_carrier":
+		var m_data = get_meta("module_data") if has_meta("module_data") else null
+		var d_type = m_data.tweaks.get("drone_type", "attack") if m_data else "attack"
+		if d_type == "scout":
+			target = null
+			_tick_scout_drones(delta)
+			return
+
 	var resting_forward = get_parent().global_transform.basis * resting_transform.basis * Vector3.FORWARD
 
 	if _is_current_target_still_valid(resting_forward):
@@ -1309,9 +1367,9 @@ func _find_nearest_target(delta: float = -1.0):
 				if not _teams_allied(c_team, my_team): continue
 				if "is_dead" in c and c.is_dead: continue
 				if not ("hp" in c and "max_hp" in c) or c.hp >= c.max_hp: continue
-				var dist = global_position.distance_to(c.global_position)
+				var dist = _distance_to_target(c)
 				if dist < closest_ally_dist:
-					var dir = (c.global_position - global_position).normalized()
+					var dir = (_aim_point(c) - global_position).normalized()
 					if _can_aim_at(resting_forward, dir):
 						closest_ally = c
 						closest_ally_dist = dist
@@ -1326,9 +1384,9 @@ func _find_nearest_target(delta: float = -1.0):
 				if not is_instance_valid(m): continue
 				var m_team = m.get_meta("team") if m.has_meta("team") else -1
 				if _teams_allied(m_team, my_team): continue
-				var dist_m = global_position.distance_to(m.global_position)
+				var dist_m = _distance_to_target(m)
 				if dist_m < closest_m_dist:
-					var dir_m = (m.global_position - global_position).normalized()
+					var dir_m = (_aim_point(m) - global_position).normalized()
 					if _can_aim_at(resting_forward, dir_m):
 						closest_m = m
 						closest_m_dist = dist_m
@@ -1349,9 +1407,9 @@ func _find_nearest_target(delta: float = -1.0):
 				if is_instance_valid(unit_target) and not ("is_dead" in unit_target and unit_target.is_dead):
 					var u_team = unit_target.get_meta("team") if unit_target.has_meta("team") else -1
 					if not _teams_allied(u_team, my_team) and _team_can_see(unit_target):
-						var u_dist := global_position.distance_to(unit_target.global_position)
+						var u_dist := _distance_to_target(unit_target)
 						if u_dist <= fire_range:
-							var u_dir := (unit_target.global_position - global_position).normalized()
+							var u_dir := (_aim_point(unit_target) - global_position).normalized()
 							if _can_aim_at(resting_forward, u_dir) and not _is_los_blocked_to(unit_target):
 								target = unit_target
 								return
@@ -1366,9 +1424,9 @@ func _find_nearest_target(delta: float = -1.0):
 			if is_instance_valid(unit_target) and not ("is_dead" in unit_target and unit_target.is_dead):
 				var u_team = unit_target.get_meta("team") if unit_target.has_meta("team") else -1
 				if not _teams_allied(u_team, my_team) and _team_can_see(unit_target):
-					var u_dist := global_position.distance_to(unit_target.global_position)
+					var u_dist := _distance_to_target(unit_target)
 					if u_dist <= fire_range:
-						var u_dir := (unit_target.global_position - global_position).normalized()
+						var u_dir := (_aim_point(unit_target) - global_position).normalized()
 						if _can_aim_at(resting_forward, u_dir) and not _is_los_blocked_to(unit_target):
 							target = unit_target
 							return
@@ -1387,9 +1445,9 @@ func _find_nearest_target(delta: float = -1.0):
 			# units on opposite sides of the field, which is the only reason
 			# a T5 weapon reaching 4x its own vision is usable at all.
 			if not _team_can_see(c): continue
-			var dist = global_position.distance_to(c.global_position)
+			var dist = _distance_to_target(c)
 			if dist < closest_c_dist:
-				var dir = (c.global_position - global_position).normalized()
+				var dir = (_aim_point(c) - global_position).normalized()
 				if _can_aim_at(resting_forward, dir) and not _is_los_blocked_to(c):
 					closest_c = c
 					closest_c_dist = dist
@@ -1403,9 +1461,9 @@ func _find_nearest_target(delta: float = -1.0):
 		var closest_dist: float = fire_range
 		for m in missiles:
 			if is_instance_valid(m):
-				var dist = global_position.distance_to(m.global_position)
+				var dist = _distance_to_target(m)
 				if dist < closest_dist:
-					var dir = (m.global_position - global_position).normalized()
+					var dir = (_aim_point(m) - global_position).normalized()
 					if _can_aim_at(resting_forward, dir):
 						closest = m
 						closest_dist = dist
@@ -1420,9 +1478,9 @@ func _find_nearest_target(delta: float = -1.0):
 	if root_vehicle and root_vehicle.is_in_group("targets"):
 		var player = get_tree().get_first_node_in_group("player_vehicle")
 		if player and is_instance_valid(player) and not player.is_dead:
-			var dist = global_position.distance_to(player.global_position)
+			var dist = _distance_to_target(player)
 			if dist < fire_range:
-				var dir = (player.global_position - global_position).normalized()
+				var dir = (_aim_point(player) - global_position).normalized()
 				if _can_aim_at(resting_forward, dir):
 					target = player
 					return
@@ -1436,9 +1494,9 @@ func _find_nearest_target(delta: float = -1.0):
 		if is_instance_valid(t) and t.has_method("take_damage"):
 			if "health" in t and t.health <= 0.0:
 				continue
-			var dist = global_position.distance_to(t.global_position)
+			var dist = _distance_to_target(t)
 			if dist < closest_dist:
-				var dir = (t.global_position - global_position).normalized()
+				var dir = (_aim_point(t) - global_position).normalized()
 				if _can_aim_at(resting_forward, dir) and not _is_los_blocked_to(t):
 					closest = t
 					closest_dist = dist
@@ -1453,14 +1511,15 @@ func _fire_at_target():
 		return
 		
 	# Spawn a directional muzzle flash (except for silent lasers/beams/harvester/welder).
-	# Flash position is per-weapon from ModuleCatalog.MUZZLE_OFFSETS, scaled by caliber.
-	# Directional cone emission sprays particles forward along the barrel axis.
+	# Flash position is per-weapon from ModuleCatalog.MUZZLE_OFFSETS, scaled by caliber and barrel length.
+	# Directional cone emission sprays particles forward along the local barrel axis.
 	# OmniLight pop is sized by caliber for visibility at RTS zoom.
 	if not type_id in ["heavy_laser", "pd_laser", "resource_harvester", "repair_array"]:
-		var flash_pos = muzzle_offset * Vector3(_caliber, _caliber, _caliber)
+		var flash_pos = get_muzzle_local_pos()
+		var flash_dir = get_muzzle_local_dir()
 		var light_r = 3.0 + _caliber * 3.0
 		var light_e = 4.0 + _caliber * 3.0
-		VFXEffects.muzzle_flash(self, flash_pos, -global_transform.basis.z, _caliber, laser_color, laser_color, light_r, light_e)
+		VFXEffects.muzzle_flash(self, flash_pos, flash_dir, _caliber, laser_color, laser_color, light_r, light_e)
 
 	# Each weapon family gets its own vocalised ordnance report. Empty string
 	# means a non-firing module (sensor, booster) - no report at all. Keys map
@@ -1569,13 +1628,45 @@ func _fire_at_target():
 
 func _fire_pd_at_missile():
 	if type_id == "pd_laser":
-		var beam = MeshInstance3D.new()
-		beam.mesh = MunitionPool.unit_cylinder()
-		beam.material_override = MunitionPool.emissive(Color.LIGHT_CORAL, Color.RED)
-		_effects_parent().add_child(beam)
-		MunitionPool.aim_beam(beam, global_position, target.global_position, 0.04)
+		var start_pos = global_position
+		var end_pos = _aim_point(target)
+		var parent = _effects_parent()
+
+		var laser = MeshInstance3D.new()
+		laser.mesh = MunitionPool.unit_cylinder()
+		laser.material_override = MunitionPool.emissive(Color.WHITE, Color.WHITE, 2.0)
+		parent.add_child(laser)
+		MunitionPool.aim_beam(laser, start_pos, end_pos, 0.04)
+
+		var glow = MeshInstance3D.new()
+		glow.mesh = MunitionPool.unit_cylinder()
+		glow.material_override = MunitionPool.additive_emissive(Color(Color.LIGHT_CORAL, 0.35), Color.RED, 1.2)
+		parent.add_child(glow)
+		MunitionPool.aim_beam(glow, start_pos, end_pos, 0.2)
+		
+		# Small vapor rings
+		var dir = (end_pos - start_pos).normalized()
+		var rings = []
+		if dir.length_squared() > 0.0:
+			for i in range(2):
+				var ring = MeshInstance3D.new()
+				ring.mesh = MunitionPool.unit_cylinder()
+				ring.material_override = MunitionPool.additive_emissive(Color(Color.LIGHT_CORAL, 0.35), Color.RED, 1.0)
+				parent.add_child(ring)
+				var t = float(i + 1) / 3.0
+				var ring_pos = start_pos.lerp(end_pos, t)
+				MunitionPool.aim_beam(ring, ring_pos - dir * 0.015, ring_pos + dir * 0.015, 0.05)
+				var rt = create_tween()
+				rt.tween_property(ring, "scale", Vector3(0.6, 0.03, 0.6), 0.12)
+				rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
+		
 		var timer = get_tree().create_timer(0.08)
-		timer.timeout.connect(func(): if is_instance_valid(beam): beam.queue_free())
+		timer.timeout.connect(func(): 
+			if is_instance_valid(laser): laser.queue_free()
+			if is_instance_valid(glow): glow.queue_free()
+		)
+		
+		target.apply_damage(dps * fire_rate)
 		
 	if target.has_method("destroy_missile"):
 		target.destroy_missile(true)
@@ -1590,14 +1681,24 @@ func _fire_kinetic_projectile(radius: float, length: float, duration: float, col
 	if profile.get("streak", false):
 		radius *= 0.45
 		length *= 1.3
-	var energy := 1.6 if profile.get("streak", false) else 1.0
+	
+	radius *= 1.5 # Punch up all tracers
+	var energy := 2.5 if profile.get("streak", false) else 2.0
+	
 	var tracer = MeshInstance3D.new()
 	tracer.mesh = MunitionPool.unit_cylinder()
-	tracer.material_override = MunitionPool.emissive(color, color, energy)
+	# Intense white/colored core
+	tracer.material_override = MunitionPool.emissive(Color.WHITE, color, energy * 2.0)
 	_effects_parent().add_child(tracer)
+	
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_cylinder()
+	glow.material_override = MunitionPool.additive_emissive(Color(color, 0.35), color, energy)
+	glow.scale = Vector3(2.5, 1.2, 2.5)
+	tracer.add_child(glow)
 
-	var start = global_position + Vector3(0, 0.4, 0)
-	var end = target.global_position if is_instance_valid(target) else start + (-global_transform.basis.z * 20.0)
+	var start = get_muzzle_world_pos()
+	var end = _aim_point(target) if is_instance_valid(target) else start + (-global_transform.basis.z * 20.0)
 	var delta = end - start
 	var dir_len = delta.length()
 	if dir_len > 0.001:
@@ -1643,7 +1744,7 @@ func _spawn_flight_mote(pos: Vector3, color: Color, size: float, delay: float):
 		var mote = MeshInstance3D.new()
 		mote.mesh = MunitionPool.unit_sphere()
 		mote.scale = Vector3.ONE * size
-		mote.material_override = MunitionPool.alpha_emissive(Color(color.r, color.g, color.b, 0.55), color, 0.8)
+		mote.material_override = MunitionPool.additive_emissive(Color(color.r, color.g, color.b, 0.55), color, 0.8)
 		scene.add_child(mote)
 		mote.global_position = pos
 		var mt = mote.create_tween()
@@ -1684,44 +1785,60 @@ func _make_round_body(kind: String, radius: float, colour: Color) -> Node3D:
 	return pivot
 
 func _fire_railgun_beam():
-	var beam = MeshInstance3D.new()
-	beam.mesh = MunitionPool.unit_cylinder()
-	beam.material_override = MunitionPool.emissive(Color.BLUE_VIOLET, Color.BLUE_VIOLET)
-	_effects_parent().add_child(beam)
+	var parent = _effects_parent()
+	if parent == null: return
+	
+	var start_pos = get_muzzle_world_pos()
+	var end_pos = _aim_point(target)
+	
+	# Intense core
+	var core = MeshInstance3D.new()
+	core.mesh = MunitionPool.unit_cylinder()
+	core.material_override = MunitionPool.emissive(Color.WHITE, Color.WHITE, 4.0)
+	parent.add_child(core)
+	var beam_len = MunitionPool.aim_beam(core, start_pos, end_pos, 0.22)
+	
+	# Thick outer glow
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_cylinder()
+	glow.material_override = MunitionPool.additive_emissive(Color(Color.BLUE_VIOLET, 0.35), Color.CYAN, 2.0)
+	parent.add_child(glow)
+	MunitionPool.aim_beam(glow, start_pos, end_pos, 0.55)
 
-	var beam_len = MunitionPool.aim_beam(beam, global_position, target.global_position, 0.06)
-
-	for i in range(4):
+	# Sparks along the path
+	for i in range(6):
 		var spark = MeshInstance3D.new()
 		spark.mesh = MunitionPool.unit_sphere()
-		spark.scale = Vector3(0.3, 0.3, 0.3)
-		spark.material_override = MunitionPool.emissive(Color.CYAN, Color.CYAN)
-		_effects_parent().add_child(spark)
+		spark.scale = Vector3(0.5, 0.5, 0.5)
+		spark.material_override = MunitionPool.emissive(Color.WHITE, Color.CYAN, 2.0)
+		parent.add_child(spark)
 
 		var pct = randf()
-		spark.global_position = global_position.lerp(target.global_position, pct) + Vector3(randf_range(-0.2, 0.2), randf_range(-0.2, 0.2), randf_range(-0.2, 0.2))
+		spark.global_position = start_pos.lerp(end_pos, pct) + Vector3(randf_range(-0.4, 0.4), randf_range(-0.4, 0.4), randf_range(-0.4, 0.4))
 		
 		var stween = create_tween()
-		stween.tween_property(spark, "scale", Vector3.ZERO, 0.1)
+		stween.tween_property(spark, "scale", Vector3.ZERO, 0.15)
 		stween.finished.connect(func(): spark.queue_free())
 		
 	if is_instance_valid(target):
 		_deal_weapon_damage(target, dps * fire_rate)
-		_spawn_explosion_visual(target.global_position, 0.6, Color.BLUE_VIOLET)
-
-	# Collapses the beam's radius while holding its length - the y component
-	# used to be a literal 1.0 because length lived in the mesh; it now lives
-	# in scale.y, so it has to be preserved explicitly here.
+		_spawn_explosion_visual(end_pos, 0.8, Color.BLUE_VIOLET)
+		
 	var tween = create_tween()
-	tween.tween_property(beam, "scale", Vector3(0.0, beam_len, 0.0), 0.15)
-	tween.finished.connect(func(): beam.queue_free())
+	tween.tween_property(core, "scale", Vector3(0.0, beam_len, 0.0), 0.15)
+	var glow_tween = create_tween()
+	glow_tween.tween_property(glow, "scale", Vector3(0.0, beam_len, 0.0), 0.2)
+	tween.finished.connect(func(): 
+		if is_instance_valid(core): core.queue_free()
+		if is_instance_valid(glow): glow.queue_free()
+	)
 
 func _fire_artillery():
 	var shell = _make_round_body("bomb", 0.4, Color.SADDLE_BROWN)
 	_effects_parent().add_child(shell)
 
-	var start = global_position
-	var end = target.global_position
+	var start = get_muzzle_world_pos()
+	var end = _aim_point(target)
 	var tween = create_tween()
 	var last_pos := [start]
 	var puff_mark := [0.0]
@@ -1729,7 +1846,7 @@ func _fire_artillery():
 		if not is_instance_valid(shell): return
 		var current_target = end
 		if is_instance_valid(target):
-			current_target = target.global_position
+			current_target = _aim_point(target)
 		var pos = start.lerp(current_target, val)
 		pos.y += sin(val * PI) * 12.0
 		shell.global_position = pos
@@ -1765,11 +1882,11 @@ func _fire_mortar_salvo():
 			shell.material_override = MunitionPool.emissive(Color.OLIVE, Color.YELLOW)
 			_effects_parent().add_child(shell)
 			
-			var start = global_position
+			var start = get_muzzle_world_pos()
 			# SIM. `end` is the AoE centre resolved in the tween's finished
 			# handler below, not just where the shell mesh flies - the salvo's
 			# spread is the weapon's accuracy, so it decides what gets hit.
-			var end = target.global_position + SimRNG.scatter_xz(0.5)
+			var end = _aim_point(target) + SimRNG.scatter_xz(0.5)
 			var tween = create_tween()
 			var height = 6.0
 			var callable = func(val: float):
@@ -1822,7 +1939,7 @@ func _spawn_missile(tgt: Node, dmg: float, seconds_to_max: float, is_top: bool =
 	var missile = Node3D.new()
 	missile.set_script(WeaponMissileScene)
 	missile.mesh_part = ModuleCatalog.get_missile_mesh(type_id)
-	missile.position = global_position + Vector3(0, y_offset, 0)
+	missile.position = get_muzzle_world_pos()
 	missile.is_top_attack = is_top
 	missile.speed = _munition_speed(seconds_to_max)
 	missile.setup(tgt, self, dmg, damage_class, get_team())
@@ -1852,7 +1969,7 @@ func _fire_swarm_missiles():
 			# "missiles" group, not a tweened visual - where it starts changes
 			# its flight time and the geometry point defence gets to engage it
 			# at, so the launch offset is part of the simulation.
-			missile.position = global_position + SimRNG.scatter_xz(0.3) + Vector3(0.0, 0.3, 0.0)
+			missile.position = get_muzzle_world_pos() + SimRNG.scatter_xz(0.2)
 			missile.speed = _munition_speed(1.50) # missile_pod: 30 / 20
 			missile.salvo_jitter = 1.2
 			missile.setup(target, self, per_missile_damage, damage_class, get_team())
@@ -1891,8 +2008,8 @@ func _fire_arcing_shell_at(shell_radius: float, arc_height: float, colour: Color
 		shell = ball
 	parent.add_child(shell)
 
-	var start = global_position
-	var end = target.global_position + aim_offset
+	var start = get_muzzle_world_pos()
+	var end = _aim_point(target) + aim_offset
 
 	# Flight time and apex both scale with how far the shell actually has to
 	# travel. `flight_time` and `arc_height` are the values for a shot at
@@ -2005,7 +2122,7 @@ func _fire_hypervelocity_missile():
 			# interceptable missile's start point. Written inline rather than
 			# via scatter_xz() because the ripple offsets the tubes across the
 			# rack only, with no depth component: one draw, not two.
-			m.position = global_position + Vector3(SimRNG.randf_range(-0.15, 0.15), 0.35, 0.0)
+			m.position = get_muzzle_world_pos() + Vector3(SimRNG.randf_range(-0.15, 0.15), 0.0, 0.0)
 			# Roughly three times a normal missile. The whole proposition is
 			# that point defence has very little time to engage it.
 			m.speed = _munition_speed(0.55) # hypervelocity: 26 / 48
@@ -2104,7 +2221,7 @@ const AA_FLAK_RADIUS: float = 2.8
 func _fire_aa_autocannon():
 	_fire_kinetic_projectile(0.035, 0.40, 0.10, laser_color, true)
 	if is_instance_valid(target) and _target_is_airborne(target):
-		_deal_aoe_damage(target.global_position, AA_FLAK_RADIUS, dps * fire_rate)
+		_deal_aoe_damage(_aim_point(target), AA_FLAK_RADIUS, dps * fire_rate)
 
 # Sensor beacon: lobs a beacon that reveals fog where it lands. Reuses
 # skirmish.reveal_area(), the same beacon system illumination ammo uses.
@@ -2168,7 +2285,7 @@ func _fire_sensor_beacon_toward(fog_point: Vector3):
 	beacon.material_override = MunitionPool.emissive(laser_color, laser_color, 1.2)
 	beacon.scale = Vector3.ONE * 0.18
 	parent.add_child(beacon)
-	var start = global_position
+	var start = get_muzzle_world_pos()
 	var tween = create_tween()
 	tween.tween_method(func(v: float):
 		if not is_instance_valid(beacon):
@@ -2197,6 +2314,74 @@ func _fire_sensor_beacon_launcher():
 	BattleLogger.beacon_fired(_carrier_name, aim)
 	_fire_sensor_beacon_toward(aim)
 
+func _tick_scout_drones(_delta: float):
+	var alive_drones: Array = []
+	for d in _active_drones:
+		if is_instance_valid(d) and not ("is_destroyed" in d and d.is_destroyed):
+			alive_drones.append(d)
+	_active_drones = alive_drones
+
+	var hangar_size := 2
+	var drone_speed := 18.0
+	if has_meta("module_data"):
+		var data = get_meta("module_data")
+		hangar_size = int(data.tweaks.get("hangar_size", 2.0))
+		var profile = ModuleCatalog.get_drone_profile("scout")
+		drone_speed = profile.get("speed", 18.0)
+	hangar_size = max(1, hangar_size)
+
+	if _active_drones.is_empty():
+		# Launch full initial complement on deployment
+		for i in range(hangar_size):
+			_launch_scout_drone(hangar_size, drone_speed)
+		time_since_last_shot = 0.0
+	elif _active_drones.size() < hangar_size:
+		# Replace destroyed drones one by one on fire_rate cooldown
+		if time_since_last_shot >= fire_rate:
+			time_since_last_shot = 0.0
+			_launch_scout_drone(hangar_size, drone_speed)
+
+func _launch_scout_drone(hangar_size: int, drone_speed: float):
+	var vehicle_root = get_vehicle_root()
+	var carrier = vehicle_root if is_instance_valid(vehicle_root) else self
+	var my_team = get_team()
+
+	var used_slots: Array = []
+	for d in _active_drones:
+		if is_instance_valid(d) and "slot_index" in d:
+			used_slots.append(d.slot_index)
+	var free_slot = 0
+	for s in range(hangar_size):
+		if not used_slots.has(s):
+			free_slot = s
+			break
+
+	var drone = Node3D.new()
+	drone.set_script(load("res://scripts/drone_unit.gd"))
+	_effects_parent().add_child(drone)
+	drone.global_position = global_position + SimRNG.scatter_xz(0.5) + Vector3(0.0, 1.0, 0.0)
+	drone.carrier = carrier
+	drone.target = null
+	drone.drone_type = "scout"
+	drone.speed = drone_speed
+	drone.team = my_team
+	drone.slot_index = free_slot
+	_active_drones.append(drone)
+	if is_instance_valid(carrier):
+		var scouts: Array = []
+		if carrier.has_meta("scout_drones"):
+			var raw = carrier.get_meta("scout_drones")
+			if raw is Array:
+				for d in raw:
+					if is_instance_valid(d) and not ("is_destroyed" in d and d.is_destroyed):
+						scouts.append(d)
+		if not scouts.has(drone):
+			scouts.append(drone)
+		carrier.set_meta("scout_drones", scouts)
+
+	BattleLogger.drone_launched(
+		String(carrier.name) if is_instance_valid(carrier) else "?", "scout", 1)
+
 func _fire_drone_swarm():
 	# Real autonomous drones (drone_unit.gd), not tweened throwaway meshes -
 	# see ENERGY_AND_BALANCE_SPEC.md #3. Count driven by the "Hangar Size"
@@ -2212,6 +2397,11 @@ func _fire_drone_swarm():
 		var profile = ModuleCatalog.get_drone_profile(drone_type)
 		drone_speed = profile.get("speed", 14.0)
 	count = max(1, count)
+
+	if drone_type == "scout":
+		_tick_scout_drones(0.0)
+		return
+
 	var per_drone_damage = (dps * fire_rate) / count
 	var my_team = get_team()
 	var vehicle_root = get_vehicle_root()
@@ -2244,6 +2434,9 @@ func _fire_drone_swarm():
 		drone.damage_per_hit = per_drone_damage
 		drone.damage_class = damage_class
 		drone.team = my_team
+		drone.slot_index = i
+		drone.orbit_angle_offset = float(i) * (TAU / float(count))
+		_active_drones.append(drone)
 
 func _fire_cluster_dispenser():
 	# Housing recoil animation
@@ -2297,7 +2490,7 @@ func _fire_cluster_dispenser():
 			# `scatter_dest` below, which is computed from `end` and never from
 			# `start`. Moving the canister's muzzle jitter cannot move a hit.
 			var start = global_position + Vector3(randf_range(-0.1, 0.1), 0.3, randf_range(-0.1, 0.1))
-			var end = target.global_position
+			var end = _aim_point(target)
 			canister.global_position = start
 			canister.scale = Vector3(payload_size, payload_size, payload_size)
 			canister.look_at(end, Vector3.UP)
@@ -2476,7 +2669,7 @@ func _fire_flame_spray():
 	# Damage timing is preserved EXACTLY as it was: one application per shot,
 	# delayed by the same flight duration the old tween used, guarded by the
 	# same is_instance_valid(target) check. Only the visual changed here, so
-	# flamethrower DPS and its feel in combat are untouched.
+				# flamethrower DPS and its feel in combat are untouched.
 	var flight_dur = 0.35 * p_valve
 	var victim = target
 	get_tree().create_timer(flight_dur).timeout.connect(func():
@@ -2484,18 +2677,53 @@ func _fire_flame_spray():
 			_deal_weapon_damage(victim, dps * fire_rate))
 
 func _fire_continuous_beam():
-	var beam = MeshInstance3D.new()
-	beam.mesh = MunitionPool.unit_cylinder()
-	beam.material_override = MunitionPool.emissive(laser_color, laser_color)
-	_effects_parent().add_child(beam)
+	var parent = _effects_parent()
+	if parent == null: return
+	
+	var start_pos = get_muzzle_world_pos()
+	var end_pos = _aim_point(target)
+	
+	# Intense core
+	var core = MeshInstance3D.new()
+	core.mesh = MunitionPool.unit_cylinder()
+	core.material_override = MunitionPool.emissive(Color.WHITE, Color.WHITE, 3.0)
+	parent.add_child(core)
+	MunitionPool.aim_beam(core, start_pos, end_pos, 0.2)
 
-	MunitionPool.aim_beam(beam, global_position, target.global_position, 0.08)
+	# Glowing outer beam
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_cylinder()
+	glow.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 1.5)
+	parent.add_child(glow)
+	MunitionPool.aim_beam(glow, start_pos, end_pos, 0.55)
+
+	# Vapor rings along the continuous beam
+	var distance = start_pos.distance_to(end_pos)
+	var ring_count = int(clamp(distance / 5.0, 3.0, 8.0))
+	var dir = (end_pos - start_pos).normalized()
+	if dir.length_squared() > 0.0:
+		for i in range(ring_count):
+			var ring = MeshInstance3D.new()
+			ring.mesh = MunitionPool.unit_cylinder()
+			ring.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 1.2)
+			parent.add_child(ring)
+			
+			var t = float(i + 1) / float(ring_count + 1)
+			var ring_pos = start_pos.lerp(end_pos, t)
+			MunitionPool.aim_beam(ring, ring_pos - dir * 0.025, ring_pos + dir * 0.025, 0.1)
+			
+			var rt = create_tween()
+			rt.tween_property(ring, "scale", Vector3(1.5, 0.05, 1.5), 0.15)
+			rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
 
 	if is_instance_valid(target):
 		_deal_weapon_damage(target, dps * fire_rate)
 
 	var timer = get_tree().create_timer(0.06)
-	timer.timeout.connect(func(): if is_instance_valid(beam): beam.queue_free())
+	timer.timeout.connect(func(): 
+		if is_instance_valid(core): core.queue_free()
+		if is_instance_valid(glow): glow.queue_free()
+	)
 
 func _fire_plasma_lobber():
 	var plasma = MeshInstance3D.new()
@@ -2504,8 +2732,8 @@ func _fire_plasma_lobber():
 	plasma.material_override = MunitionPool.emissive(Color.MEDIUM_SPRING_GREEN, Color.MEDIUM_SPRING_GREEN)
 	_effects_parent().add_child(plasma)
 	
-	var start = global_position
-	var end = target.global_position
+	var start = get_muzzle_world_pos()
+	var end = _aim_point(target)
 	var tween = create_tween()
 	var callable = func(val: float):
 		if not is_instance_valid(plasma): return
@@ -2539,8 +2767,8 @@ func _fire_flak_cannon():
 	shell.material_override = MunitionPool.emissive(Color.DARK_GOLDENROD, Color.GOLD)
 	_effects_parent().add_child(shell)
 	
-	var start = global_position
-	var end = target.global_position
+	var start = get_muzzle_world_pos()
+	var end = _aim_point(target)
 	var detonate_pos = start.lerp(end, 0.85)
 	
 	var tween = create_tween()
@@ -2576,8 +2804,8 @@ func _fire_grenade_launcher():
 	if parent == null: return
 	parent.add_child(grenade)
 
-	var start = global_position + Vector3(0, 0.35, 0)
-	var end = target.global_position
+	var start = get_muzzle_world_pos()
+	var end = _aim_point(target)
 	var tween = create_tween()
 	var callable = func(val: float):
 		if not is_instance_valid(grenade): return
@@ -2626,7 +2854,8 @@ func _fire_recoilless_rifle():
 			continue
 		if "is_dead" in c and c.is_dead:
 			continue
-		var to_c = c.global_position - blast_origin
+		var c_pos: Vector3 = c.get_nearest_surface_point(blast_origin) if c.has_method("get_nearest_surface_point") else c.global_position
+		var to_c = c_pos - blast_origin
 		var dist = to_c.length()
 		if dist > BACKBLAST_RANGE or dist < 0.01:
 			continue
@@ -2661,9 +2890,8 @@ func _fire_anti_materiel_rifle():
 
 	_fire_kinetic_projectile(0.045, 0.85, 0.10, laser_color, false)
 
-	var muzzle_forward = -global_transform.basis.z.normalized()
+	var muzzle_pos = get_muzzle_world_pos()
 	var muzzle_right = global_transform.basis.x.normalized()
-	var muzzle_pos = global_position + muzzle_forward * MUZZLE_STANDOFF
 
 	# Brake blast: two side jets, which is exactly what a big muzzle
 	# brake does and what makes it read as one at a glance.
@@ -2693,33 +2921,51 @@ func _fire_coil_gun():
 	var parent = _effects_parent()
 	if parent == null: return
 
+	var start_pos = get_muzzle_world_pos()
+	var end_pos = _aim_point(target)
 	var muzzle_forward = -global_transform.basis.z.normalized()
-	for i in range(4):
+	
+	# Magnetic accelerator rings bursting from the muzzle
+	for i in range(5):
 		var ring = MeshInstance3D.new()
-		ring.mesh = MunitionPool.unit_sphere()
-		ring.scale = Vector3(0.18, 0.18, 0.18)
-		ring.material_override = MunitionPool.emissive(laser_color, laser_color, 1.6)
+		ring.mesh = MunitionPool.unit_cylinder()
+		ring.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 2.0)
 		parent.add_child(ring)
-		ring.global_position = global_position + muzzle_forward * (0.3 + i * 0.45)
+		var ring_pos = start_pos + muzzle_forward * (0.2 + i * 0.6)
+		MunitionPool.aim_beam(ring, ring_pos - muzzle_forward * 0.02, ring_pos + muzzle_forward * 0.02, 0.1)
+		
+		# Animate ring expanding and fading rapidly
 		var rt = create_tween()
-		rt.tween_interval(i * 0.015)
-		rt.tween_property(ring, "scale", Vector3.ZERO, 0.09)
+		rt.tween_interval(i * 0.02)
+		rt.tween_property(ring, "scale", Vector3(2.5, 0.05, 2.5), 0.15)
 		rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
 
-	var beam = MeshInstance3D.new()
-	beam.mesh = MunitionPool.unit_cylinder()
-	beam.material_override = MunitionPool.emissive(laser_color, Color.WHITE, 1.4)
-	parent.add_child(beam)
-	var beam_len = MunitionPool.aim_beam(beam, global_position, target.global_position, 0.05)
+	# The main slug trail (intense white core + glowing colored envelope)
+	var core = MeshInstance3D.new()
+	core.mesh = MunitionPool.unit_cylinder()
+	core.material_override = MunitionPool.emissive(Color.WHITE, Color.WHITE, 4.0)
+	parent.add_child(core)
+	var beam_len = MunitionPool.aim_beam(core, start_pos, end_pos, 0.22)
+	
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_cylinder()
+	glow.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 2.5)
+	parent.add_child(glow)
+	MunitionPool.aim_beam(glow, start_pos, end_pos, 0.55)
 
 	if is_instance_valid(target):
-		_apply_ammo_impact(target.global_position)
+		_apply_ammo_impact(end_pos)
 		_deal_weapon_damage(target, dps * fire_rate)
-		_spawn_explosion_visual(target.global_position, 0.4, laser_color)
+		_spawn_explosion_visual(end_pos, 0.8, laser_color)
 
 	var tween = create_tween()
-	tween.tween_property(beam, "scale", Vector3(0.0, beam_len, 0.0), 0.12)
-	tween.finished.connect(func(): if is_instance_valid(beam): beam.queue_free())
+	tween.tween_property(core, "scale", Vector3(0.0, beam_len, 0.0), 0.15)
+	var glow_tween = create_tween()
+	glow_tween.tween_property(glow, "scale", Vector3(0.0, beam_len, 0.0), 0.25)
+	tween.finished.connect(func(): 
+		if is_instance_valid(core): core.queue_free()
+		if is_instance_valid(glow): glow.queue_free()
+	)
 
 # Napalm mortar: a high lob that leaves a large, long-lived burn pool.
 # Reuses the incendiary-ammo pool wholesale rather than growing a parallel
@@ -2734,8 +2980,8 @@ func _fire_napalm_mortar():
 	canister.material_override = MunitionPool.emissive(Color(0.85, 0.4, 0.1), Color(1.0, 0.55, 0.1))
 	parent.add_child(canister)
 
-	var start = global_position
-	var end = target.global_position
+	var start = get_muzzle_world_pos()
+	var end = _aim_point(target)
 	var tween = create_tween()
 	var callable = func(val: float):
 		if not is_instance_valid(canister): return
@@ -2795,7 +3041,7 @@ func _fire_mine_layer():
 		casing.scale = Vector3(0.3, 0.1, 0.3)
 		casing.material_override = MunitionPool.albedo(Color(0.35, 0.33, 0.22))
 		parent.add_child(casing)
-		casing.global_position = global_position + Vector3(0, 0.3, 0)
+		casing.global_position = get_muzzle_world_pos()
 
 		var start = casing.global_position
 		var tween = create_tween()
@@ -2842,7 +3088,7 @@ func _fire_smoke_discharger():
 		_smoke_hp_pct = float(_smoke_carrier.hp) / float(_smoke_carrier.max_hp) * 100.0
 	BattleLogger.smoke_popped(_smoke_carrier_name, _smoke_hp_pct)
 
-	var start = global_position + Vector3(0, 0.4, 0)
+	var start = get_muzzle_world_pos()
 	var aim = target.global_position if is_instance_valid(target) else (start - global_transform.basis.z * fire_range)
 	# The 70% standoff exists to convert "an enemy is over there" into "put
 	# the screen between us". When the aim point is already a deliberate
@@ -2883,36 +3129,94 @@ func _fire_smoke_discharger():
 	)
 
 func _fire_resource_harvester_tether():
-	var tether = MeshInstance3D.new()
-	tether.mesh = MunitionPool.unit_cylinder()
-	tether.material_override = MunitionPool.emissive(Color.GOLD, Color.GOLD)
-	_effects_parent().add_child(tether)
+	var parent = _effects_parent()
+	if parent == null: return
+	
+	var start_pos = global_position
+	var end_pos = _aim_point(target)
+	
+	var core = MeshInstance3D.new()
+	core.mesh = MunitionPool.unit_cylinder()
+	core.material_override = MunitionPool.emissive(Color.WHITE, Color.WHITE, 3.0)
+	parent.add_child(core)
+	var beam_len = MunitionPool.aim_beam(core, start_pos, end_pos, 0.16)
 
-	var tether_len = MunitionPool.aim_beam(tether, global_position, target.global_position, 0.16)
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_cylinder()
+	glow.material_override = MunitionPool.additive_emissive(Color(Color.GOLD, 0.35), Color.ORANGE, 1.5)
+	parent.add_child(glow)
+	MunitionPool.aim_beam(glow, start_pos, end_pos, 0.35)
+
+	# Vapor rings
+	var distance = start_pos.distance_to(end_pos)
+	var ring_count = int(clamp(distance / 5.0, 3.0, 8.0))
+	var dir = (end_pos - start_pos).normalized()
+	if dir.length_squared() > 0.0:
+		for i in range(ring_count):
+			var ring = MeshInstance3D.new()
+			ring.mesh = MunitionPool.unit_cylinder()
+			ring.material_override = MunitionPool.additive_emissive(Color(Color.GOLD, 0.35), Color.ORANGE, 1.2)
+			parent.add_child(ring)
+			var t = float(i + 1) / float(ring_count + 1)
+			var ring_pos = start_pos.lerp(end_pos, t)
+			MunitionPool.aim_beam(ring, ring_pos - dir * 0.025, ring_pos + dir * 0.025, 0.1)
+			var rt = create_tween()
+			rt.tween_property(ring, "scale", Vector3(1.5, 0.05, 1.5), 0.12)
+			rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
 
 	if is_instance_valid(target):
 		_deal_weapon_damage(target, dps * fire_rate)
 
-	# y holds the tether's length now that it is no longer baked into the mesh
-	# (was a literal 1); only the radius collapses.
 	var tween = create_tween()
-	tween.tween_property(tether, "scale", Vector3(0, tether_len, 0), 0.08)
-	tween.finished.connect(func(): tether.queue_free())
+	tween.tween_property(core, "scale", Vector3(0, beam_len, 0), 0.08)
+	var glow_tween = create_tween()
+	glow_tween.tween_property(glow, "scale", Vector3(0, beam_len, 0), 0.08)
+	tween.finished.connect(func(): 
+		if is_instance_valid(core): core.queue_free()
+		if is_instance_valid(glow): glow.queue_free()
+	)
 
 func _fire_repair_array_beam():
-	var beam = MeshInstance3D.new()
-	beam.mesh = MunitionPool.unit_cylinder()
-	beam.material_override = MunitionPool.emissive(Color.CYAN, Color.CYAN)
-	_effects_parent().add_child(beam)
+	var parent = _effects_parent()
+	if parent == null: return
+	
+	var start_pos = global_position
+	var end_pos = _aim_point(target)
+	
+	var core = MeshInstance3D.new()
+	core.mesh = MunitionPool.unit_cylinder()
+	core.material_override = MunitionPool.emissive(Color.WHITE, Color.WHITE, 3.0)
+	parent.add_child(core)
+	var beam_len = MunitionPool.aim_beam(core, start_pos, end_pos, 0.12)
 
-	MunitionPool.aim_beam(beam, global_position, target.global_position, 0.06)
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_cylinder()
+	glow.material_override = MunitionPool.additive_emissive(Color(Color.CYAN, 0.35), Color.CYAN, 1.5)
+	parent.add_child(glow)
+	MunitionPool.aim_beam(glow, start_pos, end_pos, 0.3)
+
+	var distance = start_pos.distance_to(end_pos)
+	var ring_count = int(clamp(distance / 5.0, 3.0, 8.0))
+	var dir = (end_pos - start_pos).normalized()
+	if dir.length_squared() > 0.0:
+		for i in range(ring_count):
+			var ring = MeshInstance3D.new()
+			ring.mesh = MunitionPool.unit_cylinder()
+			ring.material_override = MunitionPool.additive_emissive(Color(Color.CYAN, 0.35), Color.CYAN, 1.2)
+			parent.add_child(ring)
+			var t = float(i + 1) / float(ring_count + 1)
+			var ring_pos = start_pos.lerp(end_pos, t)
+			MunitionPool.aim_beam(ring, ring_pos - dir * 0.025, ring_pos + dir * 0.025, 0.1)
+			var rt = create_tween()
+			rt.tween_property(ring, "scale", Vector3(1.2, 0.05, 1.2), 0.12)
+			rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
 
 	var spark = MeshInstance3D.new()
 	spark.mesh = MunitionPool.unit_sphere()
 	spark.scale = Vector3(0.3, 0.3, 0.3)
 	spark.material_override = MunitionPool.emissive(Color.WHITE, Color.CYAN)
-	_effects_parent().add_child(spark)
-	spark.global_position = target.global_position + Vector3(randf_range(-0.3, 0.3), randf_range(0.2, 0.8), randf_range(-0.3, 0.3))
+	parent.add_child(spark)
+	spark.global_position = end_pos + Vector3(randf_range(-0.3, 0.3), randf_range(0.2, 0.8), randf_range(-0.3, 0.3))
 	var st = create_tween()
 	st.tween_property(spark, "scale", Vector3.ZERO, 0.1)
 	st.finished.connect(func(): spark.queue_free())
@@ -2921,7 +3225,10 @@ func _fire_repair_array_beam():
 		target.repair_hp(heal_rate * fire_rate)
 
 	var timer = get_tree().create_timer(0.08)
-	timer.timeout.connect(func(): if is_instance_valid(beam): beam.queue_free())
+	timer.timeout.connect(func(): 
+		if is_instance_valid(core): core.queue_free()
+		if is_instance_valid(glow): glow.queue_free()
+	)
 
 # --- Energy weapons (ENERGY_AND_BALANCE_SPEC.md #4/#5) ---
 # arc_projector/ion_cannon/microwave_emitter drain the TARGET's current_energy
@@ -2940,7 +3247,8 @@ func _fire_arc_projector():
 	beam.mesh = MunitionPool.unit_taper(0.4)
 	beam.material_override = MunitionPool.emissive(laser_color, laser_color, 2.0)
 	_effects_parent().add_child(beam)
-	MunitionPool.aim_beam(beam, global_position, target.global_position, 0.10)
+	var start_pos = get_muzzle_world_pos()
+	MunitionPool.aim_beam(beam, start_pos, _aim_point(target), 0.10)
 
 	if is_instance_valid(target):
 		_deal_weapon_damage(target, (dps * fire_rate) * 0.2)
@@ -2970,6 +3278,7 @@ func _fire_microwave_emitter():
 	var half_angle = clampf(MICROWAVE_BASE_HALF_ANGLE * aperture, 0.08, 1.1)
 	var forward = -global_transform.basis.z.normalized()
 	var per_shot = dps * fire_rate
+	var start_pos = get_muzzle_world_pos()
 
 	# Everything hostile inside the cone takes the hit, so a tight dish
 	# concentrates on one target and a wide one blankets a formation.
@@ -2983,7 +3292,7 @@ func _fire_microwave_emitter():
 			continue
 		if c.has_meta("team") and my_team != -1 and c.get_meta("team") == my_team:
 			continue
-		var to_c = c.global_position - global_position
+		var to_c = (c.get_nearest_surface_point(global_position) if c.has_method("get_nearest_surface_point") else c.global_position) - global_position
 		var dist = to_c.length()
 		if dist > fire_range or dist < 0.01:
 			continue
@@ -3002,7 +3311,7 @@ func _fire_microwave_emitter():
 		shell.mesh = MunitionPool.unit_sphere()
 		shell.material_override = MunitionPool.alpha(Color(0.95, 0.85, 0.45, 0.20))
 		parent.add_child(shell)
-		shell.global_position = global_position + forward * (fire_range * t * 0.55)
+		shell.global_position = start_pos + forward * (fire_range * t * 0.55)
 		var spread = fire_range * t * 0.55 * tan(half_angle)
 		shell.scale = Vector3(spread, spread, spread * 0.35)
 		var st = create_tween()
@@ -3018,19 +3327,41 @@ func _fire_particle_lance():
 	if parent == null: return
 
 	var forward = -global_transform.basis.z.normalized()
+	var start_pos = get_muzzle_world_pos()
 
 	# The beam itself: a thin, very bright core with a wider halo.
+	var aim = _aim_point(target) if is_instance_valid(target) else start_pos + forward * fire_range
 	for pass_i in range(2):
 		var beam = MeshInstance3D.new()
 		beam.mesh = MunitionPool.unit_cylinder()
 		var col = laser_color if pass_i == 0 else Color(1.0, 1.0, 1.0)
 		beam.material_override = MunitionPool.emissive(col, col, 3.0 if pass_i == 1 else 1.6)
 		parent.add_child(beam)
-		var aim = target.global_position if is_instance_valid(target) else global_position + forward * fire_range
-		MunitionPool.aim_beam(beam, global_position, aim, 0.16 if pass_i == 0 else 0.05)
+		MunitionPool.aim_beam(beam, start_pos, aim, 0.16 if pass_i == 0 else 0.05)
 		var bt = create_tween()
 		bt.tween_property(beam, "scale", Vector3(0.02, beam.scale.y, 0.02), 0.22)
 		bt.finished.connect(func(): if is_instance_valid(beam): beam.queue_free())
+		
+	# Vapor rings along the lance
+	var aim_pos = aim
+	var distance = start_pos.distance_to(aim_pos)
+	var ring_count = int(clamp(distance / 5.0, 3.0, 8.0))
+	var dir = (aim_pos - start_pos).normalized()
+	if dir.length_squared() > 0.0:
+		for i in range(ring_count):
+			var ring = MeshInstance3D.new()
+			ring.mesh = MunitionPool.unit_cylinder()
+			ring.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 1.2)
+			parent.add_child(ring)
+			
+			var t = float(i + 1) / float(ring_count + 1)
+			var ring_pos = start_pos.lerp(aim_pos, t)
+			
+			MunitionPool.aim_beam(ring, ring_pos - dir * 0.025, ring_pos + dir * 0.025, 0.1)
+			
+			var rt = create_tween()
+			rt.tween_property(ring, "scale", Vector3(1.5, 0.05, 1.5), 0.22)
+			rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
 
 	if is_instance_valid(target):
 		_deal_weapon_damage(target, dps * fire_rate)
@@ -3042,7 +3373,7 @@ func _fire_particle_lance():
 	bloom.mesh = MunitionPool.unit_sphere()
 	bloom.material_override = MunitionPool.emissive(laser_color, Color(0.8, 0.95, 1.0), 2.5)
 	parent.add_child(bloom)
-	bloom.global_position = global_position + forward * 1.2
+	bloom.global_position = start_pos
 	bloom.scale = Vector3.ONE * 0.55
 	var blt = create_tween()
 	blt.tween_property(bloom, "scale", Vector3.ZERO, 0.20)
@@ -3051,22 +3382,56 @@ func _fire_particle_lance():
 func _fire_ion_cannon():
 	# The "grounded" energy heavy-hitter - single strong beam, full HP
 	# damage plus a real energy drain alongside it.
-	var beam = MeshInstance3D.new()
-	beam.mesh = MunitionPool.unit_cylinder()
-	beam.material_override = MunitionPool.emissive(laser_color, laser_color, 1.2)
-	_effects_parent().add_child(beam)
-	var beam_len = MunitionPool.aim_beam(beam, global_position, target.global_position, 0.12)
+	var parent = _effects_parent()
+	if parent == null: return
+	
+	var start_pos = get_muzzle_world_pos()
+	var end_pos = _aim_point(target)
+	
+	var core = MeshInstance3D.new()
+	core.mesh = MunitionPool.unit_cylinder()
+	core.material_override = MunitionPool.emissive(Color.WHITE, Color.WHITE, 3.0)
+	parent.add_child(core)
+	var beam_len = MunitionPool.aim_beam(core, start_pos, end_pos, 0.16)
+
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_cylinder()
+	glow.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 1.8)
+	parent.add_child(glow)
+	MunitionPool.aim_beam(glow, start_pos, end_pos, 0.35)
+	
+	# Expanding vapor rings
+	var distance = start_pos.distance_to(end_pos)
+	var ring_count = int(clamp(distance / 5.0, 3.0, 8.0))
+	var dir = (end_pos - start_pos).normalized()
+	if dir.length_squared() > 0.0:
+		for i in range(ring_count):
+			var ring = MeshInstance3D.new()
+			ring.mesh = MunitionPool.unit_cylinder()
+			ring.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 1.2)
+			parent.add_child(ring)
+			var t = float(i + 1) / float(ring_count + 1)
+			var ring_pos = start_pos.lerp(end_pos, t)
+			MunitionPool.aim_beam(ring, ring_pos - dir * 0.025, ring_pos + dir * 0.025, 0.1)
+			var rt = create_tween()
+			rt.tween_property(ring, "scale", Vector3(1.5, 0.05, 1.5), 0.15)
+			rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
 
 	if is_instance_valid(target):
 		_deal_weapon_damage(target, dps * fire_rate)
 		if target.has_method("drain_energy"):
 			target.drain_energy(energy_drain_per_shot)
-		_spawn_explosion_visual(target.global_position, 0.7, laser_color)
+		_spawn_explosion_visual(end_pos, 0.7, laser_color)
 
 	# Radius-only collapse; y preserves the length that now lives in scale.
 	var tween = create_tween()
-	tween.tween_property(beam, "scale", Vector3(0.0, beam_len, 0.0), 0.15)
-	tween.finished.connect(func(): if is_instance_valid(beam): beam.queue_free())
+	tween.tween_property(core, "scale", Vector3(0.0, beam_len, 0.0), 0.15)
+	var glow_tween = create_tween()
+	glow_tween.tween_property(glow, "scale", Vector3(0.0, beam_len, 0.0), 0.15)
+	tween.finished.connect(func(): 
+		if is_instance_valid(core): core.queue_free()
+		if is_instance_valid(glow): glow.queue_free()
+	)
 
 # --- Ammo on-impact payload effects ---------------------------------------
 #
@@ -3279,19 +3644,55 @@ func _spawn_explosion_visual(pos: Vector3, custom_scale: float = 0.6, color: Col
 		VFXEffects.scorch(parent, impact_pos, custom_scale * 1.4, 2.0, 15.0)
 
 func _fire_standard_laser():
+	var parent = _effects_parent()
+	if parent == null: return
+	
+	var start_pos = get_muzzle_world_pos()
+	var end_pos = _aim_point(target)
+	
+	# 1. Intense White Core
 	var laser = MeshInstance3D.new()
 	laser.mesh = MunitionPool.unit_cylinder()
-	laser.material_override = MunitionPool.emissive(laser_color, laser_color)
-	_effects_parent().add_child(laser)
+	laser.material_override = MunitionPool.emissive(Color.WHITE, Color.WHITE, 3.0)
+	parent.add_child(laser)
+	MunitionPool.aim_beam(laser, start_pos, end_pos, 0.08)
 
-	MunitionPool.aim_beam(laser, global_position, target.global_position, 0.10)
+	# 2. Glowing Outer Beam
+	var glow = MeshInstance3D.new()
+	glow.mesh = MunitionPool.unit_cylinder()
+	glow.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 1.5)
+	parent.add_child(glow)
+	MunitionPool.aim_beam(glow, start_pos, end_pos, 0.28)
 
+	# 3. Expanding Vapor Rings
+	var distance = start_pos.distance_to(end_pos)
+	var ring_count = int(clamp(distance / 5.0, 3.0, 8.0))
+	var dir = (end_pos - start_pos).normalized()
+	if dir.length_squared() > 0.0:
+		for i in range(ring_count):
+			var ring = MeshInstance3D.new()
+			ring.mesh = MunitionPool.unit_cylinder()
+			ring.material_override = MunitionPool.additive_emissive(Color(laser_color, 0.35), laser_color, 1.2)
+			parent.add_child(ring)
+			
+			var t = float(i + 1) / float(ring_count + 1)
+			var ring_pos = start_pos.lerp(end_pos, t)
+			
+			# Make it a thin disc (length 0.05) facing along the beam
+			MunitionPool.aim_beam(ring, ring_pos - dir * 0.025, ring_pos + dir * 0.025, 0.1)
+			
+			var rt = create_tween()
+			rt.tween_property(ring, "scale", Vector3(1.2, 0.05, 1.2), 0.15)
+			rt.finished.connect(func(): if is_instance_valid(ring): ring.queue_free())
 
 	if is_instance_valid(target):
 		_deal_weapon_damage(target, dps * fire_rate)
 	
 	var timer = get_tree().create_timer(0.08)
-	timer.timeout.connect(func(): if is_instance_valid(laser): laser.queue_free())
+	timer.timeout.connect(func(): 
+		if is_instance_valid(laser): laser.queue_free()
+		if is_instance_valid(glow): glow.queue_free()
+	)
 
 # --- Heavy Barrier Projector (Aegis Field) Logic ---
 
@@ -3313,7 +3714,7 @@ func _tick_heavy_barrier(delta: float) -> void:
 
 	# Smoothly pivot to aim at nearest enemy or face forward if none
 	if target and is_instance_valid(target) and not ("is_dead" in target and target.is_dead):
-		var target_pos = target.global_position + Vector3(0, 0.5, 0)
+		var target_pos = _aim_point(target)
 		var dir_in_pivot_parent: Vector3
 		if pivot_parent != null and is_instance_valid(pivot_parent):
 			dir_in_pivot_parent = (pivot_parent.to_local(target_pos) - pivot_node.position).normalized()

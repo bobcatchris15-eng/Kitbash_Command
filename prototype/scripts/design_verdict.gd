@@ -86,6 +86,9 @@ static func evaluate(stats: Dictionary) -> Array:
 	# --- Power ----------------------------------------------------------------
 	var generation := float(power.get("generation", 0.0))
 	var draw := float(power.get("draw", 0.0))
+	var storage := float(power.get("storage", 0.0))
+	var max_shot_cost := float(power.get("max_shot_cost", 0.0))
+	
 	if draw > 0.0 and generation <= 0.0:
 		out.append(_v(Severity.BLOCKING, "UNPOWERED",
 			"Draws %s power and generates none. Energy systems will not run." % _round(draw)))
@@ -95,6 +98,13 @@ static func evaluate(stats: Dictionary) -> Array:
 	elif generation > 0.0 and (generation - draw) < generation * POWER_TIGHT_FRACTION:
 		out.append(_v(Severity.NOTE, "POWER TIGHT",
 			"Only %s spare. One more energy system will brown out." % _round(generation - draw)))
+
+	if max_shot_cost > storage:
+		print("Adding PEAK DRAW EXCESSIVE: max_shot_cost=", max_shot_cost, " storage=", storage)
+		out.append(_v(Severity.BLOCKING, "PEAK DRAW EXCESSIVE",
+			"A weapon needs %s energy to fire, but capacity is only %s. It will never fire." % [_round(max_shot_cost), _round(storage)]))
+	else:
+		print("No PEAK DRAW EXCESSIVE: max_shot_cost=", max_shot_cost, " storage=", storage)
 
 	# --- Speed notes ----------------------------------------------------------
 	# CAPACITY-LIMITED IS ITS OWN VERDICT because the fix is different, and that

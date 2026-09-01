@@ -26,8 +26,10 @@ func _init():
 		return
 	var battle = packed.instantiate()
 	root.add_child(battle)
-	for _i in range(6):
+	var wait_frames := 0
+	while not battle.world_is_ready and wait_frames < 60:
 		await process_frame
+		wait_frames += 1
 
 	if battle.vision == null:
 		_finish(battle, ["no vision service was built"])

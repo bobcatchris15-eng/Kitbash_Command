@@ -901,14 +901,27 @@ func _animate_locomotion(delta: float) -> void:
 			"wheels":
 				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_WHEEL + "*", "Node3D", true, false):
 					axle.rotate_x(9.0 * ground_rate * dir * delta)
-			"tracked_treads", "heavy_quad_tracks":
+			"tracked_treads", "heavy_quad_tracks", "half_track":
+				# Belt locomotion: sprockets/idlers/road wheels spin at their own
+				# surface speed (surface_speed / own radius, not a shared rate),
+				# and the belt band itself scrolls its UVs at the same
+				# surface_speed instead of being rotate_x-ed as a rigid body -
+				# that used to either not animate (tracked_treads had no belt
+				# pivot at all) or tumble the whole bogie end-over-end
+				# (half_track, heavy_quad_tracks).
+				var surface_speed := speed * dir
 				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_TREAD + "*", "Node3D", true, false):
-					axle.rotate_x(7.0 * ground_rate * dir * delta)
-			"half_track":
-				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_WHEEL + "*", "Node3D", true, false):
-					axle.rotate_x(9.0 * ground_rate * dir * delta)
-				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_TREAD + "*", "Node3D", true, false):
-					axle.rotate_x(7.0 * ground_rate * dir * delta)
+					var radius: float = axle.get_meta("spin_radius", 0.3)
+					if radius > 0.0:
+						axle.rotate_x((surface_speed / radius) * delta)
+				for belt in child.find_children(VisualBuilderScript.BELT_BAND_NAME + "*", "MeshInstance3D", true, false):
+					var mat: Material = belt.material_override
+					if mat is ShaderMaterial:
+						var uv_off: float = mat.get_shader_parameter("uv_offset")
+						mat.set_shader_parameter("uv_offset", uv_off + surface_speed * delta)
+				if child_type_id == "half_track":
+					for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_WHEEL + "*", "Node3D", true, false):
+						axle.rotate_x(9.0 * ground_rate * dir * delta)
 			"rocker_bogie":
 				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_WHEEL + "*", "Node3D", true, false):
 					axle.rotate_x(9.0 * ground_rate * dir * delta)

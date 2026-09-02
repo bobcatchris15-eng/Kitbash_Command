@@ -175,6 +175,23 @@ const SPIN_PIVOT_WHEEL := "WheelSpin"
 const SPIN_PIVOT_TREAD := "TreadSpin"
 const SPIN_PIVOT_TURBINE := "TurbineFan"
 
+# Belt band mesh instances are named with this prefix so unit.gd can find
+# them and scroll their UVs, instead of rotate_x-ing the whole band/bogie
+# (which used to either not animate at all - tracked_treads - or tumble the
+# entire assembly end-over-end - half_track / heavy_quad_tracks).
+const BELT_BAND_NAME := "TreadBeltBand"
+const TREAD_BELT_SHADER := preload("res://shaders/tread_belt.gdshader")
+
+# One ShaderMaterial per belt instance - uv_offset is per-vehicle animation
+# state, so this must never be a single cached/shared material the way
+# get_flame_arc_material() is for a VFX emitter.
+static func _belt_material(color: Color) -> ShaderMaterial:
+	var mat := ShaderMaterial.new()
+	mat.shader = TREAD_BELT_SHADER
+	mat.set_shader_parameter("albedo_color", color)
+	mat.set_shader_parameter("uv_offset", 0.0)
+	return mat
+
 # The leg chain. LegSwing is ours - built by _build_legs() and, unlike the spin
 # pivots above, matched EXACTLY rather than as a prefix, because there is one
 # per leg module and Godot never has to uniquify it.
@@ -4218,9 +4235,8 @@ static func _build_tracked_treads(parent_node: Node3D, base_size: Vector3, base_
 		var loop_box = BoxMesh.new()
 		loop_box.size = Vector3(actual_size.x * width, actual_size.y, actual_size.z)
 		loop.mesh = loop_box
-		var loop_mat = StandardMaterial3D.new()
-		loop_mat.albedo_color = base_color
-		loop.material_override = loop_mat
+	loop.name = BELT_BAND_NAME
+	loop.material_override = _belt_material(base_color)
 	loop.position = Vector3(belt_center_x, loop_center_y, 0)
 	parent_node.add_child(loop)
 
@@ -4305,6 +4321,7 @@ static func _build_tracked_treads(parent_node: Node3D, base_size: Vector3, base_
 	if sprocket and sprocket_mesh:
 		var sp_front_axle = Node3D.new()
 		sp_front_axle.name = SPIN_PIVOT_TREAD
+		sp_front_axle.set_meta("spin_radius", sprocket_radius)
 		sp_front_axle.position = Vector3(outboard_x, loop_center_y, front_z)
 		parent_node.add_child(sp_front_axle)
 		var sp_front = _mesh_inst(sprocket_mesh, Color(0.18, 0.18, 0.2))
@@ -4315,6 +4332,7 @@ static func _build_tracked_treads(parent_node: Node3D, base_size: Vector3, base_
 
 		var sp_rear_axle = Node3D.new()
 		sp_rear_axle.name = SPIN_PIVOT_TREAD
+		sp_rear_axle.set_meta("spin_radius", sprocket_radius)
 		sp_rear_axle.position = Vector3(outboard_x, loop_center_y, rear_z)
 		parent_node.add_child(sp_rear_axle)
 		var sp_rear = _mesh_inst(sprocket_mesh, Color(0.18, 0.18, 0.2))
@@ -4348,6 +4366,7 @@ static func _build_tracked_treads(parent_node: Node3D, base_size: Vector3, base_
 		# Road wheels spin with the belt, same as the sprockets.
 		var roller_axle = Node3D.new()
 		roller_axle.name = SPIN_PIVOT_TREAD
+		roller_axle.set_meta("spin_radius", wheel_radius_target)
 		roller_axle.position = Vector3(outboard_x, roller_y, pos.z)
 		p.add_child(roller_axle)
 		roller.rotation = Vector3(0, 0, PI / 2.0)
@@ -6700,12 +6719,18 @@ static func _build_half_track(parent_node: Node3D, base_size: Vector3, base_colo
 	var bogie_mesh := _part("ht_track_bogie")
 	if bogie_mesh:
 		var run: float = target_length * 0.50 * (1.0 + 0.14 * float(bogies - 3))
+		# NOT named SPIN_PIVOT_TREAD: this used to be the rotate_x pivot for the
+		# WHOLE bogie assembly, tumbling it end-over-end. The bogie mesh is the
+		# belt band now - it gets a scrolling-UV shader material instead of a
+		# rotation, so this stays a plain static mount node.
 		var bogie_pivot := Node3D.new()
-		bogie_pivot.name = SPIN_PIVOT_TREAD
+		bogie_pivot.name = "TrackBogieMount"
 		bogie_pivot.position = Vector3(0, 0, half - run * 0.5)
 		parent_node.add_child(bogie_pivot)
 
 		var bogie := _mesh_inst(bogie_mesh, Color(0.18, 0.18, 0.2))
+		bogie.name = BELT_BAND_NAME
+		bogie.material_override = _belt_material(Color(0.18, 0.18, 0.2))
 		# 20% narrower track width (1.24 factor instead of 1.55)
 		var bogie_width_scale: float = width * v_scale * 1.24
 		bogie.scale = Vector3(bogie_width_scale, v_scale, run / 1.2)
@@ -6822,6 +6847,8 @@ static func _build_heavy_quad_tracks(parent_node: Node3D, base_size: Vector3, ba
 			parent_node.add_child(bogie_pivot)
 
 			var bogie := _mesh_inst(bogie_mesh, Color(0.18, 0.18, 0.2))
+			bogie.name = BELT_BAND_NAME
+			bogie.material_override = _belt_material(Color(0.18, 0.18, 0.2))
 			bogie.scale = Vector3(bogie_width_scale, v_scale, pod_length / 1.2)
 			bogie_pivot.add_child(bogie)
 

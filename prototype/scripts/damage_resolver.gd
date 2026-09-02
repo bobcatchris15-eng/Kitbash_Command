@@ -25,7 +25,16 @@ const BattleLayersScript = preload("res://scripts/battle/battle_layers.gd")
 const ELEVATION_COMBAT_THRESHOLD: float = 2.0
 const ELEVATION_COMBAT_PIERCE_MULTIPLIER: float = 0.85
 
-# damage_type -> [base_threshold, reduction] per armor material.
+# damage_type -> [base_threshold, pass_through] per armor material.
+#
+# `pass_through` is NOT a reduction fraction - it is the multiplier applied
+# TO the damage that gets through, i.e. how much survives the armor. Low
+# pass_through (0.20, energy_shielding vs energy) means the armor stops
+# almost everything; high pass_through (0.92, steel vs thermal) means it
+# stops almost nothing. The field used to be named "reduction", which reads
+# backwards at every call site - a low "reduction" value looked like weak
+# armor when it meant the opposite. Renamed for legibility only; no value
+# below has moved.
 #
 # "energy" row added this pass (ENERGY_AND_BALANCE_SPEC.md #4 follow-up):
 # previously there was no "energy" key at all, so any weapon dealing
@@ -38,22 +47,54 @@ const ELEVATION_COMBAT_PIERCE_MULTIPLIER: float = 0.85
 # weak against it (plate steel and reactive plates don't stop directed
 # energy); ablative_ceramic is moderate (ablative/heat-resistant materials
 # have some real answer to it, just not a dedicated one).
-const ARMOR_TABLE = {
-	"steel_plate": {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]},
-	"composite_plate": {"kinetic": [20.0, 0.65], "thermal": [18.0, 0.6], "explosive": [25.0, 0.45], "energy": [15.0, 0.7]},
-	"ceramic_ablative": {"kinetic": [6.0, 0.95], "thermal": [28.0, 0.25], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
-	"ballistic_nylon": {"kinetic": [7.0, 0.85], "thermal": [22.0, 0.4], "explosive": [24.0, 0.5], "energy": [12.0, 0.7]},
-	# Aliases & Legacy
-	"hardened_steel": {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]},
-	"armor_plating": {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]},
-	"reactive_armor": {"kinetic": [9.0, 0.82], "thermal": [10.0, 0.8], "explosive": [30.0, 0.4], "energy": [8.0, 0.85]},
-	"spaced_composite": {"kinetic": [20.0, 0.65], "thermal": [18.0, 0.6], "explosive": [25.0, 0.45], "energy": [15.0, 0.7]},
-	"ablative_ceramic": {"kinetic": [6.0, 0.95], "thermal": [28.0, 0.25], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
-	"ablative_foam": {"kinetic": [6.0, 0.95], "thermal": [28.0, 0.25], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
-	"energy_shielding": {"kinetic": [8.0, 0.85], "thermal": [20.0, 0.5], "explosive": [20.0, 0.5], "energy": [48.0, 0.20]},
-	"carbon_fiber": {"kinetic": [7.0, 0.85], "thermal": [22.0, 0.4], "explosive": [24.0, 0.5], "energy": [12.0, 0.7]},
-	"titanium_plate": {"kinetic": [30.0, 0.45], "thermal": [6.0, 0.90], "explosive": [14.0, 0.7], "energy": [9.0, 0.8]},
-	"slat_armor": {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]},
+#
+# ALIASES. Fourteen material keys exist (for save-compat and naming history)
+# but only five distinct stat rows do. Building each alias group from ONE
+# shared Dictionary literal - rather than retyping the numbers per key - means
+# they are the SAME object in memory: editing "steel_plate"'s numbers edits
+# "hardened_steel"/"armor_plating"/"slat_armor" too, so the group can never
+# silently drift apart again the way it already had once. ARMOR_MATERIAL_ALIAS
+# below documents the grouping explicitly for anything that wants to know a
+# key's canonical name (e.g. collapsing UI rows) without walking ARMOR_TABLE.
+static var _STEEL_ROW := {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]}
+static var _COMPOSITE_ROW := {"kinetic": [20.0, 0.65], "thermal": [18.0, 0.6], "explosive": [25.0, 0.45], "energy": [15.0, 0.7]}
+static var _CERAMIC_ROW := {"kinetic": [6.0, 0.95], "thermal": [28.0, 0.25], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]}
+static var _NYLON_ROW := {"kinetic": [7.0, 0.85], "thermal": [22.0, 0.4], "explosive": [24.0, 0.5], "energy": [12.0, 0.7]}
+static var _REACTIVE_ROW := {"kinetic": [9.0, 0.82], "thermal": [10.0, 0.8], "explosive": [30.0, 0.4], "energy": [8.0, 0.85]}
+static var _ENERGY_SHIELDING_ROW := {"kinetic": [8.0, 0.85], "thermal": [20.0, 0.5], "explosive": [20.0, 0.5], "energy": [48.0, 0.20]}
+static var _TITANIUM_ROW := {"kinetic": [30.0, 0.45], "thermal": [6.0, 0.90], "explosive": [14.0, 0.7], "energy": [9.0, 0.8]}
+
+static var ARMOR_TABLE := {
+	"steel_plate": _STEEL_ROW,
+	"hardened_steel": _STEEL_ROW,
+	"armor_plating": _STEEL_ROW,
+	"slat_armor": _STEEL_ROW,
+	"composite_plate": _COMPOSITE_ROW,
+	"spaced_composite": _COMPOSITE_ROW,
+	"ceramic_ablative": _CERAMIC_ROW,
+	"ablative_ceramic": _CERAMIC_ROW,
+	"ablative_foam": _CERAMIC_ROW,
+	"ballistic_nylon": _NYLON_ROW,
+	"carbon_fiber": _NYLON_ROW,
+	"reactive_armor": _REACTIVE_ROW,
+	"energy_shielding": _ENERGY_SHIELDING_ROW,
+	"titanium_plate": _TITANIUM_ROW,
+}
+
+# material key -> canonical key (itself, for the canonical keys). Consumers
+# that need to know "which materials are really the same thing" (e.g. to
+# collapse duplicate UI rows) should use this rather than comparing
+# ARMOR_TABLE rows by value.
+const ARMOR_MATERIAL_ALIAS := {
+	"steel_plate": "steel_plate", "hardened_steel": "steel_plate",
+	"armor_plating": "steel_plate", "slat_armor": "steel_plate",
+	"composite_plate": "composite_plate", "spaced_composite": "composite_plate",
+	"ceramic_ablative": "ceramic_ablative", "ablative_ceramic": "ceramic_ablative",
+	"ablative_foam": "ceramic_ablative",
+	"ballistic_nylon": "ballistic_nylon", "carbon_fiber": "ballistic_nylon",
+	"reactive_armor": "reactive_armor",
+	"energy_shielding": "energy_shielding",
+	"titanium_plate": "titanium_plate",
 }
 
 # --- Hit damage math (FABLE_REVIEW.md 1.1 / 3.6 / 2.5) ---
@@ -66,7 +107,7 @@ const ARMOR_TABLE = {
 # This is the fix for the review's headline finding: per-shot damage is
 # dps*fire_rate, so every rapid-fire weapon (rotary/HMG/CIWS/laser/flamer)
 # landed under every real threshold and dealt literally zero damage to any
-# armored hull, deleting the whole sustained-fire archetype. At 0.15, armor
+# armored hull, deleting the whole sustained-fire archetype. At 0.10, armor
 # still blanks ~90% of sub-threshold fire (thresholds remain the dominant
 # mechanic and heavy alpha still rules head-on), but massed small guns now
 # grind - the Damage_And_Armor_Model.md action-economy counter actually
@@ -75,7 +116,7 @@ const CHIP_THROUGH_FACTOR: float = 0.10
 # Brute Force Rule (Damage_And_Armor_Model.md, documented since the start
 # but never implemented): an overwhelmingly large hit "punches straight
 # through the mitigation multipliers." From BRUTE_FORCE_RATIO x threshold
-# upward, the reduction multiplier blends linearly toward 1.0 (full damage),
+# upward, the pass_through multiplier blends linearly toward 1.0 (full damage),
 # reaching at most BRUTE_FORCE_MAX_BLEND of the way there at 2x that ratio.
 const BRUTE_FORCE_RATIO: float = 6.0
 const BRUTE_FORCE_MAX_BLEND: float = 0.50
@@ -85,21 +126,21 @@ const BRUTE_FORCE_MAX_BLEND: float = 0.50
 # threshold-exempt - they're exposed hardware, that's the whole point.
 const MODULE_STRIP_DAMAGE_FACTOR: float = 0.75
 
-static func compute_hull_damage(amount: float, threshold: float, reduction: float) -> float:
+static func compute_hull_damage(amount: float, threshold: float, pass_through: float) -> float:
 	if threshold > 0.0 and amount < threshold:
-		return amount * reduction * CHIP_THROUGH_FACTOR
-	var eff_reduction = reduction
+		return amount * pass_through * CHIP_THROUGH_FACTOR
+	var eff_pass_through = pass_through
 	if threshold > 0.0 and amount >= threshold * BRUTE_FORCE_RATIO:
 		var brute_t = clamp((amount / threshold - BRUTE_FORCE_RATIO) / BRUTE_FORCE_RATIO, 0.0, 1.0)
-		eff_reduction = lerpf(reduction, 1.0, brute_t * BRUTE_FORCE_MAX_BLEND)
-	return amount * eff_reduction
+		eff_pass_through = lerpf(pass_through, 1.0, brute_t * BRUTE_FORCE_MAX_BLEND)
+	return amount * eff_pass_through
 
 static func get_material_threshold(material: String, damage_type: String, thickness: float) -> Vector2:
 	var row = ARMOR_TABLE.get(material, ARMOR_TABLE["hardened_steel"])
 	var pair = row.get(damage_type, row["explosive"])
 	return Vector2(pair[0] * thickness, pair[1])
 
-# Resolves the full threshold/reduction pair for a hit, from the hull's baseline
+# Resolves the full threshold/pass_through pair for a hit, from the hull's baseline
 # material+thickness plus whatever armor is PAINTED on the facet struck.
 #
 # `active_modules` is retained for signature compatibility and is no longer read
@@ -123,7 +164,7 @@ static func resolve(hull: Node3D, active_modules: Array, damage_type: String, de
 		hull_thick = hull.get_meta("armor_thickness")
 	var baseline = get_material_threshold(hull_mat, damage_type, hull_thick)
 	var threshold = baseline.x
-	var reduction = baseline.y
+	var pass_through = baseline.y
 
 	# PAINTED ARMOR. The plan is built once at reconstruct time and hung on the
 	# hull (see ArmorPaint). An absent plan means bare hull, which is exactly
@@ -174,7 +215,7 @@ static func resolve(hull: Node3D, active_modules: Array, damage_type: String, de
 					assignment = {}
 				var applied := _apply_assignment(baseline, assignment, damage_type)
 				threshold = applied.x
-				reduction = applied.y
+				pass_through = applied.y
 			else:
 				# No usable triangle: no hull surface body, an unbaked hull, or
 				# a shot that never reached the defender. Fall back to the
@@ -184,28 +225,32 @@ static func resolve(hull: Node3D, active_modules: Array, damage_type: String, de
 				var summary: Dictionary = (plan.get("sides", {}) as Dictionary).get(side, {})
 				var blended := _blend_side(baseline, summary, damage_type)
 				threshold = blended.x
-				reduction = blended.y
+				pass_through = blended.y
 
 		threshold *= float(trace.get("slope", 1.0))
 	elif has_plan:
 		# AoE and any caller with no direction. One answer for the whole hull,
 		# blended by overall coverage - the honest expected value when we cannot
-		# say where the blast landed.
+		# say where the blast landed. `mean_thickness` carries the plan's real
+		# area-weighted thickness so a heavily-plated hull isn't silently
+		# resolved as bare 1.0x armor on the one path with no facet or side to
+		# read a thickness off of.
 		var whole := {
 			"coverage": float(plan.get("coverage", 0.0)),
 			"type_id": _dominant_type(plan),
 			"material": _dominant_material(plan),
+			"mean_thickness": float(plan.get("mean_thickness", 1.0)),
 		}
 		var blended_all := _blend_side(baseline, whole, damage_type)
 		threshold = blended_all.x
-		reduction = blended_all.y
+		pass_through = blended_all.y
 
 	if defender != null and has_origin:
 		var height_advantage = origin_vec.y - defender.global_position.y
 		if height_advantage >= ELEVATION_COMBAT_THRESHOLD:
 			threshold *= ELEVATION_COMBAT_PIERCE_MULTIPLIER
 
-	return Vector2(threshold, reduction)
+	return Vector2(threshold, pass_through)
 
 # One painted facet's contribution. Coverage is definitionally 1 here - the
 # facet either carries this assignment or it does not.
@@ -222,7 +267,7 @@ static func _apply_assignment(baseline: Vector2, a: Dictionary, damage_type: Str
 	if material == "":
 		return baseline
 	# The armor TYPE (plating/slat/composite/foam) is purely cosmetic - the
-	# painted likeness on the skin. Threshold and reduction come from the
+	# painted likeness on the skin. Threshold and pass_through come from the
 	# MATERIAL and its THICKNESS alone; the old per-type catalog-HP bonus and
 	# rock-paper-scissors bias multipliers were retired with the type rows.
 	var plate := get_material_threshold(material, damage_type, float(a.get("thickness", 1.0)))
@@ -246,7 +291,7 @@ static func _blend_side(baseline: Vector2, summary: Dictionary, damage_type: Str
 	var plated := _apply_assignment(baseline, {
 		"material": material,
 		"type_id": str(summary.get("type_id", "")),
-		"thickness": 1.0,
+		"thickness": summary.get("mean_thickness", 1.0),
 	}, damage_type)
 	return Vector2(
 		lerpf(baseline.x, plated.x, coverage),

@@ -5,8 +5,8 @@ extends RefCounted
 # WHY THIS EXISTS. `fire_rate` is a shot INTERVAL, not a rate, so a weapon's real
 # hit is `dps * fire_rate` - and damage_resolver.gd gates on THAT number, never on
 # dps. A shot under the material's threshold delivers only CHIP_THROUGH_FACTOR
-# (0.15) of its already-reduced damage; a shot at BRUTE_FORCE_RATIO (4x) threshold
-# or more starts blending the reduction back toward 1.0. Between those two regimes
+# (0.10) of its already-reduced damage; a shot at BRUTE_FORCE_RATIO (4x) threshold
+# or more starts blending the pass_through back toward 1.0. Between those two regimes
 # there is roughly a 6.7x swing in what a hit is worth, decided entirely by alpha
 # against the defender's armour.
 #
@@ -223,7 +223,7 @@ static func vs_material(shot: float, interval: float, dmg_class: String,
 		"material": material,
 		"label": short_label(material),
 		"threshold": pair.x,
-		"reduction": pair.y,
+		"pass_through": pair.y,
 		"per_shot": dealt,
 		"dps": dealt / maxf(interval, MIN_INTERVAL),
 		# Share of the raw shot that survives the armour. The headline evidence

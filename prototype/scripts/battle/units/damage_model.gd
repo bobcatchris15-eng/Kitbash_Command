@@ -168,13 +168,14 @@ static func damage_module(module: Node3D, amount: float) -> bool:
 	return module_hp <= 0.0
 
 
-# Threshold and reduction for a hit of `damage_type` against this hull, straight
-# from the resolver so armour materials, facets and elevation stay in one place.
+# Threshold and pass_through for a hit of `damage_type` against this hull,
+# straight from the resolver so armour materials, facets and elevation stay in
+# one place.
 static func resolve(hull_node: Node3D, modules: Array, damage_type: String,
 		body: Node3D, hit_origin) -> Vector2:
 	return DamageResolverScript.resolve(hull_node, modules, damage_type, body, hit_origin)
 
 
 # What actually comes off the HP pool, after chip-through and brute-force.
-static func hull_damage(amount: float, threshold: float, reduction: float) -> float:
-	return DamageResolverScript.compute_hull_damage(amount, threshold, reduction)
+static func hull_damage(amount: float, threshold: float, pass_through: float) -> float:
+	return DamageResolverScript.compute_hull_damage(amount, threshold, pass_through)

@@ -6338,7 +6338,17 @@ static func rebuild_visual(module: Node3D):
 # untouched: those rotate independently every frame (auto_weapon.gd's
 # rotary-cannon spin-up, unit.gd's rotor/prop animation) and merging
 # them into a static mesh would freeze that motion.
-const _ANIMATED_PART_NAMES := ["BarrelCluster", "RotorBlades", "WingPivot", "PropBlades"]
+# Single source of truth: every name here is one of the SPIN_PIVOT_*/
+# BELT_BAND_NAME constants above (or a literal that unit.gd/module_placer.gd
+# look up by the same string), so a builder and an animator can never again
+# name the same node two different things and silently go dead. hover_engine's
+# rings and the belt band mesh are the two that used to fall through here as
+# bare literals and get merged away by the bake below - "HoverRingMid" and
+# "HoverRingInner" specifically (not "HoverRingOuter", which never animates).
+const _ANIMATED_PART_NAMES := [
+	"BarrelCluster", "RotorBlades", "WingPivot", "PropBlades",
+	BELT_BAND_NAME, "HoverRingMid", "HoverRingInner",
+]
 
 static func bake_module_visual(module: Node3D) -> void:
 	if not module:
@@ -6834,7 +6844,17 @@ static func _build_heavy_quad_tracks(parent_node: Node3D, base_size: Vector3, ba
 		var t: float = float(i) / float(per_side - 1)
 		var cz: float = lerpf(front_pod_center_z, rear_pod_center_z, t)
 		pods.append({
-			"name": "SpinPivot_Tread_%d" % i,
+			# NOT named SPIN_PIVOT_TREAD, deliberately - same reasoning as
+			# half_track's TrackBogieMount (see _build_half_track above): the
+			# bogie mesh under this pivot is BELT_BAND_NAME, animated by
+			# scrolling its shader's uv_offset. If this mount pivot matched
+			# SPIN_PIVOT_TREAD, unit.gd would ALSO rotate_x() it every frame,
+			# physically tumbling the whole pod on top of its own UV-scroll -
+			# reintroducing the exact end-over-end bug the belt rewrite
+			# replaced. The old literal "SpinPivot_Tread_%d" never matched
+			# unit.gd's "TreadSpin*" search anyway (harmless coincidence, not
+			# by design) - renamed to make the non-participation explicit.
+			"name": "TrackPodMount_%d" % i,
 			"center_z": cz
 		})
 

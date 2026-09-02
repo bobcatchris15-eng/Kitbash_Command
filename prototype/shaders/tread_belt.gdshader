@@ -12,8 +12,23 @@ uniform float roughness_amount : hint_range(0.0, 1.0) = 0.75;
 uniform float uv_offset = 0.0;
 uniform float stripe_freq = 14.0;
 
+// Scroll coordinate comes from the mesh's own local Z (the belt's authored
+// travel axis in every builder - tracked_treads' deformed loop, half_track's
+// and heavy_quad_tracks' ht_track_bogie block), NOT from UV.y. ht_track_bogie
+// is exported as many discrete unwrapped boxes (see
+// tools/blender/build_locomotion_rework.py:build_ht_track_bogie) with no
+// continuous V gradient along the belt's length, so a UV-driven scroll reads
+// as a static/frozen band on that mesh even though uv_offset is genuinely
+// advancing every frame. VERTEX in vertex() is local (pre-MODEL-matrix)
+// space, so this works regardless of the source mesh's UV quality.
+varying float v_length_coord;
+
+void vertex() {
+	v_length_coord = VERTEX.z;
+}
+
 void fragment() {
-	float scrolled = fract(UV.y * stripe_freq - uv_offset);
+	float scrolled = fract(v_length_coord * stripe_freq - uv_offset);
 	float band = smoothstep(0.0, 0.10, scrolled) - smoothstep(0.45, 0.55, scrolled);
 	vec3 col = mix(albedo_color.rgb * 0.55, albedo_color.rgb, band);
 	ALBEDO = col;

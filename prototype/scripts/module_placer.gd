@@ -307,7 +307,9 @@ func _process(delta: float):
 				# what sells the gimbal.
 				inner_ring.rotate_z(7.0 * delta)
 		elif type_id == "plasma_thruster":
-			var ring = child.get_node_or_null("PlasmaRing")
+			# PlasmaRing is nested under PodRoot, not a direct child - a
+			# direct-child get_node_or_null() always misses it.
+			var ring = child.find_child("PlasmaRing", true, false)
 			if ring:
 				ring.rotate_z(18.0 * delta)
 

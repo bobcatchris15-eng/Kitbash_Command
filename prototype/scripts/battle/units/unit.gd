@@ -913,7 +913,12 @@ func _animate_locomotion(delta: float) -> void:
 				for axle in child.find_children(VisualBuilderScript.SPIN_PIVOT_TREAD + "*", "Node3D", true, false):
 					var radius: float = axle.get_meta("spin_radius", 0.3)
 					if radius > 0.0:
-						axle.rotate_x((surface_speed / radius) * delta)
+						# Forward is local -Z (docs/HULL_NAMING.md). Rolling without
+						# slipping: the ground-contact point (local -Y, z=0) must move
+						# +Z (backward relative to hull) while the vehicle travels -Z.
+						# Rx(theta) sends that point's z to -r*sin(theta), so POSITIVE
+						# theta for forward travel moves it the wrong way. Negate.
+						axle.rotate_x(-(surface_speed / radius) * delta)
 				for belt in child.find_children(VisualBuilderScript.BELT_BAND_NAME + "*", "MeshInstance3D", true, false):
 					var mat: Material = belt.material_override
 					if mat is ShaderMaterial:
@@ -950,7 +955,9 @@ func _animate_locomotion(delta: float) -> void:
 				if inner_ring:
 					inner_ring.rotate_y(18.0 * powered_rate * delta)
 			"plasma_thruster":
-				var ring = child.get_node_or_null("PlasmaRing")
+				# PlasmaRing is nested under PodRoot, not a direct child - a
+				# direct-child get_node_or_null() always misses it.
+				var ring = child.find_child("PlasmaRing", true, false)
 				if ring:
 					ring.rotate_z(18.0 * powered_rate * delta)
 			"legs":

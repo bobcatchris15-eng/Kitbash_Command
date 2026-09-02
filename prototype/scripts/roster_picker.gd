@@ -738,8 +738,19 @@ class RosterCard extends PanelContainer:
 
 	# Called once the design has been reconstructed and measured.
 	func set_stats(stats: Dictionary) -> void:
-		if _spec:
-			_spec.text = RosterPicker.stat_line(stats)
+		if _spec == null:
+			return
+		_spec.text = RosterPicker.stat_line(stats)
+		# The unmeasured state is deliberate, not a bare fallback string: same
+		# muted colour and reduced opacity the empty-library hint uses, so a
+		# card that failed to measure reads as "unknown", not as broken text
+		# sitting in a slot that otherwise looks fully populated.
+		if stats.is_empty():
+			_spec.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
+			_spec.modulate.a = 0.75
+		else:
+			_spec.remove_theme_color_override("font_color")
+			_spec.modulate.a = 1.0
 
 	func set_thumbnail(tex: Texture2D) -> void:
 		_tex = tex
@@ -786,6 +797,8 @@ class RosterSlot extends PanelContainer:
 		kind = slot_kind
 		custom_minimum_size = RosterPicker.SLOT_SIZE
 		mouse_filter = Control.MOUSE_FILTER_PASS
+		mouse_entered.connect(_on_mouse_entered)
+		mouse_exited.connect(_on_mouse_exited)
 
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 0)
@@ -841,8 +854,22 @@ class RosterSlot extends PanelContainer:
 		# explicitly here so the empty and filled states sit on the same value
 		# ladder as the cards (see SURFACE_TRAY's header).
 		theme_type_variation = "InsetPanel"
+		# A restricted well (harvester / defence) carries a faint category tint
+		# even while EMPTY, so it reads as "this well is different" without
+		# needing the parenthetical caption in the section heading to explain
+		# it. A general unit well stays untinted - it takes almost anything,
+		# so it has no category to announce.
+		var kind_tint := Color(0, 0, 0, 0)
+		match kind:
+			RosterPicker.SlotKind.HARVESTER: kind_tint = RosterPicker.HARVESTER_TINT
+			RosterPicker.SlotKind.BUILDING: kind_tint = RosterPicker.BUILDING_TINT
+		# Halved alpha vs. a filled card's tint: strong enough to read as
+		# "this well belongs to a category" without competing with the
+		# drag-hint text and ghost glyph sharing the same recess.
+		if kind_tint.a > 0.0:
+			kind_tint.a *= 0.5
 		add_theme_stylebox_override("panel", RosterPicker.surface_style(
-			Color(0, 0, 0, 0), RosterPicker.SURFACE_TRAY.darkened(0.28),
+			kind_tint, RosterPicker.SURFACE_TRAY.darkened(0.28),
 			RosterPicker.SURFACE_EDGE.darkened(0.35), 4))
 		if _thumb:
 			_thumb.texture = null
@@ -913,6 +940,30 @@ class RosterSlot extends PanelContainer:
 			return false
 		var data: Dictionary = _picker._data_by_path.get(entry_path, {})
 		return data.get("has_repair", false)
+
+	# Hover distinct from both empty and filled: a lit amber edge over
+	# whatever surface is already showing, so a well the cursor is over reads
+	# as "you could drop here" without having to wait for an actual drag to
+	# start. add_theme_color_override on "panel" isn't a thing for a
+	# StyleBoxFlat panel property, so this swaps the border colour on the
+	# existing stylebox directly rather than rebuilding it.
+	func _on_mouse_entered() -> void:
+		var sb := get_theme_stylebox("panel") as StyleBoxFlat
+		if sb == null:
+			return
+		sb = sb.duplicate()
+		sb.border_color = Tokens.SIGNAL_HAZARD
+		sb.border_width_top = maxi(sb.border_width_top, Tokens.BORDER_EMPHASIS)
+		sb.border_width_bottom = maxi(sb.border_width_bottom, Tokens.BORDER_EMPHASIS)
+		sb.border_width_left = maxi(sb.border_width_left, Tokens.BORDER_EMPHASIS)
+		sb.border_width_right = maxi(sb.border_width_right, Tokens.BORDER_EMPHASIS)
+		add_theme_stylebox_override("panel", sb)
+
+	func _on_mouse_exited() -> void:
+		if entry_path == "":
+			_render_empty()
+		else:
+			_render_filled()
 
 	func assign(path: String, name_text: String, tex: Texture2D) -> void:
 		entry_path = path
@@ -1042,7 +1093,13 @@ static func spec_summary(entry: Dictionary, data: Dictionary) -> String:
 # over its weight capacity should read slow on the card, since it will be.
 static func stat_line(stats: Dictionary) -> String:
 	if stats.is_empty():
-		return "stats unavailable"
+		# "MEASURING" rather than "unavailable" - the bake pipeline reaches
+		# every design eventually (see _bake_thumbnails), so an empty
+		# Dictionary at this point in the flow means the render hasn't
+		# landed yet, not that it failed. The styling on the RosterCard side
+		# (set_stats) is what actually reads as an unknown/pending state;
+		# this string is the fallback if a caller prints it before that.
+		return "measuring..."
 	var lines: Array = []
 	lines.append("HP     %.0f" % float(stats.get("hull_hp", 0.0)))
 	lines.append("Speed  %.1f" % float(stats.get("move_speed", 0.0)))

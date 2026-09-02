@@ -163,6 +163,7 @@ func _build_left_column(parent: Control) -> void:
 	# here rather than left for the player to infer from losing the last one.
 	difficulty_btn.tooltip_text = "Where the operation ENDS UP. The opening engagements run one tier easier, so the first battle is somewhere to find out what your roster does wrong."
 	difficulty_btn.item_selected.connect(func(_i): _rebuild_itinerary())
+	UITheme.style_dropdown(difficulty_btn)
 	grid.add_child(difficulty_btn)
 
 	left_col.add_child(HSeparator.new())
@@ -233,6 +234,7 @@ func _rebuild_itinerary() -> void:
 		for map_id in MAP_IDS:
 			map_btn.add_item(MapCatalog.get_map_name(map_id))
 		map_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		UITheme.style_dropdown(map_btn)
 		if i < previous.size():
 			map_btn.selected = previous[i]
 		else:

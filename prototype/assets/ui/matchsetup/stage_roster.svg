@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>stage_roster</title>
+  <path fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" d="M8 10 H28 V30 H8 Z M36 10 H56 V30 H36 Z M8 36 H28 V56 H8 Z"/>
+  <path fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" d="M46 38 V54 M38 46 H54"/>
+</svg>

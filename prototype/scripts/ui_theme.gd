@@ -264,3 +264,69 @@ static func style_dropdown(btn: OptionButton) -> OptionButton:
 	if btn.custom_minimum_size.y < Tokens.HIT_TARGET_MIN:
 		btn.custom_minimum_size.y = Tokens.HIT_TARGET_MIN
 	return btn
+
+
+# ---------------------------------------------------------------------------
+# FLAT INSTRUMENT CHROME - authored SVG glyphs + flat panel factory
+# ---------------------------------------------------------------------------
+# The "flat instrument, richer" register the Design Lab and the rebuilt Match
+# Settings screen share: flat dark fills, 1px edges, depth from LAYOUT and
+# elevation rather than from a generated texture. A screen in this register
+# builds panels through flat_style() so that no call site holds a colour, a
+# radius or a margin of its own; everything routes back to ui_tokens.gd.
+#
+# Deliberately NOT apply_material(): a material-backed StyleBoxTexture cannot
+# carry a border colour or a shadow, which is precisely what this register uses
+# to separate surfaces. The two are alternatives, not layers.
+static func flat_style(fill: Color = Tokens.BASE_800, edge: Color = Tokens.BASE_500,
+		margin: int = Tokens.SPACE_MD, tier: String = "flush",
+		border: int = Tokens.BORDER_HAIRLINE) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = fill
+	sb.border_color = edge
+	sb.set_border_width_all(border)
+	sb.set_corner_radius_all(Tokens.RADIUS_PANEL)
+	sb.set_content_margin_all(margin)
+	Tokens.apply_elevation(sb, tier)
+	return sb
+
+
+# Authored screen chrome, monochrome white SVG tinted with `modulate` at the
+# call site - the same contract assets/hud/icons + hud_icons.gd established for
+# the in-match HUD, kept separate from it because these are out-of-match assets
+# and the two languages do not share a registry.
+#
+# Returns null when the asset is missing rather than substituting a placeholder,
+# so a renamed file costs a glyph and the caller falls back to text. Nothing here
+# may become load-bearing enough to break a build.
+const CHROME_DIR = "res://assets/ui/matchsetup/"
+static var _chrome_cache: Dictionary = {}
+
+static func chrome_icon(name: String) -> Texture2D:
+	if _chrome_cache.has(name):
+		return _chrome_cache[name]
+	var path := CHROME_DIR + name + ".svg"
+	var tex: Texture2D = null
+	if ResourceLoader.exists(path):
+		tex = load(path) as Texture2D
+	else:
+		push_warning("UITheme: missing chrome glyph '%s' - falling back to text." % path)
+	_chrome_cache[name] = tex
+	return tex
+
+
+# A tinted chrome glyph sized to `px`, or null if the asset is absent. Callers
+# that need a text fallback test for null; callers that only want decoration can
+# add the result unconditionally with an is_instance_valid guard.
+static func chrome_rect(name: String, px: int, tint: Color = Tokens.TEXT_PRIMARY) -> TextureRect:
+	var tex := chrome_icon(name)
+	if tex == null:
+		return null
+	var tr := TextureRect.new()
+	tr.texture = tex
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.custom_minimum_size = Vector2(px, px)
+	tr.modulate = tint
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return tr

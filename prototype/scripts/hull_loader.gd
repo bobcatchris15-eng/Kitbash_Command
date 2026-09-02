@@ -23,6 +23,18 @@
 const BUILTIN_DIR = "res://assets/models/hulls"
 const MOD_DIR = "user://mods/hulls"
 
+# Hand-authored default armor plans, one entry per hull id. A SEPARATE FILE
+# rather than a key in the sidecars for a hard reason: every
+# assets/models/hulls/*.json is regenerated wholesale by
+# tools/blender/build_vehicle_hulls.py, so a balance key added there survives
+# exactly until the next hull bake. Mesh pipeline and balance data are kept
+# apart on purpose.
+#
+# Purely additive - a hull with no entry (including every mod hull, which has
+# no way to ship into a res:// file) returns {} and loads bare, which is the
+# behaviour that predates this file.
+const ARMOR_DEFAULTS_PATH = "res://data/armor/hull_defaults.json"
+
 const REQUIRED_FIELDS = ["name", "hp", "weight", "metal", "crystal", "size", "color"]
 const NUMERIC_TYPES = [TYPE_INT, TYPE_FLOAT]
 
@@ -60,6 +72,8 @@ const PROTECTED_DEFAULT_HULL_FALLBACK = {
 static var _cache: Dictionary = {}
 static var _mod_ids: Dictionary = {}
 static var _scanned: bool = false
+static var _armor_defaults: Dictionary = {}
+static var _armor_defaults_loaded: bool = false
 
 static func get_hulls() -> Dictionary:
 	_ensure_scanned()
@@ -81,6 +95,57 @@ static func reset_cache_for_tests() -> void:
 	_cache = {}
 	_mod_ids = {}
 	_scanned = false
+	_armor_defaults = {}
+	_armor_defaults_loaded = false
+
+
+# The authored default armor plan for a hull, as {side: {material, thickness}},
+# or {} when the hull has no entry. Read once per process, same lifetime
+# argument as the hull scan above.
+#
+# Deliberately NOT merged into the hull catalog entry: _validate_and_default()
+# rebuilds that dict field by field and every consumer of it treats its keys as
+# hull STATS. An armor plan is a starting suggestion for the Design Lab, and
+# folding it in would put it in front of code (costing, drivetrain, the AI's
+# hull picker) that has no business reading it.
+static func get_armor_default(type_id: String) -> Dictionary:
+	_ensure_armor_defaults()
+	var entry = _armor_defaults.get(type_id, null)
+	if not (entry is Dictionary):
+		return {}
+	var sides = (entry as Dictionary).get("sides", null)
+	if not (sides is Dictionary):
+		return {}
+	return sides
+
+
+static func _ensure_armor_defaults() -> void:
+	if _armor_defaults_loaded:
+		return
+	# Set before any early return: a missing or malformed file must degrade to
+	# "no hull has a default", not retry the parse on every hull load.
+	_armor_defaults_loaded = true
+	_armor_defaults = {}
+	if not FileAccess.file_exists(ARMOR_DEFAULTS_PATH):
+		return
+	var text := FileAccess.get_file_as_string(ARMOR_DEFAULTS_PATH)
+	if text.is_empty():
+		push_warning("HullLoader: '%s' is empty - no hull will pre-fill armor." % ARMOR_DEFAULTS_PATH)
+		return
+	var json := JSON.new()
+	if json.parse(text) != OK:
+		push_warning("HullLoader: '%s' failed to parse at line %d (%s) - no hull will pre-fill armor." % [
+			ARMOR_DEFAULTS_PATH, json.get_error_line(), json.get_error_message()])
+		return
+	var raw = json.get_data()
+	if not (raw is Dictionary):
+		push_warning("HullLoader: '%s' must be a JSON object." % ARMOR_DEFAULTS_PATH)
+		return
+	var hulls = (raw as Dictionary).get("hulls", null)
+	if not (hulls is Dictionary):
+		push_warning("HullLoader: '%s' has no \"hulls\" object." % ARMOR_DEFAULTS_PATH)
+		return
+	_armor_defaults = hulls
 
 static func _ensure_scanned() -> void:
 	if _scanned:

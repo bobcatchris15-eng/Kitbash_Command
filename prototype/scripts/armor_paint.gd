@@ -41,6 +41,15 @@ const PAINT_TYPE_IDS := [
 
 const SIDES := ["front", "back", "left", "right", "top", "bottom"]
 
+# The order a SIDE-KEYED plan (see data/armor/hull_defaults.json) is stamped
+# onto facets in. It is not cosmetic: HullFacets' brush sets deliberately
+# OVERLAP - a facet joins a side's set at cos 60 degrees, so a raked glacis is
+# in `front` AND `top` - so a facet named by two sides in the same plan needs a
+# documented winner. Later wins, and `front` is last because a sloped bow plate
+# is authored as the bow whatever its normal says. `bottom` is first because it
+# is the side a player least means when they also named anything else.
+const SIDE_PAINT_PRIORITY := ["bottom", "top", "back", "left", "right", "front"]
+
 # kg per square metre of painted facet per 1.0 thickness. Calibrated against
 # the module catalog: a medium hull (brenntal_medium_a) is 496 kg with ~50 m2
 # of paintable surface, so full 1.0x steel coverage adds ~100 kg - about a
@@ -244,6 +253,63 @@ static func build_plan(hull_type_id: String, assignments: Array,
 	# triangle belongs to, without needing the mesh at resolve time.
 	plan["tri_map"] = seg.get("map", PackedInt32Array())
 	return plan
+
+
+# Expands a SIDE-KEYED plan into the per-facet assignment array build_plan()
+# and the Armor Bay already consume. This is how a hand-authored default plan
+# (data/armor/hull_defaults.json, one entry per hull) becomes real paint: the
+# author names a side, a material and a thickness, and the six brush sets do
+# the geometry.
+#
+# It emits the SAME row shape the Armor Bay writes, so a pre-filled design is
+# indistinguishable from a hand-painted one from here on - the player can
+# repaint any facet, undo/redo works, and a Save serialises the resulting
+# facets explicitly rather than a reference to the default. That is deliberate:
+# a later edit to the defaults file must not be able to reach into a design
+# somebody already saved.
+#
+# `spec` is {side_name: {"material": String, "thickness": float}}. A side that
+# is absent is deliberately bare - partial coverage is a real authoring choice
+# (a transport with an armored cab and an open bed), not an incomplete entry.
+# An unknown material or an out-of-range thickness is skipped with a warning
+# rather than substituted, because a silent substitution in balance data reads
+# as a working plan while protecting the wrong thing.
+static func assignments_from_side_plan(hull_type_id: String, spec: Dictionary,
+		mesh: Mesh = null) -> Array:
+	if spec.is_empty():
+		return []
+	var by_facet := {}
+	for side in SIDE_PAINT_PRIORITY:
+		if not spec.has(side):
+			continue
+		var row = spec[side]
+		if not (row is Dictionary):
+			continue
+		var material := str((row as Dictionary).get("material", ""))
+		if not PAINT_TYPE_IDS.has(material):
+			push_warning("ArmorPaint: default plan for '%s' names unpaintable material '%s' on side '%s' - skipped." % [
+				hull_type_id, material, side])
+			continue
+		var thickness := clampf(float((row as Dictionary).get("thickness", 1.0)), 0.5, 3.0)
+		for fid in facets_for_side(hull_type_id, side, mesh):
+			by_facet[int(fid)] = {
+				"facet_id": int(fid),
+				"side": side,
+				# type_id and material are the same vocabulary here. The Armor
+				# Bay writes them as a pair and build_plan() validates type_id
+				# against PAINT_TYPE_IDS while charging weight off material, so
+				# they must agree or a plan weighs one thing and resolves as
+				# another.
+				"type_id": material,
+				"material": material,
+				"thickness": thickness,
+			}
+	var out := by_facet.keys()
+	out.sort()
+	var rows := []
+	for fid in out:
+		rows.append(by_facet[fid])
+	return rows
 
 
 # Full exterior area of a hull's plating, for the drivetrain to charge the

@@ -1,0 +1,2116 @@
+{
+	"_comment": [
+		"Default armor plans, HAND-AUTHORED PER HULL. Keyed by hull id.",
+		"PRE-FILL ONLY: blueprint_manager._deserialize_armor() expands the entry",
+		"into per-facet assignments when a blueprint carries no 'armor' block at",
+		"all - i.e. a fresh hull selection in the Design Lab. Every saved v3",
+		"blueprint writes an explicit 'armor' block, so loading a save never",
+		"consults this file and changing it can never alter an existing design.",
+		"A hull with no entry here simply loads bare, exactly as before.",
+		"Sides are the six ArmorPaint.SIDES brush sets; materials are",
+		"ArmorPaint.PAINT_TYPE_IDS; thickness is 0.5-3.0. An omitted side is",
+		"deliberately unarmored. Overlapping brush sets resolve in",
+		"ArmorPaint.SIDE_PAINT_PRIORITY order, front last so a glacis wins.",
+		"Static-defense (is_foundation) hulls DO get plans: they weigh 0.0 and",
+		"have no drivetrain, so armor weight cannot overload them.",
+		"This is NOT a hull sidecar - assets/models/hulls/*.json are regenerated",
+		"wholesale by tools/blender/build_vehicle_hulls.py and would lose it."
+	],
+	"version": 1,
+	"hulls": {
+		"ballard_heavy_a": {
+			"note": "monitor: heaviest belt in the yard, armored deck, bare keel",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 2.0
+				},
+				"left": {
+					"material": "spaced_composite",
+					"thickness": 1.8
+				},
+				"right": {
+					"material": "spaced_composite",
+					"thickness": 1.8
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.4
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.2
+				}
+			}
+		},
+		"ballard_light_a": {
+			"note": "gun launch: thin spaced belt, ceramic wheelhouse roof",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "spaced_composite",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "spaced_composite",
+					"thickness": 1.0
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 0.8
+				}
+			}
+		},
+		"ballard_medium_a": {
+			"note": "corvette: real waterline belt, ceramic deck",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "spaced_composite",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "spaced_composite",
+					"thickness": 1.4
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.0
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"ballard_oddball_a": {
+			"note": "mine tender: foam blister belt, blast-oriented not shot-oriented",
+			"sides": {
+				"front": {
+					"material": "ablative_foam",
+					"thickness": 1.8
+				},
+				"left": {
+					"material": "ablative_foam",
+					"thickness": 1.6
+				},
+				"right": {
+					"material": "ablative_foam",
+					"thickness": 1.6
+				},
+				"bottom": {
+					"material": "spaced_composite",
+					"thickness": 1.2
+				}
+			}
+		},
+		"ballard_scout_a": {
+			"note": "picket boat: nylon splinter belt only, speed is the armor",
+			"sides": {
+				"left": {
+					"material": "ballistic_nylon",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "ballistic_nylon",
+					"thickness": 1.0
+				},
+				"front": {
+					"material": "ballistic_nylon",
+					"thickness": 1.2
+				}
+			}
+		},
+		"ballard_transport_a": {
+			"note": "landing ship: side skin only, cargo deck deliberately open",
+			"sides": {
+				"front": {
+					"material": "steel_plate",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 1.1
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 1.1
+				}
+			}
+		},
+		"battery_main_meridian": {
+			"note": "Meridian battery: spaced-laminate barbette, composite skirt",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 2.2
+				},
+				"top": {
+					"material": "spaced_composite",
+					"thickness": 1.8
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.6
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.6
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 1.3
+				}
+			}
+		},
+		"battery_main_osterholm": {
+			"note": "Osterholm battery: steel barbette, slat skirt",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 2.4
+				},
+				"top": {
+					"material": "hardened_steel",
+					"thickness": 1.9
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.7
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.7
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 1.3
+				}
+			}
+		},
+		"battery_main_tidemark": {
+			"note": "Tidemark battery: ceramic barbette, foam splinter skirt",
+			"sides": {
+				"front": {
+					"material": "ablative_ceramic",
+					"thickness": 2.3
+				},
+				"top": {
+					"material": "ablative_ceramic",
+					"thickness": 1.8
+				},
+				"left": {
+					"material": "ablative_foam",
+					"thickness": 1.8
+				},
+				"right": {
+					"material": "ablative_foam",
+					"thickness": 1.8
+				},
+				"back": {
+					"material": "ablative_foam",
+					"thickness": 1.3
+				}
+			}
+		},
+		"brenntal_heavy_a": {
+			"note": "assault gun: maximum glacis, thin everywhere else",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 2.3
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.3
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.8
+				}
+			}
+		},
+		"brenntal_heavy_c": {
+			"note": "long-hull variant: flatter distribution, hull is too long to nose-armor",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.9
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.5
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.5
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.1
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.8
+				}
+			}
+		},
+		"brenntal_light_a": {
+			"note": "light casemate: glacis and a token belt",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"brenntal_medium_a": {
+			"note": "the catalogue default: even rolled-steel box, nothing clever",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.7
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.1
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.1
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 0.8
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.7
+				}
+			}
+		},
+		"brenntal_oddball_a": {
+			"note": "siege mortar carrier: turtled against counterbattery, thick roof",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.8
+				},
+				"top": {
+					"material": "hardened_steel",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 1.2
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 1.0
+				}
+			}
+		},
+		"brenntal_scout_a": {
+			"note": "recon casemate: glacis only",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.3
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.6
+				}
+			}
+		},
+		"brenntal_transport_a": {
+			"note": "armored carrier: crew box front and sides, roof open for dismounts",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 1.2
+				}
+			}
+		},
+		"bunker_main_aa": {
+			"note": "AA bunker: roof is the threat axis, so the roof is the thickest face",
+			"sides": {
+				"top": {
+					"material": "spaced_composite",
+					"thickness": 2.8
+				},
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "spaced_composite",
+					"thickness": 1.5
+				},
+				"right": {
+					"material": "spaced_composite",
+					"thickness": 1.5
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 1.2
+				}
+			}
+		},
+		"bunker_main_meridian": {
+			"note": "Meridian bunker: composite casemate, thick roof",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 2.4
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.8
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.8
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 1.4
+				},
+				"top": {
+					"material": "composite_plate",
+					"thickness": 2.2
+				}
+			}
+		},
+		"bunker_main_osterholm": {
+			"note": "Osterholm bunker: rolled steel casemate, reactive glacis",
+			"sides": {
+				"front": {
+					"material": "reactive_armor",
+					"thickness": 2.6
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 2.0
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 2.0
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "hardened_steel",
+					"thickness": 2.2
+				}
+			}
+		},
+		"bunker_main_tidemark": {
+			"note": "Tidemark bunker: ceramic against coastal thermal fire",
+			"sides": {
+				"front": {
+					"material": "ablative_ceramic",
+					"thickness": 2.5
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 1.9
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 1.9
+				},
+				"back": {
+					"material": "ceramic_ablative",
+					"thickness": 1.4
+				},
+				"top": {
+					"material": "ablative_ceramic",
+					"thickness": 2.3
+				}
+			}
+		},
+		"calder_heavy_a": {
+			"note": "fast gun car: composite bow, carbon flanks - still refuses steel",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.8
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.5
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.0
+				},
+				"back": {
+					"material": "carbon_fiber",
+					"thickness": 1.0
+				}
+			}
+		},
+		"calder_light_c": {
+			"note": "interceptor: bow and flanks in carbon, roof bare for the sensor mast",
+			"sides": {
+				"front": {
+					"material": "carbon_fiber",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.1
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.1
+				}
+			}
+		},
+		"calder_medium_a": {
+			"note": "patrol car: carbon tub, ceramic over the engine bay",
+			"sides": {
+				"front": {
+					"material": "carbon_fiber",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.2
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 0.8
+				}
+			}
+		},
+		"calder_medium_b": {
+			"note": "heavier patrol: carbon tub with a composite bow plate",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.4
+				},
+				"back": {
+					"material": "carbon_fiber",
+					"thickness": 1.0
+				}
+			}
+		},
+		"calder_scout_a": {
+			"note": "dune runner: carbon nose and a token door skin, nothing more",
+			"sides": {
+				"front": {
+					"material": "carbon_fiber",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 0.6
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 0.6
+				}
+			}
+		},
+		"calder_scout_b": {
+			"note": "long-range scout: nylon splinter liner all round, very thin",
+			"sides": {
+				"front": {
+					"material": "ballistic_nylon",
+					"thickness": 1.1
+				},
+				"left": {
+					"material": "ballistic_nylon",
+					"thickness": 0.8
+				},
+				"right": {
+					"material": "ballistic_nylon",
+					"thickness": 0.8
+				},
+				"back": {
+					"material": "ballistic_nylon",
+					"thickness": 0.6
+				}
+			}
+		},
+		"durham_heavy_a": {
+			"note": "heavy gun truck: thick bolted bow, plate belt",
+			"sides": {
+				"front": {
+					"material": "armor_plating",
+					"thickness": 2.1
+				},
+				"left": {
+					"material": "armor_plating",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "armor_plating",
+					"thickness": 1.4
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 1.0
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.7
+				}
+			}
+		},
+		"durham_light_a": {
+			"note": "technical: plate the cab, leave the bed open",
+			"sides": {
+				"front": {
+					"material": "armor_plating",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"durham_light_b": {
+			"note": "hardtop technical: same plate, roof added",
+			"sides": {
+				"front": {
+					"material": "armor_plating",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 1.0
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.7
+				}
+			}
+		},
+		"durham_medium_a": {
+			"note": "gun truck: even bolted plate, cheap and unsubtle",
+			"sides": {
+				"front": {
+					"material": "armor_plating",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "armor_plating",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "armor_plating",
+					"thickness": 1.2
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"durham_oddball_a": {
+			"note": "recovery vehicle: plated crane deck, heavy roof, light flanks",
+			"sides": {
+				"front": {
+					"material": "armor_plating",
+					"thickness": 1.6
+				},
+				"top": {
+					"material": "armor_plating",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 1.0
+				}
+			}
+		},
+		"durham_scout_a": {
+			"note": "survey truck: bolted plate on the cab face",
+			"sides": {
+				"front": {
+					"material": "armor_plating",
+					"thickness": 1.2
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 0.6
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 0.6
+				}
+			}
+		},
+		"durham_transport_a": {
+			"note": "freight hauler: cab only - the payload pays for coverage elsewhere",
+			"sides": {
+				"front": {
+					"material": "armor_plating",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				},
+				"right": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"halvorsen_heavy_a": {
+			"note": "welded heavy: full slab bow, slat over the running gear",
+			"sides": {
+				"front": {
+					"material": "steel_plate",
+					"thickness": 2.2
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.4
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 1.1
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"halvorsen_light_a": {
+			"note": "welded light: steel bow, slat flanks",
+			"sides": {
+				"front": {
+					"material": "steel_plate",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.2
+				}
+			}
+		},
+		"halvorsen_medium_a": {
+			"note": "welded medium: steel bow and deck, slat flank cages",
+			"sides": {
+				"front": {
+					"material": "steel_plate",
+					"thickness": 1.7
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.3
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.8
+				},
+				"back": {
+					"material": "steel_plate",
+					"thickness": 0.8
+				}
+			}
+		},
+		"halvorsen_oddball_a": {
+			"note": "wide-beam crane hull: broad flat deck plated against airburst",
+			"sides": {
+				"top": {
+					"material": "steel_plate",
+					"thickness": 1.5
+				},
+				"front": {
+					"material": "steel_plate",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.1
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.1
+				}
+			}
+		},
+		"halvorsen_scout_a": {
+			"note": "yard scout: slat cage on the flanks only",
+			"sides": {
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.0
+				},
+				"front": {
+					"material": "steel_plate",
+					"thickness": 1.1
+				}
+			}
+		},
+		"halvorsen_transport_a": {
+			"note": "yard carrier: steel bow, slat sides, open top",
+			"sides": {
+				"front": {
+					"material": "steel_plate",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.3
+				}
+			}
+		},
+		"hartmann_heavy_a": {
+			"note": "heavy panzer: reactive bow, hardened belt, reactive roof vs top-attack",
+			"sides": {
+				"front": {
+					"material": "reactive_armor",
+					"thickness": 2.1
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.4
+				},
+				"top": {
+					"material": "reactive_armor",
+					"thickness": 1.1
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.0
+				}
+			}
+		},
+		"hartmann_light_a": {
+			"note": "light panzer: reactive bow, hardened flanks",
+			"sides": {
+				"front": {
+					"material": "reactive_armor",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 0.9
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 0.9
+				}
+			}
+		},
+		"hartmann_medium_a": {
+			"note": "medium panzer: reactive bow and flanks, hardened back",
+			"sides": {
+				"front": {
+					"material": "reactive_armor",
+					"thickness": 1.7
+				},
+				"left": {
+					"material": "reactive_armor",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "reactive_armor",
+					"thickness": 1.2
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 0.9
+				},
+				"top": {
+					"material": "hardened_steel",
+					"thickness": 0.7
+				}
+			}
+		},
+		"hartmann_oddball_a": {
+			"note": "engineer panzer: low, wide, reactive underside against mines",
+			"sides": {
+				"front": {
+					"material": "reactive_armor",
+					"thickness": 1.5
+				},
+				"bottom": {
+					"material": "reactive_armor",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.0
+				}
+			}
+		},
+		"hartmann_scout_a": {
+			"note": "recon panzer: a reactive brick row on the nose, bare steel flanks",
+			"sides": {
+				"front": {
+					"material": "reactive_armor",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 0.7
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 0.7
+				}
+			}
+		},
+		"hartmann_transport_a": {
+			"note": "panzergrenadier carrier: reactive bow, hardened crew box",
+			"sides": {
+				"front": {
+					"material": "reactive_armor",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.2
+				}
+			}
+		},
+		"hexton_heavy_a": {
+			"note": "laminate heavy: full composite envelope including the belly",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 2.0
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.5
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.5
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 1.1
+				},
+				"top": {
+					"material": "composite_plate",
+					"thickness": 1.0
+				},
+				"bottom": {
+					"material": "composite_plate",
+					"thickness": 0.8
+				}
+			}
+		},
+		"hexton_light_b": {
+			"note": "laminate light: uniform composite tub",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.0
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 0.8
+				},
+				"top": {
+					"material": "composite_plate",
+					"thickness": 0.7
+				}
+			}
+		},
+		"hexton_medium_a": {
+			"note": "laminate medium: even 1.2 shell, Hexton's signature",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.2
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 1.0
+				},
+				"top": {
+					"material": "composite_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"hexton_medium_b": {
+			"note": "thicker laminate: same scheme, one step up",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.7
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.3
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 1.1
+				},
+				"top": {
+					"material": "composite_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"hexton_oddball_a": {
+			"note": "laminate utility: foam-cored roof over a composite tub",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "ablative_foam",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.1
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.1
+				}
+			}
+		},
+		"hexton_scout_a": {
+			"note": "laminate scout: thin composite shell all round",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.1
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 0.8
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 0.8
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 0.6
+				}
+			}
+		},
+		"hexton_transport_a": {
+			"note": "laminate hauler: composite crew box, unarmored bed",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.1
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.1
+				}
+			}
+		},
+		"kestrel_heavy_a": {
+			"note": "heavy airframe: titanium front and belt, carbon roof - still under weight",
+			"sides": {
+				"front": {
+					"material": "titanium_plate",
+					"thickness": 1.9
+				},
+				"left": {
+					"material": "titanium_plate",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "titanium_plate",
+					"thickness": 1.3
+				},
+				"top": {
+					"material": "carbon_fiber",
+					"thickness": 1.0
+				},
+				"back": {
+					"material": "carbon_fiber",
+					"thickness": 0.9
+				}
+			}
+		},
+		"kestrel_light_a": {
+			"note": "light airframe: titanium bulkhead forward, carbon skin aft",
+			"sides": {
+				"front": {
+					"material": "titanium_plate",
+					"thickness": 1.2
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 0.9
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 0.9
+				}
+			}
+		},
+		"kestrel_medium_a": {
+			"note": "medium airframe: titanium tub, carbon flanks",
+			"sides": {
+				"front": {
+					"material": "titanium_plate",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.2
+				},
+				"top": {
+					"material": "carbon_fiber",
+					"thickness": 0.8
+				}
+			}
+		},
+		"kestrel_oddball_a": {
+			"note": "drone tender: carbon over the launch deck, titanium nose",
+			"sides": {
+				"front": {
+					"material": "titanium_plate",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "carbon_fiber",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.0
+				}
+			}
+		},
+		"kestrel_oddball_b": {
+			"note": "naval drone tender: titanium belt against sea skimmers, ceramic deck",
+			"sides": {
+				"front": {
+					"material": "titanium_plate",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "titanium_plate",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "titanium_plate",
+					"thickness": 1.2
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.1
+				}
+			}
+		},
+		"kestrel_scout_a": {
+			"note": "airframe scout: carbon skin only, nose-forward",
+			"sides": {
+				"front": {
+					"material": "carbon_fiber",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 0.7
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 0.7
+				}
+			}
+		},
+		"kestrel_transport_a": {
+			"note": "air-portable hauler: titanium cab bulkhead, bare bed",
+			"sides": {
+				"front": {
+					"material": "titanium_plate",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 0.9
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 0.9
+				}
+			}
+		},
+		"moreau_heavy_a": {
+			"note": "heavy escort: thick composite belt, foam deck, armored bow",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 2.1
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.7
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.7
+				},
+				"top": {
+					"material": "ablative_foam",
+					"thickness": 1.4
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 1.1
+				}
+			}
+		},
+		"moreau_light_a": {
+			"note": "light patrol: foam blisters, composite wheelhouse",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "ablative_foam",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "ablative_foam",
+					"thickness": 1.3
+				},
+				"top": {
+					"material": "ablative_foam",
+					"thickness": 0.9
+				}
+			}
+		},
+		"moreau_medium_a": {
+			"note": "patrol corvette: composite belt over foam blisters",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 1.3
+				},
+				"top": {
+					"material": "ablative_foam",
+					"thickness": 1.2
+				},
+				"back": {
+					"material": "ablative_foam",
+					"thickness": 1.0
+				}
+			}
+		},
+		"moreau_oddball_a": {
+			"note": "survey ship: foam hull, ceramic instrument deck",
+			"sides": {
+				"front": {
+					"material": "ablative_foam",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.2
+				},
+				"left": {
+					"material": "ablative_foam",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "ablative_foam",
+					"thickness": 1.2
+				}
+			}
+		},
+		"moreau_oddball_b": {
+			"note": "amphibious tender (ground): composite tub, foam skirt",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "ablative_foam",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "ablative_foam",
+					"thickness": 1.3
+				},
+				"bottom": {
+					"material": "ablative_foam",
+					"thickness": 1.0
+				}
+			}
+		},
+		"moreau_scout_a": {
+			"note": "foam-blistered launch: splinter protection, nothing more",
+			"sides": {
+				"front": {
+					"material": "ablative_foam",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "ablative_foam",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "ablative_foam",
+					"thickness": 1.0
+				}
+			}
+		},
+		"moreau_transport_a": {
+			"note": "sea lift: foam collar all round, no deck armor",
+			"sides": {
+				"front": {
+					"material": "ablative_foam",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "ablative_foam",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "ablative_foam",
+					"thickness": 1.4
+				}
+			}
+		},
+		"orrin_heavy_a": {
+			"note": "tumblehome heavy: the roster's deepest standoff array over a ceramic belt",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.9
+				},
+				"top": {
+					"material": "spaced_composite",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 1.5
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 1.5
+				},
+				"back": {
+					"material": "ablative_ceramic",
+					"thickness": 1.0
+				}
+			}
+		},
+		"orrin_light_a": {
+			"note": "light tumblehome: spaced bow, ceramic flanks",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 1.0
+				}
+			}
+		},
+		"orrin_medium_a": {
+			"note": "tumblehome medium: spaced bow and roof, ceramic belt",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "spaced_composite",
+					"thickness": 1.1
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 1.2
+				}
+			}
+		},
+		"orrin_oddball_a": {
+			"note": "wide command car: spaced roof for the mast, ceramic sponsons",
+			"sides": {
+				"top": {
+					"material": "spaced_composite",
+					"thickness": 1.5
+				},
+				"front": {
+					"material": "ablative_ceramic",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 1.2
+				}
+			}
+		},
+		"orrin_oddball_b": {
+			"note": "tall barbette hull: spaced bow, ceramic all round, thick roof",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.6
+				},
+				"top": {
+					"material": "ablative_ceramic",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 1.3
+				},
+				"back": {
+					"material": "ablative_ceramic",
+					"thickness": 1.0
+				}
+			}
+		},
+		"orrin_scout_a": {
+			"note": "tumblehome picket: spaced bow plate over a thin ceramic belt",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 0.8
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 0.8
+				}
+			}
+		},
+		"orrin_transport_a": {
+			"note": "tumblehome carrier: spaced bow only, ceramic crew box",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 1.1
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 1.1
+				}
+			}
+		},
+		"pillar_heavy_a": {
+			"note": "breakthrough tank: slab bow, full belt",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 2.4
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.6
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.6
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.1
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"pillar_heavy_b": {
+			"note": "siege tank: titanium bow over a steel belt - the turtle build",
+			"sides": {
+				"front": {
+					"material": "titanium_plate",
+					"thickness": 2.6
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.7
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.7
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.2
+				},
+				"top": {
+					"material": "hardened_steel",
+					"thickness": 1.0
+				},
+				"bottom": {
+					"material": "steel_plate",
+					"thickness": 0.7
+				}
+			}
+		},
+		"pillar_medium_a": {
+			"note": "iron medium: heavy even plate, no clever spots",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 2.0
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.4
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.0
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"pillar_medium_b": {
+			"note": "iron medium heavy: thicker again, roof included",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 2.2
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.5
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.5
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.1
+				},
+				"top": {
+					"material": "hardened_steel",
+					"thickness": 1.0
+				}
+			}
+		},
+		"pillar_transport_a": {
+			"note": "iron carrier: heavy cab, plated flanks",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.8
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.3
+				}
+			}
+		},
+		"pillar_transport_c": {
+			"note": "heavy iron carrier: long hull, even belt, plated roof",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.9
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.4
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"rackham_heavy_a": {
+			"note": "forge heavy: hardened slab bow, slat cage, bare rear",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 2.2
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.5
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.9
+				}
+			}
+		},
+		"rackham_heavy_b": {
+			"note": "forge assault: hardened everywhere, slat on top of it",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 2.3
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.6
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.6
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.1
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 1.0
+				}
+			}
+		},
+		"rackham_light_a": {
+			"note": "forge light: hardened bow, slat standoff",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.5
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.2
+				}
+			}
+		},
+		"rackham_medium_a": {
+			"note": "forge medium: hardened bow and belt, slat over the sponsons",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.8
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.4
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 0.8
+				}
+			}
+		},
+		"rackham_scout_a": {
+			"note": "forge scout: slat skirt, hardened nose",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.0
+				}
+			}
+		},
+		"rackham_transport_a": {
+			"note": "forge carrier: hardened cab, slat troop bay",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 1.7
+				},
+				"left": {
+					"material": "slat_armor",
+					"thickness": 1.3
+				},
+				"right": {
+					"material": "slat_armor",
+					"thickness": 1.3
+				}
+			}
+		},
+		"rampart_main_meridian": {
+			"note": "Meridian rampart: laminated wall, spaced crest",
+			"sides": {
+				"front": {
+					"material": "composite_plate",
+					"thickness": 2.8
+				},
+				"top": {
+					"material": "spaced_composite",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "composite_plate",
+					"thickness": 2.0
+				},
+				"right": {
+					"material": "composite_plate",
+					"thickness": 2.0
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 1.5
+				}
+			}
+		},
+		"rampart_main_osterholm": {
+			"note": "Osterholm rampart: reactive face on a rolled-steel wall",
+			"sides": {
+				"front": {
+					"material": "reactive_armor",
+					"thickness": 3.0
+				},
+				"top": {
+					"material": "hardened_steel",
+					"thickness": 1.7
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 2.2
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 2.2
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.6
+				}
+			}
+		},
+		"rampart_main_tidemark": {
+			"note": "Tidemark rampart: ceramic seawall face, foam-backed",
+			"sides": {
+				"front": {
+					"material": "ablative_ceramic",
+					"thickness": 2.8
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.6
+				},
+				"left": {
+					"material": "ablative_foam",
+					"thickness": 2.0
+				},
+				"right": {
+					"material": "ablative_foam",
+					"thickness": 2.0
+				},
+				"back": {
+					"material": "ablative_foam",
+					"thickness": 1.5
+				}
+			}
+		},
+		"spectre_heavy_a": {
+			"note": "stealth heavy: ceramic bow, carbon belt, nylon rear",
+			"sides": {
+				"front": {
+					"material": "ceramic_ablative",
+					"thickness": 1.8
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.4
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.4
+				},
+				"top": {
+					"material": "carbon_fiber",
+					"thickness": 1.0
+				},
+				"back": {
+					"material": "ballistic_nylon",
+					"thickness": 0.9
+				}
+			}
+		},
+		"spectre_light_b": {
+			"note": "stealth light: nylon liner, ceramic bow",
+			"sides": {
+				"front": {
+					"material": "ceramic_ablative",
+					"thickness": 1.1
+				},
+				"left": {
+					"material": "ballistic_nylon",
+					"thickness": 0.9
+				},
+				"right": {
+					"material": "ballistic_nylon",
+					"thickness": 0.9
+				}
+			}
+		},
+		"spectre_medium_a": {
+			"note": "stealth medium: ceramic bow over a nylon tub",
+			"sides": {
+				"front": {
+					"material": "ceramic_ablative",
+					"thickness": 1.4
+				},
+				"left": {
+					"material": "ballistic_nylon",
+					"thickness": 1.1
+				},
+				"right": {
+					"material": "ballistic_nylon",
+					"thickness": 1.1
+				},
+				"top": {
+					"material": "carbon_fiber",
+					"thickness": 0.8
+				}
+			}
+		},
+		"spectre_medium_b": {
+			"note": "stealth medium heavy: carbon shell, ceramic bow and roof",
+			"sides": {
+				"front": {
+					"material": "ceramic_ablative",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.0
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.2
+				}
+			}
+		},
+		"spectre_oddball_a": {
+			"note": "EW hull: ceramic roof for the array, carbon flanks",
+			"sides": {
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.4
+				},
+				"front": {
+					"material": "carbon_fiber",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "carbon_fiber",
+					"thickness": 1.0
+				},
+				"right": {
+					"material": "carbon_fiber",
+					"thickness": 1.0
+				}
+			}
+		},
+		"spectre_scout_a": {
+			"note": "stealth scout: nylon liner only",
+			"sides": {
+				"front": {
+					"material": "ballistic_nylon",
+					"thickness": 1.1
+				},
+				"left": {
+					"material": "ballistic_nylon",
+					"thickness": 0.7
+				},
+				"right": {
+					"material": "ballistic_nylon",
+					"thickness": 0.7
+				}
+			}
+		},
+		"spectre_transport_a": {
+			"note": "stealth insertion carrier: ceramic bow, nylon-lined bay",
+			"sides": {
+				"front": {
+					"material": "ceramic_ablative",
+					"thickness": 1.3
+				},
+				"left": {
+					"material": "ballistic_nylon",
+					"thickness": 1.2
+				},
+				"right": {
+					"material": "ballistic_nylon",
+					"thickness": 1.2
+				}
+			}
+		},
+		"tower_main_meridian": {
+			"note": "Meridian tower: tall and thin, spaced upper works",
+			"sides": {
+				"front": {
+					"material": "spaced_composite",
+					"thickness": 2.0
+				},
+				"left": {
+					"material": "spaced_composite",
+					"thickness": 1.7
+				},
+				"right": {
+					"material": "spaced_composite",
+					"thickness": 1.7
+				},
+				"back": {
+					"material": "composite_plate",
+					"thickness": 1.4
+				},
+				"top": {
+					"material": "composite_plate",
+					"thickness": 1.6
+				}
+			}
+		},
+		"tower_main_osterholm": {
+			"note": "Osterholm tower: steel mast tower, plated all round",
+			"sides": {
+				"front": {
+					"material": "hardened_steel",
+					"thickness": 2.2
+				},
+				"left": {
+					"material": "hardened_steel",
+					"thickness": 1.8
+				},
+				"right": {
+					"material": "hardened_steel",
+					"thickness": 1.8
+				},
+				"back": {
+					"material": "hardened_steel",
+					"thickness": 1.5
+				},
+				"top": {
+					"material": "steel_plate",
+					"thickness": 1.6
+				}
+			}
+		},
+		"tower_main_tidemark": {
+			"note": "Tidemark tower: ceramic-clad light tower, thin roof",
+			"sides": {
+				"front": {
+					"material": "ablative_ceramic",
+					"thickness": 2.1
+				},
+				"left": {
+					"material": "ablative_ceramic",
+					"thickness": 1.7
+				},
+				"right": {
+					"material": "ablative_ceramic",
+					"thickness": 1.7
+				},
+				"back": {
+					"material": "ceramic_ablative",
+					"thickness": 1.3
+				},
+				"top": {
+					"material": "ceramic_ablative",
+					"thickness": 1.2
+				}
+			}
+		}
+	}
+}

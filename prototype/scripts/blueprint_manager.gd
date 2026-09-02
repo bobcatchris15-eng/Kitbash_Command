@@ -42,6 +42,7 @@ const ModuleCatalogScript = preload("res://scripts/module_catalog.gd")
 const HullSurfaceScript = preload("res://scripts/hull_surface.gd")
 const HullFacetsScript = preload("res://scripts/hull_facets.gd")
 const ArmorPaintScript = preload("res://scripts/armor_paint.gd")
+const HullLoaderScript = preload("res://scripts/hull_loader.gd")
 const ArmorPaintVisualScript = preload("res://scripts/armor_paint_visual.gd")
 # File-level, not the loop-local `var VisualBuilder = preload(...)` inside
 # reconstruct_vehicle's module loop - the ground-contact measurement at the end
@@ -215,6 +216,28 @@ func _find_hull_mesh(hull: Node3D) -> Mesh:
 # Reads the armor block back, re-resolving facet ids against the CURRENT bake
 # when the mesh has changed underneath the save. Returns the assignment array.
 func _deserialize_armor(blueprint_data: Dictionary, hull_type: String, mesh: Mesh = null) -> Array:
+	# PRE-FILL. A blueprint with NO "armor" KEY AT ALL is not a design whose
+	# armor is empty - it is a design that has never had an armor decision made
+	# about it, which in practice means a fresh hull selection in the Design Lab
+	# (module_placer._reconstruct_from_snapshot only carries `armor` forward when
+	# the hull type is UNCHANGED, so switching hull arrives here keyless). Those
+	# get the hull's hand-authored default plan from
+	# data/armor/hull_defaults.json as a starting point.
+	#
+	# WHY THE KEY, NOT THE EMPTINESS. This is the whole guarantee that an
+	# existing save is never overwritten: _serialize_armor() is called
+	# unconditionally by to_dict(), so EVERY saved v3 blueprint carries an
+	# "armor" key even when the player painted nothing. A save therefore never
+	# reaches this branch, a stripped design stays stripped, and editing the
+	# defaults file can never reach backwards into a design already on disk.
+	# The version floor covers the other direction: a v2 save predates the
+	# armor block entirely and must keep loading bare, exactly as it does today.
+	if not blueprint_data.has("armor"):
+		if float(blueprint_data.get("version", CURRENT_BLUEPRINT_VERSION)) < 3.0:
+			return []
+		return ArmorPaintScript.assignments_from_side_plan(
+			hull_type, HullLoaderScript.get_armor_default(hull_type), mesh)
+
 	var block = blueprint_data.get("armor", {})
 	if not (block is Dictionary):
 		# Common: an older save predates the armor block, OR the user saved the

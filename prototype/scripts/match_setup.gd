@@ -296,6 +296,7 @@ func _add_dropdown(parent: Control, label_text: String, labels: PackedStringArra
 	btn.custom_minimum_size = Vector2(260, 36)
 	for l in labels:
 		btn.add_item(l)
+	UITheme.style_dropdown(btn)
 	parent.add_child(btn)
 	return btn
 

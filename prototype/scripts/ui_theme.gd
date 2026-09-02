@@ -212,3 +212,55 @@ static func variation(ctrl: Control, name: String) -> Control:
 		push_warning("UITheme: unknown theme variation '%s'" % name)
 	ctrl.theme_type_variation = name
 	return ctrl
+
+
+# ---------------------------------------------------------------------------
+# DROPDOWN CONTROLS - the last stock-engine glyph left on the setup screens.
+# ---------------------------------------------------------------------------
+# bomber_theme.tres already carries the OptionButton panel/font/PopupMenu
+# styleboxes (tools/build_ui_theme.gd), so the CLOSED plate and the popup
+# list panel already read as this game's chrome. What still reads as a
+# default engine control is the caret: OptionButton falls back to the
+# built-in theme's triangle icon whenever no "arrow" icon override is set,
+# and nothing set one. This paints a small flat amber chevron that matches
+# the rest of the control's type colour instead of the stock grey wedge.
+static var _arrow_icon_cache: ImageTexture = null
+
+static func _dropdown_arrow_icon() -> ImageTexture:
+	if _arrow_icon_cache != null:
+		return _arrow_icon_cache
+	# 12x8, a flat-shaded downward chevron in ACCENT_INTERACTIVE. Procedural
+	# rather than an authored SVG: this is a single-purpose glyph reused by
+	# every dropdown in the game, not a HUD icon with its own asset entry.
+	var w := 12
+	var h := 8
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var col := Tokens.ACCENT_INTERACTIVE
+	for y in range(h):
+		# Widest at the top, narrowing to a point - a chevron, not a full
+		# triangle, so it reads as "opens a list" rather than "play".
+		var inset := int(float(y) / float(h - 1) * (w / 2.0))
+		for x in range(inset, w - inset):
+			img.set_pixel(x, y, col)
+	var tex := ImageTexture.create_from_image(img)
+	_arrow_icon_cache = tex
+	return tex
+
+
+# Applies the project's dropdown language to a stock OptionButton: the flat
+# amber chevron above, a consistent minimum height off HIT_TARGET_MIN so
+# every selector on a settings grid lines up, and the body type size so the
+# closed label matches the rest of the form instead of the engine default.
+#
+# Call this on every OptionButton the setup screens build - match_setup.gd,
+# operations_setup.gd's difficulty and per-engagement map pickers. The panel
+# and popup styling already come free from the shared Theme resource; this
+# is only the piece a StyleBox cannot express.
+static func style_dropdown(btn: OptionButton) -> OptionButton:
+	btn.add_theme_icon_override("arrow", _dropdown_arrow_icon())
+	btn.add_theme_constant_override("arrow_margin", Tokens.SPACE_SM)
+	btn.add_theme_font_size_override("font_size", Tokens.FONT_BODY)
+	if btn.custom_minimum_size.y < Tokens.HIT_TARGET_MIN:
+		btn.custom_minimum_size.y = Tokens.HIT_TARGET_MIN
+	return btn

@@ -47,9 +47,17 @@ const SIDES := ["front", "back", "left", "right", "top", "bottom"]
 # mid weapon module - and a full 3.0x turtle build adds ~300 kg, which is a
 # real drivetrain trade rather than a free win. Slat is mostly daylight and
 # nylon is a fabric; both are deliberately light.
+# slat_armor is an ALIAS of steel_plate/hardened_steel/armor_plating in
+# ARMOR_TABLE (damage_resolver.gd) - identical threshold/pass_through on every
+# damage class, because it always was a literal copy of the same row. It used
+# to also carry a lighter density (1.0 vs 2.0) and cheaper cost (0.6 vs 1.0),
+# which made it a strict upgrade over steel_plate: same protection, half the
+# weight, 60% the cost, no reason to ever pick steel. Equalized here rather
+# than given a fake stat split, since the two are the same material by any
+# combat measure that exists.
 const MATERIAL_DENSITY := {
 	"steel_plate": 2.0, "hardened_steel": 2.0, "armor_plating": 2.0,
-	"titanium_plate": 1.5, "slat_armor": 1.0,
+	"titanium_plate": 1.5, "slat_armor": 2.0,
 	"composite_plate": 1.5, "reactive_armor": 1.5, "spaced_composite": 1.5,
 	"ceramic_ablative": 1.2, "ablative_ceramic": 1.2, "ablative_foam": 1.0,
 	"ballistic_nylon": 0.5, "carbon_fiber": 0.5,
@@ -62,7 +70,7 @@ const MATERIAL_DENSITY := {
 const MATERIAL_COST := {
 	"steel_plate": Vector2(1.0, 0.0), "hardened_steel": Vector2(1.0, 0.0),
 	"armor_plating": Vector2(1.0, 0.0), "titanium_plate": Vector2(1.2, 0.2),
-	"slat_armor": Vector2(0.6, 0.0),
+	"slat_armor": Vector2(1.0, 0.0),
 	"composite_plate": Vector2(1.4, 0.3), "reactive_armor": Vector2(1.4, 0.3),
 	"spaced_composite": Vector2(1.4, 0.3),
 	"ceramic_ablative": Vector2(1.2, 0.4), "ablative_ceramic": Vector2(1.2, 0.4),
@@ -139,6 +147,7 @@ static func build_plan(hull_type_id: String, assignments: Array,
 	# Fold the assignments in.
 	var painted := {}
 	var total_painted := 0.0
+	var total_thick_w := 0.0
 	var total_area := 0.0
 	for f in range(count):
 		total_area += world_area[f]
@@ -177,6 +186,7 @@ static func build_plan(hull_type_id: String, assignments: Array,
 		}
 		painted[fid] = entry
 		total_painted += area
+		total_thick_w += area * float(entry["thickness"])
 		var thickness := float(entry["thickness"])
 		var material := str(entry["material"])
 		weight += area * thickness * float(MATERIAL_DENSITY.get(material,
@@ -217,6 +227,12 @@ static func build_plan(hull_type_id: String, assignments: Array,
 	plan["facets"] = painted
 	plan["sides"] = sides
 	plan["coverage"] = (total_painted / total_area) if total_area > 1e-9 else 0.0
+	# Hull-wide area-weighted mean thickness over painted facets only - the AoE
+	# path (damage_resolver.gd's `whole` dict) needs a single thickness figure
+	# for the same reason _blend_side's per-side one does: a 3.0x-thickness
+	# build must not silently resolve as 1.0x just because the hit had no
+	# direction to pin to a facet or side.
+	plan["mean_thickness"] = (total_thick_w / total_painted) if total_painted > 1e-9 else 0.0
 	plan["area"] = total_painted
 	plan["total_area"] = total_area
 	plan["weight"] = weight
@@ -281,6 +297,7 @@ static func _empty_plan(hull_type_id: String) -> Dictionary:
 		"facets": {},
 		"sides": sides,
 		"coverage": 0.0,
+		"mean_thickness": 0.0,
 		"area": 0.0,
 		"total_area": 0.0,
 		"weight": 0.0,

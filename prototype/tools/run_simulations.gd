@@ -20,7 +20,7 @@ extends SceneTree
 #   * resolves damage through the REAL shared math (DamageResolver.
 #     compute_hull_damage / get_material_threshold - the same functions
 #     battle_unit.gd and building.gd call on every hit, so chip-through,
-#     the brute-force blend and the per-material reduction multipliers all
+#     the brute-force blend and the per-material pass_through multipliers all
 #     apply exactly as they do in a match),
 #   * builds its target archetypes out of REAL hulls at REAL computed HP
 #     (ModuleCatalog.compute_hull_max_hp),
@@ -376,7 +376,7 @@ func _recompute_row(type_id: String) -> void:
 	# "Alpha" classification. A weapon whose per-shot damage clears
 	# BRUTE_FORCE_RATIO x threshold on most archetypes is being resolved
 	# almost entirely through DamageResolver's brute-force blend, which
-	# lerps every material's reduction multiplier toward 1.0 - so all four
+	# lerps every material's pass_through multiplier toward 1.0 - so all four
 	# materials converge and its spread is near zero BY DESIGN. That is the
 	# documented identity of a heavy weapon ("an overwhelmingly large hit
 	# punches straight through the mitigation multipliers"), not a balance

@@ -178,7 +178,7 @@ static func weakest_class_against(material: String) -> String:
 
 
 # The effective DPS a weapon deals against a specific armor material, accounting
-# for threshold and reduction. Used to rank counter-picks.
+# for threshold and pass_through. Used to rank counter-picks.
 #
 # Uses single-hit math: dps * fire_interval gives per-shot damage, then
 # resolve through armor, then back to DPS. This is the same math
@@ -193,9 +193,9 @@ static func effective_dps_against(dps: float, fire_interval: float,
 		return dps
 	var entry: Array = row.get(damage_class, [10.0, 0.8])
 	var threshold: float = float(entry[0]) * thickness
-	var reduction: float = float(entry[1])
+	var pass_through: float = float(entry[1])
 	var resolved: float = DamageResolverScript.compute_hull_damage(
-		per_shot, threshold, reduction)
+		per_shot, threshold, pass_through)
 	return resolved / fire_interval if fire_interval > 0.0 else 0.0
 
 
@@ -397,10 +397,10 @@ static func best_material_against(damage_class: String) -> String:
 		var row: Dictionary = DamageResolverScript.ARMOR_TABLE[mat]
 		var entry: Array = row.get(damage_class, [10.0, 0.8])
 		var threshold: float = float(entry[0])
-		# Prefer higher threshold AND lower reduction (more protection)
-		# Combined score: threshold * (1.0 - reduction) gives "effective block"
-		var reduction: float = float(entry[1])
-		var effectiveness: float = threshold * (1.0 - reduction)
+		# Prefer higher threshold AND lower pass_through (more protection)
+		# Combined score: threshold * (1.0 - pass_through) gives "effective block"
+		var pass_through: float = float(entry[1])
+		var effectiveness: float = threshold * (1.0 - pass_through)
 		if effectiveness > best_threshold:
 			best_threshold = effectiveness
 			best_mat = mat

@@ -8,6 +8,7 @@ extends SceneTree
 const BlueprintManagerScript = preload("res://scripts/blueprint_manager.gd")
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const VisualBuilder = preload("res://scripts/visual_builder.gd")
+const BlueprintThumbnail = preload("res://scripts/blueprint_thumbnail.gd")
 
 const PART_IDS := [
 	"plasma_thruster", "anti_grav_plate", "wheels", "air_cushion_skirt",
@@ -105,18 +106,20 @@ func _v3(v: Vector3) -> String:
 	return "%.2f,%.2f,%.2f" % [v.x, v.y, v.z]
 
 
-# Walks the tree exactly like BlueprintThumbnail.merged_aabb (VisualInstance3D
-# nodes only, transform-composed), but also tracks the single child whose own
-# world-space AABB has the largest diagonal - the "widest contributor".
+# Measures via the real shared helper, BlueprintThumbnail.merged_aabb(), so
+# this probe proves the actual framing behavior rather than a stale replica of
+# it. Widest-contributor tracking walks the same tree but applies the same
+# exclusion filter as merged_aabb() (skip Light3D / GPUParticles3D /
+# CPUParticles3D) so it never names a node the shared helper wouldn't count.
 func _measure(subject_name: String, model: Node3D) -> Dictionary:
+	var out: AABB = BlueprintThumbnail.merged_aabb(model, Transform3D.IDENTITY)
+	var has_any: bool = out.size != Vector3.ZERO
+
 	var node_count := 0
 	var widest_name := "<none>"
 	var widest_extent := -1.0
 
 	var stack: Array = [[model, Transform3D.IDENTITY]]
-	var out := AABB()
-	var has_any := false
-
 	while stack.size() > 0:
 		var top: Array = stack.pop_back()
 		var node: Node = top[0]
@@ -127,16 +130,11 @@ func _measure(subject_name: String, model: Node3D) -> Dictionary:
 		if node is Node3D:
 			local = xform * (node as Node3D).transform
 
-		if node is VisualInstance3D:
+		if node is VisualInstance3D and not (node is Light3D) and not (node is GPUParticles3D) and not (node is CPUParticles3D):
 			var vi := node as VisualInstance3D
 			var box: AABB = vi.get_aabb()
 			if box.size != Vector3.ZERO:
 				var world_box: AABB = local * box
-				if has_any:
-					out = out.merge(world_box)
-				else:
-					out = world_box
-					has_any = true
 				var this_extent: float = world_box.size.length()
 				if this_extent > widest_extent:
 					widest_extent = this_extent

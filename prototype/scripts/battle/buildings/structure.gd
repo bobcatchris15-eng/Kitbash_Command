@@ -20,6 +20,7 @@ const LiveryScript = preload("res://scripts/livery.gd")
 const BuildingMeshScript = preload("res://scripts/battle/buildings/building_mesh.gd")
 const BattleFinishScript = preload("res://scripts/battle/battle_finish.gd")
 const TerrainBuilder = preload("res://scripts/terrain_builder.gd")
+const VFXEffects = preload("res://scripts/vfx_effects.gd")
 
 signal died(structure)
 
@@ -30,6 +31,13 @@ var hp: float = 1000.0
 var is_dead: bool = false
 var footprint := Vector3(5, 3, 5)
 var display_name: String = ""
+
+# Persistent burning DoT state
+var _burn_time_remaining: float = 0.0
+var _burn_tick_timer: float = 0.0
+var _burn_dps: float = 0.0
+var _burn_hit_origin = null
+const BURN_TICK_INTERVAL: float = 0.25
 
 # Construction lifecycle
 var build_incomplete: bool = false
@@ -78,6 +86,7 @@ var _mesh: MeshInstance3D = null
 func _ready() -> void:
 	add_to_group("structures")
 	add_to_group("damageable")
+	set_physics_process(false)
 
 
 func get_display_name() -> String:
@@ -446,6 +455,27 @@ func exit_position() -> Vector3:
 # there is nothing for those to act on. Routing through the resolver anyway is
 # what keeps a thermal weapon good against buildings and a kinetic one mediocre,
 # instead of every gun doing flat damage to bases.
+# Persistent burning status effect from flamethrower/incendiary fuel
+func apply_burn(duration: float, dps: float, attacker_team: int = -1, hit_origin = null) -> void:
+	if is_dead:
+		return
+	_burn_time_remaining = maxf(_burn_time_remaining, duration)
+	_burn_dps = maxf(_burn_dps, dps)
+	_burn_hit_origin = hit_origin
+	set_physics_process(true)
+	VFXEffects.attach_target_burn(self, _burn_time_remaining)
+
+func _physics_process(delta: float) -> void:
+	if _burn_time_remaining <= 0.0 or is_dead:
+		set_physics_process(false)
+		return
+	_burn_time_remaining -= delta
+	_burn_tick_timer += delta
+	if _burn_tick_timer >= BURN_TICK_INTERVAL:
+		var tick_damage = _burn_dps * _burn_tick_timer
+		_burn_tick_timer = 0.0
+		take_damage(tick_damage, "thermal", _burn_hit_origin)
+
 func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = null) -> void:
 	if is_dead:
 		return

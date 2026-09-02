@@ -1009,7 +1009,7 @@ func _alpha_regime_color(regime: String) -> Variant:
 
 
 func _build_alpha_readout() -> void:
-	var target_parent = _diag_container if (_diag_container and is_instance_valid(_diag_container)) else _rail_vbox
+	var target_parent = _rail_vbox
 
 	_alpha_label = Label.new()
 	_alpha_label.theme_type_variation = "StatLabel"
@@ -1056,15 +1056,15 @@ func _update_alpha_readout(wa: Dictionary) -> void:
 	# but a player who has just noticed that dragging caliber barely moves Total
 	# DPS while moving this number a lot deserves the sentence that explains why.
 	_alpha_label.tooltip_text = ("What one hit is worth before armour, and the seconds between hits.\n"
-		+ "Armour thresholds gate on THIS, never on total DPS - a shot under the threshold delivers a small chip fraction, and a shot far over it punches through the reduction.\n"
-		+ "Caliber multiplies damage and the shot interval together: total DPS barely moves, but fewer, harder hits is what crosses a threshold.\n"
+		+ "Armour gates on THIS (dps*interval), never on total DPS - under threshold = 8% chip, far over (5x) = brute pierce up to 60% toward full damage.\n"
+		+ "Caliber multiplies damage and interval together: total DPS barely moves, but fewer harder hits cross thresholds.\n"
 		+ "Hardest of %d armed module(s): %s (%s damage).") % [
 			weapons.size(), str(wa.get("hardest", "")), str(wa.get("hardest_class", ""))]
 
-	_alpha_head.text = "Effective DPS vs %.1f plate" % float(wa.get("reference_thickness", 1.0))
-	_alpha_head.tooltip_text = ("What this design actually lands per second on each armour material, summed across every armed module.\n"
-		+ "Quoted at a reference plate thickness rather than at this design's own armour: this table is about what the design DEALS, and the defender it meets has whatever plate its own builder chose.\n"
-		+ "The word on each row is the regime the HARDEST shot is in against that material - hover a row for the per-weapon breakdown.")
+	_alpha_head.text = "Lands vs %.1f plate (defender's own plating)" % float(wa.get("reference_thickness", 1.0))
+	_alpha_head.tooltip_text = ("What this design lands per second on each armour, summed across weapons. Quoted at reference thickness.\n"
+		+ "Titanium (K30) stops kinetic, Ceramic (T28) stops thermal, Reactive (X30) stops explosive, Shielding (E42) stops energy.\n"
+		+ "Row colour: red=CHIP (8% chip), green=BRUTE (pierce), white=through. Hover a row for per-weapon breakdown.")
 
 	var effective: Dictionary = wa.get("effective_dps", {})
 	var regimes: Dictionary = wa.get("regime", {})

@@ -1510,11 +1510,11 @@ func _fire_at_target():
 		_fire_pd_at_missile()
 		return
 		
-	# Spawn a directional muzzle flash (except for silent lasers/beams/harvester/welder).
+	# Spawn a directional muzzle flash (except for continuous stream/beams/harvester/welder).
 	# Flash position is per-weapon from ModuleCatalog.MUZZLE_OFFSETS, scaled by caliber and barrel length.
 	# Directional cone emission sprays particles forward along the local barrel axis.
 	# OmniLight pop is sized by caliber for visibility at RTS zoom.
-	if not type_id in ["heavy_laser", "pd_laser", "resource_harvester", "repair_array"]:
+	if not type_id in ["flamethrower", "heavy_laser", "pd_laser", "resource_harvester", "repair_array"]:
 		var flash_pos = get_muzzle_local_pos()
 		var flash_dir = get_muzzle_local_dir()
 		var light_r = 3.0 + _caliber * 3.0
@@ -2578,10 +2578,11 @@ func _fire_cluster_dispenser():
 			)
 		)
 
-# Persistent flamethrower jet + its smoke, created lazily on the first shot
+# Persistent flamethrower stream mesh, created lazily on the first shot
 # and reused for the life of the weapon (see _fire_flame_spray).
-var _flame_jet: GPUParticles3D = null
-var _flame_smoke: GPUParticles3D = null
+var _flame_arc_mesh: MeshInstance3D = null
+var _flame_arc_im: ImmediateMesh = null
+var _flame_light: OmniLight3D = null
 var _flame_last_fired_at: int = 0
 
 # A continuous emitter has to be told when to stop. The weapon fires in
@@ -2673,12 +2674,70 @@ func _has_forced_target() -> bool:
 	return true
 
 func _update_flame_jet() -> void:
-	if not is_instance_valid(_flame_jet):
+	if _flame_last_fired_at == 0:
 		return
-	if _flame_jet.emitting and Time.get_ticks_msec() - _flame_last_fired_at > FLAME_JET_CUTOFF_MS:
-		_flame_jet.emitting = false
-		if is_instance_valid(_flame_smoke):
-			_flame_smoke.emitting = false
+	var is_still_firing = (Time.get_ticks_msec() - _flame_last_fired_at <= FLAME_JET_CUTOFF_MS)
+	if not is_still_firing:
+		if is_instance_valid(_flame_arc_mesh):
+			_flame_arc_mesh.visible = false
+		if is_instance_valid(_flame_arc_im):
+			_flame_arc_im.clear_surfaces()
+		if is_instance_valid(_flame_light):
+			_flame_light.visible = false
+	else:
+		_update_flame_stream_mesh()
+
+func _update_flame_stream_mesh() -> void:
+	var parent = _effects_parent()
+	if parent == null:
+		return
+	var start_pos = get_muzzle_world_pos()
+	var end_pos = Vector3.ZERO
+	if target and is_instance_valid(target):
+		end_pos = _aim_point(target)
+		var dist = start_pos.distance_to(end_pos)
+		var max_r = fire_range if fire_range > 0.0 else 11.0
+		if dist > max_r:
+			end_pos = start_pos + (end_pos - start_pos).normalized() * max_r
+	else:
+		var forward = -global_transform.basis.z.normalized()
+		var max_r = fire_range if fire_range > 0.0 else 11.0
+		end_pos = start_pos + forward * max_r
+
+	var n_width = 1.0
+	var p_valve = 1.0
+	if has_meta("module_data"):
+		var data = get_meta("module_data")
+		n_width = data.tweaks.get("nozzle_width", 1.0)
+		p_valve = data.tweaks.get("pressure_valve", 1.0)
+
+	if not is_instance_valid(_flame_arc_mesh):
+		_flame_arc_im = ImmediateMesh.new()
+		_flame_arc_mesh = MeshInstance3D.new()
+		_flame_arc_mesh.name = "FlameArcStream"
+		_flame_arc_mesh.mesh = _flame_arc_im
+		_flame_arc_mesh.top_level = true
+		_flame_arc_mesh.global_transform = Transform3D.IDENTITY
+		parent.add_child(_flame_arc_mesh)
+
+	_flame_arc_mesh.visible = true
+	VFXEffects.update_flame_arc_mesh(_flame_arc_im, start_pos, end_pos, n_width, p_valve)
+
+func _apply_target_burn(victim: Node3D, duration: float, burn_dps: float) -> void:
+	if not is_instance_valid(victim):
+		return
+	var origin = _hit_origin(victim)
+	if victim.has_method("apply_burn"):
+		victim.apply_burn(duration, burn_dps, get_team(), origin)
+	else:
+		VFXEffects.attach_target_burn(victim, duration)
+		var ticks = int(duration / 0.25)
+		var per_tick = (burn_dps * duration) / float(max(1, ticks))
+		for i in range(ticks):
+			get_tree().create_timer((i + 1) * 0.25).timeout.connect(func():
+				if is_instance_valid(victim) and victim.has_method("take_damage"):
+					victim.take_damage(per_tick, "thermal", origin)
+			)
 
 func _fire_flame_spray():
 	var n_width = 1.0
@@ -2697,39 +2756,40 @@ func _fire_flame_spray():
 			rec_tween.tween_property(c, "position", orig_pos, 0.12)
 			break
 
-	# ONE persistent GPU-particle jet, created on the first shot and only
-	# switched on thereafter (see scripts/vfx_effects.gd).
-	#
-	# This used to allocate SIX MeshInstance3D spheres and SIX Tweens per
-	# shot. At the flamethrower's fire_rate that is roughly 100 nodes and 100
-	# tweens created and destroyed every second, per weapon, all on the main
-	# thread - and six shaded spheres flying in formation never read as fire
-	# anyway, because fire has no surface. The jet now costs one draw call
-	# and allocates nothing per shot.
-	#
-	# The jet is aimed by the weapon's own transform (it emits along local
-	# -Z, the same axis the barrel points), so it tracks turret traverse for
-	# free instead of being re-aimed at target.global_position per shot.
-	if not is_instance_valid(_flame_jet):
-		var reach = fire_range if fire_range > 0.0 else 8.0
-		_flame_jet = VFXEffects.make_flame_emitter(self, reach, n_width)
-		_flame_smoke = VFXEffects.make_flame_smoke_emitter(self, reach)
-	_flame_jet.emitting = true
-	if is_instance_valid(_flame_smoke):
-		_flame_smoke.emitting = true
-	# _physics_process shuts the jet off once firing stops; a continuous
-	# emitter has no natural end the way a per-shot tween did.
-	_flame_last_fired_at = Time.get_ticks_msec()
+	var m_pos = get_muzzle_local_pos()
+	if not is_instance_valid(_flame_light):
+		_flame_light = OmniLight3D.new()
+		_flame_light.name = "FlameMuzzleLight"
+		_flame_light.light_color = Color(1.0, 0.55, 0.15)
+		_flame_light.light_energy = 2.5
+		_flame_light.omni_range = 5.0
+		_flame_light.omni_attenuation = 0.9
+		_flame_light.light_bake_mode = Light3D.BAKE_DISABLED
+		add_child(_flame_light)
+		_flame_light.position = m_pos
 
-	# Damage timing is preserved EXACTLY as it was: one application per shot,
-	# delayed by the same flight duration the old tween used, guarded by the
-	# same is_instance_valid(target) check. Only the visual changed here, so
-				# flamethrower DPS and its feel in combat are untouched.
-	var flight_dur = 0.35 * p_valve
+	if is_instance_valid(_flame_light):
+		_flame_light.visible = true
+
+	_flame_last_fired_at = Time.get_ticks_msec()
+	_update_flame_stream_mesh()
+
+	# High-pressure stream flight duration
+	var flight_dur = clampf(0.28 / maxf(p_valve, 0.5), 0.12, 0.45)
 	var victim = target
 	get_tree().create_timer(flight_dur).timeout.connect(func():
 		if is_instance_valid(self) and is_instance_valid(victim):
-			_deal_weapon_damage(victim, dps * fire_rate))
+			# Direct stream impact damage
+			var direct_damage = dps * fire_rate * 0.70
+			_deal_weapon_damage(victim, direct_damage)
+			# Burning fuel drenches target, applying DoT and attached flames
+			var burn_dps = dps * 0.40
+			_apply_target_burn(victim, 3.0, burn_dps)
+			var parent = _effects_parent()
+			if parent != null:
+				var hit_pt = _aim_point(victim)
+				VFXEffects.fire_burst(parent, hit_pt, 1.2 * n_width)
+	)
 
 func _fire_continuous_beam():
 	var parent = _effects_parent()

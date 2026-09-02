@@ -102,6 +102,14 @@ const MATERIAL_LABELS := {
 	"energy_shielding": "Shielding",
 }
 
+const DAMAGE_LETTER := {"kinetic": "K", "thermal": "T", "explosive": "X", "energy": "E"}
+const DAMAGE_COLOR := {
+	"kinetic": Color(0.68, 0.68, 0.72, 1.0),
+	"thermal": Color(0.90, 0.32, 0.22, 1.0),
+	"explosive": Color(0.85, 0.62, 0.15, 1.0),
+	"energy": Color(0.35, 0.68, 0.95, 1.0),
+}
+
 
 static func short_label(material: String) -> String:
 	if MATERIAL_LABELS.has(material):

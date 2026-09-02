@@ -239,6 +239,9 @@ const TWEAK_RESPONSE := {
 	],
 	"ornithopter_wing": [
 		{"keys": ["wingspan", "size"], "ref": 1.0, "thrust": 1.0, "capacity": 1.0},
+		# Swept wings trade low-speed lift authority for top speed - the
+		# classic swept-wing trade, wired so the slider changes flight stats.
+		{"keys": ["wing_sweep"], "ref": 1.0, "thrust": 0.5, "capacity": -0.4},
 	],
 	# An airship's lift is buoyancy, not thrust: extra cruise engines make it
 	# faster and carry nothing extra. The -1.0 exactly cancels the per-node

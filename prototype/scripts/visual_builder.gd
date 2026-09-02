@@ -591,8 +591,8 @@ static func make_module_data(type_id: String) -> ModuleData:
 	mod_data.cost_metal = catalog_data.get("cost_metal", 10)
 	mod_data.cost_crystal = catalog_data.get("cost_crystal", 0)
 	mod_data.base_dps = catalog_data.get("base_dps", 0.0)
-	mod_data.base_energy_capacity = catalog_data.get("base_energy_capacity", 0.0)
-	mod_data.base_power_output = catalog_data.get("base_power_output", 0.0)
+	mod_data.base_energy_capacity = catalog_data.get("energy_capacity", 0.0)
+	mod_data.base_power_output = catalog_data.get("power_output", 0.0)
 	mod_data.base_heal_rate = catalog_data.get("base_heal_rate", 0.0)
 	mod_data.base_vision_bonus = catalog_data.get("vision_bonus", catalog_data.get("base_vision_bonus", 0.0))
 	if catalog_data.has("default_tweaks"):
@@ -1443,6 +1443,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 	elif type_id in ["cluster_dispenser", "cluster_launcher"]:
 		var dispersion = tweaks.get("dispersion", 1.0)
 		var payload_size = tweaks.get("payload_size", 1.0)
+		var barrel_len = tweaks.get("barrel_length", 1.0)
 		var tube_count = int(tweaks.get("tube_count", 2.0))
 		tube_count = clamp(tube_count, 1, 4)
 
@@ -1474,12 +1475,12 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var house_w = (0.85 + (tube_count - 1) * 0.15) * dispersion
 		if housing_mesh:
 			housing = _mesh_inst(housing_mesh, Color(0.28, 0.22, 0.18))
-			housing.scale = Vector3(house_w, payload_size, dispersion)
+			housing.scale = Vector3(house_w, payload_size, dispersion * barrel_len)
 			housing.position = Vector3(0, trunnion_y, 0)
 		else:
 			housing = MeshInstance3D.new()
 			var h_box = BoxMesh.new()
-			h_box.size = Vector3(0.42 * house_w, 0.32 * payload_size, 0.70 * dispersion)
+			h_box.size = Vector3(0.42 * house_w, 0.32 * payload_size, 0.70 * dispersion * barrel_len)
 			housing.mesh = h_box
 			var h_mat = StandardMaterial3D.new()
 			h_mat.albedo_color = Color(0.28, 0.22, 0.18)
@@ -1523,6 +1524,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 	elif type_id == "flamethrower":
 		var nozzle_width = tweaks.get("nozzle_width", 1.0)
 		var pressure_valve = tweaks.get("pressure_valve", 1.0)
+		var nozzle_len = tweaks.get("barrel_length", 1.0)
 
 		# 1. MOUNT (flamethrower_mount.glb)
 		var mount_mesh = _part("flamethrower_mount")
@@ -1569,25 +1571,25 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var nozzle_z = 0.0
 		if nozzle_mesh:
 			nozzle = _mesh_inst(nozzle_mesh, Color(0.15, 0.15, 0.15))
-			nozzle.scale = Vector3(nozzle_width, nozzle_width, 1.0)
-			nozzle.position = Vector3(0, trunnion_y, nozzle_z)
+			nozzle.scale = Vector3(nozzle_width, nozzle_width, nozzle_len)
+			nozzle.position = Vector3(0, trunnion_y, nozzle_z - 0.05 * (nozzle_len - 1.0))
 		else:
 			nozzle = MeshInstance3D.new()
 			var n_cyl = CylinderMesh.new()
 			n_cyl.top_radius = 0.08 * nozzle_width
 			n_cyl.bottom_radius = 0.05 * nozzle_width
-			n_cyl.height = 0.35
+			n_cyl.height = 0.35 * nozzle_len
 			nozzle.mesh = n_cyl
 			var n_mat = StandardMaterial3D.new()
 			n_mat.albedo_color = Color(0.15, 0.15, 0.15)
 			nozzle.material_override = n_mat
-			nozzle.position = Vector3(0, trunnion_y, -0.37)
+			nozzle.position = Vector3(0, trunnion_y, -0.37 - 0.175 * (nozzle_len - 1.0))
 			nozzle.rotation = Vector3(PI / 2, 0, 0)
 		parent_node.add_child(nozzle)
 
 	elif type_id == "ion_cannon":
-		var beam_width = tweaks.get("beam_width", 1.0)
-		var ion_density = tweaks.get("ion_density", 1.0)
+		var lens_aperture = tweaks.get("lens_aperture", 1.0)
+		var barrel_length = tweaks.get("barrel_length", 1.0)
 
 		# 1. MOUNT (ion_cannon_mount.glb)
 		var mount_mesh = _part("ion_cannon_mount")
@@ -1596,12 +1598,12 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var mount: MeshInstance3D
 		if mount_mesh:
 			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
-			mount.scale = Vector3(beam_width, 1.0, beam_width)
+			mount.scale = Vector3(lens_aperture, 1.0, lens_aperture)
 			mount.position = Vector3(0, 0, 0)
 		else:
 			mount = MeshInstance3D.new()
 			var m_box = BoxMesh.new()
-			m_box.size = Vector3(0.50 * beam_width, 0.16, 0.50 * beam_width)
+			m_box.size = Vector3(0.50 * lens_aperture, 0.16, 0.50 * lens_aperture)
 			mount.mesh = m_box
 			var m_mat = StandardMaterial3D.new()
 			m_mat.albedo_color = base_color.darkened(0.2)
@@ -1615,35 +1617,35 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var housing: MeshInstance3D
 		if housing_mesh:
 			housing = _mesh_inst(housing_mesh, Color(0.20, 0.24, 0.30))
-			housing.scale = Vector3(beam_width, beam_width, ion_density)
+			housing.scale = Vector3(lens_aperture, lens_aperture, barrel_length)
 			housing.position = Vector3(0, trunnion_y, 0)
 		else:
 			housing = MeshInstance3D.new()
 			var h_cyl = CylinderMesh.new()
-			h_cyl.top_radius = 0.14 * beam_width
-			h_cyl.bottom_radius = 0.14 * beam_width
-			h_cyl.height = 1.20 * ion_density
+			h_cyl.top_radius = 0.14 * lens_aperture
+			h_cyl.bottom_radius = 0.14 * lens_aperture
+			h_cyl.height = 1.20 * barrel_length
 			housing.mesh = h_cyl
 			var h_mat = StandardMaterial3D.new()
 			h_mat.albedo_color = Color(0.20, 0.24, 0.30)
 			housing.material_override = h_mat
-			housing.position = Vector3(0, trunnion_y, -0.60 * ion_density)
+			housing.position = Vector3(0, trunnion_y, -0.60 * barrel_length)
 			housing.rotation = Vector3(PI / 2, 0, 0)
 		parent_node.add_child(housing)
 
 		# 3. FOCUSING LENS (ion_cannon_lens.glb)
 		var lens_mesh = _part("ion_cannon_lens")
 		var lens: MeshInstance3D
-		var lens_z = -0.60 * ion_density
+		var lens_z = -0.60 * barrel_length
 		if lens_mesh:
 			lens = _mesh_inst(lens_mesh, Color(0.25, 0.60, 0.85))
-			lens.scale = Vector3(beam_width, beam_width, beam_width)
+			lens.scale = Vector3(lens_aperture, lens_aperture, lens_aperture)
 			lens.position = Vector3(0, trunnion_y, lens_z)
 		else:
 			lens = MeshInstance3D.new()
 			var l_cyl = CylinderMesh.new()
-			l_cyl.top_radius = 0.08 * beam_width
-			l_cyl.bottom_radius = 0.14 * beam_width
+			l_cyl.top_radius = 0.08 * lens_aperture
+			l_cyl.bottom_radius = 0.14 * lens_aperture
 			l_cyl.height = 0.20
 			lens.mesh = l_cyl
 			var l_mat = StandardMaterial3D.new()
@@ -1929,6 +1931,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var barrel_len = tweaks.get("barrel_length", 1.0) * 0.75
 		var barrel_count = int(tweaks.get("barrel_count", 2.0))
 		barrel_count = clamp(barrel_count, 1, 4)
+		var fuse_tweak = clampf(tweaks.get("fuse_setting", 1.0), 0.5, 2.0)
 
 		# 1. MOUNT (flak_cannon_mount.glb)
 		var mount_mesh = _part("flak_cannon_mount")
@@ -2012,6 +2015,18 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				barrel.position = Vector3(off.x, off.y, -0.55 * barrel_len)
 				barrel.rotation = Vector3(PI / 2, 0, 0)
 				barrel_group.add_child(barrel)
+			# The proximity fuse setter rides the barrel near the muzzle: a
+			# brass ring whose size tracks the fuse setting dial.
+			var fr_torus = TorusMesh.new()
+			fr_torus.inner_radius = 0.055 * caliber * fuse_tweak
+			fr_torus.outer_radius = 0.078 * caliber * fuse_tweak
+			fr_torus.rings = 12
+			fr_torus.ring_segments = 6
+			var fuse_ring = MeshInstance3D.new()
+			fuse_ring.mesh = fr_torus
+			fuse_ring.material_override = _flat_mat(Color(0.83, 0.55, 0.20))
+			fuse_ring.position = Vector3(off.x, off.y, -0.30 * barrel_len)
+			barrel_group.add_child(fuse_ring)
 
 	elif type_id == "repair_array":
 		var arm_count = int(tweaks.get("welder_count", 2.0))
@@ -2237,9 +2252,14 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			mount = MeshInstance3D.new()
 		parent_node.add_child(mount)
 
+		# projector_diameter radially sizes the array ring; coil_count thickens
+		# its coil stack, so both sliders move the visible emitter.
+		var proj_d = clampf(tweaks.get("projector_diameter", 1.0), 0.5, 2.0)
+		var coils = clampf(tweaks.get("coil_count", 4.0), 2.0, 6.0)
 		var array_mesh = _part("energy_barrier_projector_array")
 		var array: MeshInstance3D = _mesh_inst(array_mesh, Color(0.15, 0.65, 0.85)) if array_mesh else MeshInstance3D.new()
 		array.name = "energy_barrier_projector_array"
+		array.scale = Vector3(proj_d, proj_d, proj_d * (1.0 + (coils - 4.0) * 0.12))
 		parent_node.add_child(array)
 
 		var facet = parent_node.get_meta("facet", "front") if parent_node.has_meta("facet") else "front"
@@ -2272,8 +2292,12 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		emitter_pivot.position = Vector3(0, 0.24, 0.06)
 		turret_pivot.add_child(emitter_pivot)
 
+		# barrier_capacity is how much the emitter can absorb - a bigger
+		# absorber is visibly a bigger emitter horn.
+		var bcap = clampf(tweaks.get("barrier_capacity", 1.0), 0.5, 2.5)
 		var emitter_mesh = _part("heavy_barrier_emitter")
 		var emitter: MeshInstance3D = _mesh_inst(emitter_mesh, Color(0.2, 0.75, 0.95)) if emitter_mesh else MeshInstance3D.new()
+		emitter.scale = Vector3.ONE * bcap
 		emitter_pivot.add_child(emitter)
 
 		var field_shield = build_projected_aegis_field(parent_node, tweaks)
@@ -2288,7 +2312,11 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var emitter_mesh = _part("armor_shield_emitter")
 		if emitter_mesh == null:
 			emitter_mesh = _part("energy_barrier_projector_array")
+		# barrier_capacity is shield strength - the generator ring visibly
+		# grows with the capacity dial.
+		var bcap = clampf(tweaks.get("barrier_capacity", 1.0), 0.5, 2.5)
 		var emitter: MeshInstance3D = _mesh_inst(emitter_mesh, Color(0.2, 0.75, 0.95)) if emitter_mesh else MeshInstance3D.new()
+		emitter.scale = Vector3.ONE * bcap
 		emitter.position = Vector3(0, 0.12, 0)
 		parent_node.add_child(emitter)
 
@@ -2832,6 +2860,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				# visible answer to "where does the charge come from".
 				var arc_trunnion_y = 0.352
 				var contain = tweaks.get("containment", 1.0)
+				var arc_len = tweaks.get("barrel_length", 1.0)
 
 				var arc_mount_mesh = _part("arc_projector_mount")
 				if arc_mount_mesh:
@@ -2852,8 +2881,8 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				if arc_em_mesh:
 					var ae = _mesh_inst(arc_em_mesh, Color(0.30, 0.33, 0.36),
 						Color(0.35, 0.85, 1.0), 0.7)
-					ae.scale = Vector3.ONE * caliber * contain
-					ae.position = Vector3(0, arc_trunnion_y, ARC_BODY_FRONT_Z * caliber)
+					ae.scale = Vector3(caliber * contain, caliber * contain, caliber * contain * arc_len)
+					ae.position = Vector3(0, arc_trunnion_y, ARC_BODY_FRONT_Z * caliber - 0.05 * (arc_len - 1.0))
 					parent_node.add_child(ae)
 
 			"microwave_emitter":
@@ -2862,6 +2891,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				# that stops a 2.0-aperture dish tipping the module forward.
 				var mw_trunnion_y = 0.262
 				var dish = tweaks.get("dish_aperture", 1.0)
+				var horn_len = tweaks.get("barrel_length", 1.0)
 
 				var mw_mount_mesh = _part("microwave_mount")
 				if mw_mount_mesh:
@@ -2881,8 +2911,8 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				var mw_dish_mesh = _part("microwave_dish")
 				if mw_dish_mesh:
 					var md = _mesh_inst(mw_dish_mesh, Color(0.62, 0.62, 0.60))
-					md.scale = Vector3.ONE * caliber * dish
-					md.position = Vector3(0, mw_trunnion_y, MICROWAVE_BODY_FRONT_Z * caliber)
+					md.scale = Vector3(caliber * dish, caliber * dish, caliber * dish * horn_len)
+					md.position = Vector3(0, mw_trunnion_y, MICROWAVE_BODY_FRONT_Z * caliber - 0.06 * (horn_len - 1.0))
 					parent_node.add_child(md)
 
 			"particle_lance":
@@ -2893,6 +2923,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				var pl_trunnion_y = 0.318
 				var charge = tweaks.get("charge_time", 1.0)
 				var focal = tweaks.get("focal_length", 1.0)
+				var pl_len = tweaks.get("barrel_length", 1.0)
 
 				var pl_mount_mesh = _part("lance_mount")
 				if pl_mount_mesh:
@@ -2925,7 +2956,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				var pl_acc_mesh = _part("lance_accelerator")
 				if pl_acc_mesh:
 					var pa = _mesh_inst(pl_acc_mesh, Color(0.16, 0.18, 0.21))
-					pa.scale = Vector3(caliber, caliber, focal * caliber)
+					pa.scale = Vector3(caliber, caliber, focal * pl_len * caliber)
 					pa.position = Vector3(0, pl_trunnion_y, LANCE_BREECH_FRONT_Z * caliber)
 					parent_node.add_child(pa)
 
@@ -2937,6 +2968,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				var sp_trunnion_y = 0.250
 				var sp_rod = tweaks.get("rod_thickness", 1.0)
 				var sp_pay = tweaks.get("payload_size", 1.0)
+				var sp_len = tweaks.get("barrel_length", 1.0)
 				var sp_elev = deg_to_rad(50.0)
 
 				var sp_mount_mesh = _part("spigot_mount")
@@ -2960,7 +2992,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				var sp_rod_mesh = _part("spigot_rod")
 				if sp_rod_mesh:
 					var spr = _mesh_inst(sp_rod_mesh, Color(0.14, 0.15, 0.16))
-					spr.scale = Vector3(sp_rod * caliber, sp_rod * caliber, caliber)
+					spr.scale = Vector3(sp_rod * caliber, sp_rod * caliber, caliber * sp_len)
 					spr.position = Vector3(0, 0, SPIGOT_BREECH_FRONT_Z * caliber)
 					sp_pivot.add_child(spr)
 
@@ -2968,9 +3000,12 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				if sp_bomb_mesh:
 					var spbomb = _mesh_inst(sp_bomb_mesh, Color(0.30, 0.32, 0.26))
 					spbomb.scale = Vector3.ONE * sp_pay * caliber
-					# Sits ON the rod, not at its tip - the rod runs up inside
-					# the bomb, which is what a spigot mortar actually does.
-					spbomb.position = Vector3(0, 0, (SPIGOT_BREECH_FRONT_Z - 0.20) * caliber)
+					# Rides ON the rod, and rides FURTHER forward as the rod
+					# grows (barrel_length). A longer spigot in the real
+					# weapon also means the round sits further out on it -
+					# without this the rod's extra length was hidden behind
+					# the bomb, so the slider appeared to do nothing.
+					spbomb.position = Vector3(0, 0, (SPIGOT_BREECH_FRONT_Z - 0.20 + 0.25 * (sp_len - 1.0)) * caliber)
 					sp_pivot.add_child(spbomb)
 
 			"rocket_artillery":
@@ -2980,6 +3015,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				# a free upgrade.
 				var ra_trunnion_y = 0.272
 				var ra_rails = clampi(int(tweaks.get("tube_count", 4.0)), 2, 8)
+				var ra_spread = clampf(tweaks.get("dispersion", 1.0), 0.5, 2.0)
 				var ra_elev = deg_to_rad(32.0)
 
 				var ra_mount_mesh = _part("rocket_arty_mount")
@@ -3015,8 +3051,8 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 							var t = 0.0 if per_row == 1 else (float(i) / float(per_row - 1) - 0.5)
 							var rail = _mesh_inst(ra_rail_mesh, Color(0.26, 0.27, 0.24))
 							rail.scale = Vector3.ONE * caliber
-							rail.position = Vector3(t * 0.26 * caliber,
-								row * 0.13 * caliber,
+							rail.position = Vector3(t * 0.26 * caliber * ra_spread,
+								row * 0.13 * caliber * ra_spread,
 								ROCKET_CRADLE_FRONT_Z * caliber)
 							ra_pivot.add_child(rail)
 
@@ -3050,6 +3086,14 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 					mlb.scale = Vector3.ONE * caliber
 					ml_pivot.add_child(mlb)
 
+				# bunker_buster's climb rocket and cruise's fuel load stretch the round
+				# itself along its long axis - a bigger climb motor or a longer
+				# tank literally is a longer round.
+				var round_bonus_z = 1.0
+				if type_id == "bunker_buster":
+					round_bonus_z = maxf(float(tweaks.get("ascent_thruster", 1.0)), 0.1)
+				elif type_id == "cruise_missile":
+					round_bonus_z = maxf(float(tweaks.get("motor_length", 1.0)), 0.1)
 				var ml_round_mesh = _part(ml_spec["round"])
 				if ml_round_mesh:
 					# Single-round launchers (bunker buster, cruise) mount on
@@ -3060,6 +3104,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 						var t = 0.0 if n == 1 else (float(i) / float(n - 1) - 0.5)
 						var rnd = _mesh_inst(ml_round_mesh, Color(ml_spec["tint"]))
 						rnd.scale = Vector3.ONE * caliber * float(tweaks.get(ml_spec["scale_tweak"], 1.0))
+						rnd.scale.z *= round_bonus_z
 						rnd.position = Vector3(t * 0.20 * caliber, 0.0,
 							float(ml_spec["front_z"]) * caliber)
 						ml_pivot.add_child(rnd)
@@ -3092,6 +3137,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 						aa_pivot.add_child(bar)
 
 			"sensor_beacon_launcher":
+				var beacon_size = clampf(tweaks.get("payload_size", 1.0), 0.6, 1.8)
 				var sb_body_mesh = _part("beacon_body")
 				if sb_body_mesh:
 					var sbb = _mesh_inst(sb_body_mesh, base_color.darkened(0.1))
@@ -3104,6 +3150,23 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 					sbt.position = Vector3(0, 0.196 * caliber, -0.02 * caliber)
 					sbt.rotation = Vector3(deg_to_rad(58.0), 0, 0)
 					parent_node.add_child(sbt)
+					# The beacon round itself rides the tube's far end - an
+					# emitter orb scaled by Beacon Size, so the payload is the
+					# part the slider moves.
+					var beacon_sphere = SphereMesh.new()
+					beacon_sphere.radius = 0.09 * caliber * beacon_size
+					beacon_sphere.height = 0.18 * caliber * beacon_size
+					beacon_sphere.radial_segments = 16
+					beacon_sphere.rings = 10
+					var beacon_orb = MeshInstance3D.new()
+					beacon_orb.mesh = beacon_sphere
+					var b_mat = StandardMaterial3D.new()
+					b_mat.albedo_color = Color(0.95, 0.45, 0.20)
+					b_mat.emission_enabled = true
+					b_mat.emission = Color(0.95, 0.25, 0.05) * beacon_size
+					beacon_orb.material_override = b_mat
+					beacon_orb.position = Vector3(0, 0.34 * caliber, 0)
+					sbt.add_child(beacon_orb)
 
 			"recoilless_rifle":
 				var trunnion_y = 0.27
@@ -4492,14 +4555,14 @@ static func _build_helicopter_rotors(parent_node: Node3D, base_size: Vector3, ba
 		var blade: MeshInstance3D
 		if blade_mesh:
 			blade = _mesh_inst(blade_mesh, Color(0.1, 0.1, 0.1))
-			# SPANWISE IS X. Chris: "the rotor size tweak doesn't change the
-			# blades lengths." It was scaling Z, which the re-authored
-			# rotor_blade uses for CHORD - measured, the mesh is 1.16 along X
-			# and 0.159 along Z, so the slider was fattening the blade by a
-			# hair instead of lengthening it. The old flat-plank blade this
-			# replaced was authored along Z; the axis moved in the rework and
-			# this call site did not follow it.
-			blade.scale = Vector3(blade_length, 1.0, 1.0)
+			# SPANWISE IS Z. Chris: "the rotor size tweak doesn't change the
+			# blades lengths." It was scaling X, but the re-authored
+			# rotor_blade mesh runs 1.2 along Z and 0.16 along X - measured,
+			# so the slider was fattening the blade by a hair instead of
+			# lengthening it. The old flat-plank blade this replaced was
+			# authored along X; the axis moved in the rework and this call
+			# site did not follow it. Z is the span, scaled by blade_length.
+			blade.scale = Vector3(1.0, 1.0, blade_length)
 			blade.rotation.y = angle
 		else:
 			blade = MeshInstance3D.new()
@@ -5616,10 +5679,14 @@ static func _apply_blimp_envelope(parent_node: Node3D, base_size: Vector3, base_
 	var hull_roof_y: float = hull_aabb.position.y + hull_aabb.size.y
 	var hull_center_z: float = hull_aabb.position.z + hull_aabb.size.z * 0.5
 
-	# Gasbag Ellipsoid Dimensions
-	var env_radius_z: float = hull_l * 0.72
-	var env_radius_x: float = hull_w * 0.68
-	var env_radius_y: float = hull_w * 0.60
+	# Gasbag Ellipsoid Dimensions. envelope_volume is capacity - lift is
+	# linear in it - so it shapes the bag like resource_bay's bay_volume:
+	# cube-root, so a 2.0-volume envelope reads ~1.26x on each axis while
+	# carrying exactly twice as much.
+	var env_vol_lin: float = pow(clampf(float(tweaks.get("envelope_volume", 1.0)), 0.5, 2.0), 1.0 / 3.0)
+	var env_radius_z: float = hull_l * 0.72 * env_vol_lin
+	var env_radius_x: float = hull_w * 0.68 * env_vol_lin
+	var env_radius_y: float = hull_w * 0.60 * env_vol_lin
 	var cable_gap: float = maxf(hull_h * 0.40, 0.75)
 	var env_center_y: float = hull_roof_y + cable_gap + env_radius_y
 	var env_center := Vector3(0, env_center_y, hull_center_z)
@@ -6382,7 +6449,7 @@ const MONOLITHIC_TWEAK_AXES := {
 	"cluster_dispenser": {"dispersion": Vector3(1, 0, 1), "payload_size": Vector3(1, 1, 1), "tube_count": Vector3(1, 0, 0)},
 	"mortar_array": {"tube_count": Vector3(1, 0, 1)},
 	"missile_pod": {"grid_size": Vector3(1, 0, 1), "warhead_size": Vector3(1, 1, 0), "motor_length": Vector3(0, 0, 1), "seeker_size": Vector3(1, 1, 0), "engine_length": Vector3(0, 0, 1)},
-	"ion_cannon": {"beam_width": Vector3(1, 1, 0), "ion_density": Vector3(0, 0, 1)},
+	"ion_cannon": {"lens_aperture": Vector3(1, 1, 0), "barrel_length": Vector3(0, 0, 1)},
 }
 
 # Per-axis multiplier for a monolithic mesh, expressed in MESH-local axes.

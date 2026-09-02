@@ -394,8 +394,24 @@ func _unhandled_input(event):
 			
 			_log("Casting ray from " + str(ray_origin) + " to " + str(ray_end))
 			
+			# Two-pass pick. The hull's own click body is a single axis-aligned
+			# box around the whole mesh (see _place_hull_from_ui /
+			# update_hull_appearance), and on an ANGLED face that box hangs in
+			# front of modules mounted flush to the surface - its far side
+			# slices across the slope, so a nearest-hit raycast that includes it
+			# returns the hull no matter how precisely the player aims at the
+			# module (Chris: "can't re-select modules on angled hull faces").
+			#
+			# Pass 1 therefore casts modules (2), gizmo handles (4) and the
+			# hull's real SURFACE (16), but not the enclosing box: a module
+			# wins inside its own footprint, and the surface body is the honest
+			# occluder for "can I actually see this module" - it coincides with
+			# the drawn mesh, so a module hidden behind the hull is still
+			# blocked. Pass 2 asks for the hull's box envelope alone, so
+			# clicking an empty corner of the bounding shell still selects the
+			# hull.
 			var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
-			query.collision_mask = 7 # Layer 1 (Hull), Layer 2 (Modules), Layer 3 (Gizmos)
+			query.collision_mask = 2 | 4 | SURFACE_COLLISION_LAYER # Modules + Gizmos + Hull surface
 			query.collide_with_areas = true
 			var result = space_state.intersect_ray(query)
 			
@@ -404,11 +420,10 @@ func _unhandled_input(event):
 				if result.collider.has_method("start_drag"):
 					# We clicked a Gizmo Handle!
 					result.collider.start_drag(event, result.position)
-				elif result.collider == hull or (result.collider.get_parent() == hull and not result.collider.has_meta("module_data") and not (result.collider.get_parent() and result.collider.get_parent().has_meta("module_data"))):
-					# Hit the Hull itself
-					_select_module(hull)
 				else:
-					# We clicked a Module or sub-node!
+					# Walk up to find the module that owns this collider. If
+					# there is none, the ray hit the hull's surface body (or
+					# another hull-side node) - that is a hull click.
 					var module: Node = result.collider
 					var curr: Node = module
 					while curr != null and curr != hull and curr != get_tree().root:
@@ -416,10 +431,9 @@ func _unhandled_input(event):
 							module = curr
 							break
 						curr = curr.get_parent()
-					_select_module(module if (module != null and module.has_meta("module_data")) else result.collider)
-					
-					# Initialize drag movement if not locomotion
-					if module and module.has_meta("module_data"):
+					if module != null and module.has_meta("module_data"):
+						_select_module(module)
+						# Initialize drag movement if not locomotion
 						var data = module.get_meta("module_data")
 						if data.category != "locomotion":
 							drag_pending = true
@@ -431,9 +445,22 @@ func _unhandled_input(event):
 								var mirror = module.get_meta("mirrored_counterpart")
 								if mirror and is_instance_valid(mirror):
 									drag_original_mirror_transform = mirror.transform
+					else:
+						# Hit the Hull itself (its surface body, or a collider
+						# directly under it that carries no module_data).
+						_select_module(hull)
 			else:
-				_log("Raycast missed. Deselecting.")
-				_select_module(null)
+				# No module, gizmo or hull surface along the ray - only the
+				# hull's bounding-box envelope (e.g. a ray past the mesh, into
+				# an empty corner of the shell). Ask for it on its own so a
+				# hull click still works where pass 1 deliberately skipped it.
+				query.collision_mask = 1 # Hull
+				if not space_state.intersect_ray(query).is_empty():
+					_log("Raycast hit the hull box.")
+					_select_module(hull)
+				else:
+					_log("Raycast missed. Deselecting.")
+					_select_module(null)
 		else:
 			# Left click released
 			if is_dragging_module:

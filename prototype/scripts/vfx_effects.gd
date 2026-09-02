@@ -124,10 +124,25 @@ static func _billboard_material(tex: Texture2D, additive: bool, tint: Color) -> 
 	_billboard_cache[key] = mat
 	return mat
 
+static var _stream_scale_curve: CurveTexture = null
+static func _get_stream_scale_curve() -> CurveTexture:
+	if _stream_scale_curve == null:
+		var curve = CurveTexture.new()
+		var c = Curve.new()
+		c.add_point(Vector2(0.0, 0.22))
+		c.add_point(Vector2(0.25, 0.75))
+		c.add_point(Vector2(0.60, 2.0))
+		c.add_point(Vector2(0.90, 3.5))
+		c.add_point(Vector2(1.0, 4.0))
+		curve.curve = c
+		_stream_scale_curve = curve
+	return _stream_scale_curve
+
 static func _process_material(key: String, direction: Vector3, spread: float,
 		speed_min: float, speed_max: float, gravity: Vector3,
 		scale_min: float, scale_max: float, damping: float = 0.0,
-		turbulence: float = 0.0, turbulence_scale: float = 1.0) -> ParticleProcessMaterial:
+		turbulence: float = 0.0, turbulence_scale: float = 1.0,
+		custom_scale_curve: CurveTexture = null) -> ParticleProcessMaterial:
 	if _process_cache.has(key):
 		return _process_cache[key]
 	var mat = ParticleProcessMaterial.new()
@@ -140,16 +155,26 @@ static func _process_material(key: String, direction: Vector3, spread: float,
 	mat.scale_max = scale_max
 	mat.damping_min = damping
 	mat.damping_max = damping
-	# Particles shrink as they age - the flipbook already fades them out, and
-	# scaling down as well is what sells a flame tapering rather than
-	# vanishing at full size.
-	var curve = CurveTexture.new()
-	var c = Curve.new()
-	c.add_point(Vector2(0.0, 0.35))
-	c.add_point(Vector2(0.35, 1.0))
-	c.add_point(Vector2(1.0, 0.15))
-	curve.curve = c
-	mat.scale_curve = curve
+	mat.angle_min = -180.0
+	mat.angle_max = 180.0
+	mat.anim_speed_min = 1.0
+	mat.anim_speed_max = 1.0
+	mat.anim_offset_min = 0.0
+	mat.anim_offset_max = 0.3
+
+	if custom_scale_curve != null:
+		mat.scale_curve = custom_scale_curve
+	else:
+		# Particles shrink as they age - the flipbook already fades them out, and
+		# scaling down as well is what sells a flame tapering rather than
+		# vanishing at full size.
+		var curve = CurveTexture.new()
+		var c = Curve.new()
+		c.add_point(Vector2(0.0, 0.35))
+		c.add_point(Vector2(0.35, 1.0))
+		c.add_point(Vector2(1.0, 0.15))
+		curve.curve = c
+		mat.scale_curve = curve
 
 	# Godot 4.3's built-in turbulence: a noise field that pushes particles
 	# around as they travel, evaluated on the GPU with the rest of the
@@ -174,57 +199,234 @@ static func _process_material(key: String, direction: Vector3, spread: float,
 	return mat
 
 
-# --- Continuous flame ---------------------------------------------------
-#
-# ONE persistent emitter per weapon, created once and then only toggled.
-# This is the whole point: a flamethrower firing for ten seconds allocates
-# nothing after the first frame.
-#
-# `length` is how far the jet reaches; particle speed and lifetime are
-# derived from it so a nozzle_width/pressure_valve tweak changes the reach
-# of the visual and not just its colour.
-static func make_flame_emitter(parent: Node3D, length: float = 8.0, width: float = 1.0) -> GPUParticles3D:
+# --- Flamethrower Stream (Reference-accurate military liquid-fuel stream) ---
+
+# Tight incandescent liquid fuel core jet that arcs through the air under gravity
+static func make_flame_core_emitter(parent: Node3D, length: float = 11.0, width: float = 1.0, valve: float = 1.0) -> GPUParticles3D:
 	var p = GPUParticles3D.new()
-	p.name = "FlameJet"
-	# Fewer, BIGGER, longer-lived particles than the obvious settings.
-	# A jet has to read as one continuous body of fire, which means adjacent
-	# particles must overlap generously - the first pass used 48 small
-	# short-lived ones and rendered as a scatter of separate flames with gaps
-	# between them.
-	p.amount = 44
-	p.lifetime = 0.55
+	p.name = "FlameCore"
+	p.amount = 140
+	p.lifetime = clampf(0.52 / maxf(valve, 0.5), 0.3, 0.7)
 	p.emitting = false
-	# local_coords so the jet follows the barrel as the turret traverses,
-	# instead of leaving a comet trail of stationary fire behind it.
 	p.local_coords = true
 	p.draw_pass_1 = _get_quad()
-	p.material_override = _billboard_material(FLAME_TEX, true, Color(1, 1, 1, 1))
-	var speed = length / p.lifetime
+	p.material_override = _billboard_material(FLAME_TEX, true, Color(1.1, 0.75, 0.22, 0.95))
+	var speed = (length / p.lifetime) * 1.05
 	p.process_material = _process_material(
-		"flame|%.1f|%.1f" % [length, width],
-		Vector3(0, 0, -1), 9.0 * width, speed * 0.72, speed,
-		Vector3(0, 1.0, 0), 3.0 * width, 4.4 * width, 1.2, 1.6, 1.4)
+		"milspec_flame_core|%.1f|%.1f|%.2f" % [length, width, valve],
+		Vector3(0, 0.20, -1.0).normalized(), 2.5 * width, speed * 0.92, speed,
+		Vector3(0, -13.0 * valve, 0), 0.8 * width, 1.5 * width, 0.02, 0.35, 1.2,
+		_get_stream_scale_curve())
 	parent.add_child(p)
 	return p
 
-# Smoke that trails a flame jet, as a second emitter on the same parent -
-# real flamethrowers are as much smoke as fire, and it costs one more draw
-# call rather than one more node per particle.
-static func make_flame_smoke_emitter(parent: Node3D, length: float = 8.0) -> GPUParticles3D:
+# Massive roiling outer flame envelope that billows from the liquid fuel
+static func make_flame_emitter(parent: Node3D, length: float = 11.0, width: float = 1.0, valve: float = 1.0) -> GPUParticles3D:
 	var p = GPUParticles3D.new()
-	p.name = "FlameSmoke"
-	p.amount = 16
-	p.lifetime = 1.1
+	p.name = "FlameJet"
+	p.amount = 110
+	p.lifetime = clampf(0.60 / maxf(valve, 0.5), 0.35, 0.8)
 	p.emitting = false
 	p.local_coords = true
 	p.draw_pass_1 = _get_quad()
-	p.material_override = _billboard_material(SMOKE_TEX, false, Color(0.22, 0.20, 0.19, 0.5))
+	p.material_override = _billboard_material(FLAME_TEX, true, Color(0.95, 0.40, 0.06, 0.90))
+	var speed = (length / p.lifetime) * 0.95
 	p.process_material = _process_material(
-		"flamesmoke|%.1f" % length,
-		Vector3(0, 0, -1), 22.0, length * 0.35, length * 0.55,
-		Vector3(0, 2.2, 0), 1.4, 2.6, 2.0, 2.4, 0.9)
+		"milspec_flame_env|%.1f|%.1f|%.2f" % [length, width, valve],
+		Vector3(0, 0.18, -1.0).normalized(), 4.5 * width, speed * 0.80, speed,
+		Vector3(0, -10.0 * valve, 0), 1.4 * width, 2.5 * width, 0.10, 0.75, 1.4,
+		_get_stream_scale_curve())
 	parent.add_child(p)
 	return p
+
+# Thick black smoke that billows off the top of the fiery plume
+static func make_flame_smoke_emitter(parent: Node3D, length: float = 11.0, valve: float = 1.0) -> GPUParticles3D:
+	var p = GPUParticles3D.new()
+	p.name = "FlameSmoke"
+	p.amount = 50
+	p.lifetime = 1.15
+	p.emitting = false
+	p.local_coords = true
+	p.draw_pass_1 = _get_quad()
+	p.material_override = _billboard_material(SMOKE_TEX, false, Color(0.10, 0.09, 0.08, 0.70))
+	p.process_material = _process_material(
+		"milspec_flamesmoke|%.1f|%.2f" % [length, valve],
+		Vector3(0, 0.25, -1.0).normalized(), 8.0, length * 0.40, length * 0.75,
+		Vector3(0, 3.2, 0), 1.8, 4.2, 0.8, 1.5, 1.2,
+		_get_stream_scale_curve())
+	parent.add_child(p)
+	return p
+
+const FLAME_ARC_SHADER = preload("res://assets/BinbunVFX_Vol2/FlameFX/shader/flame_arc.gdshader")
+static var _flame_arc_mat: ShaderMaterial = null
+
+static func get_flame_arc_material() -> ShaderMaterial:
+	if _flame_arc_mat == null:
+		var mat = ShaderMaterial.new()
+		mat.shader = FLAME_ARC_SHADER
+		var fnl = FastNoiseLite.new()
+		fnl.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		fnl.frequency = 0.02
+		fnl.fractal_octaves = 2
+		var noise_tex = NoiseTexture2D.new()
+		noise_tex.noise = fnl
+		noise_tex.seamless = true
+		mat.set_shader_parameter("noise_texture", noise_tex)
+		mat.set_shader_parameter("core_color", Color(1.15, 0.80, 0.26))
+		mat.set_shader_parameter("flame_color", Color(0.95, 0.38, 0.04))
+		mat.set_shader_parameter("edge_color", Color(0.45, 0.05, 0.01))
+		mat.set_shader_parameter("smoke_color", Color(0.10, 0.09, 0.08))
+		mat.set_shader_parameter("emission_strength", 1.8)
+		mat.set_shader_parameter("scroll_speed", 9.0)
+		mat.set_shader_parameter("turbulence_strength", 0.35)
+		_flame_arc_mat = mat
+	return _flame_arc_mat
+
+static func update_flame_arc_mesh(im: ImmediateMesh, start_pos: Vector3, end_pos: Vector3, n_width: float = 1.0, valve: float = 1.0) -> void:
+	im.clear_surfaces()
+	var dist = start_pos.distance_to(end_pos)
+	if dist <= 0.2:
+		return
+
+	var N = 22
+	var max_arc = clampf(dist * 0.16 * valve, 0.35, 2.5)
+
+	var pts: Array[Vector3] = []
+	var tangents: Array[Vector3] = []
+
+	for i in range(N + 1):
+		var t = float(i) / float(N)
+		var p = start_pos.lerp(end_pos, t)
+		var arc_h = 4.0 * t * (1.0 - t) * max_arc
+		p.y += arc_h
+		pts.append(p)
+
+	for i in range(N + 1):
+		if i == 0:
+			tangents.append((pts[1] - pts[0]).normalized())
+		elif i == N:
+			tangents.append((pts[N] - pts[N - 1]).normalized())
+		else:
+			tangents.append((pts[i + 1] - pts[i - 1]).normalized())
+
+	var mat = get_flame_arc_material()
+
+	# 3-Plane Volumetric Cross-Ribbon (0°, 60°, 120°)
+	var angles = [0.0, PI / 3.0, (2.0 * PI) / 3.0]
+	for angle in angles:
+		im.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP, mat)
+		for i in range(N + 1):
+			var t = float(i) / float(N)
+			# Exponential expansion profile matching military liquid flamethrower reference
+			var width = lerpf(0.25, 3.4, pow(t, 0.70)) * n_width
+			var p = pts[i]
+			var tang = tangents[i]
+			
+			var side = tang.cross(Vector3.UP).normalized()
+			if side.length_squared() < 0.01:
+				side = tang.cross(Vector3.FORWARD).normalized()
+			var vert = side.cross(tang).normalized()
+
+			var plane_normal = (side * cos(angle) + vert * sin(angle)).normalized()
+			var offset_vec = plane_normal * (width * 0.5)
+			
+			var p_left = p - offset_vec
+			var p_right = p + offset_vec
+			
+			im.surface_set_normal(plane_normal)
+			im.surface_set_uv(Vector2(0.0, t))
+			im.surface_add_vertex(p_left)
+
+			im.surface_set_normal(plane_normal)
+			im.surface_set_uv(Vector2(1.0, t))
+			im.surface_add_vertex(p_right)
+		im.surface_end()
+
+
+# --- Target burning (DoT flame clinging to hit vehicles and structures) --
+#
+# Attaches persistent burning flame + smoke particles to a target node.
+# Reuses the existing TargetBurnVFX node if already present, extending its
+# lifetime so continuous flame keeps the target burning without duplicating
+# nodes.
+static func attach_target_burn(target: Node3D, duration: float = 3.0, intensity: float = 1.0) -> Node3D:
+	if not is_instance_valid(target):
+		return null
+
+	var tree: SceneTree = target.get_tree() if target.is_inside_tree() else null
+	if tree == null:
+		var main_loop = Engine.get_main_loop()
+		if main_loop is SceneTree:
+			tree = main_loop
+
+	var existing = target.get_node_or_null("TargetBurnVFX")
+	if existing != null and is_instance_valid(existing):
+		existing.set_meta("burn_until", Time.get_ticks_msec() + int(duration * 1000.0))
+		for child in existing.get_children():
+			if child is GPUParticles3D:
+				child.emitting = true
+		return existing
+
+	var root = Node3D.new()
+	root.name = "TargetBurnVFX"
+	target.add_child(root)
+
+	# Position near the target center/top
+	if target.has_method("get_nearest_surface_point"):
+		root.position = Vector3(0, 0.4, 0)
+
+	# Flames licking up from the target
+	var flames = GPUParticles3D.new()
+	flames.name = "BurnFlames"
+	flames.amount = int(clampf(24.0 * intensity, 12.0, 48.0))
+	flames.lifetime = 0.65
+	flames.local_coords = false
+	flames.draw_pass_1 = _get_quad()
+	flames.material_override = _billboard_material(FLAME_TEX, true, Color(1.0, 0.65, 0.18, 0.95))
+	flames.process_material = _process_material(
+		"targetburn_flames|%.1f" % intensity,
+		Vector3(0, 1, 0), 32.0, 0.8, 2.2,
+		Vector3(0, 2.0, 0), 0.6 * intensity, 1.4 * intensity, 0.5, 1.2, 0.8)
+	root.add_child(flames)
+	flames.emitting = true
+
+	# Dense smoke rising from the target
+	var smoke = GPUParticles3D.new()
+	smoke.name = "BurnSmoke"
+	smoke.amount = int(clampf(14.0 * intensity, 8.0, 28.0))
+	smoke.lifetime = 1.2
+	smoke.local_coords = false
+	smoke.draw_pass_1 = _get_quad()
+	smoke.material_override = _billboard_material(SMOKE_TEX, false, Color(0.15, 0.14, 0.13, 0.55))
+	smoke.process_material = _process_material(
+		"targetburn_smoke|%.1f" % intensity,
+		Vector3(0, 1, 0), 24.0, 1.2, 2.6,
+		Vector3(0, 2.6, 0), 0.8 * intensity, 1.8 * intensity, 0.6, 1.8, 1.0)
+	root.add_child(smoke)
+	smoke.emitting = true
+
+	root.set_meta("burn_until", Time.get_ticks_msec() + int(duration * 1000.0))
+
+	if tree != null:
+		var check_timer = tree.create_timer(duration)
+		var update_check: Callable
+		update_check = func():
+			if not is_instance_valid(root) or not is_instance_valid(target):
+				return
+			var remaining = root.get_meta("burn_until", 0) - Time.get_ticks_msec()
+			if remaining > 50:
+				tree.create_timer(float(remaining) / 1000.0).timeout.connect(update_check)
+				return
+			flames.emitting = false
+			smoke.emitting = false
+			var drain_timer = tree.create_timer(1.3)
+			drain_timer.timeout.connect(func():
+				if is_instance_valid(root):
+					root.queue_free()
+			)
+
+		check_timer.timeout.connect(update_check)
+	return root
 
 
 # Dense grey smoke trail behind a missile in flight. Parent to the missile

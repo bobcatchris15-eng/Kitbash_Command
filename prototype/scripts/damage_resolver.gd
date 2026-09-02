@@ -39,21 +39,21 @@ const ELEVATION_COMBAT_PIERCE_MULTIPLIER: float = 0.85
 # energy); ablative_ceramic is moderate (ablative/heat-resistant materials
 # have some real answer to it, just not a dedicated one).
 const ARMOR_TABLE = {
-	"steel_plate": {"kinetic": [15.0, 0.7], "thermal": [5.0, 0.9], "explosive": [10.0, 0.8], "energy": [8.0, 0.85]},
+	"steel_plate": {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]},
 	"composite_plate": {"kinetic": [20.0, 0.65], "thermal": [18.0, 0.6], "explosive": [25.0, 0.45], "energy": [15.0, 0.7]},
-	"ceramic_ablative": {"kinetic": [8.0, 0.9], "thermal": [25.0, 0.3], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
+	"ceramic_ablative": {"kinetic": [6.0, 0.95], "thermal": [28.0, 0.25], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
 	"ballistic_nylon": {"kinetic": [7.0, 0.85], "thermal": [22.0, 0.4], "explosive": [24.0, 0.5], "energy": [12.0, 0.7]},
 	# Aliases & Legacy
-	"hardened_steel": {"kinetic": [15.0, 0.7], "thermal": [5.0, 0.9], "explosive": [10.0, 0.8], "energy": [8.0, 0.85]},
-	"armor_plating": {"kinetic": [15.0, 0.7], "thermal": [5.0, 0.9], "explosive": [10.0, 0.8], "energy": [8.0, 0.85]},
-	"reactive_armor": {"kinetic": [10.0, 0.8], "thermal": [10.0, 0.8], "explosive": [30.0, 0.4], "energy": [8.0, 0.85]},
+	"hardened_steel": {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]},
+	"armor_plating": {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]},
+	"reactive_armor": {"kinetic": [9.0, 0.82], "thermal": [10.0, 0.8], "explosive": [30.0, 0.4], "energy": [8.0, 0.85]},
 	"spaced_composite": {"kinetic": [20.0, 0.65], "thermal": [18.0, 0.6], "explosive": [25.0, 0.45], "energy": [15.0, 0.7]},
-	"ablative_ceramic": {"kinetic": [8.0, 0.9], "thermal": [25.0, 0.3], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
-	"ablative_foam": {"kinetic": [8.0, 0.9], "thermal": [25.0, 0.3], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
-	"energy_shielding": {"kinetic": [10.0, 0.75], "thermal": [20.0, 0.5], "explosive": [20.0, 0.5], "energy": [35.0, 0.3]},
+	"ablative_ceramic": {"kinetic": [6.0, 0.95], "thermal": [28.0, 0.25], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
+	"ablative_foam": {"kinetic": [6.0, 0.95], "thermal": [28.0, 0.25], "explosive": [10.0, 0.7], "energy": [15.0, 0.6]},
+	"energy_shielding": {"kinetic": [8.0, 0.85], "thermal": [20.0, 0.5], "explosive": [20.0, 0.5], "energy": [48.0, 0.20]},
 	"carbon_fiber": {"kinetic": [7.0, 0.85], "thermal": [22.0, 0.4], "explosive": [24.0, 0.5], "energy": [12.0, 0.7]},
-	"titanium_plate": {"kinetic": [26.0, 0.55], "thermal": [8.0, 0.85], "explosive": [14.0, 0.7], "energy": [9.0, 0.8]},
-	"slat_armor": {"kinetic": [15.0, 0.7], "thermal": [5.0, 0.9], "explosive": [10.0, 0.8], "energy": [8.0, 0.85]},
+	"titanium_plate": {"kinetic": [30.0, 0.45], "thermal": [6.0, 0.90], "explosive": [14.0, 0.7], "energy": [9.0, 0.8]},
+	"slat_armor": {"kinetic": [15.0, 0.7], "thermal": [4.0, 0.92], "explosive": [10.0, 0.8], "energy": [6.0, 0.88]},
 }
 
 # --- Hit damage math (FABLE_REVIEW.md 1.1 / 3.6 / 2.5) ---
@@ -71,14 +71,14 @@ const ARMOR_TABLE = {
 # mechanic and heavy alpha still rules head-on), but massed small guns now
 # grind - the Damage_And_Armor_Model.md action-economy counter actually
 # exists.
-const CHIP_THROUGH_FACTOR: float = 0.15
+const CHIP_THROUGH_FACTOR: float = 0.10
 # Brute Force Rule (Damage_And_Armor_Model.md, documented since the start
 # but never implemented): an overwhelmingly large hit "punches straight
 # through the mitigation multipliers." From BRUTE_FORCE_RATIO x threshold
 # upward, the reduction multiplier blends linearly toward 1.0 (full damage),
 # reaching at most BRUTE_FORCE_MAX_BLEND of the way there at 2x that ratio.
-const BRUTE_FORCE_RATIO: float = 4.0
-const BRUTE_FORCE_MAX_BLEND: float = 0.75
+const BRUTE_FORCE_RATIO: float = 6.0
+const BRUTE_FORCE_MAX_BLEND: float = 0.50
 # Subsystem strips deal a fraction of the raw hit instead of the old flat
 # `amount - 5.0` (which rounded rapid-fire strip damage to zero and made the
 # doc's "swarms strip exposed modules" counter impossible). Modules stay
@@ -134,9 +134,19 @@ static func resolve(hull: Node3D, active_modules: Array, damage_type: String, de
 		plan = hull.get_meta("armor_plan")
 	var has_plan: bool = not plan.is_empty() and not bool(plan.get("empty", true))
 
-	if defender != null and hit_origin != null:
-		var local_dir = defender.global_transform.basis.inverse() * ((hit_origin as Vector3) - defender.global_position)
-		var trace := trace_hull(defender, hit_origin as Vector3)
+	var origin_vec := Vector3.ZERO
+	var has_origin := false
+	if hit_origin != null:
+		if hit_origin is Vector3:
+			origin_vec = hit_origin
+			has_origin = true
+		elif hit_origin is Node3D and is_instance_valid(hit_origin):
+			origin_vec = hit_origin.global_position
+			has_origin = true
+
+	if defender != null and has_origin:
+		var local_dir = defender.global_transform.basis.inverse() * (origin_vec - defender.global_position)
+		var trace := trace_hull(defender, origin_vec)
 
 		if has_plan:
 			var assignment: Dictionary = {}
@@ -190,8 +200,8 @@ static func resolve(hull: Node3D, active_modules: Array, damage_type: String, de
 		threshold = blended_all.x
 		reduction = blended_all.y
 
-	if defender != null and hit_origin != null:
-		var height_advantage = (hit_origin as Vector3).y - defender.global_position.y
+	if defender != null and has_origin:
+		var height_advantage = origin_vec.y - defender.global_position.y
 		if height_advantage >= ELEVATION_COMBAT_THRESHOLD:
 			threshold *= ELEVATION_COMBAT_PIERCE_MULTIPLIER
 

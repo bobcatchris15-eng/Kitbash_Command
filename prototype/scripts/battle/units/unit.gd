@@ -38,6 +38,7 @@ const PowerBudgetScript = preload("res://scripts/power_budget.gd")
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const TerrainBuilderScript = preload("res://scripts/terrain_builder.gd")
 const VFXBurstScript = preload("res://scripts/vfx_burst.gd")
+const VFXEffects = preload("res://scripts/vfx_effects.gd")
 const VisualBuilderScript = preload("res://scripts/visual_builder.gd")
 const DebugSettingsScript = preload("res://scripts/debug_settings.gd")
 
@@ -341,6 +342,14 @@ const MINE_DROP_DISTANCE_MULT: float = 4.5
 # is called from _physics_process, so 30 Hz × 12 units = 360 wasted lookups/sec
 # in a typical Skirmish, plus the hull_node.has_meta reads).
 var _has_mine_layer: bool = false
+
+# Persistent burning DoT state (flamethrower, incendiary munitions)
+var _burn_time_remaining: float = 0.0
+var _burn_tick_timer: float = 0.0
+var _burn_dps: float = 0.0
+var _burn_attacker_team: int = -1
+var _burn_hit_origin = null
+const BURN_TICK_INTERVAL: float = 0.25
 
 # SKIRMISH_PERF_TROUBLESHOOTING.md §10.2 + §12 + §14. DISTANT PHYSICS CULL.
 #
@@ -798,6 +807,7 @@ func _physics_process(delta: float) -> void:
 	var _p := Profiler.start()
 	_tick_power(delta)
 	_tick_shields(delta)
+	_tick_burn(delta)
 	Profiler.stop("unit.tick_power", _p)
 	_p = Profiler.start()
 	_recalculate_terrain_speed_multiplier()
@@ -1935,6 +1945,26 @@ func request_repath() -> void:
 
 # --- Damage ------------------------------------------------------------------
 #
+# Persistent burning status effect from flamethrower/incendiary fuel
+func apply_burn(duration: float, dps: float, attacker_team: int = -1, hit_origin = null) -> void:
+	if is_dead:
+		return
+	_burn_time_remaining = maxf(_burn_time_remaining, duration)
+	_burn_dps = maxf(_burn_dps, dps)
+	_burn_attacker_team = attacker_team
+	_burn_hit_origin = hit_origin
+	VFXEffects.attach_target_burn(self, _burn_time_remaining)
+
+func _tick_burn(delta: float) -> void:
+	if _burn_time_remaining <= 0.0:
+		return
+	_burn_time_remaining -= delta
+	_burn_tick_timer += delta
+	if _burn_tick_timer >= BURN_TICK_INTERVAL:
+		var tick_damage = _burn_dps * _burn_tick_timer
+		_burn_tick_timer = 0.0
+		take_damage(tick_damage, "thermal", _burn_hit_origin)
+
 # THE SIGNATURE IS THE CONTRACT. auto_weapon.gd calls
 # `take_damage(amount, damage_class, hit_origin)` on whatever it hits, and it
 # duck-types the target - anything in the `damageable` group with this method is
@@ -2000,7 +2030,7 @@ func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = nu
 
 	var dealt := DamageModelScript.hull_damage(amount, resolved.x, resolved.y)
 	hp = maxf(0.0, hp - dealt)
-	if dealt > 0.0 and is_inside_tree() and hit_origin != null:
+	if dealt > 0.0 and is_inside_tree() and hit_origin != null and damage_type != "thermal":
 		var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
 		var h_pos: Vector3 = hit_origin if hit_origin is Vector3 else (hit_origin.global_position if is_instance_valid(hit_origin) and hit_origin is Node3D else global_position)
 		var contact_pt: Vector3 = get_nearest_surface_point(h_pos)

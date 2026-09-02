@@ -4,8 +4,9 @@ extends SceneTree
 # specific files I edited in this turn still parse.
 
 const FILES := [
+	"res://scripts/visual_builder.gd",
+	"res://scripts/module_data.gd",
 	"res://scripts/drivetrain.gd",
-	"res://scripts/armor_paint.gd",
 ]
 
 func _init():

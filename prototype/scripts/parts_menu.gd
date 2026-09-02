@@ -40,7 +40,6 @@ signal part_unhovered()
 
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const ArmorPaint = preload("res://scripts/armor_paint.gd")
-const UITheme = preload("res://scripts/ui_theme.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const UIAnim = preload("res://scripts/ui_anim.gd")
 const ToolboxPlateScript = preload("res://scripts/ui_toolbox_plate.gd")
@@ -203,27 +202,27 @@ var _dock_scroll: ScrollContainer
 const DOCK_GAP := 10.0
 const DOCK_LEFT_INSET := 20.0   # inset from screen edge
 
-# Border widths — read as concentric rings visible between each layer
-const LIP_WIDTH := 16.0   # outer stamped steel ring — wide enough to read at a glance
-const GASKET_WIDTH := 6.0 # rubber gasket ring, sits inside the lip
-# Body starts inset by LIP_WIDTH + GASKET_WIDTH from the steel lip outer edge
 
 func _build_shell() -> void:
 	# ----------------------------------------------------------------
-	# The assembly, bottom-to-top in Z order (later child = on top):
+	# UNIFIED TO THE RAIL'S FLAT INSTRUMENT LANGUAGE (Chris, design pass):
+	# this dock used to be three concentric layers - a bare-steel lip, a
+	# rubber gasket, and a chipped oxide-enamel "toolbox" body sampled from
+	# field_toolbox.png - built to read as a mechanic's steel toolbox
+	# standing on end. telemetry_rail.gd's dock at the bottom of the same
+	# screen is flat dark panels with 1px hairline edges and amber-on-dark
+	# type, and the two clashed hard enough that a screenshot of either did
+	# not look like it belonged with the other. Direction is to bring THIS
+	# dock down to THAT vocabulary, not the reverse, so the lip/gasket
+	# Panels and the toolbox material are gone; `_dock_panel` alone is now
+	# a single flat BASE_800 fill with a BASE_500 hairline border, exactly
+	# the shape `_build_warning_panel()` and the rail's other panels use.
 	#
 	#   outer  (Control)          — positions the whole block
-	#   ├─ steel_lip  (Panel)     — outermost ring, BARE worn steel
-	#   ├─ gasket     (Panel)     — sits inside lip, shows as a rubber band
-	#   └─ _dock_panel (PanelContainer) — the chipped enamel body; children here
-	#
-	# Using Panel (NOT PanelContainer) for lip and gasket is critical:
-	# PanelContainer forces its ONE child into the content-margin rect,
-	# which would eat our manual anchor+offset positioning. Plain Panel
-	# is just a Node2D with a StyleBox drawn behind; children lay out freely.
+	#   └─ _dock_panel (PanelContainer) — flat panel body; children here
 	# ----------------------------------------------------------------
 
-	const TOTAL_INSET := LIP_WIDTH + GASKET_WIDTH
+	const TOTAL_INSET := Tokens.SPACE_SM
 
 	# ---- 1. Outer positioner ----------------------------------------
 	var outer = Control.new()
@@ -265,58 +264,11 @@ func _build_shell() -> void:
 		elif event is InputEventMouseMotion and not get_viewport().gui_is_dragging():
 			outer.accept_event())
 
-	# ---- 2. Stamped steel outer lip --------------------------------
-	var steel_lip = Panel.new()
-	steel_lip.name = "SteelLip"
-	steel_lip.set_anchors_preset(Control.PRESET_FULL_RECT)
-	steel_lip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var lip_style = StyleBoxFlat.new()
-	lip_style.bg_color = Color.WHITE  # the material shader drives the colour
-	lip_style.corner_radius_top_left    = 5
-	lip_style.corner_radius_top_right   = 5
-	lip_style.corner_radius_bottom_left = 8
-	lip_style.corner_radius_bottom_right = 8
-	# Thick bright highlight on the top edge — reads as the stamped lip catching light
-	lip_style.border_width_top = 3
-	lip_style.border_color = Tokens.BASE_500
-	lip_style.set_content_margin_all(0)
-	steel_lip.add_theme_stylebox_override("panel", lip_style)
-	# BARE STEEL, not paint. The lip is the folded edge of the pressed box and
-	# the one part of a real toolbox that gets handled every time it is opened,
-	# so it is worn back to metal rather than carrying the enamel. It is also
-	# what gives the dock its "steel box" read at a glance - a body and a rim in
-	# the same paint reads as a flat red rectangle with a border.
-	UITheme.apply_material(steel_lip, "steel", {"brightness": 0.62, "grime": 0.40})
-	outer.add_child(steel_lip)
-
-	# ---- 3. Rubber gasket ring (inset from lip edge) ---------------
-	var gasket = Panel.new()
-	gasket.name = "RubberGasket"
-	gasket.anchor_left   = 0.0
-	gasket.anchor_top    = 0.0
-	gasket.anchor_right  = 1.0
-	gasket.anchor_bottom = 1.0
-	gasket.offset_left   = LIP_WIDTH
-	gasket.offset_top    = LIP_WIDTH
-	gasket.offset_right  = -LIP_WIDTH
-	gasket.offset_bottom = -LIP_WIDTH
-	gasket.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var gasket_style = StyleBoxFlat.new()
-	gasket_style.bg_color = Color(0.07, 0.07, 0.08, 1.0)  # dark matte rubber
-	gasket_style.corner_radius_top_left    = 3
-	gasket_style.corner_radius_top_right   = 3
-	gasket_style.corner_radius_bottom_left = 5
-	gasket_style.corner_radius_bottom_right = 5
-	gasket_style.set_content_margin_all(0)
-	gasket.add_theme_stylebox_override("panel", gasket_style)
-	var gasket_mat = ShaderMaterial.new()
-	gasket_mat.shader = preload("res://shaders/rubber_gasket.gdshader")
-	gasket.material = gasket_mat
-	outer.add_child(gasket)
-
-	# ---- 4. Red-steel body panel (inset from gasket edge) ----------
+	# ---- 2. Flat instrument body panel ------------------------------
+	# One flat fill, one hairline edge - the same shape the telemetry rail's
+	# panels use (see telemetry_rail.gd's `_build_warning_panel` and
+	# `_build_combat_profile_header`): BASE_800 body, BASE_500 border,
+	# RADIUS_PANEL corners. No shader, no bevel ring, no rivets.
 	_dock_panel = PanelContainer.new()
 	_dock_panel.name = "Toolboxes"
 	_dock_panel.anchor_left   = 0.0
@@ -330,21 +282,18 @@ func _build_shell() -> void:
 	_dock_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var body_style = StyleBoxFlat.new()
-	body_style.bg_color = Color.WHITE  # shader drives colour
-	body_style.corner_radius_top_left    = 2
-	body_style.corner_radius_top_right   = 2
-	body_style.corner_radius_bottom_left = 3
-	body_style.corner_radius_bottom_right = 3
-	body_style.set_content_margin_all(0)
+	body_style.bg_color = Tokens.BASE_800
+	body_style.border_color = Tokens.BASE_500
+	body_style.set_border_width_all(Tokens.BORDER_HAIRLINE)
+	body_style.corner_radius_top_left    = Tokens.RADIUS_PANEL
+	body_style.corner_radius_top_right   = Tokens.RADIUS_PANEL
+	body_style.corner_radius_bottom_left = Tokens.RADIUS_PANEL
+	body_style.corner_radius_bottom_right = Tokens.RADIUS_PANEL
+	body_style.content_margin_left = Tokens.SPACE_XS
+	body_style.content_margin_right = Tokens.SPACE_XS
+	body_style.content_margin_top = Tokens.SPACE_XS
+	body_style.content_margin_bottom = Tokens.SPACE_XS
 	_dock_panel.add_theme_stylebox_override("panel", body_style)
-	# THE CHIPPED ENAMEL, and the reason this dock stopped being a flat red
-	# rectangle. It replaces red_steel.gdshader, which generated its noise from
-	# FRAGCOORD - i.e. in SCREEN space - so the "texture" bore no relation to the
-	# panel at all: it did not move with the dock, did not scale with it, and
-	# tiled across the whole viewport, which is why the body read as a uniform
-	# wash rather than as a surface. field_toolbox.png is sampled in the panel's
-	# own space by ui_material.gdshader, so the chips sit ON the box.
-	UITheme.apply_material(_dock_panel, "toolbox")
 	outer.add_child(_dock_panel)
 
 	var margin = MarginContainer.new()
@@ -716,15 +665,15 @@ func _build_part_card(type_id: String, data: Dictionary) -> Button:
 
 	# 2. Bottom tag — stamped metal label, sized to be readable
 	var tag_rect = ColorRect.new()
-	tag_rect.color = Color(0.10, 0.04, 0.04, 0.92)  # deep dark steel, near-black
+	tag_rect.color = Tokens.BASE_900
 	tag_rect.custom_minimum_size = Vector2(0, 34)
 	tag_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(tag_rect)
 
 	var name_lbl = Label.new()
 	name_lbl.text = data["name"]
-	name_lbl.add_theme_font_size_override("font_size", 13)
-	name_lbl.add_theme_color_override("font_color", Color(0.90, 0.82, 0.72, 1.0))  # warm ivory stamp
+	name_lbl.add_theme_font_size_override("font_size", Tokens.FONT_SMALL)
+	name_lbl.add_theme_color_override("font_color", Tokens.TEXT_PRIMARY)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	# TRIM_ELLIPSIS, not clip_text. clip_text truncates from both the left AND
@@ -789,39 +738,25 @@ func _make_section(category: String, cards: Array, family: String) -> Control:
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		header_btn.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 
-	# Knurled handle backing — lighter steel-grey, shinier than the red family tabs
+	# Flat drawer header, matching the rail's panel language rather than a
+	# knurled physical handle: BASE_700 fill, BASE_500 hairline edge, amber
+	# left accent when the drawer would be selected. No shader, no bevel -
+	# "minimal texture" per the unify-toward-flat-instrument direction.
 	var handle_panel = PanelContainer.new()
 	handle_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	handle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	
+
 	var handle_style = StyleBoxFlat.new()
-	# Machined gunmetal, straight off the palette. This used to be a hardcoded
-	# Color(0.19, 0.19, 0.23) - a COOL blue-grey, on a palette that is warm
-	# olive-grey throughout and against a body that is now warm oxide red. That
-	# single literal is most of why the category rows in Chris's screenshot read
-	# as belonging to a different program than the box they sit in.
-	#
-	# NOT white-and-let-the-shader-colour-it, which is the trick the dock body
-	# uses: knurled_metal.gdshader MODULATES the incoming COLOR (x0.8..1.2, then
-	# a 0.7..1.1 vertical gradient) rather than replacing it, so a white plate
-	# comes out a blown-out silver bar.
-	handle_style.bg_color = Tokens.BASE_600
-	handle_style.corner_radius_top_left = 4
-	handle_style.corner_radius_top_right = 4
-	handle_style.corner_radius_bottom_left = 4
-	handle_style.corner_radius_bottom_right = 4
-	# Emboss: bright highlight on top edge, dark shadow on bottom — reads as raised
-	handle_style.border_color = Tokens.BASE_900  # groove edge
-	handle_style.border_width_top = 0    # highlight drawn below as separate rect
-	handle_style.border_width_bottom = 4  # heavy drawer-front lip
-	handle_style.border_width_left = 2
-	handle_style.border_width_right = 2
+	handle_style.bg_color = Tokens.BASE_700
+	handle_style.corner_radius_top_left = Tokens.RADIUS_PANEL
+	handle_style.corner_radius_top_right = Tokens.RADIUS_PANEL
+	handle_style.corner_radius_bottom_left = Tokens.RADIUS_PANEL
+	handle_style.corner_radius_bottom_right = Tokens.RADIUS_PANEL
+	handle_style.border_color = Tokens.BASE_500
+	handle_style.set_border_width_all(Tokens.BORDER_HAIRLINE)
+	handle_style.border_width_bottom = Tokens.BORDER_EMPHASIS
 	handle_style.set_content_margin_all(0)
 	handle_panel.add_theme_stylebox_override("panel", handle_style)
-
-	var knurl_mat = ShaderMaterial.new()
-	knurl_mat.shader = preload("res://shaders/knurled_metal.gdshader")
-	handle_panel.material = knurl_mat
 	header_btn.add_child(handle_panel)
 
 	# Row inside the handle: label on left, count on right
@@ -836,24 +771,24 @@ func _make_section(category: String, cards: Array, family: String) -> Control:
 	pad_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inner_row.add_child(pad_left)
 
-	# The stamped category name — bigger, brighter, reads as a stencil label
+	# Category name — amber-on-dark, matching the rail's HeadingLabel role.
 	var name_label = Label.new()
 	name_label.text = category.to_upper()
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_label.add_theme_font_size_override("font_size", 14)
-	name_label.add_theme_color_override("font_color", Color(0.88, 0.85, 0.80, 1.0))
+	name_label.add_theme_font_size_override("font_size", Tokens.FONT_SMALL)
+	name_label.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inner_row.add_child(name_label)
 
-	# Count badge — lighter, right-aligned
+	# Count badge — secondary text token, right-aligned
 	var count_label = Label.new()
 	count_label.text = str(cards.size())
 	count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	count_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	count_label.add_theme_font_size_override("font_size", Tokens.FONT_MICRO)
-	count_label.add_theme_color_override("font_color", Color(0.55, 0.55, 0.60, 1.0))  # muted but legible
+	count_label.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
 	count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inner_row.add_child(count_label)
 

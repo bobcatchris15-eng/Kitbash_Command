@@ -129,6 +129,15 @@ const BORDER_EMPHASIS = 2
 # the bottom command bar starts costing players fights.
 const HIT_TARGET_MIN = 32
 
+# Ghosted/idle opacity for a warning indicator slot that has not tripped yet.
+# The Design Lab's three telemetry warnings (overweight, power deficit,
+# spotter/vision) always occupy their layout row - lit or not - so the slot
+# never reflows when a condition trips. Unlit, the panel modulates down to
+# this alpha so it reads as an inactive indicator outline rather than a
+# blank gap; DURATION_INSTANT is used for the snap to full opacity so lighting
+# one reads as immediate, not an animated reveal.
+const WARNING_GHOST_OPACITY = 0.16
+
 # ---------------------------------------------------------------------------
 # ELEVATION
 # ---------------------------------------------------------------------------

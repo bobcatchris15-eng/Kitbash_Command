@@ -504,7 +504,17 @@ func _build_warning_panel(role: String) -> Array:
 	warn_style.content_margin_top = Tokens.SPACE_XS
 	warn_style.content_margin_bottom = Tokens.SPACE_XS
 	panel.add_theme_stylebox_override("panel", warn_style)
-	panel.visible = false
+	# ALWAYS VISIBLE, GHOSTED WHEN UNLIT. The panel used to be `visible = false`
+	# until its condition tripped, which meant three different amounts of the
+	# rail's vertical space depending on how many warnings were currently true
+	# - lighting one shoved everything below it down the rail mid-drag, which
+	# is the opposite of what a warning arriving before the cliff should feel
+	# like. The slot now always occupies its row; _apply_warning() below is the
+	# single place that snaps it between the ghosted and lit look, so a fourth
+	# warning added later only has to call that function, not invent a new
+	# show/hide rule.
+	panel.visible = true
+	panel.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
 
 	var warn_box := VBoxContainer.new()
 	warn_box.add_theme_constant_override("separation", Tokens.SPACE_XS)
@@ -542,6 +552,24 @@ func _build_warning_panel(role: String) -> Array:
 	warn_box.add_child(detail)
 
 	return [panel, title, detail]
+
+
+# The ONE lit/unlit rule every warning panel goes through - see the ghosting
+# comment in _build_warning_panel(). idle_title/idle_detail are what the slot
+# reads as an inactive indicator ("no problem right now"); lit_title/
+# lit_detail are the specific, actionable message. Adding a fourth warning
+# later is a call to this function with its own four strings, not a new
+# widget or a new show/hide branch.
+func _apply_warning(panel: PanelContainer, title_lbl: Label, detail_lbl: Label, lit: bool,
+		idle_title: String, idle_detail: String, lit_title: String = "", lit_detail: String = "") -> void:
+	if lit:
+		panel.modulate = Color(1, 1, 1, 1)
+		title_lbl.text = lit_title
+		detail_lbl.text = lit_detail
+	else:
+		panel.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
+		title_lbl.text = idle_title
+		detail_lbl.text = idle_detail
 
 
 func _build_drivetrain_readout() -> void:
@@ -699,21 +727,26 @@ func _update_power_readout(pw: Dictionary) -> void:
 	var has_deficit: bool = bool(pw.get("has_deficit", false))
 	var firing_only: bool = bool(pw.get("firing_deficit_only", false))
 	
-	_power_panel.visible = has_deficit or firing_only or excessive_peak
 	if excessive_peak:
-		_power_title.text = "!  PEAK DRAW EXCESSIVE"
-		_power_detail.text = "A weapon needs %.1f energy to fire, but capacity is only %.1f. It will never fire. Add a Capacitor Bank." % [float(pw.get("max_shot_cost", 0.0)), float(pw.get("storage", 0.0))]
+		_apply_warning(_power_panel, _power_title, _power_detail, true, "", "",
+			"!  PEAK DRAW EXCESSIVE",
+			"A weapon needs %.1f energy to fire, but capacity is only %.1f. It will never fire. Add a Capacitor Bank." % [float(pw.get("max_shot_cost", 0.0)), float(pw.get("storage", 0.0))])
 	elif has_deficit:
-		_power_title.text = "!  POWER DEFICIT - %.1f /s SHORT" % absf(net)
-		_power_detail.text = "A full buffer lasts %.0fs with everything running. Shields drop first, then sensors dim, then energy weapons stop. Buildable and fieldable as-is - fit a generator, add storage to ride it out, or drop some electronics." % float(pw.get("endurance", 0.0))
+		_apply_warning(_power_panel, _power_title, _power_detail, true, "", "",
+			"!  POWER DEFICIT - %.1f /s SHORT" % absf(net),
+			"A full buffer lasts %.0fs with everything running. Shields drop first, then sensors dim, then energy weapons stop. Buildable and fieldable as-is - fit a generator, add storage to ride it out, or drop some electronics." % float(pw.get("endurance", 0.0)))
 	elif firing_only:
 		# Fine at rest and short only while shooting. A legitimate build rather
 		# than a fault - burst damage paid for out of the buffer and recharged
 		# between engagements - so it is stated as a duty cycle, not a warning to
 		# be fixed.
-		_power_title.text = "!  SUSTAINED FIRE OUTRUNS POWER"
-		_power_detail.text = "Fine at rest, but %.1f /s short while firing - about %.0fs of continuous fire from a full buffer before energy weapons cut out. Capacitors buy a longer burst; a generator buys sustain." % [
-			absf(float(pw.get("firing_net", 0.0))), float(pw.get("firing_endurance", 0.0))]
+		_apply_warning(_power_panel, _power_title, _power_detail, true, "", "",
+			"!  SUSTAINED FIRE OUTRUNS POWER",
+			"Fine at rest, but %.1f /s short while firing - about %.0fs of continuous fire from a full buffer before energy weapons cut out. Capacitors buy a longer burst; a generator buys sustain." % [
+				absf(float(pw.get("firing_net", 0.0))), float(pw.get("firing_endurance", 0.0))])
+	else:
+		_apply_warning(_power_panel, _power_title, _power_detail, false,
+			"!  POWER DEFICIT", "Generation and storage cover this design's draw.")
 
 
 func _update_drivetrain_readout(dt: Dictionary) -> void:
@@ -793,9 +826,7 @@ func _update_drivetrain_readout(dt: Dictionary) -> void:
 		state = "hazard"
 	_load_bar.add_theme_stylebox_override("fill", _load_fill_style(state))
 
-	_overweight_panel.visible = dt["is_overloaded"]
 	if dt["is_overloaded"]:
-		_overweight_title.text = "!  OVERWEIGHT - %.0f%% OF CAPACITY" % load_pct
 		# Same rounding guard as the speed row above: at a fraction of a
 		# percent over, "Top speed 5.0 instead of 5.0" reads as a broken
 		# label, so the cost is stated as a percentage alone until the two
@@ -809,8 +840,13 @@ func _update_drivetrain_readout(dt: Dictionary) -> void:
 		# Overage against capacity, not total: the locomotor is calibrated
 		# for the unit, so what it cannot carry is what matters. See the
 		# `_load_label` note above for the same reasoning.
-		_overweight_detail.text = "%.0f kg over what this locomotion is rated to carry. %s Buildable and fieldable as-is - add locomotion, shed carried mass, or accept the loss." % [
+		var overweight_detail := "%.0f kg over what this locomotion is rated to carry. %s Buildable and fieldable as-is - add locomotion, shed carried mass, or accept the loss." % [
 			carried - dt["capacity"], cost]
+		_apply_warning(_overweight_panel, _overweight_title, _overweight_detail, true,
+			"", "", "!  OVERWEIGHT - %.0f%% OF CAPACITY" % load_pct, overweight_detail)
+	else:
+		_apply_warning(_overweight_panel, _overweight_title, _overweight_detail, false,
+			"!  OVERWEIGHT", "Load is within what this locomotion is rated to carry.")
 	_load_label.tooltip_text = "What this design's locomotion is rated to carry, tweaks included. The chassis and locomotion themselves are not counted against this limit - the locomotor is tuned for the unit.\nOver capacity, top speed falls steeply - see the warning below.\nUnder %.0f%%, the design runs light and gains top speed, up to +%.0f%% empty." % [
 		DrivetrainScript.UNDERLOAD_THRESHOLD * 100.0,
 		(DrivetrainScript.UNDERLOAD_CEILING - 1.0) * 100.0]
@@ -930,30 +966,34 @@ func _update_range_readout(wr: Dictionary) -> void:
 
 	var required: Array = wr["spotter_required"]
 	var assisted: Array = wr["spotter_assisted"]
-	_spotter_panel.visible = not required.is_empty() or not assisted.is_empty()
-	if not _spotter_panel.visible:
+	var spotter_lit: bool = not required.is_empty() or not assisted.is_empty()
+	if not spotter_lit:
+		_apply_warning(_spotter_panel, _spotter_title, _spotter_detail, false,
+			"!  OUT-REACHES ITS OWN VISION", "Every weapon's reach fits inside this design's own vision.")
 		return
 
 	# The stronger claim first. A weapon past 2x vision cannot meaningfully
 	# self-acquire at range at all, which is a different and much more
 	# consequential fact than "reaches a bit past its own eyes".
 	if not required.is_empty():
-		_spotter_title.text = "!  NEEDS A SPOTTER"
 		var names: Array = []
 		for w in required:
 			names.append("%s (%.0f)" % [w["name"], w["reach"]])
-		_spotter_detail.text = "%s %s far past this design's own %.0f vision. Without another unit of yours watching the target, it can only shoot as far as it can see - roughly %.0f%% of its reach. Pair it with a scout or a radar mast and it works at full range." % [
+		var detail := "%s %s far past this design's own %.0f vision. Without another unit of yours watching the target, it can only shoot as far as it can see - roughly %.0f%% of its reach. Pair it with a scout or a radar mast and it works at full range." % [
 			", ".join(names),
 			"reaches" if names.size() == 1 else "reach",
 			vision,
 			(vision / longest) * 100.0]
+		_apply_warning(_spotter_panel, _spotter_title, _spotter_detail, true, "", "",
+			"!  NEEDS A SPOTTER", detail)
 	else:
-		_spotter_title.text = "!  OUT-REACHES ITS OWN VISION"
 		var names: Array = []
 		for w in assisted:
 			names.append("%s (%.0f)" % [w["name"], w["reach"]])
-		_spotter_detail.text = "%s can shoot further than this design can see (%.0f). Usable as-is, but a spotting unit or a radar mast is what unlocks the last %.0f units of that reach." % [
+		var detail := "%s can shoot further than this design can see (%.0f). Usable as-is, but a spotting unit or a radar mast is what unlocks the last %.0f units of that reach." % [
 			", ".join(names), vision, longest - vision]
+		_apply_warning(_spotter_panel, _spotter_title, _spotter_detail, true, "", "",
+			"!  OUT-REACHES ITS OWN VISION", detail)
 
 # --- Alpha readout (per-shot damage and what it is worth vs armour) ---------
 #

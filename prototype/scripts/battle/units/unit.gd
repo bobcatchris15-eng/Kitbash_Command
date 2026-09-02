@@ -350,6 +350,9 @@ var _burn_dps: float = 0.0
 var _burn_attacker_team: int = -1
 var _burn_hit_origin = null
 const BURN_TICK_INTERVAL: float = 0.25
+# Side-channel flag: set immediately before a burn tick's take_damage() call,
+# consumed and cleared at the top of take_damage(). See _tick_burn().
+var _pending_burn_tick: bool = false
 
 # SKIRMISH_PERF_TROUBLESHOOTING.md §10.2 + §12 + §14. DISTANT PHYSICS CULL.
 #
@@ -1969,8 +1972,17 @@ func request_repath() -> void:
 func apply_burn(duration: float, dps: float, attacker_team: int = -1, hit_origin = null) -> void:
 	if is_dead:
 		return
-	_burn_time_remaining = maxf(_burn_time_remaining, duration)
+	# Stack by REMAINING DAMAGE (dps * time-left), not by maxf'ing duration and
+	# dps independently - the old code let a long weak burn and a short strong
+	# one combine into a burn that was simultaneously the longest AND the
+	# strongest, double-dipping both axes. Conserving the damage total instead:
+	# the new dps becomes the stronger of the two (fire intensifies, it doesn't
+	# get diluted), and duration is whatever length delivers the combined total
+	# at that dps.
+	var remaining_damage: float = _burn_dps * _burn_time_remaining
+	var incoming_damage: float = dps * duration
 	_burn_dps = maxf(_burn_dps, dps)
+	_burn_time_remaining = (remaining_damage + incoming_damage) / _burn_dps if _burn_dps > 0.0 else 0.0
 	_burn_attacker_team = attacker_team
 	_burn_hit_origin = hit_origin
 	VFXEffects.attach_target_burn(self, _burn_time_remaining)
@@ -1983,6 +1995,11 @@ func _tick_burn(delta: float) -> void:
 	if _burn_tick_timer >= BURN_TICK_INTERVAL:
 		var tick_damage = _burn_dps * _burn_tick_timer
 		_burn_tick_timer = 0.0
+		# take_damage()'s signature is a fixed contract (auto_weapon.gd duck-types
+		# every damageable target against it), so the "this hit is a DoT tick"
+		# flag rides in as a side channel rather than a new parameter. take_damage
+		# reads and clears it immediately.
+		_pending_burn_tick = true
 		take_damage(tick_damage, "thermal", _burn_hit_origin)
 
 # THE SIGNATURE IS THE CONTRACT. auto_weapon.gd calls
@@ -1999,6 +2016,14 @@ func _tick_burn(delta: float) -> void:
 func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = null) -> void:
 	if is_dead:
 		return
+
+	# See _tick_burn(): a DoT tick is threshold-exempt and facet-agnostic - fire
+	# on the hull isn't an incoming shot from a fixed bearing, so it resolves
+	# against the hull's overall armor coverage rather than whatever direction
+	# the attacker stood at when the burn ignited.
+	var is_dot_tick := _pending_burn_tick
+	_pending_burn_tick = false
+	var resolve_origin = null if is_dot_tick else hit_origin
 
 	var modules := DamageModelScript.active_modules(hull_node)
 
@@ -2020,7 +2045,7 @@ func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = nu
 	# Any remaining damage that hits the unit resets the shield recharge delay timer (3.0s clean of damage)
 	_reset_shield_recharge_timers(modules)
 
-	var resolved := DamageModelScript.resolve(hull_node, modules, damage_type, self, hit_origin)
+	var resolved := DamageModelScript.resolve(hull_node, modules, damage_type, self, resolve_origin)
 
 	# Subsystem stripping. A hit that lands on a module spends itself entirely on
 	# that module - it does not also come off the hull, which is what makes
@@ -2048,7 +2073,7 @@ func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = nu
 		_strip_module(SimRNG.pick(strippable), amount)
 		return
 
-	var dealt := DamageModelScript.hull_damage(amount, resolved.x, resolved.y)
+	var dealt := DamageModelScript.hull_damage(amount, resolved.x, resolved.y, is_dot_tick)
 	hp = maxf(0.0, hp - dealt)
 	if dealt > 0.0 and is_inside_tree() and hit_origin != null and damage_type != "thermal":
 		var parent = get_tree().current_scene if get_tree().current_scene != null else get_tree().root

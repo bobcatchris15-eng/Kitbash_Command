@@ -177,5 +177,5 @@ static func resolve(hull_node: Node3D, modules: Array, damage_type: String,
 
 
 # What actually comes off the HP pool, after chip-through and brute-force.
-static func hull_damage(amount: float, threshold: float, pass_through: float) -> float:
-	return DamageResolverScript.compute_hull_damage(amount, threshold, pass_through)
+static func hull_damage(amount: float, threshold: float, pass_through: float, threshold_exempt: bool = false) -> float:
+	return DamageResolverScript.compute_hull_damage(amount, threshold, pass_through, threshold_exempt)

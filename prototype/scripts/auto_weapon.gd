@@ -2730,14 +2730,47 @@ func _apply_target_burn(victim: Node3D, duration: float, burn_dps: float) -> voi
 	if victim.has_method("apply_burn"):
 		victim.apply_burn(duration, burn_dps, get_team(), origin)
 	else:
+		# Fallback for any damageable target with no apply_burn() of its own.
+		# The old version spawned duration/0.25 independent one-shot timer
+		# closures PER CALL - the flamethrower re-applies on every hit, so
+		# repeated hits compounded an ever-growing, uncancellable pile of
+		# closures each capturing `victim`. State now lives on the victim
+		# itself (meta), stacked by remaining damage the same way apply_burn()
+		# stacks, with at most one self-rescheduling tick chain alive per
+		# victim at a time.
 		VFXEffects.attach_target_burn(victim, duration)
-		var ticks = int(duration / 0.25)
-		var per_tick = (burn_dps * duration) / float(max(1, ticks))
-		for i in range(ticks):
-			get_tree().create_timer((i + 1) * 0.25).timeout.connect(func():
-				if is_instance_valid(victim) and victim.has_method("take_damage"):
-					victim.take_damage(per_tick, "thermal", origin)
-			)
+		var remaining: float = float(victim.get_meta("_fallback_burn_damage", 0.0))
+		var cur_dps: float = float(victim.get_meta("_fallback_burn_dps", 0.0))
+		remaining += burn_dps * duration
+		cur_dps = maxf(cur_dps, burn_dps)
+		victim.set_meta("_fallback_burn_damage", remaining)
+		victim.set_meta("_fallback_burn_dps", cur_dps)
+		victim.set_meta("_fallback_burn_origin", origin)
+		if bool(victim.get_meta("_fallback_burn_active", false)):
+			return
+		victim.set_meta("_fallback_burn_active", true)
+		_tick_fallback_burn(victim)
+
+# Self-rescheduling tick chain for the no-apply_burn() fallback. Reads its
+# state back off the victim's meta each tick so a mid-chain re-application
+# (see _apply_target_burn above) just extends the pool this chain is already
+# draining, rather than starting a second chain.
+func _tick_fallback_burn(victim: Node3D) -> void:
+	if not is_instance_valid(victim):
+		return
+	var remaining: float = float(victim.get_meta("_fallback_burn_damage", 0.0))
+	if remaining <= 0.0:
+		victim.set_meta("_fallback_burn_active", false)
+		return
+	var dps: float = float(victim.get_meta("_fallback_burn_dps", 0.0))
+	var origin = victim.get_meta("_fallback_burn_origin", null)
+	var tick_amount = minf(remaining, dps * 0.25)
+	victim.set_meta("_fallback_burn_damage", remaining - tick_amount)
+	if victim.has_method("take_damage"):
+		victim.take_damage(tick_amount, "thermal", origin)
+	get_tree().create_timer(0.25).timeout.connect(func():
+		_tick_fallback_burn(victim)
+	)
 
 func _fire_flame_spray():
 	var n_width = 1.0

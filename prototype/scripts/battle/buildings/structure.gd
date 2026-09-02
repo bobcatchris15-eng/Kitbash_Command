@@ -38,6 +38,9 @@ var _burn_tick_timer: float = 0.0
 var _burn_dps: float = 0.0
 var _burn_hit_origin = null
 const BURN_TICK_INTERVAL: float = 0.25
+# Side-channel flag: set immediately before a burn tick's take_damage() call,
+# consumed and cleared at the top of take_damage(). See _physics_process().
+var _pending_burn_tick: bool = false
 
 # Construction lifecycle
 var build_incomplete: bool = false
@@ -459,8 +462,13 @@ func exit_position() -> Vector3:
 func apply_burn(duration: float, dps: float, attacker_team: int = -1, hit_origin = null) -> void:
 	if is_dead:
 		return
-	_burn_time_remaining = maxf(_burn_time_remaining, duration)
+	# See unit.gd's apply_burn: stack by remaining damage (dps * time-left)
+	# rather than maxf'ing duration and dps independently, which used to yield
+	# a burn that was simultaneously the longest AND the strongest.
+	var remaining_damage: float = _burn_dps * _burn_time_remaining
+	var incoming_damage: float = dps * duration
 	_burn_dps = maxf(_burn_dps, dps)
+	_burn_time_remaining = (remaining_damage + incoming_damage) / _burn_dps if _burn_dps > 0.0 else 0.0
 	_burn_hit_origin = hit_origin
 	set_physics_process(true)
 	VFXEffects.attach_target_burn(self, _burn_time_remaining)
@@ -474,14 +482,21 @@ func _physics_process(delta: float) -> void:
 	if _burn_tick_timer >= BURN_TICK_INTERVAL:
 		var tick_damage = _burn_dps * _burn_tick_timer
 		_burn_tick_timer = 0.0
+		# See unit.gd's _tick_burn(): threshold-exempt/facet-agnostic DoT tick,
+		# threaded through the fixed take_damage() contract via a side flag.
+		_pending_burn_tick = true
 		take_damage(tick_damage, "thermal", _burn_hit_origin)
 
 func take_damage(amount: float, damage_type: String = "kinetic", hit_origin = null) -> void:
 	if is_dead:
 		return
 
-	var resolved := DamageModelScript.resolve(null, [], damage_type, self, hit_origin)
-	hp = maxf(0.0, hp - DamageModelScript.hull_damage(amount, resolved.x, resolved.y))
+	var is_dot_tick := _pending_burn_tick
+	_pending_burn_tick = false
+	var resolve_origin = null if is_dot_tick else hit_origin
+
+	var resolved := DamageModelScript.resolve(null, [], damage_type, self, resolve_origin)
+	hp = maxf(0.0, hp - DamageModelScript.hull_damage(amount, resolved.x, resolved.y, is_dot_tick))
 	if hp > 0.0:
 		return
 

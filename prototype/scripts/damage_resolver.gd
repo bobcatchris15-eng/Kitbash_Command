@@ -126,7 +126,16 @@ const BRUTE_FORCE_MAX_BLEND: float = 0.50
 # threshold-exempt - they're exposed hardware, that's the whole point.
 const MODULE_STRIP_DAMAGE_FACTOR: float = 0.75
 
-static func compute_hull_damage(amount: float, threshold: float, pass_through: float) -> float:
+static func compute_hull_damage(amount: float, threshold: float, pass_through: float, threshold_exempt: bool = false) -> float:
+	# DoT ticks (burn) are threshold-exempt, same reasoning as module strips
+	# above: a burn tick is an artifact of how often we choose to sample a
+	# continuous effect, not a discrete "shot" that a threshold should be able
+	# to shrug off entirely. Without this, finer ticking makes DoT weaker
+	# (each slice falls further under the threshold) - backwards. pass_through
+	# still applies, so armor keeps mattering against fire; only the
+	# below-threshold chip-through gate is skipped.
+	if threshold_exempt:
+		return amount * pass_through
 	if threshold > 0.0 and amount < threshold:
 		return amount * pass_through * CHIP_THROUGH_FACTOR
 	var eff_pass_through = pass_through

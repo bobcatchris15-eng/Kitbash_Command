@@ -727,7 +727,14 @@ func _build_part_card(type_id: String, data: Dictionary) -> Button:
 	name_lbl.add_theme_color_override("font_color", Color(0.90, 0.82, 0.72, 1.0))  # warm ivory stamp
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	name_lbl.clip_text = true
+	# TRIM_ELLIPSIS, not clip_text. clip_text truncates from both the left AND
+	# right of a centered label once the text overflows ("Rocker-Bogie
+	# Suspension" rendered as "cker-Bogie Suspensi") - unreadable either way.
+	# Ellipsising keeps the label anchored at its natural start and only
+	# truncates the tail, so a long name is still identifiable.
+	name_lbl.clip_text = false
+	name_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
 	name_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tag_rect.add_child(name_lbl)

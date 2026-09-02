@@ -148,13 +148,29 @@ func bake(blueprint_data: Dictionary) -> ImageTexture:
 # world scale, so the scout is a speck and the airship overflows - and the
 # Design Lab's continuous stretch sliders mean bounds vary a lot more than the
 # hull-size tiers alone suggest.
+#
+# SHARED IMPLEMENTATION. `frame_camera()` and `merged_aabb()` below are static
+# and take the camera/rotation as parameters instead of reading `self`, so
+# part_thumbnail.gd's per-part rig can call the exact same math instead of
+# carrying a near-duplicate. The single-axis version part_thumbnail.gd used to
+# keep had its own drift bug (a floor that clamped every sub-1m part to the
+# same apparent size); one implementation means that class of bug can only
+# exist once.
 func _frame_model(model: Node3D) -> void:
-	var aabb := _merged_aabb(model, Transform3D.IDENTITY)
+	frame_camera(_camera, model, Vector3(-25.0, 35.0, 0.0))
+
+
+# Static so it has no `self` to smuggle framing state between unrelated
+# bakes. `rotation_degrees` is passed in because part_thumbnail.gd's rig uses
+# a different three-quarter angle than the blueprint rig.
+static func frame_camera(camera: Camera3D, model: Node3D, rotation_degrees: Vector3, margin: float = 1.15) -> void:
+	var aabb := merged_aabb(model, Transform3D.IDENTITY)
+	camera.rotation_degrees = rotation_degrees
 	if aabb.size == Vector3.ZERO:
-		_camera.size = 4.0
-		_camera.position = Vector3(6.0, 6.0, 6.0)
-		_camera.look_at(Vector3.ZERO, Vector3.UP)
-		_camera.rotation_degrees = Vector3(-25.0, 35.0, 0.0)
+		camera.size = 4.0
+		camera.position = Vector3(6.0, 6.0, 6.0)
+		camera.look_at(Vector3.ZERO, Vector3.UP)
+		camera.rotation_degrees = rotation_degrees
 		return
 
 	var centre := aabb.get_center()
@@ -162,21 +178,26 @@ func _frame_model(model: Node3D) -> void:
 	# three-quarters presents its diagonal to the camera, so fitting the widest
 	# axis alone still clips the nose and tail.
 	var extent: float = aabb.size.length()
-	# 1.15 leaves a small margin so nothing touches the thumbnail edge, which
-	# reads as clipped even when it is not.
-	_camera.size = maxf(1.0, extent * 1.15)
+	# NO FLOOR on camera.size. A `maxf(1.0, ...)` floor here used to force
+	# every part/design under ~0.87m diagonal to share the same apparent
+	# size regardless of how much smaller it actually was - which is exactly
+	# why a small scout hull or a small module (Plasma Thruster, Anti-Grav
+	# Plate) still rendered as a speck next to a larger one even though this
+	# function already framed to real bounds. Framing must be a pure
+	# function of the subject's own size with no clamp, or "uniform fraction
+	# of the cell" breaks for anything smaller than the floor.
+	camera.size = extent * margin
 
 	# Pull back along the camera's own forward axis from the model centre. The
 	# distance barely matters for an orthogonal projection - only `size` sets the
 	# framing - but it has to clear the near plane and the model itself.
-	var basis := Basis.from_euler(Vector3(deg_to_rad(-25.0), deg_to_rad(35.0), 0.0))
-	_camera.rotation_degrees = Vector3(-25.0, 35.0, 0.0)
-	_camera.position = centre + basis.z * (extent + 8.0)
-	_camera.near = 0.05
-	_camera.far = extent * 4.0 + 32.0
+	var basis := Basis.from_euler(Vector3(deg_to_rad(rotation_degrees.x), deg_to_rad(rotation_degrees.y), deg_to_rad(rotation_degrees.z)))
+	camera.position = centre + basis.z * (extent + 8.0)
+	camera.near = 0.05
+	camera.far = extent * 4.0 + 32.0
 
 
-func _merged_aabb(node: Node, xform: Transform3D) -> AABB:
+static func merged_aabb(node: Node, xform: Transform3D) -> AABB:
 	var out := AABB()
 	var has_any := false
 	var local := xform
@@ -189,7 +210,7 @@ func _merged_aabb(node: Node, xform: Transform3D) -> AABB:
 			out = local * box
 			has_any = true
 	for child in node.get_children():
-		var child_box := _merged_aabb(child, local)
+		var child_box := merged_aabb(child, local)
 		if child_box.size == Vector3.ZERO:
 			continue
 		if has_any:

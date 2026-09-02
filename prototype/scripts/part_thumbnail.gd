@@ -26,17 +26,23 @@ class_name PartThumbnailCache
 # would also leak a baked texture's mesh dependency into the next session
 # and would make test teardown depend on a globally-shared state.
 #
-# WHY THIS DIFFERS FROM blueprint_thumbnail.gd. The blueprint rig is sized
-# to the model's real bounds because blueprints vary wildly in length (a
-# scout and an airship are orders of magnitude apart). Parts cards are all
-# roughly the same scale (within a 2x range, dominated by artillery vs
-# sensors), so a fixed-size rig with a per-part orbit and zoom is enough
-# and avoids the per-bake "size the camera to the model" pass.
+# FRAMING IS SHARED WITH blueprint_thumbnail.gd, not a second implementation.
+# Parts vary in real extent by far more than a "2x range" (a Plasma Thruster
+# vs a set of Wheels) - the premise this comment used to state was false and
+# was the actual root cause of parts rendering at wildly different apparent
+# sizes. `BlueprintThumbnail.frame_camera()` is the one place that AABB→camera
+# math lives; this rig just calls it with its own three-quarter angle.
 
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const VisualBuilder = preload("res://scripts/visual_builder.gd")
 const HullMaterialBuilderScript = preload("res://scripts/hull_material_builder.gd")
 const MeshAssetLoader = preload("res://scripts/mesh_asset_loader.gd")
+const BlueprintThumbnailScript = preload("res://scripts/blueprint_thumbnail.gd")
+
+# Three-quarter angle for the parts rig. Kept as a constant here (rather than
+# only living on the Camera3D) so _frame_model can pass it to the shared
+# framing helper without re-reading it back off the node.
+const CAMERA_ROTATION_DEGREES := Vector3(-22.0, -32.0, 0.0)
 
 # Square, large enough that an artillery barrel fits but small enough that
 # the parts-menu cards do not need to be retrofitted if/when the bake
@@ -91,11 +97,9 @@ func _build_rig() -> void:
 	# would render at different on-screen sizes. Orthogonal makes "part fits
 	# the frame" a property of the rig, not of the part.
 	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	_camera.rotation_degrees = Vector3(-22.0, -32.0, 0.0)
-	# 1.6 leaves a small margin so a part that ends exactly at the catalog
-	# size does not touch the frame edge - touching reads as clipping even
-	# when it is not, the same complaint blueprint_thumbnail.gd notes for
-	# its own framing.
+	_camera.rotation_degrees = CAMERA_ROTATION_DEGREES
+	# Placeholder only - every real bake calls _frame_model(), which sizes
+	# this to the part's own bounds via the shared BlueprintThumbnail helper.
 	_camera.size = 1.6
 	_camera.near = 0.05
 	_camera.far = 32.0
@@ -269,60 +273,13 @@ func _bake(type_id: String) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-# Frames the part so it fills the rig without clipping. Unlike
-# blueprint_thumbnail.gd, parts share a camera size - what changes per
-# part is the orbit distance, computed from the part's actual bounds.
+# Frames the part so it fills the rig at a uniform fraction of the frame,
+# regardless of the part's real-world scale. Delegates the AABB→camera math
+# to BlueprintThumbnail.frame_camera() - see that function's header for why
+# there is no size floor here (a floor is what made small parts render as
+# specks even though this function has always called into per-part bounds).
 func _frame_model(model: Node3D) -> void:
-	var aabb := _merged_aabb(model, Transform3D.IDENTITY)
-	if aabb.size == Vector3.ZERO:
-		_camera.position = Vector3(0, 0, 4.0)
-		return
-	var centre := aabb.get_center()
-	# The longest extent drives framing, so a part that is taller than it is
-	# wide (a sensor mast) and a part that is wider than it is tall (a
-	# tracked-tread base) both fit the same rig at the same on-screen size.
-	var extent: float = maxf(aabb.size.x, maxf(aabb.size.y, aabb.size.z))
-	# Margin in the same spirit as blueprint_thumbnail.gd's 1.15 - touching
-	# the frame edge reads as clipped. 1.25 is a hair more because parts
-	# cards are read at smaller on-screen sizes than blueprint previews and
-	# the visual mass matters more.
-	_camera.size = extent * 1.25
-	# Same basis the camera's rotation_degrees encodes, so the position is
-	# exactly along the camera's forward axis. A mismatch would put the
-	# model off-centre.
-	var basis := Basis.from_euler(Vector3(deg_to_rad(-22.0), deg_to_rad(-32.0), 0.0))
-	# Orthogonal projection makes the actual distance nearly free; only the
-	# near/far clip range and a buffer for parts that extend further than
-	# their own AABB (sub-meshes past the catalog size, which happens for
-	# the few authored parts with negative-origin meshes) need to be
-	# covered.
-	_camera.position = centre + basis.z * (extent * 2.0 + 4.0)
-	_camera.near = 0.05
-	_camera.far = extent * 4.0 + 16.0
-
-
-func _merged_aabb(node: Node, xform: Transform3D) -> AABB:
-	var out := AABB()
-	var has_any := false
-	var local := xform
-	if node is Node3D:
-		local = xform * (node as Node3D).transform
-	if node is VisualInstance3D:
-		var vi := node as VisualInstance3D
-		var box := vi.get_aabb()
-		if box.size != Vector3.ZERO:
-			out = local * box
-			has_any = true
-	for child in node.get_children():
-		var child_box := _merged_aabb(child, local)
-		if child_box.size == Vector3.ZERO:
-			continue
-		if has_any:
-			out = out.merge(child_box)
-		else:
-			out = child_box
-			has_any = true
-	return out
+	BlueprintThumbnailScript.frame_camera(_camera, model, CAMERA_ROTATION_DEGREES, 1.25)
 
 
 # Drops every cached thumbnail. Exposed for tests and for any future

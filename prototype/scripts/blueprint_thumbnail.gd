@@ -203,7 +203,13 @@ static func merged_aabb(node: Node, xform: Transform3D) -> AABB:
 	var local := xform
 	if node is Node3D:
 		local = xform * (node as Node3D).transform
-	if node is VisualInstance3D:
+	# Only count nodes that contribute real, visible geometry. Light3D
+	# extends VisualInstance3D but get_aabb() returns a sphere sized by
+	# omni_range, not by anything rendered - it dwarfed small modules'
+	# (Plasma Thruster, Anti-Grav Plate glow lights) actual mesh bounds and
+	# inflated the framing camera. GPUParticles3D / CPUParticles3D have the
+	# same failure mode via visibility_aabb. Exclude all three from bounds.
+	if node is VisualInstance3D and not (node is Light3D) and not (node is GPUParticles3D) and not (node is CPUParticles3D):
 		var vi := node as VisualInstance3D
 		var box := vi.get_aabb()
 		if box.size != Vector3.ZERO:

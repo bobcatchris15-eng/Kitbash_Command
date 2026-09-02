@@ -8,13 +8,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Running the Prototype
 
-The prototype bundles its own Godot engine executables. Run from the `prototype/` directory:
+The repo bundles its own Godot engine executables **at the repo root** (not in
+`prototype/`, despite the project living there). Run from the root and point
+Godot at the project with `--path`:
 
 ```bash
-cd prototype
-./Godot_v4.7.1-stable_win64.exe          # run the game
-./Godot_v4.7.1-stable_win64.exe -e       # open in the editor
+./Godot_v4.7.1-stable_win64.exe --path prototype       # run the game
+./Godot_v4.7.1-stable_win64.exe -e --path prototype    # open in the editor
 ```
+
+`cd prototype && ./Godot_...` fails with "No such file or directory" — there is
+no exe in that directory. Both binaries are gitignored, so a fresh worktree or
+clone has neither.
 
 The main menu (DEPLOY / DESIGN sections) links the full game loop:
 
@@ -38,13 +43,13 @@ Plus a guided TUTORIAL card, and LIVERY (cosmetic paint authoring) / RECORDS / S
 1. **Parse check after edits.** Targeted first (edit the `FILES` list at the top to your touched scripts):
 
    ```bash
-   cd prototype && ./Godot_v4.7.1-stable_win64_console.exe --headless --path . --script res://tools/compile_check_changed.gd --quit
+   ./Godot_v4.7.1-stable_win64_console.exe --headless --path prototype --script res://tools/compile_check_changed.gd --quit
    ```
 
    Full-tree check when something structural changed (autoloads, `class_name`s):
 
    ```bash
-   cd prototype && ./Godot_v4.7.1-stable_win64_console.exe --headless --path . --script res://tools/compile_check_all.gd
+   ./Godot_v4.7.1-stable_win64_console.exe --headless --path prototype --script res://tools/compile_check_all.gd
    ```
 
    This one is **slow** (loads 200+ interdependent scripts with `CACHE_MODE_IGNORE`, observed 20+ min). Godot block-buffers stdout when piped, so expect no output until it exits — always pass `--quit`/`--path`.
@@ -52,7 +57,7 @@ Plus a guided TUTORIAL card, and LIVERY (cosmetic paint authoring) / RECORDS / S
 2. **Headless probe scripts.** `tools/probe_*.gd` are one-off SceneTree scripts that boot a slice of the game (navmesh, economy, AI, placement…) and print findings — this is the de-facto regression harness now. Run pattern:
 
    ```bash
-   cd prototype && ./Godot_v4.7.1-stable_win64_console.exe --headless --path . --script res://tools/probe_<area>.gd --quit
+   ./Godot_v4.7.1-stable_win64_console.exe --headless --path prototype --script res://tools/probe_<area>.gd --quit
    ```
 
 3. **Manual playtest** for anything visual/interactive.
@@ -188,13 +193,13 @@ a real window and eyeball it; `battle/hud/debug_overlay.gd`, `perf_hud.gd` and
 
 ```bash
 # Run the game
-cd prototype && ./Godot_v4.7.1-stable_win64.exe
+./Godot_v4.7.1-stable_win64.exe --path prototype
 
 # Open editor
-cd prototype && ./Godot_v4.7.1-stable_win64.exe -e
+./Godot_v4.7.1-stable_win64.exe -e --path prototype
 
 # Parse check all scripts (slow - see Checks)
-cd prototype && ./Godot_v4.7.1-stable_win64_console.exe --headless --path . --script res://tools/compile_check_all.gd
+./Godot_v4.7.1-stable_win64_console.exe --headless --path prototype --script res://tools/compile_check_all.gd
 
 # Regenerate ALL audio (SFX, vocalisations, comms, ambience; music is copied
 # from Tracks/, not synthesised - see below)
@@ -206,12 +211,12 @@ cd prototype && python tools/generate_audio.py --music-only
 # set (both exist; curated is what currently ships - see Audio Pipeline below):
 cd prototype && python tools/generate_audio.py --music-only --procedural-music
 # Then reimport so Godot writes the .import sidecars:
-cd prototype && ./Godot_v4.7.1-stable_win64_console.exe --headless --editor --import
+./Godot_v4.7.1-stable_win64_console.exe --headless --editor --import --path prototype
 
 # Regenerate parts/foundations/buildings meshes (Blender)
 cd prototype && "/c/Program Files/Blender Foundation/Blender 5.2/blender.exe" --background --python tools/blender/build_meshes.py
 # Then reimport in Godot:
-cd prototype && ./Godot_v4.7.1-stable_win64_console.exe --headless --editor --import
+./Godot_v4.7.1-stable_win64_console.exe --headless --editor --import --path prototype
 ```
 
 ## Art Pipeline
@@ -252,7 +257,7 @@ genuinely convex and get one, i.e. no change.
 
 ```bash
 # Re-derive collision for the whole roster WITHOUT touching hull geometry
-cd prototype && ./Godot_v4.7.1-stable_win64_console.exe --headless --path . --script res://tools/bake_hull_roster.gd --quit -- --collision-only
+./Godot_v4.7.1-stable_win64_console.exe --headless --path prototype --script res://tools/bake_hull_roster.gd --quit -- --collision-only
 ```
 
 Three things about this are non-obvious and were each found the hard way:
@@ -362,3 +367,41 @@ interface, ambience — to be played straight. Ordnance banks come from
 - **No emoji/dingbats in UI text** — a standing rule, but note it is **not** currently enforced by anything. `ui_audit.gd` checks panel overflow / offscreen controls, theme-resource validity, icon/cursor assets, input-binding collisions, material luminance and layer discipline. Box-drawing and arrows are allowed (technical notation).
 - **Blueprint version**: Only bumped when JSON schema changes could silently mis-load older saves (currently 3.0).
 - **Scratch vs Saved designs**: "Test in Arena" writes a scratch file (`user://lab_scratch.json`), never a roster entry. Only explicit Save creates `user://blueprints/<id>.json`.
+---
+
+## VALIDATE
+
+Adapter for Orchestrator Mode (see `~/.claude/CLAUDE.md`). Paste the relevant
+line verbatim into a dispatch packet as `Validate:`. Run from the **repo
+root** — the engine exes live there, not in `prototype/`.
+
+```
+Fast:   ./Godot_v4.7.1-stable_win64_console.exe --headless --path prototype \
+          --script res://tools/compile_check_<slug>.gd --quit
+Full:   ./Godot_v4.7.1-stable_win64_console.exe --headless --path prototype \
+          --script res://tools/compile_check_all.gd
+Probe:  ./Godot_v4.7.1-stable_win64_console.exe --headless --path prototype \
+          --script res://tools/probe_<area>.gd --quit
+```
+
+Notes:
+- **There is no unit test suite** — deleted 2026-08-10 (see `## Checks`). The
+  152 `tools/probe_*.gd` scripts are the regression harness. Name one in
+  `Acceptance_Criteria` whenever behavior, not just parsing, must hold.
+- `Fast` above is deliberately **not** `compile_check_changed.gd`. That script
+  hardcodes `const FILES := [...]`, so parallel Clankers editing it collide.
+  Each task gets its own `tools/compile_check_<slug>.gd` — the 20-line pattern
+  with its own `Target_Nodes` in the array — deleted on PASS.
+  **Whoever dispatches writes it when the Clanker cannot.** `impl-worker` has
+  `Write` and makes its own; `validate-runner` is `disallowedTools: Write,
+  Edit`, so it must be handed a script that already exists or it fails the
+  packet.
+- `Full` loads 200+ interdependent scripts with `CACHE_MODE_IGNORE` — 20+ min
+  observed. Structural-change gate only, never per-task, never retried by a
+  circuit breaker.
+- Godot block-buffers stdout when piped: no output until exit. Always pass
+  `--path` and `--quit`.
+- On a structural change (new autoload or `class_name`), reimport before
+  validating or you get a misleading `Identifier "X" not declared`:
+  `./Godot_v4.7.1-stable_win64_console.exe --headless --editor --import`.
+  Same trigger as the graphify rebuild — do both.

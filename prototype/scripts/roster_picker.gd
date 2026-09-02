@@ -88,6 +88,96 @@ const SLOT_GHOST_SIZE := Vector2(30, 30)
 # same mark, just not competing with a filled slot's thumbnail.
 const SLOT_GHOST_ALPHA := 0.32
 
+# ---------------------------------------------------------------------------
+# THE TILE VARIANT TABLE - one card implementation, four (now five) variants.
+# ---------------------------------------------------------------------------
+# Before this, a library card, a filled slot and an empty well each built their
+# own surface, their own tint decision and their own badge row, and the three
+# had already drifted (different borders, different padding, a badge on one and
+# a ghost glyph on another for the same category). A fifth kind would have been
+# a fourth hand-styled copy.
+#
+# Now there is ONE surface builder (tile_style) and ONE glyph/label lookup
+# (variant_def), both keyed off a variant name. Adding a variant - a commander
+# unit, an aircraft well, whatever - is an entry in this dictionary plus a
+# clause in variant_for_path(). It is a DATA change; no drawing code moves.
+#
+# `tint` is the category wash, `icon` the UIIcons registry name (degrades to no
+# badge when absent), `label` the empty-well legend, `tip` the badge tooltip.
+const TILE_VARIANTS := {
+	"unit": {
+		"tint": Color(0, 0, 0, 0), "icon": "", "label": "",
+		"tip": "Combat design - fits any unit slot",
+	},
+	"harvester": {
+		"tint": HARVESTER_TINT, "icon": ICON_HARVESTER, "label": "HARVESTER",
+		"tip": "Harvester - can gather resources",
+	},
+	"defence": {
+		"tint": BUILDING_TINT, "icon": ICON_BUILDING, "label": "DEFENCE",
+		"tip": "Defensive building - placed on the map during the match",
+	},
+	"support": {
+		"tint": REPAIR_TINT, "icon": ICON_REPAIR, "label": "SUPPORT",
+		"tip": "Support - carries a repair array",
+	},
+	"empty": {
+		"tint": Color(0, 0, 0, 0), "icon": "", "label": "",
+		"tip": "Empty slot",
+	},
+}
+
+# The three surface STATES a variant can be rendered in. Separated from the
+# variant so a harvester reads as the same category whether it is a library
+# card, a filled well or the empty well reserved for it - only the surface
+# changes, never the hue.
+const TILE_STATES := {
+	"card": {"recess": false, "margin": 8, "tint_mult": 1.0},
+	"slot_filled": {"recess": false, "margin": 4, "tint_mult": 1.0},
+	# Half tint on an empty well: enough to say "this well belongs to a
+	# category" without competing with the ghost glyph sharing the recess.
+	"slot_empty": {"recess": true, "margin": 4, "tint_mult": 0.5},
+}
+
+
+static func variant_def(variant: String) -> Dictionary:
+	return TILE_VARIANTS.get(variant, TILE_VARIANTS["unit"])
+
+
+# Variant from the ENTRY FLAGS the blueprint manager already resolved. Order is
+# load-bearing and matches _category_of(): a foundation-hull design carrying a
+# harvester module is a static extractor, so defensive wins.
+static func variant_for_entry(entry: Dictionary) -> String:
+	if entry.get("is_defensive", false):
+		return "defence"
+	if entry.get("is_harvester", false):
+		return "harvester"
+	if entry.get("has_repair", false):
+		return "support"
+	return "unit"
+
+
+# The one surface builder. Every tile on this screen - card, filled well, empty
+# well - comes out of here, so two tiles can differ in hue and in depth but
+# never in border weight, radius or padding.
+static func tile_style(variant: String, state: String) -> StyleBoxFlat:
+	var v := variant_def(variant)
+	var st: Dictionary = TILE_STATES.get(state, TILE_STATES["card"])
+	var tint: Color = v["tint"]
+	tint.a *= float(st["tint_mult"])
+	var fill: Color = SURFACE_TRAY.darkened(0.28) if st["recess"] else SURFACE_CARD
+	var edge: Color = SURFACE_EDGE.darkened(0.35) if st["recess"] else SURFACE_EDGE
+	return surface_style(tint, fill, edge, int(st["margin"]))
+
+
+# Maps a slot kind onto the variant its EMPTY state advertises. A general unit
+# well announces nothing (it takes almost anything); the two reserved kinds do.
+static func variant_for_kind(kind: int) -> String:
+	match kind:
+		SlotKind.HARVESTER: return "harvester"
+		SlotKind.BUILDING: return "defence"
+		_: return "empty"
+
 	# A FLOOR, not a fixed size. The slots expand to share the full width of the
 	# tray (see _build_slot_grid), so this only sets how small one is allowed to get
 	# on a narrow window. Raised from 96x78: at that height the thumbnail had barely
@@ -146,6 +236,12 @@ var _data_by_path: Dictionary = {}
 var _harvester_paths: Dictionary = {}  # path -> entry, for slot validation
 var _building_paths: Dictionary = {}   # path -> entry, for slot validation
 var _repair_paths: Dictionary = {}     # path -> true, for the support badge
+# The auto-draft placard. Empty array = the screen using this picker has no
+# auto-draft behaviour to announce (the Operations draft does not), so nothing
+# is built and those screens are untouched.
+var _auto_names: Array = []
+var _auto_panel: PanelContainer = null
+var _auto_label: Label = null
 
 
 # `entries` is blueprint_manager.list_blueprints(true) output.
@@ -263,6 +359,7 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 	for entry in picked:
 		var card := RosterCard.new()
 		card.configure(entry, _data_by_path.get(str(entry.get("path", "")), {}))
+		card.bind_picker(self)
 		# EXPAND_FILL, so every card in the row takes the row's full height
 		# rather than each shrinking to its own content. Without this a design
 		# whose spec block has an extra line (harvesters carry a HARVESTER
@@ -313,7 +410,9 @@ func _build_slot_section() -> VBoxContainer:
 	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var heading := Label.new()
-	heading.text = "MATCH ROSTER  (slot 12 = harvester only)"
+	# No parenthetical restriction caption: the reserved well says HARVESTER on
+	# its own face (see RosterSlot._render_empty).
+	heading.text = "MATCH ROSTER"
 	heading.theme_type_variation = "HeadingLabel"
 	section.add_child(heading)
 
@@ -490,6 +589,7 @@ func _update_counter() -> void:
 		_counter.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
 	else:
 		_counter.add_theme_color_override("font_color", Tokens.SIGNAL_GO)
+	_refresh_auto_placard(units)
 
 
 # Finds the slot currently holding a path, or null. Used to enforce that a design
@@ -646,6 +746,8 @@ class RosterCard extends PanelContainer:
 	var _thumb: TextureRect = null
 	var _tex: Texture2D = null
 	var _spec: Label = null
+	var variant: String = "unit"
+	var _picker: RosterPicker = null
 
 	func configure(entry: Dictionary, data: Dictionary) -> void:
 		entry_path = str(entry.get("path", ""))
@@ -653,7 +755,10 @@ class RosterCard extends PanelContainer:
 		theme_type_variation = "CardPanel"
 		custom_minimum_size = RosterPicker.CARD_SIZE
 		mouse_filter = Control.MOUSE_FILTER_PASS
-		tooltip_text = "%s\nDrag into a roster slot." % entry_name
+		# CLICK-TO-ASSIGN is the primary gesture now; drag is the deliberate
+		# one. Filling twelve wells by drag alone was the thing being fixed -
+		# twelve press-move-release gestures to express "field these".
+		tooltip_text = "%s\nClick to field in the next free slot. Drag to place it deliberately." % entry_name
 
 		# Category tint: harvesters green, defences amber, repair units blue.
 		# Applied as a StyleBoxFlat background override so the tint is visible
@@ -661,16 +766,10 @@ class RosterCard extends PanelContainer:
 		var is_harv: bool = entry.get("is_harvester", false)
 		var is_def: bool = entry.get("is_defensive", false)
 		var has_rep: bool = entry.get("has_repair", false)
-		var tint := Color(0, 0, 0, 0)
-		if is_def:
-			tint = RosterPicker.BUILDING_TINT
-		elif is_harv:
-			tint = RosterPicker.HARVESTER_TINT
-		elif has_rep:
-			tint = RosterPicker.REPAIR_TINT
-		# EVERY card gets the same built surface, tinted or not. See
-		# surface_style()'s header for why sharing the builder matters.
-		add_theme_stylebox_override("panel", RosterPicker.surface_style(tint))
+		# ONE builder, keyed by variant. See TILE_VARIANTS' header: the card,
+		# the filled well and the empty well all come out of tile_style().
+		variant = RosterPicker.variant_for_entry(entry)
+		add_theme_stylebox_override("panel", RosterPicker.tile_style(variant, "card"))
 
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", Tokens.SPACE_XS)
@@ -760,6 +859,25 @@ class RosterCard extends PanelContainer:
 			# more apart, and a row of images snapping in one by one reads as
 			# stutter.
 			UIAnimScript.fade(_thumb, 1.0, UIAnimScript.DURATION_NORMAL)
+
+	func bind_picker(picker: RosterPicker) -> void:
+		_picker = picker
+
+	# Click, not drag. Guarded on gui_is_dragging so the release that ENDS a
+	# drag out of this card does not also fire an assign - Godot delivers the
+	# button-up to the source control, and without the guard every drag placed
+	# the design twice (once where it was dropped, once in the next free well).
+	func _gui_input(event: InputEvent) -> void:
+		if not (event is InputEventMouseButton) or event.pressed:
+			return
+		if event.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if get_viewport() and get_viewport().gui_is_dragging():
+			return
+		if _picker == null or entry_path == "":
+			return
+		_picker.assign_to_next_free(entry_path, entry_name, _tex, self)
+		accept_event()
 
 	func _get_drag_data(_at_position: Vector2) -> Variant:
 		if entry_path == "":
@@ -859,33 +977,29 @@ class RosterSlot extends PanelContainer:
 		# needing the parenthetical caption in the section heading to explain
 		# it. A general unit well stays untinted - it takes almost anything,
 		# so it has no category to announce.
-		var kind_tint := Color(0, 0, 0, 0)
-		match kind:
-			RosterPicker.SlotKind.HARVESTER: kind_tint = RosterPicker.HARVESTER_TINT
-			RosterPicker.SlotKind.BUILDING: kind_tint = RosterPicker.BUILDING_TINT
-		# Halved alpha vs. a filled card's tint: strong enough to read as
-		# "this well belongs to a category" without competing with the
-		# drag-hint text and ghost glyph sharing the same recess.
-		if kind_tint.a > 0.0:
-			kind_tint.a *= 0.5
-		add_theme_stylebox_override("panel", RosterPicker.surface_style(
-			kind_tint, RosterPicker.SURFACE_TRAY.darkened(0.28),
-			RosterPicker.SURFACE_EDGE.darkened(0.35), 4))
+		add_theme_stylebox_override("panel", RosterPicker.tile_style(
+			RosterPicker.variant_for_kind(kind), "slot_empty"))
 		if _thumb:
 			_thumb.texture = null
 		if _ghost:
 			_ghost.visible = true
+		# Legend and colour come from the variant table, so the restriction
+		# reads off the WELL itself. That is what retired the parenthetical
+		# "(slot 12 = harvester only)" caption in the section heading.
 		if _label:
-			match kind:
-				RosterPicker.SlotKind.HARVESTER:
-					_label.text = "HARVESTER"
-					_label.add_theme_color_override("font_color", RosterPicker.HARVESTER_TINT.lightened(0.4))
-				RosterPicker.SlotKind.BUILDING:
-					_label.text = "DEFENCE %d" % (index + 1)
-					_label.add_theme_color_override("font_color", RosterPicker.BUILDING_TINT.lightened(0.4))
-				_:
-					_label.text = str(index + 1)
-					_label.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
+			var v := RosterPicker.variant_def(RosterPicker.variant_for_kind(kind))
+			var legend := str(v["label"])
+			if legend == "":
+				_label.text = str(index + 1)
+				_label.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
+			else:
+				var tint_col: Color = v["tint"]
+				if kind == RosterPicker.SlotKind.BUILDING:
+					_label.text = "%s %d" % [legend, index + 1]
+				else:
+					_label.text = legend
+				_label.add_theme_color_override("font_color",
+					Color(tint_col.r, tint_col.g, tint_col.b, 1.0).lightened(0.5))
 		# Persistent drag hint — discoverable without mousing over
 		var drag_hint = get_node_or_null("DragHint")
 		if drag_hint:
@@ -893,7 +1007,7 @@ class RosterSlot extends PanelContainer:
 		else:
 			drag_hint = Label.new()
 			drag_hint.name = "DragHint"
-			drag_hint.text = "DRAG HERE"
+			drag_hint.text = "CLICK OR DRAG"
 			drag_hint.theme_type_variation = "HintLabel"
 			drag_hint.add_theme_color_override("font_color", Tokens.BASE_400)
 			drag_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -903,7 +1017,7 @@ class RosterSlot extends PanelContainer:
 		match kind:
 			RosterPicker.SlotKind.HARVESTER: slot_type = "harvester only"
 			RosterPicker.SlotKind.BUILDING: slot_type = "defensive buildings only"
-		tooltip_text = "Empty slot %d (%s). Drag a design here." % [index + 1, slot_type]
+		tooltip_text = "Empty slot %d (%s). Click a design to field it here, or drag one in." % [index + 1, slot_type]
 
 	func _render_filled() -> void:
 		# CardPanel: a filled slot is an object sitting IN the recess, so it
@@ -912,14 +1026,14 @@ class RosterSlot extends PanelContainer:
 		theme_type_variation = "CardPanel"
 		# Same surface builder the library cards use, so a design looks like the
 		# same object in the slot it was dragged into.
-		var tint := Color(0, 0, 0, 0)
+		var variant := "unit"
 		if _picker and _picker.is_building_path(entry_path):
-			tint = RosterPicker.BUILDING_TINT
+			variant = "defence"
 		elif _picker and _picker.is_harvester_path(entry_path):
-			tint = RosterPicker.HARVESTER_TINT
+			variant = "harvester"
 		elif _has_repair_in_data():
-			tint = RosterPicker.REPAIR_TINT
-		add_theme_stylebox_override("panel", RosterPicker.surface_style(tint, RosterPicker.SURFACE_CARD, RosterPicker.SURFACE_EDGE, 4))
+			variant = "support"
+		add_theme_stylebox_override("panel", RosterPicker.tile_style(variant, "slot_filled"))
 		# The ghost is a "what goes here" prompt, so it goes away the moment
 		# something does.
 		if _ghost:
@@ -933,7 +1047,7 @@ class RosterSlot extends PanelContainer:
 		var drag_hint = get_node_or_null("DragHint")
 		if drag_hint:
 			drag_hint.visible = false
-		tooltip_text = "%s\nDrag out or right-click to clear." % entry_name
+		tooltip_text = "%s\nClick to clear. Drag to move it to another slot." % entry_name
 
 	func _has_repair_in_data() -> bool:
 		if _picker == null or entry_path == "":
@@ -1039,7 +1153,22 @@ class RosterSlot extends PanelContainer:
 		}
 
 	func _gui_input(event: InputEvent) -> void:
-		# Right-click clears. Dragging a unit off the grid and dropping it on
+		# LEFT-click-release on a filled well clears it. Same gui_is_dragging
+		# guard the library card uses: the button-up that finishes a drag OUT of
+		# this well is delivered here too, and without the guard every
+		# slot-to-slot move cleared the well it had just filled.
+		if event is InputEventMouseButton and not event.pressed \
+				and event.button_index == MOUSE_BUTTON_LEFT and entry_path != "":
+			if get_viewport() and get_viewport().gui_is_dragging():
+				return
+			clear_slot()
+			UIFeedbackScript.play(self, "select")
+			if _picker:
+				_picker.notify_slot_changed(self)
+			accept_event()
+			return
+		# Right-click clears too, kept as the gesture the drag-first version
+		# taught. Dragging a unit off the grid and dropping it on
 		# nothing does NOT clear the slot - Godot gives no "dropped on nowhere"
 		# callback, so an unhandled drop is indistinguishable from a cancelled
 		# one, and guessing wrong would silently delete a pick.
@@ -1185,3 +1314,116 @@ static func make_drag_preview(tex: Texture2D, label_text: String) -> Control:
 	name_label.clip_text = true
 	box.add_child(name_label)
 	return wrap
+
+
+# ---------------------------------------------------------------------------
+# CLICK-TO-ASSIGN
+# ---------------------------------------------------------------------------
+# The gesture that makes a twelve-well roster fillable. Drag still works and
+# still places deliberately; this is the same operation without the motion.
+#
+# Routing is _first_free_slot_for()'s, i.e. exactly what fill_from() uses, so a
+# click and a drag put a design in the same well - a defence goes to the defence
+# grid, a harvester prefers a general well so the reserved one stays open.
+# Returns the slot it landed in, or null when the relevant grid is full: a full
+# roster REJECTS rather than silently replacing a pick.
+func assign_to_next_free(path: String, name_text: String = "", tex: Texture2D = null,
+		source: Control = null) -> RosterSlot:
+	if path == "":
+		return null
+	# Already fielded: clicking it again is a no-op rather than a move, because
+	# the design is visibly in a well and a second click reads as "yes, that
+	# one" not "move it somewhere else".
+	var held: RosterSlot = slot_holding(path)
+	if held != null:
+		UIAnimScript.shake(held)
+		if source != null:
+			UIFeedbackScript.play(source, "reject")
+		return null
+	var slot: RosterSlot = _first_free_slot_for(path)
+	if slot == null:
+		if source != null:
+			UIAnimScript.shake(source)
+			UIFeedbackScript.play(source, "reject")
+		return null
+	var label := name_text
+	if label == "":
+		var data: Dictionary = _data_by_path.get(path, {})
+		label = str(data.get("name", path.get_file()))
+	slot.assign(path, label, tex)
+	UIAnimScript.button_press_feedback(slot)
+	UIFeedbackScript.play(slot, "place")
+	notify_slot_changed(slot)
+	return slot
+
+
+# ---------------------------------------------------------------------------
+# AUTO-DRAFT, AS A VISIBLE STATE
+# ---------------------------------------------------------------------------
+# "Leave the roster empty to auto-include your newest designs" used to be one
+# clause at the end of a caption, which is the same as not saying it: the
+# player could not tell WHICH designs, or whether it was still in effect after
+# they filled a single well.
+#
+# The caller passes the names the match will actually draft (match_director
+# takes the first ROSTER_AUTOPICK_LIMIT of the same library listing, then tops
+# up from the bundled loadout). The placard shows them while the roster is
+# empty and goes away the moment a unit is fielded, so the state is legible in
+# both directions.
+func set_auto_draft(names: Array) -> void:
+	_auto_names = names.duplicate()
+	if _auto_panel == null and not _auto_names.is_empty():
+		_auto_panel = PanelContainer.new()
+		_auto_panel.add_theme_stylebox_override("panel", surface_style(
+			Color(Tokens.SIGNAL_HAZARD.r, Tokens.SIGNAL_HAZARD.g, Tokens.SIGNAL_HAZARD.b, 0.30),
+			SURFACE_TRAY, SURFACE_EDGE, Tokens.SPACE_SM))
+		_auto_label = Label.new()
+		_auto_label.theme_type_variation = "HintLabel"
+		_auto_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_auto_panel.add_child(_auto_label)
+		add_child(_auto_panel)
+		move_child(_auto_panel, 0)
+	_update_counter()
+
+
+func _refresh_auto_placard(unit_count: int) -> void:
+	if _auto_panel == null or _auto_label == null:
+		return
+	var active: bool = unit_count == 0 and not _auto_names.is_empty()
+	_auto_panel.visible = active
+	if not active:
+		return
+	_auto_label.text = "AUTO-DRAFT ACTIVE - the roster is empty, so the match will field: %s (plus the built-in defaults). Field one design and this stops." % ", ".join(PackedStringArray(_auto_names))
+	_auto_label.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+
+
+# How many unit wells are filled. The launch stage gates on this rather than
+# reaching into _slots, so "is this roster fieldable" has one answer.
+func filled_unit_count() -> int:
+	var n := 0
+	for slot in _slots:
+		if slot.entry_path != "":
+			n += 1
+	return n
+
+
+func filled_defence_count() -> int:
+	var n := 0
+	for slot in _building_slots:
+		if slot.entry_path != "":
+			n += 1
+	return n
+
+
+# The names in slot order, for the launch stage's summary. Parallel to
+# ordered_paths() and derived from the same walk, so a summary can never list a
+# roster the rule set will not carry.
+func ordered_names() -> Array:
+	var out := []
+	for slot in _slots:
+		if slot.entry_path != "":
+			out.append(slot.entry_name)
+	for slot in _building_slots:
+		if slot.entry_path != "":
+			out.append(slot.entry_name)
+	return out

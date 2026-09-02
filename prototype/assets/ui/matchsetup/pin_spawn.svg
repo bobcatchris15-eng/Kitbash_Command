@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>pin_spawn</title>
+  <path fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" d="M32 8 L52 22 L44 50 H20 L12 22 Z"/>
+  <circle cx="32" cy="30" r="7" fill="none" stroke="#ffffff" stroke-width="4"/>
+</svg>

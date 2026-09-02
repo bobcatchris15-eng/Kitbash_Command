@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>nav_next</title>
+  <path fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" d="M26 12 L44 32 L26 52"/>
+  <path fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" d="M14 12 L14 52"/>
+</svg>

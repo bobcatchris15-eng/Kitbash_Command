@@ -301,3 +301,35 @@ static func phosphor_pair(tube: String) -> Dictionary:
 			return {"lit": PHOSPHOR_GREEN, "unlit": PHOSPHOR_GREEN_DIM, "glass": PHOSPHOR_GLASS}
 		_:
 			return {"lit": PHOSPHOR_AMBER, "unlit": PHOSPHOR_AMBER_DIM, "glass": PHOSPHOR_GLASS}
+
+
+# ---------------------------------------------------------------------------
+# MATCH SETUP — staged flow chrome
+# ---------------------------------------------------------------------------
+# The rebuilt Match Settings screen (match_setup.gd) is a three-stage flow with
+# a persistent progress spine. These are the metrics and the schematic palette
+# it draws with, here rather than at the call sites so the screen has no colour
+# or spacing literals of its own. The schematic colours are ALIASES onto the
+# existing signal set, not new hues: a spawn is "go/alert" because it is your
+# base or theirs, a deposit is amber because it is the thing you must attend to,
+# and terrain is neutral base grey. Adding a new marker kind means adding an
+# alias here, not picking a colour in a _draw().
+const SPINE_HEIGHT = 72          # the progress spine band
+const SPINE_ICON = 26            # stage glyph, inside the spine
+const SPINE_RULE = 3             # the spine's own connector rule thickness
+const STAGE_PAD = 24             # inset from the screen frame to stage content
+const NAV_BUTTON_MIN = Vector2(184, 48)
+const MAP_PREVIEW_MIN = Vector2(560, 380)   # holds at 1920x1080, shrinks below
+const MAP_TILE_MIN = Vector2(196, 132)      # one map in the chooser rail
+const MAP_MARKER_R = 6.0         # schematic marker radius, px
+const MAP_MARKER_EDGE = 2.0
+const SUMMARY_COL_MIN = 320
+
+const MAP_TERRAIN = BASE_600
+const MAP_WATER = SIGNAL_INFO
+const MAP_OBSTACLE = BASE_500
+const MAP_RESOURCE = SIGNAL_HAZARD
+const MAP_SPAWN_PLAYER = SIGNAL_GO
+const MAP_SPAWN_ENEMY = SIGNAL_ALERT
+const MAP_GRID = Color(0.290, 0.281, 0.257, 0.35)   # BASE_500 at grid alpha
+const MAP_GRID_DIVISIONS = 8

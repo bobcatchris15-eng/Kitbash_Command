@@ -40,13 +40,10 @@ const WeaponVFXMissilePod = preload("res://scripts/vfx/weapon_vfx_missile_pod.gd
 const WeaponVFXRocketArtillery = preload("res://scripts/vfx/weapon_vfx_rocket_artillery.gd")
 const WeaponVFXHypervelocityMissile = preload("res://scripts/vfx/weapon_vfx_hypervelocity_missile.gd")
 const WeaponVFXSAMLauncher = preload("res://scripts/vfx/weapon_vfx_sam_launcher.gd")
-const WeaponVFXLoiteringMunition = preload("res://scripts/vfx/weapon_vfx_loitering_munition.gd")
-const WeaponVFXAntiRadiationMissile = preload("res://scripts/vfx/weapon_vfx_anti_radiation_missile.gd")
 const WeaponVFXCruiseMissile = preload("res://scripts/vfx/weapon_vfx_cruise_missile.gd")
 const WeaponVFXArtillery = preload("res://scripts/vfx/weapon_vfx_artillery.gd")
 const WeaponVFXMortarArray = preload("res://scripts/vfx/weapon_vfx_mortar_array.gd")
 const WeaponVFXClusterDispenser = preload("res://scripts/vfx/weapon_vfx_cluster_dispenser.gd")
-const WeaponVFXPlasmaLobber = preload("res://scripts/vfx/weapon_vfx_plasma_lobber.gd")
 const WeaponVFXMK19GrenadeLauncher = preload("res://scripts/vfx/weapon_vfx_mk19_grenade_launcher.gd")
 const WeaponVFXSpigotMortar = preload("res://scripts/vfx/weapon_vfx_spigot_mortar.gd")
 const WeaponVFXNapalmMortar = preload("res://scripts/vfx/weapon_vfx_napalm_mortar.gd")
@@ -214,13 +211,13 @@ var targets_allies: bool = false
 # own current_energy per shot (checked/spent via spend_energy() on the
 # vehicle root, duck-typed) and, for ion_cannon, drain the TARGET's energy
 # pool alongside HP damage. arc_projector is the dedicated pure-drain weapon.
-const ENERGY_WEAPON_TYPES = ["arc_projector", "ion_cannon", "microwave_emitter", "particle_lance", "heavy_laser", "pd_laser", "gauss_railgun", "coil_gun", "plasma_lobber"]
+const ENERGY_WEAPON_TYPES = ["arc_projector", "ion_cannon", "microwave_emitter", "particle_lance", "heavy_laser", "pd_laser", "gauss_railgun", "coil_gun"]
 var energy_cost_per_shot: float = 0.0
 var energy_drain_per_shot: float = 0.0
 
 # damage_class reclassification (DECISIONS_NEEDED.md - deliberately
 # deferred, then revisited once damage_resolver.gd actually had a real
-# "energy" armor-table row to resolve against): heavy_laser/plasma_lobber/
+# "energy" armor-table row to resolve against): heavy_laser/
 # pd_laser are thematically directed-energy weapons, reclassified to
 # damage_class "energy" for real armor-matchup purposes. This list and
 # ENERGY_WEAPON_TYPES above stay separate because they answer different
@@ -230,7 +227,7 @@ var energy_drain_per_shot: float = 0.0
 # because the two concepts are the same thing. A weapon that dealt energy
 # damage without a capacitor cost, or vice versa, would still belong in only
 # one of these two lists.
-const ENERGY_DAMAGE_CLASS_TYPES = ["arc_projector", "ion_cannon", "heavy_laser", "plasma_lobber", "pd_laser", "microwave_emitter", "particle_lance"]
+const ENERGY_DAMAGE_CLASS_TYPES = ["arc_projector", "ion_cannon", "heavy_laser", "pd_laser", "microwave_emitter", "particle_lance"]
 
 # --- Ammunition (ModuleCatalog.AMMO_TYPES) ---
 # A design-time payload choice stored in the module's own tweaks dict,
@@ -281,7 +278,7 @@ const ILLUM_LIFETIME: float = 12.0
 # The true munition-interceptors. The AA autocannon deliberately is NOT one:
 # it engages AIRCRAFT, which is a different job, and putting it here would
 # have made it ignore the thing it exists to shoot.
-const PD_WEAPON_TYPES = ["ciws", "pd_laser", "flak_cannon"]
+const PD_WEAPON_TYPES = ["ciws", "pd_laser"]
 # FABLE_REVIEW.md 1.8: the point-defense family finally gets a real anti-AIR
 # identity (previously "flak = AA" was pure flavor - nothing anywhere
 # distinguished air targets, and PD per-shot damage rounded to zero against
@@ -859,9 +856,9 @@ func _ready():
 		elevation_down_limit = ModuleCatalog.get_elevation_down(type_id, data.tweaks)
 
 
-		if type_id in ["basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "ciws", "coil_gun", "autocannon", "anti_materiel_rifle", "hypervelocity_missile", "aa_autocannon"]:
+		if type_id in ["basic_cannon", "rotary_cannon", "gauss_railgun", "ciws", "coil_gun", "autocannon", "anti_materiel_rifle", "hypervelocity_missile", "aa_autocannon"]:
 			damage_class = "kinetic"
-		elif type_id in ["artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flak_cannon", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "mine_layer", "spigot_mortar", "rocket_artillery", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile"]:
+		elif type_id in ["artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "mine_layer", "spigot_mortar", "rocket_artillery", "sam_launcher", "bunker_buster", "cruise_missile"]:
 			damage_class = "explosive"
 		elif type_id in ENERGY_DAMAGE_CLASS_TYPES:
 			# See ENERGY_DAMAGE_CLASS_TYPES's own comment for the full
@@ -1546,25 +1543,24 @@ func _fire_at_target():
 	match type_id:
 		"basic_cannon", "recoilless_rifle", "anti_materiel_rifle": sfx_name = "cannon"
 		"artillery": sfx_name = "artillery"
-		"heavy_machine_gun": sfx_name = "machine_gun"
 		"rotary_cannon": sfx_name = "rotary"
-		"flak_cannon", "flak_battery", "ciws", "autocannon", "aa_autocannon": sfx_name = "autocannon"
+		"flak_battery", "ciws", "autocannon", "aa_autocannon": sfx_name = "autocannon"
 		"mk19_grenade_launcher": sfx_name = "grenade"
 		"gauss_railgun", "coil_gun": sfx_name = "gauss"
 		"heavy_laser", "pd_laser", "point_defense_laser", "laser_cannon", "arc_projector", "ion_cannon", "microwave_emitter", "particle_lance": sfx_name = "beam"
-		"guided_missile", "missile_pod", "cluster_dispenser", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "drone_carrier": sfx_name = "missile"
+		"guided_missile", "missile_pod", "cluster_dispenser", "sam_launcher", "bunker_buster", "cruise_missile", "drone_carrier": sfx_name = "missile"
 		"hypervelocity_missile", "rocket_artillery": sfx_name = "rocket"
 		"smoke_discharger", "mine_layer", "sensor_beacon_launcher": sfx_name = "smoke"
-		"mortar_array", "napalm_mortar", "spigot_mortar": sfx_name = "mortar"
+		"mortar_array", "spigot_mortar": sfx_name = "mortar"
 		"flamethrower": sfx_name = "flamethrower"
-		"plasma_lobber", "plasma_launcher": sfx_name = "plasma"
+		"plasma_launcher": sfx_name = "plasma"
 		"resource_harvester", "repair_array": sfx_name = "harvest"
 	if sfx_name != "" and get_node_or_null("/root/AudioManager"):
 		get_node("/root/AudioManager").play_sfx_3d(sfx_name, global_position, null, 50.0)
 
 	# Call unique visual functions
 	match type_id:
-		"basic_cannon", "heavy_machine_gun", "rotary_cannon":
+		"basic_cannon", "rotary_cannon":
 			_fire_gun_tracer()
 		"gauss_railgun":
 			_fire_railgun_beam()
@@ -1582,10 +1578,6 @@ func _fire_at_target():
 			_fire_hypervelocity_missile()
 		"sam_launcher":
 			_fire_sam_launcher()
-		"loitering_munition":
-			_fire_loitering_munition()
-		"anti_radiation_missile":
-			_fire_anti_radiation_missile()
 		"bunker_buster":
 			_fire_bunker_buster()
 		"cruise_missile":
@@ -1604,14 +1596,10 @@ func _fire_at_target():
 			_fire_flame_spray()
 		"heavy_laser":
 			_fire_continuous_beam()
-		"plasma_lobber":
-			_fire_plasma_lobber()
 		"ciws":
 			_fire_gun_tracer()
 		"pd_laser":
 			_fire_continuous_beam()
-		"flak_cannon":
-			_fire_flak_cannon()
 		"smoke_discharger":
 			_fire_smoke_discharger()
 		"mk19_grenade_launcher":
@@ -1624,8 +1612,6 @@ func _fire_at_target():
 			_fire_gun_tracer()
 		"anti_materiel_rifle":
 			_fire_anti_materiel_rifle()
-		"napalm_mortar":
-			_fire_napalm_mortar()
 		"mine_layer":
 			_fire_mine_layer()
 		"resource_harvester":
@@ -1866,10 +1852,12 @@ func _fire_artillery():
 
 func _fire_mortar_salvo():
 	var count = 3
+	var ammo := "standard"
 	if has_meta("module_data"):
 		var data = get_meta("module_data")
 		count = int(data.tweaks.get("tube_count", 2.0))
-		
+		ammo = ModuleCatalog.get_ammo(type_id, data.tweaks)
+
 	for i in range(count):
 		get_tree().create_timer(i * 0.18).timeout.connect(func():
 			if not is_instance_valid(target): return
@@ -1902,8 +1890,13 @@ func _fire_mortar_salvo():
 			tween.finished.connect(func():
 				if is_instance_valid(shell): shell.queue_free()
 				_deal_aoe_damage(end, 4.0, (dps * fire_rate) / count)
-				# Mortar impact VFX replaces _spawn_explosion_visual
-				WeaponVFXMortarArray.spawn_impact(_effects_parent(), end)
+				# Mortar impact VFX replaces _spawn_explosion_visual. Incendiary
+				# ammo keeps napalm_mortar's distinct fire-pool look (that weapon
+				# was folded into mortar_array's incendiary option).
+				if ammo == "incendiary":
+					WeaponVFXNapalmMortar.spawn_impact_visuals(_effects_parent(), end)
+				else:
+					WeaponVFXMortarArray.spawn_impact(_effects_parent(), end)
 			)
 		)
 
@@ -2298,29 +2291,6 @@ func _fire_sam_launcher():
 # Loitering munition: climbs, holds, then dives. Modelled as a top-attack
 # missile with a deliberate delay before it starts tracking - the loiter is
 # the weapon's cost, paid in time before anything happens.
-func _fire_loitering_munition():
-	var endurance = 1.0
-	if has_meta("module_data"):
-		endurance = float(get_meta("module_data").tweaks.get("seeker_size", 1.0))
-	var loiter_delay = clampf(0.9 * endurance, 0.3, 2.5)
-	var locked = target
-	get_tree().create_timer(loiter_delay).timeout.connect(func():
-		if is_instance_valid(self) and is_instance_valid(locked):
-			_spawn_missile(locked, dps * fire_rate, 2.71, true, 0.6) # loitering_munition: 38 / 14
-			# Launcher cell eject pop
-			WeaponVFXLoiteringMunition.spawn_launch_pop(self, get_muzzle_local_pos())
-	)
-
-# Anti-radiation: only engages units that actually carry a sensor module.
-# That makes an enemy's radar into a liability, and makes this the one weapon
-# whose usefulness is decided by what the OPPONENT chose to build - a
-# genuinely different axis from everything else in the roster.
-func _fire_anti_radiation_missile():
-	if is_instance_valid(target) and _target_carries_sensors(target):
-		_spawn_missile(target, dps * fire_rate, 1.55, false, 0.5) # anti_radiation_missile: 34 / 22
-		# Seeker uncage vent
-		WeaponVFXAntiRadiationMissile.spawn_launch_vent(self, get_muzzle_local_pos())
-
 # Bunker buster: top-attack, and heavily biased toward structures. Against
 # anything that moves it is clumsy and slow; against a building it is the
 # best per-shot in the roster.
@@ -2992,53 +2962,6 @@ func _fire_continuous_beam():
 		if is_instance_valid(glow): glow.queue_free()
 	)
 
-func _fire_plasma_lobber():
-	# Custom plasma shell with ion trail. NOT added to the tree here -
-	# _fire_arcing_shell_at()'s "custom_shell" branch below does that itself;
-	# adding it twice throws "already has a parent".
-	var shell = WeaponVFXPlasmaLobber.make_plasma_shell(0.35, laser_color)
-	WeaponVFXPlasmaLobber.attach_ion_trail(shell, 0.35)
-
-	# Fire arcing shell with custom shell and plasma impact callback
-	var profile = {
-		"body": "bomb",
-		"custom_shell": shell,
-		"impact_vfx_callback": func(cb_parent: Node3D, cb_world_pos: Vector3, cb_blast_radius: float, cb_damage: float):
-			_deal_aoe_damage(cb_world_pos, cb_blast_radius, cb_damage)
-			WeaponVFXPlasmaLobber.plasma_impact(cb_parent, cb_world_pos, 4.5, laser_color)
-	}
-	_fire_arcing_shell_at(0.35, 4.0, laser_color, 4.5, dps * fire_rate, Vector3.ZERO, 0.6, profile)
-
-func _fire_flak_cannon():
-	var shell = MeshInstance3D.new()
-	shell.mesh = MunitionPool.unit_sphere()
-	shell.scale = Vector3(0.18, 0.18, 0.18)
-	shell.material_override = MunitionPool.emissive(Color.DARK_GOLDENROD, Color.GOLD)
-	_effects_parent().add_child(shell)
-	
-	var start = get_muzzle_world_pos()
-	var end = _aim_point(target)
-	var detonate_pos = start.lerp(end, 0.85)
-	
-	var tween = create_tween()
-	tween.tween_property(shell, "global_position", detonate_pos, 0.22)
-	tween.finished.connect(func():
-		if is_instance_valid(shell): shell.queue_free()
-		
-		var smoke = MeshInstance3D.new()
-		smoke.mesh = MunitionPool.unit_sphere()
-		smoke.scale = Vector3(1.6, 1.6, 1.6)
-		smoke.material_override = MunitionPool.alpha(Color(0.15, 0.15, 0.15, 0.7))
-		_effects_parent().add_child(smoke)
-		smoke.global_position = detonate_pos
-		
-		var st = create_tween()
-		st.tween_property(smoke, "scale", Vector3.ZERO, 0.4)
-		st.finished.connect(func(): smoke.queue_free())
-
-		_deal_aoe_damage(detonate_pos, 5.0, dps * fire_rate)
-	)
-
 # --- Roster expansion fire functions ---------------------------------------
 
 # MK19: a low, fast arc with a small blast on arrival. Deliberately a
@@ -3229,25 +3152,6 @@ func _fire_coil_gun():
 # Reuses the incendiary-ammo pool wholesale rather than growing a parallel
 # fire system - this weapon simply always does what incendiary ammo does,
 # and does it bigger.
-func _fire_napalm_mortar():
-	var parent = _effects_parent()
-	if parent == null: return
-	var profile: Dictionary = WeaponVFXNapalmMortar.get_projectile_profile()
-	profile["custom_trail"] = true
-	# _fire_arcing_shell_at's else branch (the one that calls _deal_aoe_damage)
-	# is skipped whenever impact_vfx_callback is set, so this lambda deals the
-	# damage itself - same fix class as Part A, applied up front here.
-	profile["impact_vfx_callback"] = func(cb_parent: Node3D, cb_world_pos: Vector3, _cb_blast_radius: float, cb_damage: float):
-		_deal_aoe_damage(cb_world_pos, 4.0, cb_damage)
-		WeaponVFXNapalmMortar.spawn_impact_visuals(cb_parent, cb_world_pos)
-	var shell_radius: float = float(profile.get("shell_radius", 0.3))
-	var arc_height: float = float(profile.get("arc_height", 7.0))
-	var shell := _fire_arcing_shell_at(shell_radius, arc_height, Color(0.85, 0.4, 0.1),
-		4.0, dps * fire_rate, Vector3.ZERO, 0.7, profile)
-	if shell:
-		var trail := WeaponVFXNapalmMortar.make_napalm_trail(shell, shell_radius)
-		_detach_trail_on_free(shell, trail)
-
 # Mine layer: lobs a proximity mine a short way out and leaves it. The mine
 # is a real, persistent world entity that outlives its layer - see
 # proximity_mine.gd.

@@ -157,13 +157,13 @@ const PHASE_2_STEPS := [
 	},
 	{
 		"scene": SCENE_LAB,
-		"title": "ADD A CO-AXIAL MACHINE GUN",
+		"title": "ADD A CO-AXIAL AUTOCANNON",
 		"body": "A turret cannon has traverse limits and reload time. "
-			+ "Add a Heavy Machine Gun as a pintle mount on the turret "
+			+ "Add an Autocannon as a pintle mount on the turret "
 			+ "for close-in defense against light units and aircraft.\n\n"
-			+ "Drag Heavy Machine Gun onto the TOP facet near the cannon. "
+			+ "Drag Autocannon onto the TOP facet near the cannon. "
 			+ "It mounts as a pintle (side-mounted, limited arc but fast tracking).",
-		"target": "part_card:heavy_machine_gun",
+		"target": "part_card:autocannon",
 		"advance": "weapon_placed",
 	},
 	{

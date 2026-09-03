@@ -400,7 +400,7 @@
 				"weight": 40.0
 			},
 			"tweaks": {},
-			"type_id": "heavy_machine_gun",
+			"type_id": "autocannon",
 			"yaw_offset": 0.0
 		}
 	],

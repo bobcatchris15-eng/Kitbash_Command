@@ -446,7 +446,6 @@ static func _assert_animated_pivots(type_id: String, module: Node3D) -> void:
 # angle the mount is supposed to restore.
 const ARTILLERY_ELEVATION_DEG := 35.0
 const MORTAR_ELEVATION_DEG := 60.0
-const NAPALM_ELEVATION_DEG := 55.0
 
 # Anti-materiel rifle assembly stations, MEASURED from the authored .glb
 # AABBs rather than estimated. amr_breech's front face sits at z = -0.168 and
@@ -488,10 +487,6 @@ const MISSILE_LAUNCHER_PARTS := {
 		"scale_tweak": "seeker_size", "front_z": -0.064, "cant_deg": 6.0, "tint": Color(0.24, 0.25, 0.22)},
 	"sam_launcher": {"body": "sam_body", "round": "sam_missile", "default_count": 2,
 		"scale_tweak": "radar_dish", "front_z": -0.035, "cant_deg": 34.0, "tint": Color(0.72, 0.72, 0.70)},
-	"loitering_munition": {"body": "loiter_body", "round": "loiter_tube", "default_count": 2,
-		"scale_tweak": "seeker_size", "front_z": -0.098, "cant_deg": 62.0, "tint": Color(0.25, 0.27, 0.23)},
-	"anti_radiation_missile": {"body": "arm_body", "round": "arm_missile", "default_count": 2,
-		"scale_tweak": "seeker_size", "front_z": -0.106, "cant_deg": 14.0, "tint": Color(0.34, 0.36, 0.33)},
 	"bunker_buster": {"body": "bb_body", "round": "bb_penetrator", "default_count": 1,
 		"scale_tweak": "warhead_size", "front_z": -0.080, "cant_deg": 46.0, "tint": Color(0.19, 0.20, 0.21)},
 	"cruise_missile": {"body": "cruise_body", "round": "cruise_container", "default_count": 1,
@@ -499,18 +494,18 @@ const MISSILE_LAUNCHER_PARTS := {
 }
 
 const MODULAR_ASSEMBLY_TYPES := {
-	"basic_cannon": true, "heavy_machine_gun": true, "rotary_cannon": true, "gauss_railgun": true,
+	"basic_cannon": true, "rotary_cannon": true, "gauss_railgun": true,
 	"artillery": true, "mortar_array": true, "guided_missile": true, "missile_pod": true,
 	"cluster_dispenser": true, "flamethrower": true, "ion_cannon": true,
-	"heavy_laser": true, "plasma_lobber": true, "ciws": true, "pd_laser": true, "flak_cannon": true,
+	"heavy_laser": true, "ciws": true, "pd_laser": true,
 	"smoke_discharger": true,
 	"mk19_grenade_launcher": true, "recoilless_rifle": true, "coil_gun": true,
-	"autocannon": true, "napalm_mortar": true, "mine_layer": true,
+	"autocannon": true, "mine_layer": true,
 	"anti_materiel_rifle": true,
 	"arc_projector": true, "microwave_emitter": true, "particle_lance": true,
 	"spigot_mortar": true, "rocket_artillery": true,
-	"hypervelocity_missile": true, "sam_launcher": true, "loitering_munition": true,
-	"anti_radiation_missile": true, "bunker_buster": true, "cruise_missile": true,
+	"hypervelocity_missile": true, "sam_launcher": true,
+	"bunker_buster": true, "cruise_missile": true,
 	"aa_autocannon": true,
 	"sensor_beacon_launcher": true,
 	"wheels": true, "helicopter_rotors": true, "tracked_treads": true, "heavy_quad_tracks": true, "legs": true,
@@ -532,7 +527,6 @@ const MODULAR_ASSEMBLY_TYPES := {
 
 const MODULAR_AUTHORED_SIZES := {
 	"basic_cannon": Vector3(0.6, 0.6, 2.0),
-	"heavy_machine_gun": Vector3(0.5, 0.5, 1.8),
 	"rotary_cannon": Vector3(0.6, 0.6, 2.2),
 	"gauss_railgun": Vector3(0.7, 0.7, 3.2),
 	"artillery": Vector3(0.8, 0.8, 3.5),
@@ -543,10 +537,8 @@ const MODULAR_AUTHORED_SIZES := {
 	"flamethrower": Vector3(0.5, 0.5, 1.6),
 	"ion_cannon": Vector3(0.7, 0.7, 2.4),
 	"heavy_laser": Vector3(0.6, 0.6, 2.2),
-	"plasma_lobber": Vector3(0.8, 0.8, 2.0),
 	"ciws": Vector3(0.8, 1.0, 1.2),
 	"pd_laser": Vector3(0.5, 0.6, 0.8),
-	"flak_cannon": Vector3(0.7, 0.7, 2.0),
 	"wheels": Vector3(0.8, 0.8, 0.8),
 	"tracked_treads": Vector3(0.9, 0.8, 2.8),
 	"heavy_quad_tracks": Vector3(0.9, 0.7, 1.4),
@@ -569,7 +561,6 @@ const MODULAR_AUTHORED_SIZES := {
 	"recoilless_rifle": Vector3(0.35, 0.35, 2.0),
 	"coil_gun": Vector3(0.5, 0.5, 2.2),
 	"autocannon": Vector3(0.35, 0.35, 1.4),
-	"napalm_mortar": Vector3(0.7, 0.6, 0.7),
 	"mine_layer": Vector3(0.9, 0.5, 0.9),
 	"anti_materiel_rifle": Vector3(0.4, 0.4, 2.2),
 	"arc_projector": Vector3(0.5, 0.5, 1.0),
@@ -579,8 +570,6 @@ const MODULAR_AUTHORED_SIZES := {
 	"rocket_artillery": Vector3(0.9, 0.7, 1.8),
 	"hypervelocity_missile": Vector3(0.6, 0.5, 1.3),
 	"sam_launcher": Vector3(0.7, 0.6, 1.4),
-	"loitering_munition": Vector3(0.7, 0.6, 1.2),
-	"anti_radiation_missile": Vector3(0.6, 0.6, 1.4),
 	"bunker_buster": Vector3(0.7, 0.7, 1.5),
 	"cruise_missile": Vector3(0.8, 0.7, 2.0),
 	"aa_autocannon": Vector3(0.7, 0.6, 1.5),
@@ -907,106 +896,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				barrel.position = Vector3(cur_x, trunnion_y, -(1.25 * length / 2.0) - 0.05 * caliber)
 				barrel.rotation = Vector3(PI / 2, 0, 0)
 			parent_node.add_child(barrel)
-
-	elif type_id == "heavy_machine_gun":
-		var multi_b = bool(tweaks.get("multi_barrel", false))
-		var drum_scale = tweaks.get("drum_size", 1.0)
-		var caliber = tweaks.get("caliber", 1.0)
-		var length = tweaks.get("barrel_length", 1.0)
-		var b_count = 2 if multi_b else 1
-
-		# 1. PINTLE MOUNT (hmg_pintle_mount.glb)
-		var pintle_mesh = _part("hmg_pintle_mount")
-		if not pintle_mesh:
-			pintle_mesh = _part("pintle_mount")
-		var pintle: MeshInstance3D
-		var base_w_scale = (1.4 if multi_b else 1.0) * caliber
-		if pintle_mesh:
-			pintle = _mesh_inst(pintle_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
-			pintle.scale = Vector3(base_w_scale, caliber, caliber)
-			pintle.position = Vector3(0, 0, 0)
-		else:
-			pintle = MeshInstance3D.new()
-			var p_box = BoxMesh.new()
-			p_box.size = Vector3(0.28 * base_w_scale, 0.22 * caliber, 0.28 * caliber)
-			pintle.mesh = p_box
-			var p_mat = StandardMaterial3D.new()
-			p_mat.albedo_color = base_color.darkened(0.2)
-			pintle.material_override = p_mat
-			pintle.position = Vector3(0, 0.11 * caliber, 0)
-		parent_node.add_child(pintle)
-
-		# 2. RECEIVER(S) & BARREL(S)
-		var rec_mesh = _part("hmg_receiver")
-		var barrel_mesh = _part("hmg_barrel")
-		var trunnion_y = 0.22 * caliber
-		var x_spacing = 0.22 * caliber
-		var start_x = -((b_count - 1) * x_spacing) / 2.0
-
-		for i in range(b_count):
-			var cur_x = start_x + i * x_spacing
-
-			# 2A. RECEIVER
-			var receiver: MeshInstance3D
-			if rec_mesh:
-				receiver = _mesh_inst(rec_mesh, Color(0.20, 0.22, 0.24))
-				receiver.scale = Vector3(caliber, caliber, caliber)
-				receiver.position = Vector3(cur_x, trunnion_y, 0.0)
-			else:
-				receiver = MeshInstance3D.new()
-				var r_box = BoxMesh.new()
-				r_box.size = Vector3(0.14 * caliber, 0.16 * caliber, 0.34 * caliber)
-				receiver.mesh = r_box
-				var r_mat = StandardMaterial3D.new()
-				r_mat.albedo_color = Color(0.20, 0.22, 0.24)
-				receiver.material_override = r_mat
-				receiver.position = Vector3(cur_x, trunnion_y, -0.06 * caliber)
-			parent_node.add_child(receiver)
-
-			# 2B. BARREL (Mounted at front of receiver socket, scaling with caliber and barrel_length)
-			var barrel: MeshInstance3D
-			if barrel_mesh:
-				barrel = _mesh_inst(barrel_mesh, Color(0.15, 0.16, 0.18))
-				barrel.scale = Vector3(caliber, caliber, length * caliber)
-				barrel.position = Vector3(cur_x, trunnion_y, 0.0)
-			else:
-				barrel = MeshInstance3D.new()
-				var b_cyl = CylinderMesh.new()
-				b_cyl.top_radius = 0.03 * caliber
-				b_cyl.bottom_radius = 0.04 * caliber
-				b_cyl.height = 0.85 * length
-				barrel.mesh = b_cyl
-				var b_mat = StandardMaterial3D.new()
-				b_mat.albedo_color = Color(0.15, 0.16, 0.18)
-				barrel.material_override = b_mat
-				barrel.position = Vector3(cur_x, trunnion_y, -0.425 * length)
-				barrel.rotation = Vector3(PI / 2, 0, 0)
-			parent_node.add_child(barrel)
-
-		# 3. SIDE AMMO DRUM (hmg_ammo_drum.glb) - Deformed by drum_size slider!
-		var drum_mesh = _part("hmg_ammo_drum")
-		if not drum_mesh:
-			drum_mesh = _part("ammo_drum")
-		var drum: MeshInstance3D
-		var drum_x = start_x - 0.07 * caliber
-		var total_drum_s = drum_scale * caliber
-		if drum_mesh:
-			drum = _mesh_inst(drum_mesh, Color(0.25, 0.28, 0.25))
-			drum.scale = Vector3(total_drum_s, total_drum_s, total_drum_s)
-			drum.position = Vector3(drum_x, trunnion_y, -0.06 * caliber)
-		else:
-			drum = MeshInstance3D.new()
-			var drum_cyl = CylinderMesh.new()
-			drum_cyl.top_radius = 0.13 * total_drum_s
-			drum_cyl.bottom_radius = 0.13 * total_drum_s
-			drum_cyl.height = 0.14 * total_drum_s
-			drum.mesh = drum_cyl
-			var d_mat = StandardMaterial3D.new()
-			d_mat.albedo_color = Color(0.25, 0.28, 0.25)
-			drum.material_override = d_mat
-			drum.position = Vector3(drum_x - 0.10 * caliber, trunnion_y, -0.06 * caliber)
-			drum.rotation = Vector3(0, 0, PI / 2)
-		parent_node.add_child(drum)
 
 	elif type_id == "rotary_cannon":
 		var caliber = tweaks.get("caliber", 1.0)
@@ -1812,78 +1701,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			lens.rotation = Vector3(PI / 2, 0, 0)
 		parent_node.add_child(lens)
 
-	elif type_id in ["plasma_lobber", "plasma_launcher"]:
-		var containment = tweaks.get("containment", 1.0)
-		var barrel_len = tweaks.get("barrel_length", tweaks.get("charge_rate", 1.0))
-
-		# 1. MOUNT (plasma_lobber_mount.glb)
-		var mount_mesh = _part("plasma_lobber_mount")
-		if not mount_mesh:
-			mount_mesh = _part("pintle_mount")
-		var mount: MeshInstance3D
-		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
-			mount.scale = Vector3(1.0, 1.0, 1.0)
-			mount.position = Vector3(0, 0, 0)
-		else:
-			mount = MeshInstance3D.new()
-			var m_box = BoxMesh.new()
-			m_box.size = Vector3(0.56, 0.16, 0.56)
-			mount.mesh = m_box
-			var m_mat = StandardMaterial3D.new()
-			m_mat.albedo_color = base_color.darkened(0.2)
-			mount.material_override = m_mat
-			mount.position = Vector3(0, 0.08, 0)
-		parent_node.add_child(mount)
-
-		var trunnion_y = 0.28
-		var barrel_group = Node3D.new()
-		barrel_group.position = Vector3(0, trunnion_y, 0)
-		barrel_group.rotation.x = deg_to_rad(35.0)
-		parent_node.add_child(barrel_group)
-
-		# 2. CONTAINMENT VESSEL CHAMBER (plasma_lobber_chamber.glb)
-		var chamber_mesh = _part("plasma_lobber_chamber")
-		var chamber: MeshInstance3D
-		if chamber_mesh:
-			chamber = _mesh_inst(chamber_mesh, Color(0.30, 0.20, 0.35))
-			chamber.scale = Vector3(containment, containment, containment)
-			chamber.position = Vector3(0, 0, 0)
-		else:
-			chamber = MeshInstance3D.new()
-			var h_cyl = CylinderMesh.new()
-			h_cyl.top_radius = 0.24 * containment
-			h_cyl.bottom_radius = 0.24 * containment
-			h_cyl.height = 0.40 * containment
-			chamber.mesh = h_cyl
-			var h_mat = StandardMaterial3D.new()
-			h_mat.albedo_color = Color(0.30, 0.20, 0.35)
-			chamber.material_override = h_mat
-			chamber.position = Vector3(0, 0, -0.20 * containment)
-			chamber.rotation = Vector3(PI / 2, 0, 0)
-		barrel_group.add_child(chamber)
-
-		# 3. ACCELERATOR BARREL (plasma_lobber_barrel.glb)
-		var barrel_mesh = _part("plasma_lobber_barrel")
-		var barrel: MeshInstance3D
-		if barrel_mesh:
-			barrel = _mesh_inst(barrel_mesh, Color(0.20, 0.18, 0.25))
-			barrel.scale = Vector3(containment, containment, barrel_len)
-			barrel.position = Vector3(0, 0, 0)
-		else:
-			barrel = MeshInstance3D.new()
-			var n_cyl = CylinderMesh.new()
-			n_cyl.top_radius = 0.13 * containment
-			n_cyl.bottom_radius = 0.13 * containment
-			n_cyl.height = 0.45 * barrel_len
-			barrel.mesh = n_cyl
-			var n_mat = StandardMaterial3D.new()
-			n_mat.albedo_color = Color(0.20, 0.18, 0.25)
-			barrel.material_override = n_mat
-			barrel.position = Vector3(0, 0, -0.45 * barrel_len)
-			barrel.rotation = Vector3(PI / 2, 0, 0)
-		barrel_group.add_child(barrel)
-
 	elif type_id == "ciws":
 		var caliber = tweaks.get("caliber", 1.0)
 		var barrel_len = tweaks.get("barrel_length", 1.0)
@@ -2014,108 +1831,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			lens.position = Vector3(0, trunnion_y, -0.14 * barrel_len)
 			lens.rotation = Vector3(PI / 2, 0, 0)
 		parent_node.add_child(lens)
-
-	elif type_id in ["flak_cannon", "flak_battery"]:
-		var caliber = tweaks.get("caliber", 1.0) * 0.75  # Cut flak scale to 0.75 per user request
-		var barrel_len = tweaks.get("barrel_length", 1.0) * 0.75
-		var barrel_count = int(tweaks.get("barrel_count", 2.0))
-		barrel_count = clamp(barrel_count, 1, 4)
-		var fuse_tweak = clampf(tweaks.get("fuse_setting", 1.0), 0.5, 2.0)
-
-		# 1. MOUNT (flak_cannon_mount.glb)
-		var mount_mesh = _part("flak_cannon_mount")
-		if not mount_mesh:
-			mount_mesh = _part("pintle_mount")
-		var mount: MeshInstance3D
-		var mount_w = (1.0 + (barrel_count - 1) * 0.15) * caliber
-		if mount_mesh:
-			mount = _mesh_inst(mount_mesh, base_color.darkened(0.2), Color(0, 0, 0, 0), 0.0, "accent")
-			mount.scale = Vector3(mount_w, 1.0, caliber)
-			mount.position = Vector3(0, 0, 0)
-		else:
-			mount = MeshInstance3D.new()
-			var m_box = BoxMesh.new()
-			m_box.size = Vector3(0.52 * mount_w, 0.16, 0.52 * caliber)
-			mount.mesh = m_box
-			var m_mat = StandardMaterial3D.new()
-			m_mat.albedo_color = base_color.darkened(0.2)
-			mount.material_override = m_mat
-			mount.position = Vector3(0, 0.08, 0)
-		parent_node.add_child(mount)
-
-		var trunnion_y = 0.28
-		var barrel_group = Node3D.new()
-		barrel_group.position = Vector3(0, trunnion_y, 0)
-		barrel_group.rotation.x = deg_to_rad(45.0)
-		parent_node.add_child(barrel_group)
-
-		# 2. BREECH BLOCK & RECUPERATOR (flak_cannon_breech.glb)
-		var breech_mesh = _part("flak_cannon_breech")
-		if not breech_mesh:
-			breech_mesh = _part("flak_cannon_housing")
-		var breech: MeshInstance3D
-		if breech_mesh:
-			breech = _mesh_inst(breech_mesh, Color(0.20, 0.22, 0.18))
-			breech.scale = Vector3(mount_w, caliber, caliber)
-			breech.position = Vector3(0, 0, 0)
-		else:
-			breech = MeshInstance3D.new()
-			var h_box = BoxMesh.new()
-			h_box.size = Vector3(0.34 * mount_w, 0.32 * caliber, 0.50 * caliber)
-			breech.mesh = h_box
-			var h_mat = StandardMaterial3D.new()
-			h_mat.albedo_color = Color(0.20, 0.22, 0.18)
-			breech.material_override = h_mat
-			breech.position = Vector3(0, 0, -0.25 * caliber)
-		barrel_group.add_child(breech)
-
-		# 3. CLUSTERED FLAK BARRELS (flak_cannon_barrel.glb) - clustered formation, not line abreast
-		var barrel_mesh = _part("flak_cannon_barrel")
-		var offsets: Array[Vector2] = []
-		if barrel_count == 1:
-			offsets = [Vector2(0, 0)]
-		elif barrel_count == 2:
-			# Vertical stack cluster
-			offsets = [Vector2(0, -0.06 * caliber), Vector2(0, 0.06 * caliber)]
-		elif barrel_count == 3:
-			# Delta triangle cluster
-			offsets = [Vector2(0, 0.07 * caliber), Vector2(-0.06 * caliber, -0.05 * caliber), Vector2(0.06 * caliber, -0.05 * caliber)]
-		else:
-			# 2x2 Box cluster
-			offsets = [Vector2(-0.06 * caliber, -0.06 * caliber), Vector2(0.06 * caliber, -0.06 * caliber), Vector2(-0.06 * caliber, 0.06 * caliber), Vector2(0.06 * caliber, 0.06 * caliber)]
-
-		for off in offsets:
-			var barrel: MeshInstance3D
-			if barrel_mesh:
-				barrel = _mesh_inst(barrel_mesh, Color(0.15, 0.16, 0.14))
-				barrel.scale = Vector3(caliber, caliber, barrel_len)
-				barrel.position = Vector3(off.x, off.y, 0.0)
-				barrel_group.add_child(barrel)
-			else:
-				barrel = MeshInstance3D.new()
-				var b_cyl = CylinderMesh.new()
-				b_cyl.top_radius = 0.07 * caliber
-				b_cyl.bottom_radius = 0.07 * caliber
-				b_cyl.height = 1.10 * barrel_len
-				barrel.mesh = b_cyl
-				var b_mat = StandardMaterial3D.new()
-				b_mat.albedo_color = Color(0.15, 0.16, 0.14)
-				barrel.material_override = b_mat
-				barrel.position = Vector3(off.x, off.y, -0.55 * barrel_len)
-				barrel.rotation = Vector3(PI / 2, 0, 0)
-				barrel_group.add_child(barrel)
-			# The proximity fuse setter rides the barrel near the muzzle: a
-			# brass ring whose size tracks the fuse setting dial.
-			var fr_torus = TorusMesh.new()
-			fr_torus.inner_radius = 0.055 * caliber * fuse_tweak
-			fr_torus.outer_radius = 0.078 * caliber * fuse_tweak
-			fr_torus.rings = 12
-			fr_torus.ring_segments = 6
-			var fuse_ring = MeshInstance3D.new()
-			fuse_ring.mesh = fr_torus
-			fuse_ring.material_override = _flat_mat(Color(0.83, 0.55, 0.20))
-			fuse_ring.position = Vector3(off.x, off.y, -0.30 * barrel_len)
-			barrel_group.add_child(fuse_ring)
 
 	elif type_id == "repair_array":
 		var arm_count = int(tweaks.get("welder_count", 2.0))
@@ -2698,11 +2413,11 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			parent_node.add_child(cells)
 
 	elif type_id in ["mk19_grenade_launcher", "autocannon", "recoilless_rifle", "coil_gun",
-					 "napalm_mortar", "mine_layer", "smoke_discharger",
+					 "mine_layer", "smoke_discharger",
 					 "anti_materiel_rifle", "arc_projector", "microwave_emitter",
 					 "particle_lance", "spigot_mortar", "rocket_artillery",
-					 "hypervelocity_missile", "sam_launcher", "loitering_munition",
-					 "anti_radiation_missile", "bunker_buster", "cruise_missile",
+					 "hypervelocity_missile", "sam_launcher",
+					 "bunker_buster", "cruise_missile",
 					 "aa_autocannon", "sensor_beacon_launcher"]:
 		# --- Roster expansion ------------------------------------------------
 		# Assembled from authored .glb sub-parts (tools/blender/
@@ -3145,8 +2860,8 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 								ROCKET_CRADLE_FRONT_Z * caliber)
 							ra_pivot.add_child(rail)
 
-			"hypervelocity_missile", "sam_launcher", "loitering_munition", \
-			"anti_radiation_missile", "bunker_buster", "cruise_missile":
+			"hypervelocity_missile", "sam_launcher", \
+			"bunker_buster", "cruise_missile":
 				# The six guided launchers share one authored pedestal and one
 				# assembly path, differing in the body that gives each its
 				# identity and in what it carries. That is honest reuse - they
@@ -3406,84 +3121,6 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 					caps.scale = Vector3.ONE * caliber
 					caps.position = Vector3(0, trunnion_y * 0.45, 0.14 * caliber)
 					parent_node.add_child(caps)
-
-			"napalm_mortar":
-				var trunnion_y = 0.18
-				# Steep fixed elevation, applied as a pivot rotation on the
-				# tube group rather than baked into the mesh - the same
-				# approach ARTILLERY_ELEVATION_DEG/MORTAR_ELEVATION_DEG use.
-				# SIGN: positive, same as ARTILLERY_/MORTAR_ELEVATION_DEG. The
-				# parts are authored with the bore along -Z, and a POSITIVE X
-				# rotation pitches -Z upward. This read -55.0, which pitched
-				# the assembly nose-down through the deck - the flared muzzle
-				# ended up below the breech, which is what made the barrel
-				# look like it had been fitted upside down.
-				var elev = deg_to_rad(NAPALM_ELEVATION_DEG)
-
-				# 1. BASEPLATE
-				var np_mount_mesh = _part("napalm_mount")
-				if not np_mount_mesh:
-					np_mount_mesh = _part("mortar_swivel_mount")
-				if np_mount_mesh:
-					var mount = _mesh_inst(np_mount_mesh, base_color.darkened(0.3), Color(0, 0, 0, 0), 0.0, "accent")
-					mount.scale = Vector3(caliber, 1.0, caliber)
-					parent_node.add_child(mount)
-				else:
-					var mount = MeshInstance3D.new()
-					var m_cyl = CylinderMesh.new()
-					m_cyl.top_radius = 0.12 * caliber
-					m_cyl.bottom_radius = 0.24 * caliber
-					m_cyl.height = trunnion_y
-					mount.mesh = m_cyl
-					mount.material_override = _flat_mat(base_color.darkened(0.3))
-					mount.position = Vector3(0, trunnion_y / 2.0, 0)
-					parent_node.add_child(mount)
-
-				# Elevation pivot carries breech + tube together so they stay
-				# aligned at any barrel_length.
-				var elev_pivot = Node3D.new()
-				elev_pivot.name = "ElevationPivot"
-				elev_pivot.position = Vector3(0, trunnion_y, 0)
-				elev_pivot.rotation = Vector3(elev, 0, 0)
-				parent_node.add_child(elev_pivot)
-
-				# 2. BREECH CAP
-				var np_breech_mesh = _part("napalm_breech")
-				if np_breech_mesh:
-					var breech = _mesh_inst(np_breech_mesh, Color(0.30, 0.28, 0.24))
-					breech.scale = Vector3(caliber, caliber, caliber)
-					elev_pivot.add_child(breech)
-
-				# 3. TUBE
-				var np_tube_mesh = _part("napalm_tube")
-				if not np_tube_mesh:
-					np_tube_mesh = _part("mortar_tube_single")
-				if np_tube_mesh:
-					var tube = _mesh_inst(np_tube_mesh, Color(0.32, 0.30, 0.26))
-					tube.scale = Vector3(caliber, caliber, length * caliber)
-					elev_pivot.add_child(tube)
-				else:
-					var tube = MeshInstance3D.new()
-					var t_cyl = CylinderMesh.new()
-					t_cyl.top_radius = 0.13 * caliber
-					t_cyl.bottom_radius = 0.115 * caliber
-					t_cyl.height = 0.55 * length
-					tube.mesh = t_cyl
-					tube.material_override = _flat_mat(Color(0.32, 0.30, 0.26))
-					tube.position = Vector3(0, 0, -t_cyl.height / 2.0)
-					tube.rotation = Vector3(PI / 2, 0, 0)
-					elev_pivot.add_child(tube)
-
-				# 4. FUEL DRUM - deliberately OUTSIDE the elevation pivot: the
-				# drum is hull-mounted plumbing, it doesn't swing with the tube.
-				var drum_mesh = _part("napalm_fuel_drum")
-				if not drum_mesh:
-					drum_mesh = _part("fuel_tank")
-				if drum_mesh:
-					var drum = _mesh_inst(drum_mesh, Color(0.52, 0.24, 0.09))
-					drum.scale = Vector3.ONE * caliber
-					drum.position = Vector3(-0.22 * caliber, 0, 0.10 * caliber)
-					parent_node.add_child(drum)
 
 			"mine_layer":
 				# Mines-per-volley and charge size are both visible on the
@@ -6529,16 +6166,13 @@ static func _with_lods(mesh: ArrayMesh) -> ArrayMesh:
 # binds to the X and Z drag handles.
 const MONOLITHIC_TWEAK_AXES := {
 	"basic_cannon": {"caliber": Vector3(1, 1, 0), "barrel_length": Vector3(0, 0, 1)},
-	"heavy_machine_gun": {"caliber": Vector3(1, 1, 0), "drum_size": Vector3(1, 1, 1)},
 	"rotary_cannon": {"caliber": Vector3(1, 1, 0), "motor_size": Vector3(1, 1, 1)},
 	"artillery": {"caliber": Vector3(1, 1, 0), "barrel_length": Vector3(0, 0, 1)},
 	"guided_missile": {"seeker_size": Vector3(1, 1, 0), "barrel_length": Vector3(0, 0, 1)},
 	"flamethrower": {"nozzle_width": Vector3(1, 1, 0), "pressure_valve": Vector3(1, 1, 1)},
 	"heavy_laser": {"lens_aperture": Vector3(1, 1, 0), "barrel_length": Vector3(0, 0, 1), "focal_length": Vector3(0, 0, 1)},
-	"plasma_lobber": {"containment": Vector3(1, 1, 1), "caliber": Vector3(1, 1, 0), "barrel_length": Vector3(0, 0, 1), "charge_rate": Vector3(0, 0, 1)},
 	"ciws": {"caliber": Vector3(1, 1, 0), "barrel_length": Vector3(0, 0, 1), "radar_dish": Vector3(1, 1, 1), "burst_length": Vector3(0, 0, 1)},
 	"pd_laser": {"cooling_jacket": Vector3(1, 1, 1), "barrel_length": Vector3(0, 0, 1), "tracking_speed": Vector3(1, 0, 0)},
-	"flak_cannon": {"caliber": Vector3(1, 1, 0), "barrel_length": Vector3(0, 0, 1), "barrel_count": Vector3(1, 0, 0), "fuse_setting": Vector3(1, 1, 1), "burst_size": Vector3(0, 0, 1)},
 	"drone_carrier": {"hangar_size": Vector3(1, 0, 0), "launch_catapult": Vector3(0, 0, 1)},
 	"resource_harvester": {"cutter_head": Vector3(1, 1, 1), "extractor_size": Vector3(1, 1, 1), "mount_extension": Vector3(0, 1, 0)},
 	# Which axis each bay tweak grows, for the footprint/clipping side. The
@@ -6634,7 +6268,7 @@ static func _apply_tweak_deformations(type_id: String, parent: Node3D, tweaks: D
 	if children.is_empty(): return
 
 	match type_id:
-		"basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flamethrower", "ion_cannon", "heavy_laser", "laser_cannon", "plasma_lobber", "plasma_launcher", "ciws", "pd_laser", "point_defense_laser", "flak_cannon", "flak_battery", "drone_carrier", "resource_harvester", "repair_array", "sensor_suite", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "coil_gun", "autocannon", 		"napalm_mortar", "mine_layer", "anti_materiel_rifle", "arc_projector", "microwave_emitter", "particle_lance", "spigot_mortar", "rocket_artillery", "hypervelocity_missile", "sam_launcher", "loitering_munition", "anti_radiation_missile", "bunker_buster", "cruise_missile", "aa_autocannon", "sensor_beacon_launcher", "booster_rack":
+		"basic_cannon", "rotary_cannon", "gauss_railgun", "artillery", "mortar_array", "guided_missile", "missile_pod", "cluster_dispenser", "flamethrower", "ion_cannon", "heavy_laser", "laser_cannon", "ciws", "pd_laser", "point_defense_laser", "drone_carrier", "resource_harvester", "repair_array", "sensor_suite", "smoke_discharger", "mk19_grenade_launcher", "recoilless_rifle", "coil_gun", "autocannon", 		"mine_layer", "anti_materiel_rifle", "arc_projector", "microwave_emitter", "particle_lance", "spigot_mortar", "rocket_artillery", "hypervelocity_missile", "sam_launcher", "bunker_buster", "cruise_missile", "aa_autocannon", "sensor_beacon_launcher", "booster_rack":
 			return
 
 # Builds a wedge (triangular prism) mesh from a base_size Vector3.

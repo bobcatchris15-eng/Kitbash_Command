@@ -118,14 +118,6 @@ static func get_drone_options() -> Array:
 # `get_module_data(id).fire_rate` is the single source of truth.
 const WEAPON_FIRE_PROFILES = {
 	"basic_cannon":       {"fire_rate": 1.8,  "fire_range": 38.0, "laser_color": Color.ORANGE},
-	# 0.22 -> 0.66 is the largest single change the balance sweep asked for,
-	# and the one most likely to need a feel check: at 0.22s the HMG's
-	# per-shot damage (dps * fire_rate) was ~5.5, permanently under every
-	# real armor threshold, so it spent the whole game in CHIP_THROUGH_FACTOR
-	# territory dealing 15% damage to anything armored. At 0.66s it clears
-	# the lighter thresholds and becomes a real gun - but it also fires 3x
-	# slower, which reads more like a light autocannon than a machine gun.
-	"heavy_machine_gun":  {"fire_rate": 0.66, "fire_range": 26.0, "laser_color": Color.GOLD},
 	"rotary_cannon":      {"fire_rate": 0.05, "fire_range": 28.0, "laser_color": Color.GOLD},
 	"gauss_railgun":      {"fire_rate": 3.5,  "fire_range": 72.0, "laser_color": Color.BLUE_VIOLET},
 	"artillery":          {"fire_rate": 4.5,  "fire_range": 140.0, "laser_color": Color.SADDLE_BROWN},
@@ -136,7 +128,6 @@ const WEAPON_FIRE_PROFILES = {
 	"cluster_dispenser":  {"fire_rate": 3.0,  "fire_range": 34.0, "laser_color": Color.CHOCOLATE},
 	"flamethrower":       {"fire_rate": 0.06, "fire_range": 11.0,  "laser_color": Color.CRIMSON},
 	"heavy_laser":        {"fire_rate": 0.05, "fire_range": 34.0, "laser_color": Color.DARK_RED},
-	"plasma_lobber":      {"fire_rate": 2.2, "fire_range": 32.0, "laser_color": Color.MEDIUM_SPRING_GREEN},
 	"arc_projector":      {"fire_rate": 0.9, "fire_range": 12.0, "laser_color": Color.CYAN},
 	"ion_cannon":         {"fire_rate": 3.2,  "fire_range": 50.0, "laser_color": Color.SKY_BLUE},
 	# Cone denial. Short interval and low per-shot on purpose: it is not
@@ -152,15 +143,12 @@ const WEAPON_FIRE_PROFILES = {
 	"rocket_artillery":   {"fire_rate": 3.0,  "fire_range": 100.0, "laser_color": Color(0.95, 0.60, 0.25)},
 	"hypervelocity_missile": {"fire_rate": 2.2, "fire_range": 44.0, "laser_color": Color(0.85, 0.92, 1.0)},
 	"sam_launcher":       {"fire_rate": 2.6,  "fire_range": 62.0, "laser_color": Color(0.80, 0.85, 0.90)},
-	"loitering_munition": {"fire_rate": 4.0,  "fire_range": 120.0, "laser_color": Color(0.70, 0.78, 0.66)},
-	"anti_radiation_missile": {"fire_rate": 3.4, "fire_range": 60.0, "laser_color": Color(0.75, 0.80, 0.78)},
 	"bunker_buster":      {"fire_rate": 4.2,  "fire_range": 36.0, "laser_color": Color(0.70, 0.72, 0.75)},
 	"cruise_missile":     {"fire_rate": 5.0, "fire_range": 170.0, "laser_color": Color(0.78, 0.80, 0.72)},
 	"aa_autocannon":      {"fire_rate": 0.20, "fire_range": 38.0, "laser_color": Color(1.0, 0.85, 0.45)},
 	"sensor_beacon_launcher": {"fire_rate": 6.0, "fire_range": 46.0, "laser_color": Color(0.65, 0.90, 0.75)},
 	"ciws":               {"fire_rate": 0.06, "fire_range": 22.0, "laser_color": Color.WHITE_SMOKE},
 	"pd_laser":           {"fire_rate": 0.1,  "fire_range": 24.0, "laser_color": Color.LIGHT_CORAL},
-	"flak_cannon":        {"fire_rate": 1.2,  "fire_range": 40.0, "laser_color": Color.DARK_GOLDENROD},
 	# --- Roster expansion ---
 	# Belt-fed: fast for a grenade weapon, slow for an autogun.
 	"mk19_grenade_launcher": {"fire_rate": 0.5, "fire_range": 30.0, "laser_color": Color(0.55, 0.62, 0.30)},
@@ -178,7 +166,6 @@ const WEAPON_FIRE_PROFILES = {
 	# armor threshold in the table, and utterly wasted on a scout it can only
 	# hit once every four and a half seconds.
 	"anti_materiel_rifle": {"fire_rate": 4.5, "fire_range": 66.0, "laser_color": Color(0.95, 0.92, 0.80)},
-	"napalm_mortar":      {"fire_rate": 2.6,  "fire_range": 40.0, "laser_color": Color(1.0, 0.45, 0.1)},
 	# Short "range" because it is not really shooting - it lobs a mine a
 	# short way ahead and leaves it there.
 	"mine_layer":         {"fire_rate": 3.5,  "fire_range": 14.0, "laser_color": Color(0.62, 0.56, 0.30)},
@@ -206,7 +193,6 @@ static func get_fire_profile(type_id: String) -> Dictionary:
 const DEFAULT_MUZZLE_OFFSET := Vector3(0.0, 0.3, -0.6)
 const MUZZLE_OFFSETS: Dictionary = {
 	"basic_cannon":          Vector3(0.0, 0.26, -2.58),
-	"heavy_machine_gun":     Vector3(0.0, 0.22, -0.57),
 	"rotary_cannon":         Vector3(0.0, 0.24, -1.10),
 	"gauss_railgun":         Vector3(0.0, 0.24, -2.20),
 	"artillery":             Vector3(0.0, 4.85, -6.20),  # 35° elev pivot
@@ -214,9 +200,7 @@ const MUZZLE_OFFSETS: Dictionary = {
 	"flamethrower":          Vector3(0.0, 0.20, -0.47),
 	"ion_cannon":            Vector3(0.0, 0.26, -2.07),
 	"heavy_laser":           Vector3(0.0, 0.25, -1.92),
-	"plasma_lobber":         Vector3(0.0, 0.62, -0.55),  # 35° elev pivot
 	"ciws":                  Vector3(0.0, 0.32, -1.75),
-	"flak_cannon":           Vector3(0.0, 1.00, -0.86),  # 45° elev pivot
 	"pd_laser":              Vector3(0.0, 0.20, -0.89),
 	"mk19_grenade_launcher": Vector3(0.0, 0.25, -0.38),
 	"autocannon":            Vector3(0.0, 0.24, -1.93),
@@ -228,7 +212,6 @@ const MUZZLE_OFFSETS: Dictionary = {
 	"microwave_emitter":     Vector3(0.0, 0.26, -0.62),
 	"particle_lance":        Vector3(0.0, 0.32, -2.36),
 	"aa_autocannon":         Vector3(0.0, 1.28, -1.19),  # 38° elev pivot
-	"napalm_mortar":         Vector3(0.0, 0.97, -0.75),  # 55° elev pivot
 	"rocket_artillery":      Vector3(0.0, 1.84, -1.93),  # 32° elev pivot
 	"hypervelocity_missile":  Vector3(0.0, 0.58, -1.25),
 	"sam_launcher":          Vector3(0.0, 1.56, -1.58),  # 45° elev pivot
@@ -236,8 +219,6 @@ const MUZZLE_OFFSETS: Dictionary = {
 	"cluster_dispenser":     Vector3(0.0, 0.30, -0.51),
 	"guided_missile":        Vector3(0.0, 0.24, -1.30),
 	"missile_pod":           Vector3(0.0, 0.36, -0.82),
-	"loitering_munition":    Vector3(0.0, 1.34, -0.62),  # 58° elev pivot
-	"anti_radiation_missile": Vector3(0.0, 0.67, -1.24),
 	"bunker_buster":         Vector3(0.0, 1.47, -1.21),  # 45° elev pivot
 	"cruise_missile":        Vector3(0.0, 0.94, -1.38),
 	"smoke_discharger":      Vector3(0.0, 0.33, -0.37),
@@ -253,14 +234,10 @@ static func get_muzzle_offset(type_id: String) -> Vector3:
 const MUZZLE_DIRECTIONS: Dictionary = {
 	"artillery":             Vector3(0.0, 0.5736, -0.8192),  # 35° elev
 	"mortar_array":          Vector3(0.0, 0.8660, -0.5000),  # 60° elev
-	"plasma_lobber":         Vector3(0.0, 0.5736, -0.8192),  # 35° elev
-	"flak_cannon":           Vector3(0.0, 0.7071, -0.7071),  # 45° elev
 	"spigot_mortar":         Vector3(0.0, 0.7660, -0.6428),  # 50° elev
 	"aa_autocannon":         Vector3(0.0, 0.6157, -0.7880),  # 38° elev
-	"napalm_mortar":         Vector3(0.0, 0.8192, -0.5736),  # 55° elev
 	"rocket_artillery":      Vector3(0.0, 0.5299, -0.8480),  # 32° elev
 	"sam_launcher":          Vector3(0.0, 0.7071, -0.7071),  # 45° elev
-	"loitering_munition":    Vector3(0.0, 0.8480, -0.5299),  # 58° elev
 	"bunker_buster":         Vector3(0.0, 0.7071, -0.7071),  # 45° elev
 }
 
@@ -336,8 +313,7 @@ static func get_range_tier_label(reach: float) -> String:
 # gauss_railgun reaches 72 and still needs to see what it is shooting.
 const INDIRECT_FIRE_TYPES = [
 	"artillery", "mortar_array", "rocket_artillery", "spigot_mortar",
-	"napalm_mortar", "mk19_grenade_launcher", "cruise_missile",
-	"loitering_munition",
+	"mk19_grenade_launcher", "cruise_missile",
 ]
 
 static func is_indirect_fire(type_id: String) -> bool:
@@ -359,25 +335,6 @@ static func _build_catalog_literal() -> Dictionary:
 			# reasoned relative to this 1.0 anchor.
 			"size": Vector3(1.0, 1.0, 3.3),
 			"color": Color.DIM_GRAY
-		},
-		"heavy_machine_gun": {
-			"name": "Heavy Machine Gun",
-			"category": "weapon",
-			"hp": 60.0,
-			"weight": 40.0,
-			"base_traverse": 1.937,
-			"metal": 15,
-			"crystal": 0,
-			"dps": 32.5,
-			# Pintle-mount eligibility (MOUNTING_AND_ARMOR_SPEC.md #3 second
-			# correction - see get_sponson_up_alignment()'s comment): a
-			# small, light, classic pintle weapon in real life - bolts onto
-			# almost anything short of a genuinely vertical wall.
-			"pintle_min_up_alignment": 0.15,
-			# Small, light gun on a light mount - swings fast, same real-world
-			# intuition as its pintle tolerance above.
-			"size": Vector3(0.3, 0.3, 1.0),
-			"color": Color.SLATE_GRAY
 		},
 		"rotary_cannon": {
 			"name": "Rotary Cannon",
@@ -680,45 +637,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"color": Color(0.33, 0.35, 0.33)
 		},
 
-		# Launches, circles, then dives. The longest reach in the roster,
-		# bought with a long flight time before anything happens at all.
-		"loitering_munition": {
-			"name": "Loitering Munition Launcher",
-			"category": "weapon",
-			# Indirect fire - needs open sky, so it is levelled on a vertical
-			# face but never enclosed in a sponson housing. See
-			# ModuleCatalog.is_sponson_capable().
-			"sponson_capable": false,
-			"hp": 65.0,
-			"weight": 120.0,
-			"base_traverse": 0.733,
-			"metal": 36,
-			"crystal": 22,
-			"dps": 65.0,
-			"size": Vector3(1.0, 0.8, 2.5),
-			"color": Color(0.28, 0.31, 0.27)
-		},
-
-		# Only locks units carrying sensors, which turns radar into a
-		# liability and makes it the one weapon whose usefulness depends
-		# entirely on what the enemy chose to build.
-		"anti_radiation_missile": {
-			"name": "Anti-Radiation Missile Launcher",
-			"category": "weapon",
-			# Indirect fire - needs open sky, so it is levelled on a vertical
-			# face but never enclosed in a sponson housing. See
-			# ModuleCatalog.is_sponson_capable().
-			"sponson_capable": false,
-			"hp": 70.0,
-			"weight": 115.0,
-			"base_traverse": 0.792,
-			"metal": 33,
-			"crystal": 26,
-			"dps": 75.0,
-			"size": Vector3(0.8, 0.8, 2.6),
-			"color": Color(0.29, 0.31, 0.30)
-		},
-
 		# Top-attack anti-structure. Heavily biased toward buildings, and
 		# clumsy against anything that moves.
 		"bunker_buster": {
@@ -859,28 +777,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"size": Vector3(1.0, 1.0, 3.5),
 			"color": Color.DARK_RED
 		},
-		"plasma_lobber": {
-			"name": "Plasma Mortar",
-			"category": "weapon",
-			"required_building": "exotics_lab",
-			# Indirect fire - needs open sky, so it is levelled on a vertical
-			# face but never enclosed in a sponson housing. See
-			# ModuleCatalog.is_sponson_capable().
-			"sponson_capable": false,
-			"hp": 110.0,
-			"weight": 120.0,
-			"base_traverse": 0.448,
-			"metal": 50,
-			"crystal": 60,
-			"dps": 95.0,
-			# "Lobber" is in the name - an arcing projectile weapon, same
-			# ballistic-baseline reasoning as mortar_array/cluster_dispenser.
-			"pintle_min_up_alignment": 0.5,
-			# Arcing lob weapon, same slow-deliberate character as the
-			# mortars/cluster_dispenser.
-			"size": Vector3(1.2, 1.2, 2.5),
-			"color": Color.MEDIUM_SPRING_GREEN
-		},
 
 		# --- POINT DEFENSE ---
 		"ciws": {
@@ -916,26 +812,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"dps": 5.0,
 			"size": Vector3(0.6, 0.8, 0.6),
 			"color": Color.LIGHT_CORAL
-		},
-		"flak_cannon": {
-			"name": "Point-Defense Flak Cannon",
-			"category": "weapon",
-			"required_building": "tech_lab",
-			"hp": 90.0,
-			"weight": 110.0,
-			"base_traverse": 1.196,
-			"metal": 45,
-			"crystal": 10,
-			"dps": 15.0,
-			# Bulkier than the other PD weapons (110kg, boxier housing) but
-			# still an anti-air mount that needs to swing to steep elevations
-			# routinely - moderate tolerance, between the light PD guns and
-			# the heavier precision/ballistic weapons.
-			"pintle_min_up_alignment": 0.3,
-			# Bulkier than the other PD weapons but still needs to swing to
-			# steep anti-air elevations routinely - fast, just not CIWS-fast.
-			"size": Vector3(1.0, 1.0, 2.8),
-			"color": Color.DARK_GOLDENROD
 		},
 
 		# --- ROSTER EXPANSION: new base archetypes ---------------------------
@@ -1040,29 +916,6 @@ static func _build_catalog_literal() -> Dictionary:
 			"pintle_min_up_alignment": 0.20,
 			"size": Vector3(0.5, 0.5, 2.2),
 			"color": Color(0.24, 0.28, 0.26)
-		},
-
-		# Area denial by fire rather than by fragments: modest impact
-		# damage, but it leaves a large, long-lived burning pool that
-		# makes ground genuinely expensive to stand on.
-		"napalm_mortar": {
-			"name": "Incendiary Mortar",
-			"category": "weapon",
-			"required_building": "tech_lab",
-			# Indirect fire - needs open sky, so it is levelled on a vertical
-			# face but never enclosed in a sponson housing. See
-			# ModuleCatalog.is_sponson_capable().
-			"sponson_capable": false,
-			"hp": 85.0,
-			"weight": 95.0,
-			"base_traverse": 0.463,
-			"metal": 42,
-			"crystal": 12,
-			"dps": 45.0,
-			# Arcing tube, same ballistic-baseline reasoning as mortar_array.
-			"pintle_min_up_alignment": 0.55,
-			"size": Vector3(1.0, 0.8, 1.2),
-			"color": Color(0.78, 0.35, 0.12)
 		},
 
 		# Nothing in the roster could HOLD ground - every weapon had to keep
@@ -1856,7 +1709,6 @@ static func _build_catalog_literal() -> Dictionary:
 const MODULE_FLAVOR = {
 	# Ballistic & Kinetic
 	"basic_cannon": "Direct-fire kinetic cannon. Fires high-velocity armor-piercing shells with balanced fire rate and range.",
-	"heavy_machine_gun": "Rapid-fire ballistic weapon. High rate of fire effective against unarmored targets and light armor.",
 	"rotary_cannon": "Motorized multi-barrel rotary cannon delivering extreme sustained ballistic DPS at medium range.",
 	"gauss_railgun": "Long-range electromagnetic accelerator firing hypervelocity kinetic slugs with extreme armor penetration.",
 	"artillery": "Long-range indirect artillery cannon firing heavy explosive shells in high-arching trajectories.",
@@ -1875,8 +1727,6 @@ const MODULE_FLAVOR = {
 	"rocket_artillery": "Long-range multiple launch rocket system (MLRS) unleashing destructive saturation barrages.",
 	"hypervelocity_missile": "Kinetic dart missile traveling at extreme velocities to bypass point defense interception.",
 	"sam_launcher": "Dedicated surface-to-air guided missile launcher providing long-range anti-aircraft defense.",
-	"loitering_munition": "Reconnaissance drone missile that orbits target airspace before diving onto high-value targets.",
-	"anti_radiation_missile": "Homing missile that automatically tracks active hostile radar and electronic emissions.",
 	"bunker_buster": "Top-attack heavy penetrator missile engineered to pierce and demolish reinforced structures.",
 	"cruise_missile": "Ultra-long-range strategic cruise missile delivering a high-yield warhead to distant coordinates.",
 	"aa_autocannon": "High-elevation dual autocannon specialized in shredding low-altitude aircraft and drones.",
@@ -1885,19 +1735,16 @@ const MODULE_FLAVOR = {
 	"microwave_emitter": "Directed microwave beam that penetrates armor plating to scramble electronics and drain power.",
 	"particle_lance": "Heavy charged particle beam cannon that fires a devastating continuous beam after a power spin-up.",
 	"heavy_laser": "Continuous direct-fire laser beam delivering focused thermal cutting damage with instant hitscan delivery.",
-	"plasma_lobber": "Heavy plasma containment mortar firing arcing superheated plasma globes with wide thermal splash.",
-	
+
 	# Point Defense & Tactical
 	"ciws": "Automated high-speed rotary point-defense gun that intercepts incoming missiles, artillery, and mortar shells.",
 	"pd_laser": "Rapid-cycling point-defense laser designed to instantly burn down incoming guided ordnance.",
-	"flak_cannon": "Flak point-defense cannon detonating shrapnel clouds to intercept ordnance and damage aircraft.",
 	"smoke_discharger": "Tactical aerosol grenade discharger creating dense smoke screens that block line of sight.",
 	"mk19_grenade_launcher": "Belt-fed automatic grenade launcher firing continuous high-explosive fragmentation grenades.",
 	"recoilless_rifle": "Lightweight high-caliber anti-tank gun with massive per-shot HEAT impact and significant rear backblast.",
 	"coil_gun": "Turreted multi-stage magnetic coilgun providing rapid hitscan kinetic fire at medium-long reach.",
 	"autocannon": "Intermediate-caliber rapid autocannon offering high per-shot kinetic impact against armored vehicles.",
 	"anti_materiel_rifle": "High-precision heavy sniper rifle delivering massive single-shot kinetic damage at extreme range.",
-	"napalm_mortar": "Incendiary mortar launching persistent chemical fire shells that ignite large ground areas.",
 	"mine_layer": "Mine dispenser deploying persistent proximity explosives to deny chokepoints and access routes.",
 	
 	# Utility & Support
@@ -2307,7 +2154,6 @@ static func get_power_draw(type_id: String) -> float:
 # vanishing.
 const MODULE_ROLES = {
 	# Flat-trajectory barrels you point at what you want to hit.
-	"heavy_machine_gun": "Direct-Fire Guns",
 	"flamethrower": "Direct-Fire Guns",
 	"autocannon": "Direct-Fire Guns",
 	"anti_materiel_rifle": "Direct-Fire Guns",
@@ -2326,8 +2172,6 @@ const MODULE_ROLES = {
 	"rocket_artillery": "Indirect Fire",
 	"hypervelocity_missile": "Missiles",
 	"sam_launcher": "Missiles",
-	"loitering_munition": "Missiles",
-	"anti_radiation_missile": "Missiles",
 	"bunker_buster": "Missiles",
 	"cruise_missile": "Missiles",
 	"aa_autocannon": "Point Defense",
@@ -2339,9 +2183,7 @@ const MODULE_ROLES = {
 	# Lobbed, arcing, or otherwise fired at something you cannot see.
 	"mk19_grenade_launcher": "Indirect Fire",
 	"mortar_array": "Indirect Fire",
-	"napalm_mortar": "Indirect Fire",
 	"cluster_dispenser": "Indirect Fire",
-	"plasma_lobber": "Indirect Fire",
 	"artillery": "Indirect Fire",
 
 	"guided_missile": "Missiles",
@@ -2349,7 +2191,6 @@ const MODULE_ROLES = {
 
 	"pd_laser": "Point Defense",
 	"ciws": "Point Defense",
-	"flak_cannon": "Point Defense",
 
 	# Weapons that leave something behind on the field instead of resolving
 	# damage at a target - the reason smoke_discharger (0 dps) and mine_layer
@@ -2676,8 +2517,8 @@ const PROJECTILE_CLASS = {
 	"ion_cannon": "hitscan",
 	"arc_projector": "hitscan", "microwave_emitter": "hitscan", "particle_lance": "hitscan",
 	"resource_harvester": "hitscan", "repair_array": "hitscan",
-	"basic_cannon": "ballistic", "heavy_machine_gun": "ballistic", "rotary_cannon": "ballistic",
-	"ciws": "ballistic", "flak_cannon": "ballistic", "flamethrower": "ballistic",
+	"basic_cannon": "ballistic", "rotary_cannon": "ballistic",
+	"ciws": "ballistic", "flamethrower": "ballistic",
 	"artillery": "arc", "mortar_array": "arc", "smoke_discharger": "arc",
 	"spigot_mortar": "arc", "rocket_artillery": "arc",
 	"sensor_beacon_launcher": "arc",
@@ -2685,7 +2526,6 @@ const PROJECTILE_CLASS = {
 	# the "missiles" group via weapon_missile.gd), which is the property that
 	# makes them a different proposition from a gun of the same per-shot number.
 	"hypervelocity_missile": "guided", "sam_launcher": "guided",
-	"loitering_munition": "guided", "anti_radiation_missile": "guided",
 	"bunker_buster": "guided", "cruise_missile": "guided",
 	# Roster expansion: a coil gun accelerates a slug the same way a rail
 	# does (hitscan); the recoilless/autocannon all throw a real
@@ -2694,8 +2534,8 @@ const PROJECTILE_CLASS = {
 	"coil_gun": "hitscan",
 	"recoilless_rifle": "ballistic", "autocannon": "ballistic",
 	"anti_materiel_rifle": "ballistic",
-	"mk19_grenade_launcher": "arc", "napalm_mortar": "arc", "mine_layer": "arc",
-	"cluster_dispenser": "arc", "plasma_lobber": "arc",
+	"mk19_grenade_launcher": "arc", "mine_layer": "arc",
+	"cluster_dispenser": "arc",
 	"guided_missile": "guided", "missile_pod": "guided",
 	"drone_carrier": "guided",
 }
@@ -2718,7 +2558,6 @@ static func get_projectile_class(type_id: String) -> String:
 # fall back to weapon_missile.gd's procedural body.
 const GUN_TRACER_VISUALS := {
 	"basic_cannon":       {"radius": 0.05, "length": 0.50, "duration": 0.18, "explode_on_hit": true},
-	"heavy_machine_gun":  {"radius": 0.015, "length": 0.25, "duration": 0.08, "explode_on_hit": true},
 	"rotary_cannon":      {"radius": 0.012, "length": 0.20, "duration": 0.06, "streak": true, "explode_on_hit": true},
 	"ciws":               {"radius": 0.010, "length": 0.22, "duration": 0.06, "streak": true, "explode_on_hit": true},
 	"autocannon":         {"radius": 0.03, "length": 0.35, "duration": 0.12, "explode_on_hit": true},
@@ -2729,8 +2568,6 @@ const GUIDED_MISSILE_MESH := {
 	"missile_pod": "missile_pod_missile",
 	"sam_launcher": "sam_missile",
 	"cruise_missile": "cruise_body",
-	"loitering_munition": "loiter_body",
-	"anti_radiation_missile": "arm_missile",
 	"bunker_buster": "bb_body",
 	"hypervelocity_missile": "hvm_body",
 }
@@ -2899,10 +2736,8 @@ const WEAPON_AMMO_OPTIONS = {
 	"bunker_buster":     ["standard", "he"],
 	"cluster_dispenser": ["standard", "he", "incendiary", "flechette", "smoke"],
 	# Automatic weapons - small rounds, so no illumination/blast-filler
-	"heavy_machine_gun": ["standard", "ap", "incendiary", "flechette"],
 	"rotary_cannon":     ["standard", "ap", "incendiary", "flechette"],
 	"ciws":              ["standard", "ap", "flechette"],
-	"flak_cannon":       ["standard", "he", "flechette", "emp"],
 	# A rail slug is a kinetic mass by definition - only variants that stay
 	# kinetic-ish make sense.
 	"gauss_railgun":     ["standard", "ap", "emp"],
@@ -2918,9 +2753,6 @@ const WEAPON_AMMO_OPTIONS = {
 	# a screening round is fighting its own premise. AP listed first is
 	# deliberate - it is the round this weapon is FOR.
 	"anti_materiel_rifle": ["ap", "standard", "he", "incendiary", "emp"],
-	# A dedicated fire weapon - incendiary is its DEFAULT, not an option,
-	# hence it heading the list (get_ammo() falls back to options[0]).
-	"napalm_mortar":     ["incendiary", "standard", "smoke"],
 	"mine_layer":        ["standard", "he", "incendiary"],
 	# The dedicated obscurant launcher - the complement to the shell-based
 	# smoke above, not a duplicate of it: far larger, faster-blooming clouds,
@@ -3666,14 +3498,11 @@ const COUNT_TWEAK_DEFAULTS := {
 	"rotary_cannon":            {"barrel_count": 6.0},
 	"artillery":                {"barrel_count": 1.0},
 	"guided_missile":           {"barrel_count": 1.0},
-	"flak_cannon":              {"barrel_count": 2.0},
 	"mortar_array":             {"tube_count": 2.0},
 	"cluster_dispenser":        {"tube_count": 2.0},
 	"rocket_artillery":         {"tube_count": 4.0},
 	"hypervelocity_missile":    {"tube_count": 2.0},
 	"sam_launcher":             {"tube_count": 2.0},
-	"loitering_munition":       {"tube_count": 2.0},
-	"anti_radiation_missile":   {"tube_count": 2.0},
 	"mine_layer":               {"tube_count": 1.0},
 	"smoke_discharger":         {"tube_count": 4.0},
 	"missile_pod":              {"grid_size": 4.0},
@@ -4038,19 +3867,15 @@ const ELEVATION_LIMITS := {
 	# things directly overhead, and a PD gun that cannot look up is furniture.
 	"pd_laser":            {"up": 90.0, "down": 20.0},
 	"ciws":                {"up": 90.0, "down": 20.0},
-	# Machine gun and gatling, also named. A pintle MG on a high ring mount
-	# genuinely does point vertically, and it is the classic light-AA answer.
-	"heavy_machine_gun":   {"up": 90.0, "down": 15.0},
+	# Gatling, also named. A high ring mount genuinely does point vertically,
+	# and it is the classic light-AA answer.
 	"rotary_cannon":       {"up": 90.0, "down": 18.0},
 	# Named: both are launch rails, and a rail can be brought fully vertical.
 	"sam_launcher":        {"up": 90.0, "down": 5.0},
-	"anti_radiation_missile": {"up": 90.0, "down": 8.0},
-	# NOT in Chris's list, but included deliberately: these are the roster's
-	# two DEDICATED anti-air guns. It would be incoherent for a general-purpose
-	# machine gun to out-elevate the purpose-built AA autocannon sitting next
-	# to it, and an AA gun that cannot engage overhead has no reason to exist.
+	# NOT in Chris's list, but included deliberately: the roster's
+	# DEDICATED anti-air gun. An AA gun that cannot engage overhead has no
+	# reason to exist.
 	"aa_autocannon":       {"up": 88.0, "down": 10.0},
-	"flak_cannon":         {"up": 85.0, "down": 8.0},
 	# --- High, but not vertical (70-80) ---------------------------------
 	# Light/medium autoguns and short-range missiles: high-angle capable,
 	# stopping short of true vertical because the mount or the feed gets in
@@ -4078,7 +3903,6 @@ const ELEVATION_LIMITS := {
 	"coil_gun":            {"up": 40.0, "down": 10.0},
 	"gauss_railgun":       {"up": 30.0, "down": 8.0},
 	"flamethrower":        {"up": 40.0, "down": 20.0},
-	"plasma_lobber":       {"up": 50.0, "down": 10.0},
 	"cluster_dispenser":   {"up": 45.0, "down": 8.0},
 	"bunker_buster":       {"up": 40.0, "down": 10.0},
 	"smoke_discharger":    {"up": 60.0, "down": 5.0},
@@ -4095,9 +3919,7 @@ const ELEVATION_LIMITS := {
 	"artillery":           {"up": 20.0, "down": 3.0},
 	"rocket_artillery":    {"up": 25.0, "down": 3.0},
 	"cruise_missile":      {"up": 25.0, "down": 3.0},
-	"loitering_munition":  {"up": 30.0, "down": 3.0},
 	"mortar_array":        {"up": 20.0, "down": 3.0},
-	"napalm_mortar":       {"up": 18.0, "down": 3.0},
 	"spigot_mortar":       {"up": 15.0, "down": 3.0},
 	"mk19_grenade_launcher": {"up": 35.0, "down": 8.0},
 	"drone_carrier":       {"up": 40.0, "down": 5.0},

@@ -11,8 +11,6 @@ const WeaponVFXGuidedMissile = preload("res://scripts/vfx/weapon_vfx_guided_miss
 const WeaponVFXMissilePod = preload("res://scripts/vfx/weapon_vfx_missile_pod.gd")
 const WeaponVFXHypervelocityMissile = preload("res://scripts/vfx/weapon_vfx_hypervelocity_missile.gd")
 const WeaponVFXSAMLauncher = preload("res://scripts/vfx/weapon_vfx_sam_launcher.gd")
-const WeaponVFXLoiteringMunition = preload("res://scripts/vfx/weapon_vfx_loitering_munition.gd")
-const WeaponVFXAntiRadiationMissile = preload("res://scripts/vfx/weapon_vfx_anti_radiation_missile.gd")
 const WeaponVFXCruiseMissile = preload("res://scripts/vfx/weapon_vfx_cruise_missile.gd")
 const WeaponVFXBunkerBuster = preload("res://scripts/vfx/weapon_vfx_bunker_buster.gd")
 # Real, interceptable weapon missile (FABLE_REVIEW.md 2.2). Fired by
@@ -152,12 +150,6 @@ func _ready():
 		"sam_launcher":
 			_trail = WeaponVFXSAMLauncher.make_missile_trail(self)
 			_trail.position = Vector3(0, 0, 0.4)
-		"loitering_munition":
-			_trail = WeaponVFXLoiteringMunition.make_loiter_trail(self)
-			_trail.position = Vector3(0, 0, 0.35)
-		"anti_radiation_missile":
-			_trail = WeaponVFXAntiRadiationMissile.make_missile_trail(self)
-			_trail.position = Vector3(0, 0, 0.4)
 		"cruise_missile":
 			_trail = WeaponVFXCruiseMissile.make_missile_trail(self)
 			_trail.position = Vector3(0, 0, 0.6)
@@ -292,12 +284,6 @@ func _spawn_impact_visual():
 			return
 		"sam_launcher":
 			WeaponVFXSAMLauncher.spawn_proximity_burst(scene, _impact_pos)
-			return
-		"loitering_munition":
-			WeaponVFXLoiteringMunition.spawn_shaped_charge_impact(scene, _impact_pos)
-			return
-		"anti_radiation_missile":
-			WeaponVFXAntiRadiationMissile.spawn_impact(scene, _impact_pos)
 			return
 		"cruise_missile":
 			WeaponVFXCruiseMissile.spawn_impact_sequence(scene, _impact_pos)

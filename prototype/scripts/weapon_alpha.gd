@@ -74,19 +74,19 @@ const REGIME_BRUTE := "brute"
 # damage_resolver.gd's "energy" row for why those weapons stopped resolving as
 # explosive.
 const KINETIC_TYPES := [
-	"basic_cannon", "heavy_machine_gun", "rotary_cannon", "gauss_railgun", "ciws",
+	"basic_cannon", "rotary_cannon", "gauss_railgun", "ciws",
 	"coil_gun", "autocannon", "anti_materiel_rifle",
 	"hypervelocity_missile", "aa_autocannon",
 ]
 const EXPLOSIVE_TYPES := [
 	"artillery", "mortar_array", "guided_missile", "missile_pod",
-	"cluster_dispenser", "flak_cannon", "smoke_discharger",
+	"cluster_dispenser", "smoke_discharger",
 	"mk19_grenade_launcher", "recoilless_rifle", "mine_layer", "spigot_mortar",
-	"rocket_artillery", "sam_launcher", "loitering_munition",
-	"anti_radiation_missile", "bunker_buster", "cruise_missile",
+	"rocket_artillery", "sam_launcher",
+	"bunker_buster", "cruise_missile",
 ]
 const ENERGY_TYPES := [
-	"arc_projector", "ion_cannon", "heavy_laser", "plasma_lobber",
+	"arc_projector", "ion_cannon", "heavy_laser",
 	"pd_laser", "microwave_emitter", "particle_lance",
 ]
 

@@ -57,7 +57,7 @@
 				"weight": 110.0
 			},
 			"tweaks": {},
-			"type_id": "flak_cannon",
+			"type_id": "ciws",
 			"yaw_offset": 0.0
 		},
 		{

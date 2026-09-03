@@ -9,8 +9,8 @@
 | Firing Method | Projectile Type | Spawn Entry Point | Projectile Body Builder | Trail Hook |
 |---------------|-----------------|-------------------|-------------------------|------------|
 | `_fire_kinetic_projectile` / `_fire_gun_tracer` / `_fire_aa_autocannon` / `_fire_anti_materiel_rifle` / `_fire_coil_gun` | Hitscan/tracer (MeshInstance3D cylinder) | `_fire_kinetic_projectile(radius, length, duration, color, explode_on_hit, profile)` | Inline: `MunitionPool.unit_cylinder()` + emissive core/glow | Optional `profile.trail == "embers"` → `_spawn_flight_mote` |
-| `_fire_arcing_shell_at` (artillery, mortar_array, spigot_mortar, rocket_artillery, grenade_launcher, plasma_lobber, napalm_mortar) | Lobbed shell (Node3D + MeshInstance3D) | `_fire_arcing_shell_at(shell_radius, arc_height, colour, blast_radius, damage, aim_offset, flight_time, profile)` | `_make_round_body(kind, radius, colour)` — `kind ∈ {"bomb","rocket"}` | `profile.trail_bulk > 0` → `VFXEffects.make_missile_trail(shell, trail_bulk)` + `_detach_trail_on_free` |
-| `_spawn_missile` / `_fire_missile_projectile` / `_fire_swarm_missiles` / `_fire_hypervelocity_missile` / `_fire_sam_launcher` / `_fire_loitering_munition` / `_fire_anti_radiation_missile` / `_fire_bunker_buster` / `_fire_cruise_missile` | Interceptable missile (weapon_missile.gd) | `_spawn_missile(target, damage, seconds_to_max_range, is_top_attack, y_offset)` | `ModuleCatalog.get_missile_mesh(type_id)` → authored mesh_part else procedural fallback in `weapon_missile._ready()` | `VFXEffects.make_missile_trail(self)` in `weapon_missile._ready()` (local_coords=true) |
+| `_fire_arcing_shell_at` (artillery, mortar_array, spigot_mortar, rocket_artillery, grenade_launcher) | Lobbed shell (Node3D + MeshInstance3D) | `_fire_arcing_shell_at(shell_radius, arc_height, colour, blast_radius, damage, aim_offset, flight_time, profile)` | `_make_round_body(kind, radius, colour)` — `kind ∈ {"bomb","rocket"}` | `profile.trail_bulk > 0` → `VFXEffects.make_missile_trail(shell, trail_bulk)` + `_detach_trail_on_free` |
+| `_spawn_missile` / `_fire_missile_projectile` / `_fire_swarm_missiles` / `_fire_hypervelocity_missile` / `_fire_sam_launcher` / `_fire_bunker_buster` / `_fire_cruise_missile` | Interceptable missile (weapon_missile.gd) | `_spawn_missile(target, damage, seconds_to_max_range, is_top_attack, y_offset)` | `ModuleCatalog.get_missile_mesh(type_id)` → authored mesh_part else procedural fallback in `weapon_missile._ready()` | `VFXEffects.make_missile_trail(self)` in `weapon_missile._ready()` (local_coords=true) |
 | `_fire_drone_swarm` / `_launch_scout_drone` | Autonomous drone (drone_unit.gd) | Inline in `_fire_drone_swarm` / `_launch_scout_drone` | `drone_unit.gd` builds its own visual | None |
 | `_fire_cluster_dispenser` | Canister → bomblets | Inline in `_fire_cluster_dispenser` | `cluster_dispenser_canister.glb` fallback `BoxMesh` + `MunitionPool.unit_sphere()` bomblets | None |
 | `_fire_mine_layer` | Proximity mine (proximity_mine.gd) | `ProximityMine.spawn(parent, dest, team, damage, damage_class)` | `proximity_mine.gd` builds visual | None |
@@ -18,7 +18,6 @@
 | `_fire_continuous_beam` / `_fire_railgun_beam` / `_fire_arc_projector` / `_fire_ion_cannon` / `_fire_microwave_emitter` / `_fire_particle_lance` | Hitscan beam (MeshInstance3D cylinder) | Inline per weapon | `MunitionPool.unit_cylinder()` / `unit_taper()` + `aim_beam()` | Vapor rings along path |
 | `_fire_smoke_discharger` / `_fire_sensor_beacon_launcher` | Lobbed canister/beacon | Inline | `MunitionPool.unit_cylinder()` / `unit_sphere()` | None |
 | `_fire_recoilless_rifle` | Kinetic projectile + backblast cone | `_fire_kinetic_projectile` + inline backblast | Same as kinetic | None |
-| `_fire_flak_cannon` | Timed-fuse shell | Inline | `MunitionPool.unit_sphere()` | None |
 
 ---
 
@@ -150,8 +149,6 @@ func _spawn_explosion_visual(pos: Vector3, scale: float, color: Color) -> void:
 | missile_pod | `_fire_swarm_missiles()` (4×) | 1.50 | false | `missile_pod` | 1.0 | 1.0 per missile |
 | hypervelocity_missile | `_fire_hypervelocity_missile()` (2-4× ripple) | 0.55 | false | `hypervelocity_missile` | 1.0 | 1.0 |
 | sam_launcher | `_fire_sam_launcher()` | 1.15 | false | `sam_launcher` | 1.0 | 1.0 |
-| loitering_munition | `_fire_loitering_munition()` | 2.71 | **true** | `loitering_munition` | 1.0 | 1.2 |
-| anti_radiation_missile | `_fire_anti_radiation_missile()` | 1.55 | false | `anti_radiation_missile` | 1.0 | 1.0 |
 | bunker_buster | `_fire_bunker_buster()` | 1.60 | **true** | `bunker_buster` | 1.0 | 1.4 |
 | cruise_missile | `_fire_cruise_missile()` | 4.67 | false | `cruise_missile` | 1.0 | 1.5 |
 | rocket_artillery | `_fire_rocket_artillery()` (4-8×) | — | false | N/A (uses `_fire_arcing_shell_at`) | **2.6** | 2.4×spread |
@@ -166,9 +163,13 @@ func _spawn_explosion_visual(pos: Vector3, scale: float, color: Color) -> void:
 | mortar_array | `_fire_mortar_salvo()` (3×) | 0.2 | 6.0 | 4.0 | 0.6 | discrete spheres, no trail |
 | spigot_mortar | `_fire_spigot_mortar()` | 0.5×payload | 0.55 | 5.5×payload | 1.1 | `{"body":"bomb","tumble":true}` |
 | cluster_dispenser | `_fire_cluster_dispenser()` (canisters→bomblets) | 0.12×payload | — | 2.5×payload | 0.2 (bomblet) | canister glb + spheres |
-| plasma_lobber | `_fire_plasma_lobber()` | 0.35 | 4.0 | 4.5 | 0.6 | sphere + puddle decal |
 | mk19_grenade_launcher | `_fire_grenade_launcher()` | 0.16 | 1.8 | 2.2 | 0.35 | shallow arc, tight blast |
-| napalm_mortar | `_fire_napalm_mortar()` | 0.3 | 7.0 | 4.0 | 0.7 | `{"body":"bomb"}` + `_spawn_burn_pool(1.7, 2.2)` |
+
+> **Note:** `napalm_mortar` is no longer a standalone weapon. Its VFX identity
+> (`weapon_vfx_napalm_mortar.gd`) was repurposed as `mortar_array`'s
+> incendiary-ammo impact visual — `_spawn_burn_pool(1.7, 2.2)` fires on impact
+> when `mortar_array` is loaded with incendiary ammo, not from its own
+> `_fire_*` entry.
 
 ---
 

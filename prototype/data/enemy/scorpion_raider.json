@@ -14,7 +14,7 @@
 	},
 	"modules": [
 		{
-			"type_id": "heavy_machine_gun",
+			"type_id": "autocannon",
 			"name": "Heavy Machine Gun",
 			"position": {"x": 0.0, "y": 0.82, "z": -0.3},
 			"rotation": {"x": 0.0, "y": 0.0, "z": 0.0},

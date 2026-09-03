@@ -1,5 +1,7 @@
 extends SceneTree
-# Regression probe for the Part A-D weapon VFX wiring pass (2026-09-03).
+# Regression probe for the Part A-D weapon VFX wiring pass (2026-09-03),
+# updated when plasma_lobber and napalm_mortar were removed as standalone
+# weapons (2026-09-03, later same day - see the weapon-removal commit).
 #
 # Part A found that artillery and plasma_lobber's impact_vfx_callback was
 # being bound with extra .bind() args on top of the 4 positional args
@@ -10,6 +12,12 @@ extends SceneTree
 # only runs in the callback-absent branch). This probe fires every touched
 # weapon type at a stationary dummy with real HP and asserts damage actually
 # lands - the exact thing that broke silently before.
+#
+# plasma_lobber no longer exists (removed entirely). napalm_mortar no
+# longer exists as its own weapon either - its distinct impact visual was
+# folded into mortar_array's existing "incendiary" ammo option instead, so
+# this probe now exercises THAT path (mortar_array + ammo="incendiary")
+# rather than a standalone napalm_mortar fire call.
 #
 #   Godot_v4.7.1-stable_win64_console.exe --headless --path prototype \
 #     --script res://tools/probe_weapon_vfx_wiring.gd
@@ -26,6 +34,7 @@ extends SceneTree
 
 const AutoWeaponScript = preload("res://scripts/auto_weapon.gd")
 const WeaponMissileScript = preload("res://scripts/weapon_missile.gd")
+const ModuleDataScript = preload("res://scripts/module_data.gd")
 
 # Dummy target with real HP, in "damageable" (AoE weapons search this group)
 # and "targets" (get_vehicle_root() on a weapon walks up looking for this,
@@ -38,7 +47,7 @@ class Dummy extends Node3D:
 		if hp <= 0.0:
 			is_dead = true
 
-const WEAPON_TYPES := ["artillery", "plasma_lobber", "spigot_mortar", "napalm_mortar", "bunker_buster"]
+const WEAPON_TYPES := ["artillery", "spigot_mortar", "mortar_array_incendiary", "bunker_buster"]
 
 
 func _init():
@@ -68,10 +77,17 @@ func _run_one(weapon_type: String) -> bool:
 	var weapon := Node3D.new()
 	weapon.set_script(AutoWeaponScript)
 	shooter.add_child(weapon)
-	weapon.type_id = weapon_type
+	# "mortar_array_incendiary" is a synthetic test id, not a real weapon
+	# type - it drives the real "mortar_array" with incendiary ammo loaded,
+	# to exercise the path napalm_mortar's distinct visual was folded into.
+	weapon.type_id = "mortar_array" if weapon_type == "mortar_array_incendiary" else weapon_type
 	weapon.dps = 40.0
 	weapon.fire_rate = 1.0
 	weapon.damage_class = "kinetic"
+	if weapon_type == "mortar_array_incendiary":
+		var data := ModuleDataScript.new()
+		data.tweaks = {"ammo": "incendiary"}
+		weapon.set_meta("module_data", data)
 
 	var dummy := Dummy.new()
 	root.add_child(dummy)
@@ -93,12 +109,10 @@ func _run_one(weapon_type: String) -> bool:
 	match weapon_type:
 		"artillery":
 			weapon.call("_fire_artillery")
-		"plasma_lobber":
-			weapon.call("_fire_plasma_lobber")
 		"spigot_mortar":
 			weapon.call("_fire_spigot_mortar")
-		"napalm_mortar":
-			weapon.call("_fire_napalm_mortar")
+		"mortar_array_incendiary":
+			weapon.call("_fire_mortar_salvo")
 		"bunker_buster":
 			weapon.call("_fire_bunker_buster")
 		_:

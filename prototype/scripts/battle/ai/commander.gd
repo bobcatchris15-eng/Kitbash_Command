@@ -68,11 +68,11 @@ const Profiler = preload("res://scripts/battle/battle_profiler.gd")
 # one purpose-built surface-to-air weapon in the game was not recognised as an
 # answer to air - an AI holding a SAM turret design would keep scoring "build
 # anti-air" and pick something else.
-const ANTI_AIR_WEAPONS := ["ciws", "flak_cannon", "pd_laser", "sam_launcher", "aa_autocannon"]
+const ANTI_AIR_WEAPONS := ["ciws", "pd_laser", "sam_launcher", "aa_autocannon"]
 const ANTI_ARMOR_WEAPONS := ["gauss_railgun", "artillery", "ion_cannon",
 	"coil_gun", "recoilless_rifle", "anti_materiel_rifle", "particle_lance"]
-const POINT_DEFENSE_WEAPONS := ["ciws", "pd_laser", "flak_cannon"]
-const INDIRECT_WEAPONS := ["artillery", "mortar_array", "spigot_mortar", "rocket_artillery", "cluster_dispenser", "plasma_lobber", "mk19_grenade_launcher", "napalm_mortar"]
+const POINT_DEFENSE_WEAPONS := ["ciws", "pd_laser"]
+const INDIRECT_WEAPONS := ["artillery", "mortar_array", "spigot_mortar", "rocket_artillery", "cluster_dispenser", "mk19_grenade_launcher"]
 
 enum Action {
 	EXPAND_ECONOMY,   # another harvester

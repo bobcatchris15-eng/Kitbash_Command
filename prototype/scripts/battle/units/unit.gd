@@ -970,6 +970,15 @@ func _animate_locomotion(delta: float) -> void:
 				var spin = child.get_node_or_null(VisualBuilderScript.PIVOT_SCREW_SPIN)
 				if spin:
 					spin.rotate_z(6.0 * ground_rate * dir * delta)
+			"resource_harvester":
+				var drill = child.get_node_or_null(VisualBuilderScript.PIVOT_DRILL_HEAD)
+				if drill:
+					# Drill bit's long axis is the module's own +Y (the mount
+					# extrudes/points along the facet normal) - spinning about
+					# it reads as the auger biting into the deposit. Constant
+					# rate, not throttle-tied: the arm turns whenever it's
+					# mounted, same as hover_engine/plasma_thruster's idle spin.
+					drill.rotate_y(8.0 * delta)
 			"propeller_prop", "pusher_prop", "naval_propeller", "ship_screw", "paddle_wheel", "buoyant_envelope":
 				var prop = child.get_node_or_null(VisualBuilderScript.PIVOT_PROP_BLADES)
 				if prop:

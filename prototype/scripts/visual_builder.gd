@@ -196,6 +196,7 @@ const PIVOT_WING := "WingPivot"
 const PIVOT_WING_FORE := "WingPivotFore"
 const PIVOT_WING_HIND := "WingPivotHind"
 const PIVOT_PROP_BLADES := "PropBlades"
+const PIVOT_DRILL_HEAD := "HarvesterDrillHead"
 const PIVOT_SCREW_SPIN := "ScrewSpin"
 const HOVER_RING_OUTER := "HoverRingOuter"
 const HOVER_RING_MID := "HoverRingMid"
@@ -417,6 +418,7 @@ const EXPECTED_ANIMATED_PIVOTS := {
 	"buoyant_envelope": [{"name": PIVOT_PROP_BLADES, "prefix": false}],
 	"plasma_thruster": [{"name": PIVOT_PLASMA_RING, "prefix": false}],
 	"legs": [{"name": LEG_PIVOT_SWING, "prefix": false}],
+	"resource_harvester": [{"name": PIVOT_DRILL_HEAD, "prefix": false}],
 }
 
 # Fails loudly (push_error, not a comment asking future readers to be
@@ -2175,13 +2177,13 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var drill: MeshInstance3D
 		if drill_mesh:
 			drill = _mesh_inst(drill_mesh, Color(0.30, 0.32, 0.35))
-			drill.name = "HarvesterDrillHead"
+			drill.name = PIVOT_DRILL_HEAD
 			drill.scale = Vector3(cutter_scale, cutter_scale, cutter_scale)
 			drill.position = Vector3(0, mount_depth, 0)
 			drill.rotation = Vector3.ZERO
 		else:
 			drill = MeshInstance3D.new()
-			drill.name = "HarvesterDrillHead"
+			drill.name = PIVOT_DRILL_HEAD
 			var d_cyl = CylinderMesh.new()
 			d_cyl.top_radius = 0.04 * cutter_scale
 			d_cyl.bottom_radius = 0.45 * cutter_scale
@@ -6088,7 +6090,7 @@ static func rebuild_visual(module: Node3D):
 # "HoverRingInner" specifically (not "HoverRingOuter", which never animates).
 const _ANIMATED_PART_NAMES := [
 	PIVOT_BARREL_CLUSTER, PIVOT_ROTOR_BLADES, PIVOT_WING, PIVOT_PROP_BLADES,
-	BELT_BAND_NAME, HOVER_RING_MID, HOVER_RING_INNER,
+	BELT_BAND_NAME, HOVER_RING_MID, HOVER_RING_INNER, PIVOT_DRILL_HEAD,
 ]
 
 static func bake_module_visual(module: Node3D) -> void:

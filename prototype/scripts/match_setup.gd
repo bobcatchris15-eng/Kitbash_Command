@@ -968,7 +968,7 @@ class MapPreview extends PanelContainer:
 		_shot.texture = tex
 		_shot.visible = tex != null
 		_fill.color = MatchSetupChrome.ground_for(map_def)
-		_overlay.set_map(map_def)
+		_overlay.set_map(map_def, tex.get_size() if tex != null else Vector2.ZERO)
 
 
 # The vector half of the preview. Everything it draws is a token colour; it
@@ -976,22 +976,38 @@ class MapPreview extends PanelContainer:
 class MapSchematic extends Control:
 	var _def: Dictionary = {}
 	var _half: Vector2 = Vector2(400, 400)
+	var _tex_size: Vector2 = Vector2.ZERO
 
-	func set_map(map_def: Dictionary) -> void:
+	func set_map(map_def: Dictionary, tex_size: Vector2 = Vector2.ZERO) -> void:
 		_def = map_def
+		_tex_size = tex_size
 		_half = MapCatalog.half_extents(map_def)
 		if _half.x <= 0.0 or _half.y <= 0.0:
 			_half = Vector2(400, 400)
 		queue_redraw()
 
-	# World XZ -> preview px. The preview is not the map's aspect ratio, so this
-	# stretches rather than letterboxing: a schematic that does not fill the
-	# frame reads as a rendering fault, and the marker POSITIONS relative to the
-	# terrain photo behind them are what matter, not the metric shape.
+	# The texture beneath this overlay is STRETCH_KEEP_ASPECT_CENTERED, so it
+	# letterboxes into a centred sub-rect of this control rather than filling
+	# it. Recomputed every call (never cached) so a resize or a map swap to a
+	# different aspect ratio can't leave stale margins. With no texture (a map
+	# with no baked shot) the content rect is the full control - there is no
+	# letterbox to account for.
+	func _content_rect() -> Rect2:
+		if _tex_size.x <= 0.0 or _tex_size.y <= 0.0 or size.x <= 0.0 or size.y <= 0.0:
+			return Rect2(Vector2.ZERO, size)
+		var fit_scale: float = min(size.x / _tex_size.x, size.y / _tex_size.y)
+		var content_size := _tex_size * fit_scale
+		return Rect2((size - content_size) * 0.5, content_size)
+
+	# World XZ -> preview px, mapped onto the letterboxed CONTENT rect (the
+	# actual drawn area of the texture) rather than the full control rect, so
+	# markers land on the terrain features they label regardless of the map's
+	# aspect ratio relative to the frame.
 	func _to_px(x: float, z: float) -> Vector2:
-		return Vector2(
-			(x + _half.x) / (_half.x * 2.0) * size.x,
-			(z + _half.y) / (_half.y * 2.0) * size.y)
+		var rect := _content_rect()
+		return rect.position + Vector2(
+			(x + _half.x) / (_half.x * 2.0) * rect.size.x,
+			(z + _half.y) / (_half.y * 2.0) * rect.size.y)
 
 	func _vec3(value) -> Vector3:
 		if value is Vector3:
@@ -1016,12 +1032,17 @@ class MapSchematic extends Control:
 		if size.x <= 1.0 or size.y <= 1.0:
 			return
 		# A survey grid, first, under everything. It is what makes the preview
-		# read as an instrument's plot rather than as a photograph.
-		var step := size / float(Tokens.MAP_GRID_DIVISIONS)
+		# read as an instrument's plot rather than as a photograph. Drawn over
+		# the same content rect as the markers, so the grid lines up with the
+		# terrain photo rather than the letterbox margin.
+		var content := _content_rect()
+		var step := content.size / float(Tokens.MAP_GRID_DIVISIONS)
 		for i in range(1, Tokens.MAP_GRID_DIVISIONS):
-			draw_line(Vector2(step.x * i, 0), Vector2(step.x * i, size.y),
+			draw_line(content.position + Vector2(step.x * i, 0),
+				content.position + Vector2(step.x * i, content.size.y),
 				Tokens.MAP_GRID, 1.0)
-			draw_line(Vector2(0, step.y * i), Vector2(size.x, step.y * i),
+			draw_line(content.position + Vector2(0, step.y * i),
+				content.position + Vector2(content.size.x, step.y * i),
 				Tokens.MAP_GRID, 1.0)
 
 		for water in _def.get("water_areas", []):

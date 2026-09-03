@@ -288,17 +288,17 @@ func _process(delta: float):
 		if not child.has_meta("module_data"): continue
 		var type_id = child.get_meta("module_data").type_id
 		if type_id == "helicopter_rotors":
-			var rotor = child.get_node_or_null("RotorBlades")
+			var rotor = child.get_node_or_null(VisualBuilderScript.PIVOT_ROTOR_BLADES)
 			if rotor:
 				rotor.rotate_y(15.0 * delta)
 		elif type_id == "hover_engine":
 			# Same idle spin as helicopter_rotors' blades - outer ring stays
 			# fixed/horizontal, middle ring spins around X, inner ring
 			# around Y (Chris's ask).
-			var mid_ring = child.get_node_or_null("HoverRingMid")
+			var mid_ring = child.get_node_or_null(VisualBuilderScript.HOVER_RING_MID)
 			if mid_ring:
 				mid_ring.rotate_x(12.0 * delta)
-			var inner_ring = child.get_node_or_null("HoverRingInner")
+			var inner_ring = child.get_node_or_null(VisualBuilderScript.HOVER_RING_INNER)
 			if inner_ring:
 				inner_ring.rotate_y(18.0 * delta)
 				# Chris: the innermost ring should turn about a horizontal axis
@@ -309,7 +309,7 @@ func _process(delta: float):
 		elif type_id == "plasma_thruster":
 			# PlasmaRing is nested under PodRoot, not a direct child - a
 			# direct-child get_node_or_null() always misses it.
-			var ring = child.find_child("PlasmaRing", true, false)
+			var ring = child.find_child(VisualBuilderScript.PIVOT_PLASMA_RING, true, false)
 			if ring:
 				ring.rotate_z(18.0 * delta)
 

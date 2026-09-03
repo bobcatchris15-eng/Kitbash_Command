@@ -182,6 +182,26 @@ const SPIN_PIVOT_TURBINE := "TurbineFan"
 const BELT_BAND_NAME := "TreadBeltBand"
 const TREAD_BELT_SHADER := preload("res://shaders/tread_belt.gdshader")
 
+# Remaining animated-pivot names, unified for the same reason as the
+# SPIN_PIVOT_*/BELT_BAND_NAME block above: every one of these used to be a
+# bare string literal independently duplicated across visual_builder.gd,
+# module_placer.gd (Lab preview animation) and unit.gd (battle animation).
+# hover_engine's rings and plasma_thruster's ring specifically caused live
+# bugs (a Lab-only path that looked fine and a battle bake that silently
+# dropped the animated part) - see the commit history at _ANIMATED_PART_NAMES
+# below. Reference these constants everywhere; never retype the string.
+const PIVOT_BARREL_CLUSTER := "BarrelCluster"
+const PIVOT_ROTOR_BLADES := "RotorBlades"
+const PIVOT_WING := "WingPivot"
+const PIVOT_WING_FORE := "WingPivotFore"
+const PIVOT_WING_HIND := "WingPivotHind"
+const PIVOT_PROP_BLADES := "PropBlades"
+const PIVOT_SCREW_SPIN := "ScrewSpin"
+const HOVER_RING_OUTER := "HoverRingOuter"
+const HOVER_RING_MID := "HoverRingMid"
+const HOVER_RING_INNER := "HoverRingInner"
+const PIVOT_PLASMA_RING := "PlasmaRing"
+
 # One ShaderMaterial per belt instance - uv_offset is per-vehicle animation
 # state, so this must never be a single cached/shared material the way
 # get_flame_arc_material() is for a VFX emitter.
@@ -352,12 +372,12 @@ static func _beam_hardware(parent_node: Node3D, base_size: Vector3) -> void:
 # its side, which is worse than leaving it static. That one needs the barrels
 # authored as a separate mesh before it can animate.
 const MONOLITHIC_ANIMATION_PIVOTS := {
-	"helicopter_rotors": "RotorBlades",
-	"ornithopter_wing": "WingPivot",
-	"ship_screw": "PropBlades",
-	"propeller_prop": "PropBlades",
-	"pusher_prop": "PropBlades",
-	"paddle_wheel": "PropBlades",
+	"helicopter_rotors": PIVOT_ROTOR_BLADES,
+	"ornithopter_wing": PIVOT_WING,
+	"ship_screw": PIVOT_PROP_BLADES,
+	"propeller_prop": PIVOT_PROP_BLADES,
+	"pusher_prop": PIVOT_PROP_BLADES,
+	"paddle_wheel": PIVOT_PROP_BLADES,
 }
 
 const LOCOMOTION_MODULAR_TYPES := {
@@ -367,6 +387,57 @@ const LOCOMOTION_MODULAR_TYPES := {
 	"half_track": true, "rocker_bogie": true, "air_cushion_skirt": true,
 	"anti_grav_plate": true, "plasma_thruster": true,
 }
+
+# What _assert_animated_pivots() (called right after the match dispatch below)
+# requires each modular locomotion type to have actually produced, keyed by
+# the SAME constants unit.gd/module_placer.gd look up at animation time. This
+# is the guard against the exact failure class fixed in 29e63230: a type in
+# this table that resolves an empty pivot set is a builder/animator naming
+# mismatch, and it fails loudly here at build time instead of silently
+# freezing in the Lab or (worse) in battle. "prefix" true means the animator
+# matches this name as a find_children() prefix (Godot uniquifies duplicate
+# sibling names); false means it is looked up by exact name, possibly nested
+# (plasma_thruster's ring sits under PodRoot, not a direct child).
+const EXPECTED_ANIMATED_PIVOTS := {
+	"wheels": [{"name": SPIN_PIVOT_WHEEL, "prefix": true}],
+	"rocker_bogie": [{"name": SPIN_PIVOT_WHEEL, "prefix": true}],
+	"tracked_treads": [{"name": SPIN_PIVOT_TREAD, "prefix": true}],
+	"heavy_quad_tracks": [{"name": BELT_BAND_NAME, "prefix": true}],
+	"half_track": [{"name": BELT_BAND_NAME, "prefix": true}, {"name": SPIN_PIVOT_WHEEL, "prefix": true}],
+	"helicopter_rotors": [{"name": PIVOT_ROTOR_BLADES, "prefix": false}],
+	"ornithopter_wing": [
+		{"name": PIVOT_WING_FORE, "prefix": false},
+		{"name": PIVOT_WING_HIND, "prefix": false},
+	],
+	"hover_engine": [
+		{"name": HOVER_RING_MID, "prefix": false},
+		{"name": HOVER_RING_INNER, "prefix": false},
+	],
+	"screw_drive": [{"name": PIVOT_SCREW_SPIN, "prefix": false}],
+	"buoyant_envelope": [{"name": PIVOT_PROP_BLADES, "prefix": false}],
+	"plasma_thruster": [{"name": PIVOT_PLASMA_RING, "prefix": false}],
+	"legs": [{"name": LEG_PIVOT_SWING, "prefix": false}],
+}
+
+# Fails loudly (push_error, not a comment asking future readers to be
+# careful) if a locomotion type in EXPECTED_ANIMATED_PIVOTS just built a
+# module with none of its required pivots present. This is a build-time
+# check of exactly the defect class that shipped hover_engine broken: the
+# keep-list and the writer disagreeing about a name with no error anywhere.
+static func _assert_animated_pivots(type_id: String, module: Node3D) -> void:
+	if not EXPECTED_ANIMATED_PIVOTS.has(type_id):
+		return
+	for req in EXPECTED_ANIMATED_PIVOTS[type_id]:
+		var pivot_name: String = req["name"]
+		var found: Node = null
+		if req["prefix"]:
+			var matches := module.find_children(pivot_name + "*", "Node3D", true, false)
+			if matches.size() > 0:
+				found = matches[0]
+		else:
+			found = module.find_child(pivot_name, true, false)
+		if found == null:
+			push_error("VisualBuilder: locomotion type '%s' built with no '%s' animation pivot - builder/animator name mismatch, this part will not animate" % [type_id, pivot_name])
 
 # Firing elevation applied as a PIVOT ROTATION for the two weapons whose barrels
 # used to have their elevation baked into the mesh. Must match
@@ -738,6 +809,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			"anti_grav_plate": _build_anti_grav_plate(parent_node, base_size, base_color, tweaks)
 			"plasma_thruster": _build_plasma_thruster(parent_node, base_size, base_color, tweaks)
 		_apply_tweak_deformations(type_id, parent_node, tweaks, base_size)
+		_assert_animated_pivots(type_id, parent_node)
 
 		return
 
@@ -3841,7 +3913,7 @@ static func build_enclosing_bubble_shield(full_hull_aabb: AABB, module_transform
 
 static func _attach_rotary_barrels(parent_node: Node3D, base_size: Vector3, tweaks: Dictionary):
 	var pivot = Node3D.new()
-	pivot.name = "BarrelCluster"
+	pivot.name = PIVOT_BARREL_CLUSTER
 	parent_node.add_child(pivot)
 
 	var b_count = int(tweaks.get("barrel_count", 6.0))
@@ -3909,7 +3981,7 @@ static func _attach_radar_dish(parent_node: Node3D, base_size: Vector3, base_col
 
 static func _attach_rotor_blades(parent_node: Node3D, base_size: Vector3):
 	var pivot = Node3D.new()
-	pivot.name = "RotorBlades"
+	pivot.name = PIVOT_ROTOR_BLADES
 	var shaft_h = base_size.y * 0.8
 	pivot.position = Vector3(0, shaft_h, 0)
 	parent_node.add_child(pivot)
@@ -3924,7 +3996,7 @@ static func _attach_rotor_blades(parent_node: Node3D, base_size: Vector3):
 
 static func _attach_ornithopter_pivot(parent_node: Node3D, base_size: Vector3, base_color: Color):
 	var pivot = Node3D.new()
-	pivot.name = "WingPivot"
+	pivot.name = PIVOT_WING
 	pivot.position = Vector3(base_size.x * 0.2, base_size.y * 0.15, 0)
 	parent_node.add_child(pivot)
 
@@ -4566,7 +4638,7 @@ static func _build_helicopter_rotors(parent_node: Node3D, base_size: Vector3, ba
 		parent_node.add_child(hub)
 
 	var pivot = Node3D.new()
-	pivot.name = "RotorBlades"
+	pivot.name = PIVOT_ROTOR_BLADES
 	pivot.position = Vector3(0, shaft_h + 0.05, 0)
 	parent_node.add_child(pivot)
 
@@ -4612,7 +4684,7 @@ static func _build_hover_engine(parent_node: Node3D, base_size: Vector3, base_co
 	const HEAD_SCALE := 2.1
 	var ring_scale: float = (base_size.x / authored_diameter) * HEAD_SCALE
 	var ring_radii := [1.0, 0.65, 0.35]
-	var ring_names := ["HoverRingOuter", "HoverRingMid", "HoverRingInner"]
+	var ring_names := [HOVER_RING_OUTER, HOVER_RING_MID, HOVER_RING_INNER]
 	var ring_y: float = base_size.y * 0.5
 
 	# 1. Concentric Hover Rings
@@ -5061,8 +5133,8 @@ static func _build_ornithopter_wing(parent_node: Node3D, base_size: Vector3, bas
 	# Keyed to the rig's own rail length now, not base_size, so the two roots
 	# sit at the gearboxes the rig actually placed.
 	var root_gap = roof_len * 0.30
-	_build_ornithopter_wing_unit(parent_node, base_size, base_color, wingspan, sweep, "WingPivotFore", root_gap, wing_root, 1.0)
-	_build_ornithopter_wing_unit(parent_node, base_size, base_color, wingspan, sweep, "WingPivotHind", -root_gap, wing_root, 1.15)
+	_build_ornithopter_wing_unit(parent_node, base_size, base_color, wingspan, sweep, PIVOT_WING_FORE, root_gap, wing_root, 1.0)
+	_build_ornithopter_wing_unit(parent_node, base_size, base_color, wingspan, sweep, PIVOT_WING_HIND, -root_gap, wing_root, 1.15)
 
 
 ## The flapping rig: a two-rail frame lying fore-and-aft along the hull roof,
@@ -5392,7 +5464,7 @@ static func _build_pylon_mounted_propeller(parent_node: Node3D, base_size: Vecto
 		parent_node.add_child(house)
 
 	var pivot = Node3D.new()
-	pivot.name = "PropBlades"
+	pivot.name = PIVOT_PROP_BLADES
 	pivot.position = Vector3(0, 0, actual_size.z * 0.35)
 	parent_node.add_child(pivot)
 
@@ -5571,7 +5643,7 @@ static func _build_buoyant_envelope(parent_node: Node3D, base_size: Vector3, bas
 
 	# 4. Rear Propeller Hub & Blades (Snug against rear reduction gear at Z = +0.45 * s)
 	var pivot := Node3D.new()
-	pivot.name = "PropBlades"
+	pivot.name = PIVOT_PROP_BLADES
 	pivot.position = Vector3(0, 0.04 * s, 0.45 * s)
 	parent_node.add_child(pivot)
 
@@ -5952,7 +6024,7 @@ static func _build_screw_drive(parent_node: Node3D, base_size: Vector3, base_col
 
 	# Drum slung between gearboxes at outboard_x
 	var spin = Node3D.new()
-	spin.name = "ScrewSpin"
+	spin.name = PIVOT_SCREW_SPIN
 	spin.position = Vector3(outboard_x, hub_y, 0)
 	parent_node.add_child(spin)
 
@@ -6073,7 +6145,7 @@ static func _build_frustum_block_mesh(w_base: float, h_base: float, w_tip: float
 static func _attach_propeller_blades(parent_node: Node3D, base_size: Vector3, base_color: Color, pusher: bool):
 	var facing = 1.0 if pusher else -1.0
 	var pivot = Node3D.new()
-	pivot.name = "PropBlades"
+	pivot.name = PIVOT_PROP_BLADES
 	pivot.position = Vector3(0, 0, facing * base_size.z * 0.55)
 	parent_node.add_child(pivot)
 
@@ -6093,7 +6165,7 @@ static func _attach_propeller_blades(parent_node: Node3D, base_size: Vector3, ba
 # of the (static) disc.
 static func _attach_paddle_wheel_blades(parent_node: Node3D, base_size: Vector3, base_color: Color):
 	var pivot = Node3D.new()
-	pivot.name = "PropBlades"
+	pivot.name = PIVOT_PROP_BLADES
 	parent_node.add_child(pivot)
 
 	var paddle_mat = StandardMaterial3D.new()
@@ -6114,7 +6186,7 @@ static func _attach_paddle_wheel_blades(parent_node: Node3D, base_size: Vector3,
 # independently of the (static) hub.
 static func _attach_ship_screw_blades(parent_node: Node3D, base_size: Vector3):
 	var pivot = Node3D.new()
-	pivot.name = "PropBlades"
+	pivot.name = PIVOT_PROP_BLADES
 	parent_node.add_child(pivot)
 
 	var blade_mat = StandardMaterial3D.new()
@@ -6346,8 +6418,8 @@ static func rebuild_visual(module: Node3D):
 # bare literals and get merged away by the bake below - "HoverRingMid" and
 # "HoverRingInner" specifically (not "HoverRingOuter", which never animates).
 const _ANIMATED_PART_NAMES := [
-	"BarrelCluster", "RotorBlades", "WingPivot", "PropBlades",
-	BELT_BAND_NAME, "HoverRingMid", "HoverRingInner",
+	PIVOT_BARREL_CLUSTER, PIVOT_ROTOR_BLADES, PIVOT_WING, PIVOT_PROP_BLADES,
+	BELT_BAND_NAME, HOVER_RING_MID, HOVER_RING_INNER,
 ]
 
 static func bake_module_visual(module: Node3D) -> void:
@@ -7402,7 +7474,7 @@ static func _build_plasma_thruster(parent_node: Node3D, base_size: Vector3, base
 
 	# 5. Spinning Magnetic Induction Ring (for runtime animation)
 	var spin_pivot := Node3D.new()
-	spin_pivot.name = "PlasmaRing"
+	spin_pivot.name = PIVOT_PLASMA_RING
 	spin_pivot.position = Vector3(0, 0.05 * POD_SCALE, body_len * 0.38)
 	pod_root.add_child(spin_pivot)
 

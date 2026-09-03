@@ -3883,6 +3883,11 @@ static func _make_trapezoid_gearbox_mesh(r: float) -> ArrayMesh:
 	add_quad.call(v0, v3, v7, v4, (v3 - v0).cross(v4 - v0).normalized())
 	add_quad.call(v1, v5, v6, v2, (v1 - v5).cross(v6 - v5).normalized())
 
+	# See _build_frustum_block_mesh()'s comment: an unindexed SurfaceTool
+	# mesh sharing a material with an indexed sibling (any built-in
+	# PrimitiveMesh, or another st.index()'d procedural mesh) silently loses
+	# its geometry when bake_module_visual() merges them.
+	st.index()
 	return st.commit()
 
 
@@ -5721,6 +5726,10 @@ static func _build_tapered_blade_mesh(thickness: float, root_chord: float, tip_c
 	st.add_vertex(root_pts[0]); st.add_vertex(root_pts[3]); st.add_vertex(root_pts[2])
 	st.add_vertex(tip_pts[0]); st.add_vertex(tip_pts[1]); st.add_vertex(tip_pts[2])
 	st.add_vertex(tip_pts[0]); st.add_vertex(tip_pts[2]); st.add_vertex(tip_pts[3])
+	# See _build_frustum_block_mesh()'s comment: an unindexed SurfaceTool
+	# mesh sharing a material with an indexed sibling silently loses its
+	# geometry when bake_module_visual() merges them.
+	st.index()
 	st.generate_normals()
 	return st.commit()
 
@@ -5781,6 +5790,20 @@ static func _build_frustum_block_mesh(w_base: float, h_base: float, w_tip: float
 	st.add_vertex(b0); st.add_vertex(b2); st.add_vertex(b1)
 	st.add_vertex(b0); st.add_vertex(b3); st.add_vertex(b2)
 
+	# index() is mandatory, not an optimisation: bake_module_visual() merges
+	# same-material sibling meshes into one SurfaceTool session via
+	# append_from(), and mixing a non-indexed surface with an indexed one in
+	# the same session silently DROPS one of the two meshes' geometry
+	# entirely (confirmed empirically - Godot does not error or warn). Every
+	# built-in PrimitiveMesh (BoxMesh included, e.g. the harvester's own
+	# mounting flange right next to this block) is indexed, so an unindexed
+	# procedural mesh sharing a material with one - which happens whenever
+	# an active faction livery makes their tints resolve to the same zone
+	# colour - vanishes the moment battle baking merges them. This is why
+	# the mount block disappeared in Skirmish/Proving Ground while staying
+	# visible in the Design Lab (which never bakes/merges modules) and why
+	# only the thin flange survived.
+	st.index()
 	st.generate_normals()
 	return st.commit()
 

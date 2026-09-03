@@ -111,32 +111,11 @@ func _make_custom_tooltip(for_text: String) -> Control:
 	return panel
 
 func _get_drag_data(at_position: Vector2):
-	# GHOST DRAG PREVIEW. Just the rendered model thumbnail, tinted like a
-	# semi-transparent holographic ghost. No card, no border, no label.
-	# Reads as "you are carrying an object" rather than "you are carrying a UI card".
-	var ghost := Control.new()
-	ghost.custom_minimum_size = Vector2(80, 80)
-
-	var preview_tex := TextureRect.new()
-	preview_tex.custom_minimum_size = Vector2(80, 80)
-	preview_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	preview_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	# Pale blue-white tint at ~60% opacity — reads as a ghost/wireframe phantom
-	preview_tex.modulate = Color(0.70, 0.88, 1.00, 0.65)
-	preview_tex.set_anchors_preset(Control.PRESET_FULL_RECT)
-	ghost.add_child(preview_tex)
-
-	var cache := _get_thumbnail_cache()
-	if cache != null:
-		var existing: Texture2D = cache.get_thumbnail_now(module_type_id)
-		if existing != null:
-			preview_tex.texture = existing
-
-	set_drag_preview(ghost)
-
-	if cache != null and preview_tex.texture == null:
-		_run_bake(cache, preview_tex)
-
+	# No 2D cursor-following preview here. DragDropManager's 3D ghost (spawned
+	# by show_ghost_for_drag() below and kept live by _can_drop_data()) is the
+	# only drag preview now - a flat thumbnail chip riding the OS cursor was a
+	# second, disconnected preview that never got cleared in step with the 3D
+	# one, so both stayed on screen at once.
 	return {"type": "module_part", "id": module_type_id}
 
 

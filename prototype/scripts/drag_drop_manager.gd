@@ -23,6 +23,12 @@ var _ghost_is_clipping: bool = false
 var _cached_ghost_material: Material = null
 var _ghost_shader: Shader = null
 
+# How far in front of the camera to float the ghost when the cursor isn't
+# over any surface (still over the toolbox, over empty sky, off the hull,
+# etc.) - keeps it visible for the whole drag instead of disappearing
+# whenever the raycast comes up empty.
+const _GHOST_FLOAT_DISTANCE := 8.0
+
 func _get_ghost_shader() -> Shader:
 	if _ghost_shader != null:
 		return _ghost_shader
@@ -245,15 +251,6 @@ func _update_ghost_mesh_hull(type_id: String):
 
 # Helper to create/update the ghost mesh preview
 func _update_ghost_mesh(screen_pos: Vector2, type_id: String):
-	var result = _raycast_from_screen(screen_pos)
-	if not result:
-		if ghost_mesh: ghost_mesh.visible = false
-		if ghost_mesh_mirror: ghost_mesh_mirror.visible = false
-		# Nothing under the cursor is not the same as "clipping". Clearing it
-		# keeps a stale red from an earlier hover out of the next drop.
-		_ghost_is_clipping = false
-		return
-
 	var root = get_node_or_null("/root/MainLab")
 	if not root: return
 
@@ -283,6 +280,29 @@ func _update_ghost_mesh(screen_pos: Vector2, type_id: String):
 		_ghost_visual_bottom_y = aabb.position.y if aabb.size.length_squared() > 0.0 else 0.0
 
 	ghost_mesh.visible = true
+
+	var result = _raycast_from_screen(screen_pos)
+	if not result:
+		# Nothing under the cursor - toolbox, empty sky, off the edge of the
+		# hull. Float the ghost a fixed distance in front of the camera along
+		# the cursor ray instead of hiding it, so it stays visible for the
+		# whole drag rather than only once it lands on the hull. The stat
+		# preview still applies (module count doesn't depend on where the
+		# ghost is floating) - only the mount transform and clipping verdict
+		# need an actual surface, so those are skipped here.
+		var camera = get_viewport().get_camera_3d()
+		if camera:
+			ghost_mesh.global_position = camera.project_ray_origin(screen_pos) \
+				+ camera.project_ray_normal(screen_pos) * _GHOST_FLOAT_DISTANCE
+			ghost_mesh.transform.basis = Basis.IDENTITY
+		if ghost_mesh_mirror:
+			ghost_mesh_mirror.visible = false
+		_ghost_is_clipping = false
+		_apply_ghost_materials_recursive(ghost_mesh, _get_foggy_part_material())
+		var lab_doc = root.get_node_or_null("UI_StatBlock")
+		if lab_doc and lab_doc.telemetry_rail:
+			lab_doc.telemetry_rail.update_preview_stats(ghost_mesh, null)
+		return
 	# The placement normal in the module's local frame is +Y (mount
 	# axis), so the offset the ghost needs is along its own +Y. The
 	# surface position from the raycast is the CONTACT point, and the
@@ -361,7 +381,7 @@ func _update_ghost_mesh(screen_pos: Vector2, type_id: String):
 		if ghost_mesh_mirror and ghost_mesh_mirror.visible:
 			_apply_ghost_materials_recursive(ghost_mesh_mirror, _get_foggy_part_material())
 			
-	var lab_doc = root.get_node_or_null("LabDocument")
+	var lab_doc = root.get_node_or_null("UI_StatBlock")
 	if lab_doc and lab_doc.telemetry_rail:
 		lab_doc.telemetry_rail.update_preview_stats(ghost_mesh, ghost_mesh_mirror)
 
@@ -433,7 +453,7 @@ func _destroy_ghost_mesh():
 	if cleared_something:
 		var root = get_node_or_null("/root/MainLab")
 		if root:
-			var lab_doc = root.get_node_or_null("LabDocument")
+			var lab_doc = root.get_node_or_null("UI_StatBlock")
 			if lab_doc and lab_doc.telemetry_rail:
 				lab_doc.telemetry_rail.clear_preview()
 

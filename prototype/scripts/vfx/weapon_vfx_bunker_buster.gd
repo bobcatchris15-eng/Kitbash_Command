@@ -9,6 +9,7 @@ const VFXEffects = preload("res://scripts/vfx_effects.gd")
 const VFXBurst = preload("res://scripts/vfx_burst.gd")
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const MunitionPool = preload("res://scripts/munition_pool.gd")
+const MeshAssetLoader = preload("res://scripts/mesh_asset_loader.gd")
 
 # =========================================================================
 # MISSILE BODY — called from weapon_missile._ready() when mesh_part == "bb_body"
@@ -18,7 +19,7 @@ const MunitionPool = preload("res://scripts/munition_pool.gd")
 # =========================================================================
 static func build_missile_body(mesh_part: String = "bb_body") -> Node3D:
 	var pivot = Node3D.new()
-	var body_mesh: Mesh = MunitionPool.get_part_mesh(mesh_part) if mesh_part != "" else null
+	var body_mesh: Mesh = MeshAssetLoader.get_part_mesh(mesh_part) if mesh_part != "" else null
 	if body_mesh != null:
 		var vis = MeshInstance3D.new()
 		vis.mesh = body_mesh

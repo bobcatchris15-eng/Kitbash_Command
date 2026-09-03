@@ -34,7 +34,7 @@ static func spawn_muzzle_ring(parent: Node3D, local_pos: Vector3, forward_dir: V
 		var mat = ParticleProcessMaterial.new()
 		mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
 		mat.emission_ring_inner_radius = 0.15 * scale
-		mat.emission_ring_outer_radius = 0.35 * scale
+		mat.emission_ring_radius = 0.35 * scale
 		mat.direction = forward_dir.normalized()
 		mat.spread = 5.0
 		mat.initial_velocity_min = 0.5 * scale
@@ -105,7 +105,7 @@ static func spawn_impact_whump(parent: Node3D, world_pos: Vector3, blast_radius:
 		var mat = ParticleProcessMaterial.new()
 		mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
 		mat.emission_ring_inner_radius = blast_radius * 0.15
-		mat.emission_ring_outer_radius = blast_radius * 0.95
+		mat.emission_ring_radius = blast_radius * 0.95
 		mat.direction = Vector3.UP
 		mat.spread = 8.0
 		mat.initial_velocity_min = blast_radius * 0.6

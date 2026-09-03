@@ -14,6 +14,7 @@ const WeaponVFXSAMLauncher = preload("res://scripts/vfx/weapon_vfx_sam_launcher.
 const WeaponVFXLoiteringMunition = preload("res://scripts/vfx/weapon_vfx_loitering_munition.gd")
 const WeaponVFXAntiRadiationMissile = preload("res://scripts/vfx/weapon_vfx_anti_radiation_missile.gd")
 const WeaponVFXCruiseMissile = preload("res://scripts/vfx/weapon_vfx_cruise_missile.gd")
+const WeaponVFXBunkerBuster = preload("res://scripts/vfx/weapon_vfx_bunker_buster.gd")
 # Real, interceptable weapon missile (FABLE_REVIEW.md 2.2). Fired by
 # guided_missile / dual_stage_missile / missile_pod instead of the old
 # cosmetic tweened meshes - those never registered in the "missiles" group,
@@ -160,6 +161,9 @@ func _ready():
 		"cruise_missile":
 			_trail = WeaponVFXCruiseMissile.make_missile_trail(self)
 			_trail.position = Vector3(0, 0, 0.6)
+		"bunker_buster":
+			_trail = WeaponVFXBunkerBuster.make_penetrator_trail(self)
+			_trail.position = Vector3(0, 0, 0.4)
 		_:
 			_trail = VFXEffects.make_missile_trail(self)
 			_trail.position = Vector3(0, 0, 0.20)
@@ -297,6 +301,9 @@ func _spawn_impact_visual():
 			return
 		"cruise_missile":
 			WeaponVFXCruiseMissile.spawn_impact_sequence(scene, _impact_pos)
+			return
+		"bunker_buster":
+			WeaponVFXBunkerBuster.spawn_impact_sequence(scene, _impact_pos)
 			return
 		"missile_pod":
 			# missile_pod impacts handled via signal connection in _fire_swarm_missiles

@@ -48,6 +48,8 @@ const WeaponVFXMortarArray = preload("res://scripts/vfx/weapon_vfx_mortar_array.
 const WeaponVFXClusterDispenser = preload("res://scripts/vfx/weapon_vfx_cluster_dispenser.gd")
 const WeaponVFXPlasmaLobber = preload("res://scripts/vfx/weapon_vfx_plasma_lobber.gd")
 const WeaponVFXMK19GrenadeLauncher = preload("res://scripts/vfx/weapon_vfx_mk19_grenade_launcher.gd")
+const WeaponVFXSpigotMortar = preload("res://scripts/vfx/weapon_vfx_spigot_mortar.gd")
+const WeaponVFXNapalmMortar = preload("res://scripts/vfx/weapon_vfx_napalm_mortar.gd")
 
 var target: Node3D = null
 var fire_range: float = 12.0
@@ -1854,7 +1856,9 @@ func _fire_artillery():
 		"body": "bomb", 
 		"trail": "whistle", 
 		"trail_bulk": 0.25,
-		"impact_vfx_callback": Callable(WeaponVFXArtillery, "spawn_artillery_impact").bind(_effects_parent(), Vector3.ZERO)
+		"impact_vfx_callback": func(cb_parent: Node3D, cb_world_pos: Vector3, cb_blast_radius: float, cb_damage: float):
+			_deal_aoe_damage(cb_world_pos, cb_blast_radius, cb_damage)
+			WeaponVFXArtillery.spawn_artillery_impact(cb_parent, cb_world_pos)
 	}
 	_fire_arcing_shell_at(0.4, 1.0, Color.SADDLE_BROWN, 6.0, dps * fire_rate, Vector3.ZERO, 0.8, profile)
 	# Breech vent
@@ -2071,6 +2075,7 @@ func _fire_arcing_shell_at(shell_radius: float, arc_height: float, colour: Color
 	var tween = create_tween()
 	var last_pos := [start]
 	var puff_mark := [0.0]
+	var tumble_mark := [0.0]
 	tween.tween_method(func(val: float):
 		if not is_instance_valid(shell):
 			return
@@ -2084,6 +2089,9 @@ func _fire_arcing_shell_at(shell_radius: float, arc_height: float, colour: Color
 			last_pos[0] = pos
 			if profile.get("tumble", false):
 				shell.rotate_object_local(Vector3(0, 0, 1), 0.22)
+				if profile.has("tumble_mote_fn") and val > tumble_mark[0]:
+					tumble_mark[0] = val + 0.15 / maxf(scaled_flight, 0.01)
+					profile["tumble_mote_fn"].call(shell, pos, shell_radius)
 		if profile.get("trail", "") == "smoke" and val > puff_mark[0]:
 			# A round carrying a plume gets its motes proportionally closer
 			# together and larger, so the two layers read as one trail rather
@@ -2161,8 +2169,17 @@ func _fire_spigot_mortar():
 	var pay = 1.0
 	if has_meta("module_data"):
 		pay = float(get_meta("module_data").tweaks.get("payload_size", 1.0))
+	WeaponVFXSpigotMortar.spawn_muzzle_ring(self, get_muzzle_local_pos(), -global_transform.basis.z, pay)
+	var spigot_impact_fn := func(cb_parent: Node3D, cb_world_pos: Vector3, cb_blast_radius: float, cb_damage: float):
+		_deal_aoe_damage(cb_world_pos, cb_blast_radius, cb_damage)
+		WeaponVFXSpigotMortar.spawn_impact_whump(cb_parent, cb_world_pos, cb_blast_radius, laser_color)
+	var spigot_profile := {
+		"body": "bomb", "tumble": true,
+		"tumble_mote_fn": Callable(WeaponVFXSpigotMortar, "spawn_tumble_mote"),
+		"impact_vfx_callback": spigot_impact_fn,
+	}
 	_fire_arcing_shell_at(0.5 * pay, 0.55, laser_color, SPIGOT_BLAST_RADIUS * pay,
-						  dps * fire_rate, Vector3.ZERO, 1.1, {"body": "bomb", "tumble": true})
+						  dps * fire_rate, Vector3.ZERO, 1.1, spigot_profile)
 
 # Rocket artillery: the whole rack empties in a couple of seconds, then the
 # long fire_rate interval is the reload. Damage is split across the salvo, so
@@ -2976,16 +2993,19 @@ func _fire_continuous_beam():
 	)
 
 func _fire_plasma_lobber():
-	# Custom plasma shell with ion trail
+	# Custom plasma shell with ion trail. NOT added to the tree here -
+	# _fire_arcing_shell_at()'s "custom_shell" branch below does that itself;
+	# adding it twice throws "already has a parent".
 	var shell = WeaponVFXPlasmaLobber.make_plasma_shell(0.35, laser_color)
-	_effects_parent().add_child(shell)
 	WeaponVFXPlasmaLobber.attach_ion_trail(shell, 0.35)
-	
+
 	# Fire arcing shell with custom shell and plasma impact callback
 	var profile = {
 		"body": "bomb",
 		"custom_shell": shell,
-		"impact_vfx_callback": Callable(WeaponVFXPlasmaLobber, "plasma_impact").bind(_effects_parent(), Vector3.ZERO, 4.5, laser_color)
+		"impact_vfx_callback": func(cb_parent: Node3D, cb_world_pos: Vector3, cb_blast_radius: float, cb_damage: float):
+			_deal_aoe_damage(cb_world_pos, cb_blast_radius, cb_damage)
+			WeaponVFXPlasmaLobber.plasma_impact(cb_parent, cb_world_pos, 4.5, laser_color)
 	}
 	_fire_arcing_shell_at(0.35, 4.0, laser_color, 4.5, dps * fire_rate, Vector3.ZERO, 0.6, profile)
 
@@ -3212,32 +3232,21 @@ func _fire_coil_gun():
 func _fire_napalm_mortar():
 	var parent = _effects_parent()
 	if parent == null: return
-	var canister = MeshInstance3D.new()
-	canister.mesh = MunitionPool.unit_sphere()
-	canister.scale = Vector3(0.3, 0.3, 0.3)
-	canister.material_override = MunitionPool.emissive(Color(0.85, 0.4, 0.1), Color(1.0, 0.55, 0.1))
-	parent.add_child(canister)
-
-	var start = get_muzzle_world_pos()
-	var end = _aim_point(target)
-	var tween = create_tween()
-	var callable = func(val: float):
-		if not is_instance_valid(canister): return
-		var pos = start.lerp(end, val)
-		pos.y += sin(val * PI) * 7.0
-		canister.global_position = pos
-	tween.tween_method(callable, 0.0, 1.0, 0.7)
-	for i in range(3):
-		var t := (float(i) + 1.0) / 4.0
-		_spawn_flight_mote(start.lerp(end, t) + Vector3(0, sin(t * PI) * 7.0 - 0.2, 0), Color(1.0, 0.5, 0.15), 0.28, 0.7 * t)
-	tween.finished.connect(func():
-		if is_instance_valid(canister): canister.queue_free()
-		_deal_aoe_damage(end, 4.0, dps * fire_rate)
-		_spawn_explosion_visual(end, 0.9, Color(1.0, 0.5, 0.1))
-		# Bigger and longer than an incendiary shell's pool - this is the
-		# weapon's entire identity, not a side effect.
-		_spawn_burn_pool(end, 1.7, 2.2)
-	)
+	var profile: Dictionary = WeaponVFXNapalmMortar.get_projectile_profile()
+	profile["custom_trail"] = true
+	# _fire_arcing_shell_at's else branch (the one that calls _deal_aoe_damage)
+	# is skipped whenever impact_vfx_callback is set, so this lambda deals the
+	# damage itself - same fix class as Part A, applied up front here.
+	profile["impact_vfx_callback"] = func(cb_parent: Node3D, cb_world_pos: Vector3, _cb_blast_radius: float, cb_damage: float):
+		_deal_aoe_damage(cb_world_pos, 4.0, cb_damage)
+		WeaponVFXNapalmMortar.spawn_impact_visuals(cb_parent, cb_world_pos)
+	var shell_radius: float = float(profile.get("shell_radius", 0.3))
+	var arc_height: float = float(profile.get("arc_height", 7.0))
+	var shell := _fire_arcing_shell_at(shell_radius, arc_height, Color(0.85, 0.4, 0.1),
+		4.0, dps * fire_rate, Vector3.ZERO, 0.7, profile)
+	if shell:
+		var trail := WeaponVFXNapalmMortar.make_napalm_trail(shell, shell_radius)
+		_detach_trail_on_free(shell, trail)
 
 # Mine layer: lobs a proximity mine a short way out and leaves it. The mine
 # is a real, persistent world entity that outlives its layer - see

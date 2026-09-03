@@ -2872,14 +2872,27 @@ static func blueprint_is_static(data: Dictionary) -> bool:
 	return not blueprint_has_locomotion(data)
 
 
+static func _resource_bay_tweak_capacity(tweaks: Dictionary) -> float:
+	# bay_volume is the dedicated capacity slider, but hopper_depth and
+	# hatch_width are not purely cosmetic either - visual_builder.gd scales
+	# the tub mesh by vol_lin*width_t and vol_lin*depth_t (vol_lin =
+	# cbrt(bay_volume)) on top of vol_lin itself, so the bay's REAL rendered
+	# volume is bay_volume * hatch_width * hopper_depth. Capacity has to
+	# track that product or a wider/deeper bay looks like it carries more
+	# without actually doing so.
+	var vol: float = clampf(float(tweaks.get(RESOURCE_BAY_TWEAK_KEY, 1.0)), 0.5, 2.0)
+	var depth_t: float = clampf(float(tweaks.get("hopper_depth", 1.0)), 0.6, 1.6)
+	var width_t: float = clampf(float(tweaks.get("hatch_width", 1.0)), 0.6, 1.6)
+	return RESOURCE_BAY_CAPACITY * vol * depth_t * width_t
+
+
 static func blueprint_bay_capacity(data: Dictionary) -> float:
 	var total := 0.0
 	for mod in data.get("modules", []):
 		if str(mod.get("type_id", "")) != "resource_bay":
 			continue
 		var tweaks: Dictionary = mod.get("tweaks", {})
-		var vol: float = float(tweaks.get(RESOURCE_BAY_TWEAK_KEY, 1.0))
-		total += RESOURCE_BAY_CAPACITY * clampf(vol, 0.5, 2.0)
+		total += _resource_bay_tweak_capacity(tweaks)
 	return total
 
 
@@ -2893,8 +2906,7 @@ static func resource_bay_capacity(hull_node) -> float:
 		var data = child.get_meta("module_data")
 		if data == null or data.type_id != "resource_bay":
 			continue
-		var vol: float = float(data.tweaks.get(RESOURCE_BAY_TWEAK_KEY, 1.0))
-		total += RESOURCE_BAY_CAPACITY * clampf(vol, 0.5, 2.0)
+		total += _resource_bay_tweak_capacity(data.tweaks)
 	return total
 
 # Tweak names that scale a single part's physical size/mass (shared meaning

@@ -70,6 +70,7 @@ var combat_weight_label: Label = null
 var combat_role_label: Label = null
 var combat_parts_label: Label = null
 var combat_armor_label: Label = null
+var combat_cargo_label: Label = null
 
 var build_cost_label: Label = null
 var build_materials_label: Label = null
@@ -1196,6 +1197,15 @@ func _build_stats_dock() -> void:
 	combat_armor_label.text = "Plating: Hardened Steel [K:0% T:0% X:0% E:0%]"
 	c2_vbox.add_child(combat_armor_label)
 
+	# Cargo capacity - only meaningful (and only shown) on a design that
+	# actually mounts a resource_harvester; see update_stats_display()'s
+	# is_harv branch for the show/hide toggle.
+	combat_cargo_label = Label.new()
+	combat_cargo_label.theme_type_variation = "StatLabel"
+	combat_cargo_label.text = "Cargo Capacity: 0"
+	combat_cargo_label.visible = false
+	c2_vbox.add_child(combat_cargo_label)
+
 	# =========================================================================
 	# CLUSTER 3: BUILD GROUP (Width: 210px)
 	# =========================================================================
@@ -1407,6 +1417,11 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 		combat_weight_label.add_theme_color_override("font_color", Tokens.SIGNAL_ALERT if is_over else Tokens.TEXT_PRIMARY)
 
 	var is_harv: bool = bool(stats.get("is_harvester", false))
+	if combat_cargo_label:
+		combat_cargo_label.visible = is_harv
+		if is_harv:
+			combat_cargo_label.text = "Cargo Capacity: %d" % int(stats.get("cargo_capacity", 0))
+
 	var role_str := "Direct Fire"
 	if is_harv:
 		role_str = "Resource Harvester"

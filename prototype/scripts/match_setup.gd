@@ -131,6 +131,31 @@ var _back_btn: Button
 var _next_btn: Button
 var _launch_btn: Button
 
+# Console Mode (War Room Ops-Table)
+var _ops_table_mode: bool = false
+var _ops_table_page: Control = null
+var _ops_mode_btn: Button = null
+var _nav_bar: Control = null
+var _stage_roster_host: Control = null
+var _ops_roster_host: Control = null
+
+var _ops_map_select: OptionButton = null
+var _ops_preview: MapPreview = null
+var _ops_map_title: Label = null
+var _ops_map_desc: Label = null
+var _ops_map_facts: VBoxContainer = null
+
+var _ops_hero_view: SquadronHeroView = null
+var _ops_difficulty_btn: OptionButton = null
+var _ops_resources_btn: OptionButton = null
+var _ops_ai_btn: OptionButton = null
+
+var _ops_summary_map: Label = null
+var _ops_summary_rules: Label = null
+var _ops_manifest_list: VBoxContainer = null
+var _ops_manifest_footer: Label = null
+var _ops_summary_note: Label = null
+
 
 func _ready() -> void:
 	bp_manager = BlueprintManagerScript.new()
@@ -169,7 +194,15 @@ func _ready() -> void:
 		page.set_anchors_preset(Control.PRESET_FULL_RECT)
 		_stage_host.add_child(page)
 
-	column.add_child(_build_nav())
+	_ops_table_page = _build_ops_table()
+	_ops_table_page.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_ops_table_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_ops_table_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ops_table_page.visible = false
+	column.add_child(_ops_table_page)
+
+	_nav_bar = _build_nav()
+	column.add_child(_nav_bar)
 
 	_sync_map_selection()
 	_goto_stage(0, false)
@@ -211,6 +244,27 @@ func _build_spine() -> Control:
 				Tokens.BASE_500, Tokens.BASE_500, 0, "flush", 0))
 			row.add_child(rule)
 		row.add_child(_build_chip(i))
+
+	var mode_spacer := Control.new()
+	mode_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(mode_spacer)
+
+	var mode_rule := Panel.new()
+	mode_rule.custom_minimum_size = Vector2(Tokens.SPACE_MD, Tokens.SPINE_RULE)
+	mode_rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mode_rule.add_theme_stylebox_override("panel", UITheme.flat_style(
+		Tokens.BASE_500, Tokens.BASE_500, 0, "flush", 0))
+	row.add_child(mode_rule)
+
+	_ops_mode_btn = Button.new()
+	_ops_mode_btn.theme_type_variation = "TabButton"
+	_ops_mode_btn.custom_minimum_size = Vector2(240, Tokens.HIT_TARGET_MIN + Tokens.SPACE_SM)
+	_ops_mode_btn.focus_mode = Control.FOCUS_NONE
+	_ops_mode_btn.toggle_mode = true
+	_ops_mode_btn.text = "[MODE: WAR ROOM OPS-TABLE]"
+	_ops_mode_btn.pressed.connect(_toggle_console_mode)
+	UIFeedbackScript.wire(_ops_mode_btn, "select")
+	row.add_child(_ops_mode_btn)
 	return band
 
 
@@ -253,6 +307,8 @@ func _build_chip(idx: int) -> Button:
 
 
 func _on_chip_pressed(idx: int) -> void:
+	if _ops_table_mode:
+		set_console_mode(false)
 	# Backwards always; forwards only into a stage the flow has already
 	# confirmed. That is the whole gate on LAUNCH - it cannot be reached out of
 	# an unvisited flow, and it needs no separate validity rule to say so.
@@ -264,6 +320,8 @@ func _on_chip_pressed(idx: int) -> void:
 
 
 func _goto_stage(idx: int, animate: bool = true) -> void:
+	if _ops_table_mode:
+		set_console_mode(false)
 	_stage = clampi(idx, 0, STAGES.size() - 1)
 	_unlocked = maxi(_unlocked, _stage)
 	for i in range(_stage_pages.size()):
@@ -279,6 +337,41 @@ func _goto_stage(idx: int, animate: bool = true) -> void:
 		_refresh_summary()
 
 
+func _toggle_console_mode() -> void:
+	set_console_mode(not _ops_table_mode)
+
+
+func set_console_mode(enabled: bool) -> void:
+	_ops_table_mode = enabled
+	if _stage_host != null:
+		_stage_host.visible = not _ops_table_mode
+	if _ops_table_page != null:
+		_ops_table_page.visible = _ops_table_mode
+	if _nav_bar != null:
+		_nav_bar.visible = not _ops_table_mode
+
+	_sync_roster_parent()
+	_refresh_spine()
+
+	if _ops_table_mode:
+		_caption.text = "WAR ROOM OPS-TABLE — High-density command deck: theatre recon, squadron turntable, roster wells & directives."
+		_refresh_map_facts()
+		_refresh_summary()
+	else:
+		_caption.text = str(STAGES[_stage]["caption"])
+		_refresh_nav()
+
+
+func _sync_roster_parent() -> void:
+	if roster_picker == null:
+		return
+	var target_parent: Control = _ops_roster_host if _ops_table_mode else _stage_roster_host
+	if target_parent != null and roster_picker.get_parent() != target_parent:
+		roster_picker.reparent(target_parent)
+		roster_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		roster_picker.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+
 func _refresh_spine() -> void:
 	for i in range(_spine_chips.size()):
 		var chip: Button = _spine_chips[i]
@@ -289,16 +382,16 @@ func _refresh_spine() -> void:
 				if legend != null:
 					break
 		var col: Color = Tokens.TEXT_DISABLED
-		if i == _stage:
+		if not _ops_table_mode and i == _stage:
 			col = Tokens.SIGNAL_HAZARD
-		elif i < _stage:
+		elif not _ops_table_mode and i < _stage:
 			col = Tokens.SIGNAL_GO
 		elif i <= _unlocked:
 			col = Tokens.TEXT_SECONDARY
 		if legend != null:
 			legend.add_theme_color_override("font_color", col)
-		chip.button_pressed = i == _stage
-		chip.disabled = i > _unlocked
+		chip.button_pressed = (i == _stage and not _ops_table_mode)
+		chip.disabled = (i > _unlocked)
 		# A completed stage swaps its glyph tint to GO rather than swapping the
 		# glyph itself, except for the tick, which is the one place a different
 		# mark says something the colour cannot.
@@ -309,7 +402,7 @@ func _refresh_spine() -> void:
 				break
 		if glyph != null:
 			glyph.modulate = col
-			if i < _stage:
+			if not _ops_table_mode and i < _stage:
 				var done := UITheme.chrome_icon("stage_done")
 				if done != null:
 					glyph.texture = done
@@ -317,6 +410,13 @@ func _refresh_spine() -> void:
 				var own := UITheme.chrome_icon(str(STAGES[i]["glyph"]))
 				if own != null:
 					glyph.texture = own
+
+	if _ops_mode_btn != null:
+		_ops_mode_btn.button_pressed = _ops_table_mode
+		if _ops_table_mode:
+			_ops_mode_btn.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+		else:
+			_ops_mode_btn.remove_theme_color_override("font_color")
 
 
 # ---------------------------------------------------------------------------
@@ -542,8 +642,12 @@ func select_map(map_id: String) -> void:
 		match_config.selected_map_id = map_id
 	for tile in _map_tiles:
 		tile.set_selected(tile.map_id == map_id)
+	if _ops_map_select != null:
+		var midx := MAP_IDS.find(map_id)
+		if midx >= 0 and _ops_map_select.selected != midx:
+			_ops_map_select.selected = midx
 	_refresh_map_facts()
-	if _stage == STAGES.size() - 1:
+	if _stage == STAGES.size() - 1 or _ops_table_mode:
 		_refresh_summary()
 
 
@@ -551,14 +655,29 @@ func _refresh_map_facts() -> void:
 	var map_def: Dictionary = MapCatalog.get_map(_map_id)
 	if _preview:
 		_preview.set_map(_map_id, map_def)
+	if _ops_preview:
+		_ops_preview.set_map(_map_id, map_def)
 	if _map_title:
 		_map_title.text = str(map_def.get("name", MapCatalog.get_map_name(_map_id)))
+	if _ops_map_title:
+		_ops_map_title.text = str(map_def.get("name", MapCatalog.get_map_name(_map_id)))
 	if _map_desc:
 		_map_desc.text = str(map_def.get("description", ""))
-	if _map_facts == null:
+	if _ops_map_desc:
+		_ops_map_desc.text = str(map_def.get("description", ""))
+
+	var target_boxes: Array[VBoxContainer] = []
+	if _map_facts != null:
+		target_boxes.append(_map_facts)
+	if _ops_map_facts != null:
+		target_boxes.append(_ops_map_facts)
+
+	if target_boxes.is_empty():
 		return
-	for child in _map_facts.get_children():
-		child.queue_free()
+
+	for box in target_boxes:
+		for child in box.get_children():
+			child.queue_free()
 		
 	var he: Vector2 = MapCatalog.half_extents(map_def)
 	var deposits: Dictionary = {}
@@ -616,17 +735,18 @@ func _refresh_map_facts() -> void:
 		facts.append([str(kind).to_upper(), str(deposits[kind])])
 
 	for fact in facts:
-		var row := HBoxContainer.new()
-		var key := Label.new()
-		key.text = str(fact[0])
-		key.theme_type_variation = "StatLabel"
-		key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(key)
-		var val := Label.new()
-		val.text = str(fact[1])
-		val.theme_type_variation = "HUDValueLabel"
-		row.add_child(val)
-		_map_facts.add_child(row)
+		for box in target_boxes:
+			var row := HBoxContainer.new()
+			var key := Label.new()
+			key.text = str(fact[0])
+			key.theme_type_variation = "StatLabel"
+			key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(key)
+			var val := Label.new()
+			val.text = str(fact[1])
+			val.theme_type_variation = "HUDValueLabel"
+			row.add_child(val)
+			box.add_child(row)
 
 
 func _sync_map_selection() -> void:
@@ -650,12 +770,17 @@ func _build_roster_stage() -> Control:
 	var page := VBoxContainer.new()
 	page.add_theme_constant_override("separation", Tokens.SPACE_SM)
 
+	_stage_roster_host = VBoxContainer.new()
+	_stage_roster_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_stage_roster_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_child(_stage_roster_host)
+
 	var entries: Array = bp_manager.list_blueprints(true)
 
 	roster_picker = RosterPickerScript.new()
 	roster_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	roster_picker.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	page.add_child(roster_picker)
+	_stage_roster_host.add_child(roster_picker)
 	roster_picker.setup(entries, ROSTER_CAP)
 	roster_picker.roster_changed.connect(_on_roster_changed)
 
@@ -675,7 +800,7 @@ func _build_roster_stage() -> Control:
 
 
 func _on_roster_changed() -> void:
-	if _stage == STAGES.size() - 1:
+	if _stage == STAGES.size() - 1 or _ops_table_mode:
 		_refresh_summary()
 
 
@@ -868,7 +993,28 @@ func _summary_line(parent: Control, heading_text: String) -> Label:
 
 
 func _on_rule_changed(_idx: int) -> void:
+	if _ops_difficulty_btn != null and difficulty_btn != null:
+		_ops_difficulty_btn.selected = difficulty_btn.selected
+	if _ops_resources_btn != null and resources_btn != null:
+		_ops_resources_btn.selected = resources_btn.selected
+	if _ops_ai_btn != null and ai_btn != null:
+		_ops_ai_btn.selected = ai_btn.selected
 	_refresh_summary()
+
+
+func _on_ops_rule_changed(_idx: int) -> void:
+	if difficulty_btn != null and _ops_difficulty_btn != null:
+		difficulty_btn.selected = _ops_difficulty_btn.selected
+	if resources_btn != null and _ops_resources_btn != null:
+		resources_btn.selected = _ops_resources_btn.selected
+	if ai_btn != null and _ops_ai_btn != null:
+		ai_btn.selected = _ops_ai_btn.selected
+	_refresh_summary()
+
+
+func _on_ops_map_selected(idx: int) -> void:
+	if idx >= 0 and idx < MAP_IDS.size():
+		select_map(str(MAP_IDS[idx]))
 
 
 func _format_number(val: int) -> String:
@@ -981,18 +1127,35 @@ func _build_manifest_row(path: String) -> Dictionary:
 
 
 func _refresh_summary() -> void:
-	if _summary_map == null:
+	if _summary_map == null and _ops_summary_map == null:
 		return
-	_summary_map.text = "%s  (%s)" % [MapCatalog.get_map_name(_map_id), _map_id]
-	_summary_rules.text = "%s diff · %s bank · AI %s" % [
-		DIFFICULTY_LABELS[difficulty_btn.selected],
-		RESOURCE_LABELS[resources_btn.selected],
-		AI_OPPONENT_LABELS[ai_btn.selected],
-	]
+	var map_title_str := "%s  (%s)" % [MapCatalog.get_map_name(_map_id), _map_id]
+	if _summary_map != null:
+		_summary_map.text = map_title_str
+	if _ops_summary_map != null:
+		_ops_summary_map.text = map_title_str
 
-	if _manifest_list != null:
-		for child in _manifest_list.get_children():
-			child.queue_free()
+	var diff_idx: int = difficulty_btn.selected if difficulty_btn != null else 1
+	var res_idx: int = resources_btn.selected if resources_btn != null else 0
+	var ai_idx: int = ai_btn.selected if ai_btn != null else 1
+
+	var rules_text := "%s diff · %s bank · AI %s" % [
+		DIFFICULTY_LABELS[diff_idx],
+		RESOURCE_LABELS[res_idx],
+		AI_OPPONENT_LABELS[ai_idx],
+	]
+	if _summary_rules != null:
+		_summary_rules.text = rules_text
+	if _ops_summary_rules != null:
+		_ops_summary_rules.text = rules_text
+
+	if _manifest_list != null or _ops_manifest_list != null:
+		if _manifest_list != null:
+			for child in _manifest_list.get_children():
+				child.queue_free()
+		if _ops_manifest_list != null:
+			for child in _ops_manifest_list.get_children():
+				child.queue_free()
 
 		var paths: Array = roster_picker.ordered_paths() if roster_picker else []
 		var is_autodraft := paths.is_empty()
@@ -1009,15 +1172,27 @@ func _refresh_summary() -> void:
 		var total_crystal := 0
 
 		if is_autodraft:
-			var notice := PanelContainer.new()
-			notice.add_theme_stylebox_override("panel", UITheme.flat_style(
-				Color(0.12, 0.16, 0.22), Tokens.BASE_500, 4, "flush"))
-			var n_lbl := Label.new()
-			n_lbl.text = "AUTO-DRAFT ACTIVE — Fielded from standard reserves"
-			n_lbl.theme_type_variation = "HintLabel"
-			n_lbl.add_theme_color_override("font_color", Tokens.SIGNAL_INFO)
-			notice.add_child(n_lbl)
-			_manifest_list.add_child(notice)
+			if _manifest_list != null:
+				var notice := PanelContainer.new()
+				notice.add_theme_stylebox_override("panel", UITheme.flat_style(
+					Color(0.12, 0.16, 0.22), Tokens.BASE_500, 4, "flush"))
+				var n_lbl := Label.new()
+				n_lbl.text = "AUTO-DRAFT ACTIVE — Fielded from standard reserves"
+				n_lbl.theme_type_variation = "HintLabel"
+				n_lbl.add_theme_color_override("font_color", Tokens.SIGNAL_INFO)
+				notice.add_child(n_lbl)
+				_manifest_list.add_child(notice)
+
+			if _ops_manifest_list != null:
+				var ops_notice := PanelContainer.new()
+				ops_notice.add_theme_stylebox_override("panel", UITheme.flat_style(
+					Color(0.12, 0.16, 0.22), Tokens.BASE_500, 4, "flush"))
+				var ops_n_lbl := Label.new()
+				ops_n_lbl.text = "AUTO-DRAFT ACTIVE — Fielded from standard reserves"
+				ops_n_lbl.theme_type_variation = "HintLabel"
+				ops_n_lbl.add_theme_color_override("font_color", Tokens.SIGNAL_INFO)
+				ops_notice.add_child(ops_n_lbl)
+				_ops_manifest_list.add_child(ops_notice)
 
 		for path in paths:
 			var path_str := str(path)
@@ -1025,14 +1200,22 @@ func _refresh_summary() -> void:
 				continue
 			var row_data := _build_manifest_row(path_str)
 			if not row_data.is_empty():
-				_manifest_list.add_child(row_data.node)
 				total_metal += int(row_data.metal)
 				total_crystal += int(row_data.crystal)
+				if _manifest_list != null:
+					_manifest_list.add_child(row_data.node)
+				if _ops_manifest_list != null:
+					var ops_row := _build_manifest_row(path_str)
+					if not ops_row.is_empty():
+						_ops_manifest_list.add_child(ops_row.node)
 
+		var cost_str := "TOTAL ECHELON DEPLOYMENT COST: %s M / %s C" % [
+			_format_number(total_metal), _format_number(total_crystal)
+		]
 		if _manifest_footer != null:
-			_manifest_footer.text = "TOTAL ECHELON DEPLOYMENT COST: %s M / %s C" % [
-				_format_number(total_metal), _format_number(total_crystal)
-			]
+			_manifest_footer.text = cost_str
+		if _ops_manifest_footer != null:
+			_ops_manifest_footer.text = cost_str
 
 	var names: Array = roster_picker.ordered_names() if roster_picker else []
 	var has_harvester := false
@@ -1041,22 +1224,34 @@ func _refresh_summary() -> void:
 			if roster_picker.is_harvester_path(str(path)):
 				has_harvester = true
 				break
-	if not names.is_empty() and not has_harvester:
-		_summary_note.text = "No harvester in the roster - the match will add one for you so the economy can start."
-		_summary_note.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
-	else:
-		_summary_note.text = "Ready to deploy."
-		_summary_note.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
 
+	var note_text := ""
+	var note_col: Color = Tokens.TEXT_SECONDARY
+	if not names.is_empty() and not has_harvester:
+		note_text = "No harvester in the roster - the match will add one for you so the economy can start."
+		note_col = Tokens.SIGNAL_HAZARD
+	else:
+		note_text = "Ready to deploy."
+		note_col = Tokens.TEXT_SECONDARY
+
+	if _summary_note != null:
+		_summary_note.text = note_text
+		_summary_note.add_theme_color_override("font_color", note_col)
+	if _ops_summary_note != null:
+		_ops_summary_note.text = note_text
+		_ops_summary_note.add_theme_color_override("font_color", note_col)
+
+	var hero_paths: Array = roster_picker.ordered_paths() if roster_picker else []
+	if hero_paths.is_empty() and bp_manager != null:
+		var listed: Array = bp_manager.list_blueprints(true)
+		for b in listed:
+			var bp_path := str(b.get("path", ""))
+			if bp_path != "":
+				hero_paths.append(bp_path)
 	if _hero_view != null:
-		var hero_paths: Array = roster_picker.ordered_paths() if roster_picker else []
-		if hero_paths.is_empty() and bp_manager != null:
-			var listed: Array = bp_manager.list_blueprints(true)
-			for b in listed:
-				var bp_path := str(b.get("path", ""))
-				if bp_path != "":
-					hero_paths.append(bp_path)
 		_hero_view.update_squadron(hero_paths)
+	if _ops_hero_view != null:
+		_ops_hero_view.update_squadron(hero_paths)
 
 
 func _add_dropdown(parent: Control, label_text: String, labels: PackedStringArray) -> OptionButton:
@@ -1075,6 +1270,291 @@ func _add_dropdown(parent: Control, label_text: String, labels: PackedStringArra
 	UITheme.style_dropdown(btn)
 	parent.add_child(btn)
 	return btn
+
+
+# ---------------------------------------------------------------------------
+# WAR ROOM OPS-TABLE - CONSOLE MODE
+# ---------------------------------------------------------------------------
+# A unified high-density command deck bringing together Theatre Recon,
+# the 3D Squadron Apron Turntable, Roster Tray, and Directives on one screen.
+func _build_ops_table() -> Control:
+	var deck := HBoxContainer.new()
+	deck.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	deck.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	deck.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	# -----------------------------------------------------------------------
+	# COLUMN 1: THEATRE RECON (Left, 360px)
+	# -----------------------------------------------------------------------
+	var col1 := PanelContainer.new()
+	col1.custom_minimum_size = Vector2(360, 0)
+	col1.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col1.add_theme_stylebox_override("panel", UITheme.flat_style(
+		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_MD, "raised"))
+	deck.add_child(col1)
+
+	var col1_vbox := VBoxContainer.new()
+	col1_vbox.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	col1_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col1.add_child(col1_vbox)
+
+	var col1_hdr := HBoxContainer.new()
+	col1_hdr.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	var col1_icon = UITheme.chrome_rect("stage_theatre", Tokens.SPINE_ICON, Tokens.TEXT_PRIMARY)
+	if col1_icon != null:
+		col1_hdr.add_child(col1_icon)
+	var col1_title := Label.new()
+	col1_title.text = "THEATRE RECON"
+	col1_title.theme_type_variation = "HeadingLabel"
+	col1_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col1_hdr.add_child(col1_title)
+	col1_vbox.add_child(col1_hdr)
+
+	# Map Selector Dropdown
+	var map_sel_row := HBoxContainer.new()
+	map_sel_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	var map_sel_lbl := Label.new()
+	map_sel_lbl.text = "SECTOR:"
+	map_sel_lbl.theme_type_variation = "StatLabel"
+	map_sel_row.add_child(map_sel_lbl)
+
+	_ops_map_select = OptionButton.new()
+	_ops_map_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ops_map_select.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
+	for id in MAP_IDS:
+		_ops_map_select.add_item(MapCatalog.get_map_name(str(id)))
+	UITheme.style_dropdown(_ops_map_select)
+	_ops_map_select.item_selected.connect(_on_ops_map_selected)
+	map_sel_row.add_child(_ops_map_select)
+	col1_vbox.add_child(map_sel_row)
+
+	# Topo Preview
+	_ops_preview = MapPreview.new()
+	_ops_preview.custom_minimum_size = Vector2(340, 220)
+	_ops_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ops_preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_ops_preview.size_flags_stretch_ratio = 1.0
+	col1_vbox.add_child(_ops_preview)
+
+	# Map facts & SITREP
+	var sitrep_box := VBoxContainer.new()
+	sitrep_box.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	sitrep_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sitrep_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sitrep_box.size_flags_stretch_ratio = 1.0
+
+	var sitrep_hdr := Label.new()
+	sitrep_hdr.text = "SITREP BRIEFING"
+	sitrep_hdr.theme_type_variation = "HeadingLabel"
+	sitrep_box.add_child(sitrep_hdr)
+
+	_ops_map_title = Label.new()
+	_ops_map_title.theme_type_variation = "HUDValueLabel"
+	_ops_map_title.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	sitrep_box.add_child(_ops_map_title)
+
+	_ops_map_desc = Label.new()
+	_ops_map_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_ops_map_desc.theme_type_variation = "HintLabel"
+	sitrep_box.add_child(_ops_map_desc)
+
+	sitrep_box.add_child(HSeparator.new())
+
+	var sitrep_scroll := ScrollContainer.new()
+	sitrep_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sitrep_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sitrep_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sitrep_box.add_child(sitrep_scroll)
+
+	_ops_map_facts = VBoxContainer.new()
+	_ops_map_facts.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	_ops_map_facts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sitrep_scroll.add_child(_ops_map_facts)
+
+	col1_vbox.add_child(sitrep_box)
+
+	# -----------------------------------------------------------------------
+	# COLUMN 2: SQUADRON TURNTABLE & ROSTER TRAY (Center, Expand Fill)
+	# -----------------------------------------------------------------------
+	var col2 := VBoxContainer.new()
+	col2.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	col2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col2.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	deck.add_child(col2)
+
+	# Center-Top: 3D Squadron Formation Turntable
+	_ops_hero_view = SquadronHeroView.new()
+	_ops_hero_view.custom_minimum_size = Vector2(0, 240)
+	_ops_hero_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ops_hero_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_ops_hero_view.size_flags_stretch_ratio = 1.0
+	col2.add_child(_ops_hero_view)
+
+	# Center-Bottom: Roster wells and blueprint library drawer host
+	_ops_roster_host = VBoxContainer.new()
+	_ops_roster_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ops_roster_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_ops_roster_host.size_flags_stretch_ratio = 1.5
+	col2.add_child(_ops_roster_host)
+
+	# -----------------------------------------------------------------------
+	# COLUMN 3: DIRECTIVES & MANIFEST (Right, 380px)
+	# -----------------------------------------------------------------------
+	var col3 := PanelContainer.new()
+	col3.custom_minimum_size = Vector2(380, 0)
+	col3.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col3.add_theme_stylebox_override("panel", UITheme.flat_style(
+		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_MD, "raised"))
+	deck.add_child(col3)
+
+	var col3_vbox := VBoxContainer.new()
+	col3_vbox.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	col3_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col3.add_child(col3_vbox)
+
+	var col3_hdr := HBoxContainer.new()
+	col3_hdr.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	var col3_icon = UITheme.chrome_rect("stage_launch", Tokens.SPINE_ICON, Tokens.TEXT_PRIMARY)
+	if col3_icon != null:
+		col3_hdr.add_child(col3_icon)
+	var col3_title := Label.new()
+	col3_title.text = "ENGAGEMENT DIRECTIVES"
+	col3_title.theme_type_variation = "HeadingLabel"
+	col3_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col3_hdr.add_child(col3_title)
+	col3_vbox.add_child(col3_hdr)
+
+	# Engagement Rules
+	var rules_grid := GridContainer.new()
+	rules_grid.columns = 2
+	rules_grid.add_theme_constant_override("h_separation", Tokens.SPACE_MD)
+	rules_grid.add_theme_constant_override("v_separation", Tokens.SPACE_XS)
+	col3_vbox.add_child(rules_grid)
+
+	_ops_difficulty_btn = _add_dropdown(rules_grid, "AI Difficulty", DIFFICULTY_LABELS)
+	_ops_difficulty_btn.custom_minimum_size = Vector2(180, Tokens.HIT_TARGET_MIN)
+	_ops_difficulty_btn.selected = difficulty_btn.selected if difficulty_btn else 1
+
+	_ops_resources_btn = _add_dropdown(rules_grid, "Resources", RESOURCE_LABELS)
+	_ops_resources_btn.custom_minimum_size = Vector2(180, Tokens.HIT_TARGET_MIN)
+	_ops_resources_btn.selected = resources_btn.selected if resources_btn else 0
+
+	_ops_ai_btn = _add_dropdown(rules_grid, "AI Opponent", AI_OPPONENT_LABELS)
+	_ops_ai_btn.custom_minimum_size = Vector2(180, Tokens.HIT_TARGET_MIN)
+	_ops_ai_btn.selected = ai_btn.selected if ai_btn else 1
+
+	for b in [_ops_difficulty_btn, _ops_resources_btn, _ops_ai_btn]:
+		b.item_selected.connect(_on_ops_rule_changed)
+	UIFeedbackScript.wire_tree(rules_grid, "select")
+
+	col3_vbox.add_child(HSeparator.new())
+
+	# Manifest Header & Summary
+	var manifest_hdr := Label.new()
+	manifest_hdr.text = "ECHELON MANIFEST"
+	manifest_hdr.theme_type_variation = "HeadingLabel"
+	col3_vbox.add_child(manifest_hdr)
+
+	var ops_meta_row := HBoxContainer.new()
+	ops_meta_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	col3_vbox.add_child(ops_meta_row)
+
+	var ops_map_col := VBoxContainer.new()
+	ops_map_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ops_summary_map = _summary_line(ops_map_col, "THEATRE")
+	ops_meta_row.add_child(ops_map_col)
+
+	var ops_rules_col := VBoxContainer.new()
+	ops_rules_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ops_summary_rules = _summary_line(ops_rules_col, "PARAMETERS")
+	ops_meta_row.add_child(ops_rules_col)
+
+	# Manifest table container
+	var ops_roster_wrap := PanelContainer.new()
+	ops_roster_wrap.add_theme_stylebox_override("panel", UITheme.flat_style(
+		Tokens.BASE_900, Tokens.BASE_600, Tokens.SPACE_SM, "recessed"))
+	ops_roster_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ops_roster_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col3_vbox.add_child(ops_roster_wrap)
+
+	var ops_manifest_box := VBoxContainer.new()
+	ops_manifest_box.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	ops_manifest_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ops_manifest_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	ops_roster_wrap.add_child(ops_manifest_box)
+
+	# Column headers
+	var col_hdr := HBoxContainer.new()
+	col_hdr.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	var h_role := Label.new()
+	h_role.text = "ROLE"
+	h_role.custom_minimum_size = Vector2(42, 0)
+	h_role.theme_type_variation = "StatLabel"
+	h_role.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col_hdr.add_child(h_role)
+
+	var h_name := Label.new()
+	h_name.text = "DESIGN NAME"
+	h_name.theme_type_variation = "StatLabel"
+	h_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col_hdr.add_child(h_name)
+
+	var h_cost := Label.new()
+	h_cost.text = "COST"
+	h_cost.custom_minimum_size = Vector2(80, 0)
+	h_cost.theme_type_variation = "StatLabel"
+	h_cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	col_hdr.add_child(h_cost)
+	ops_manifest_box.add_child(col_hdr)
+
+	# Scrollable list of units
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	ops_manifest_box.add_child(scroll)
+
+	_ops_manifest_list = VBoxContainer.new()
+	_ops_manifest_list.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	_ops_manifest_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_ops_manifest_list)
+
+	# Total deployment cost footer
+	var footer_panel := PanelContainer.new()
+	footer_panel.add_theme_stylebox_override("panel", UITheme.flat_style(
+		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_XS, "flush"))
+	ops_manifest_box.add_child(footer_panel)
+
+	_ops_manifest_footer = Label.new()
+	_ops_manifest_footer.theme_type_variation = "HUDValueLabel"
+	_ops_manifest_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_ops_manifest_footer.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	footer_panel.add_child(_ops_manifest_footer)
+
+	_ops_summary_note = Label.new()
+	_ops_summary_note.theme_type_variation = "HintLabel"
+	_ops_summary_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col3_vbox.add_child(_ops_summary_note)
+
+	# Heavy Primary Actuator: [ENGAGE // DEPLOY]
+	var deploy_btn := Button.new()
+	deploy_btn.text = "ENGAGE // DEPLOY"
+	deploy_btn.theme_type_variation = "PrimaryButton"
+	deploy_btn.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN + Tokens.SPACE_SM)
+	deploy_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	deploy_btn.pressed.connect(_on_start_pressed)
+	UIFeedbackScript.wire(deploy_btn, "confirm")
+	col3_vbox.add_child(deploy_btn)
+
+	var menu_btn := Button.new()
+	menu_btn.text = "MAIN MENU"
+	menu_btn.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN)
+	menu_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	menu_btn.pressed.connect(_return_to_menu)
+	UIFeedbackScript.wire(menu_btn)
+	col3_vbox.add_child(menu_btn)
+
+	return deck
 
 
 # ---------------------------------------------------------------------------

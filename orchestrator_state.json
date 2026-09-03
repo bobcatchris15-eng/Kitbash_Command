@@ -450,11 +450,11 @@
     },
     {
       "task_id": "TASK-0040",
-      "status": "QUEUED",
-      "system_intent": "Implement War Room Ops-Table architecture uniting Theatre Recon, 3D Staging Turntable, Roster Tray, and Directives into a single-screen command console",
+      "status": "PASS",
+      "system_intent": "Implement War Room Ops-Table console mode toggle and view synchronization uniting Theatre Recon, 3D Staging Turntable, Roster Tray, and Directives into a single-screen command console",
       "depends_on": ["TASK-0039"],
-      "model_tier": "flash_lite",
-      "attempts": 0,
+      "model_tier": "flash",
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/match_setup.gd",
         "prototype/scenes/MatchSetup.tscn"

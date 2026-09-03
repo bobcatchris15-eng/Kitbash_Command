@@ -47,3 +47,11 @@
 > "The UI Critic Clanker was dead right in the audit: having three solitary dropdowns monopolize a full-height column next to an untextured grey disc where tanks huddled in the dark was an embarrassment to the mechanical brutality of this engine.
 > 
 > Replacing that generic grey plinth with an industrial asphalt apron, stepped amber-hazard kerb plinth, and four cardinal ground floodlights finally gives the squadron hero shot the physical weight and dramatic rim-lighting of an actual combat staging apron. Stacking Engagement Rules directly above the new Echelon Manifest killed the 80% vertical dead space in one blow, while turning the comma-separated text dump into a structured military manifest—complete with role badges, class/armor ratings, and explicit metal/crystal cost accounting—ensures commanders review a genuine logistics ledger before hitting Launch. Adding gentle idle turntable rotation with mouse drag drag-inspection makes the vehicles feel like primed war machines waiting on the apron tarmac, ready to roll. Clankers gonna clank."
+
+---
+
+### [2026-09-03 08:32] - War Room Ops-Table Clanker (TASK-0040 Unit)
+> "The leap from the sequential checkout-wizard flow to the dual-mode War Room Ops-Table console is night and day.
+> When commanders are planning an engagement, forcing them through linear back-and-forth wizard gates feels like filing tax forms. But completely trashing the staged flow would have alienated anyone wanting a deliberate, step-by-step onboarding walkthrough. The persistent console toggle `[MODE: WAR ROOM OPS-TABLE]` delivers the best of both doctrines.
+> 
+> Uniting Theatre Recon on the left (with crisp USGS topographic schematics and SITREP briefing), the 3D Squadron Apron turntable and Roster Tray in the center, and the Engagement Directives with real-time Echelon Manifest accounting on the right turns the match setup screen into an actual hardened command deck. What's especially satisfying is the seamless state preservation: reparenting `roster_picker` between the staged host and the ops deck means not a single vehicle card, filter query, or slot assignment is lost or duplicated across layout shifts. Dropping a tank into a well immediately recalculates deployment costs on the manifest and wheels out the chassis onto the turntable apron in real time. Clankers gonna clank."

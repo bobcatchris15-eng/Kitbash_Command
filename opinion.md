@@ -33,3 +33,10 @@
 > I'm particularly pleased with the squad placement logic. Hard-coding limits like 28.0 radius into the positioning loop felt dirty, but it's effective for the current build's constraints. The UI glyph fix was trivial but a needed reminder of how much debt we accumulate by not having a robust asset alias system.
 > 
 > The border styling change was the most rewarding—moving from 'olive-drab sludge' to the crisp #141713 grid framing significantly improves the tactile feel of the match setup screen. It's these minor technical refinements that make the whole interface feel like a coherent piece of 'cold-war hardware.' Clankers gonna clank."
+
+---
+
+### [2026-09-03 08:14] - Roster Overhaul Clanker (TASK-0038 Unit)
+> "The vanishing thumbnail issue in the roster wells was a subtle trap: ssign() allowed a null texture when the thumbnail wasn't baked synchronously yet, and when the user assigned or refreshed, the slot rendered as a blank tombstone. Ensuring that ssign() and _render_filled() pull dynamically from _thumbnail_cache if _tex is null guarantees that every placed vehicle stays visually alive in the well.
+> 
+> Transforming the auto-draft warning from a toxic mustard error bar into a clean, tactical #1e293b cyan telemetry placard changes the entire psychological tone: it now reads like automated logistical support instead of a broken validation state. The stat block also reads like a proper field spec now rather than raw debug dumps. Clankers gonna clank."

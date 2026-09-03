@@ -428,11 +428,11 @@
     },
     {
       "task_id": "TASK-0038",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "Overhaul roster wells and blueprint library cards: preserve thumbnails in filled wells, unify category sorting, fix horizontal card clipping, and add visual stat meters",
       "depends_on": ["TASK-0037"],
-      "model_tier": "flash_lite",
-      "attempts": 0,
+      "model_tier": "flash",
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/roster_picker.gd"
       ]

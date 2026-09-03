@@ -326,16 +326,6 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hdr.add_child(heading)
 
-	var sort_btn := OptionButton.new()
-	sort_btn.add_item("Sort: Name")
-	sort_btn.add_item("Sort: Tier")
-	sort_btn.add_item("Sort: HP")
-	sort_btn.add_item("Sort: Speed")
-	sort_btn.add_item("Sort: DPS")
-	sort_btn.add_item("Sort: Cost")
-	sort_btn.theme_type_variation = "StatLabel"
-	hdr.add_child(sort_btn)
-
 	var picked := []
 	for entry in entries:
 		if _category_of(entry) == category:
@@ -349,6 +339,24 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 		col.add_child(hint)
 		return col
 
+	var sort_btn: OptionButton = null
+	if category == "unit" or picked.size() > 2:
+		sort_btn = OptionButton.new()
+		sort_btn.add_item("Sort: Name")
+		sort_btn.add_item("Sort: Tier")
+		sort_btn.add_item("Sort: HP")
+		sort_btn.add_item("Sort: Speed")
+		sort_btn.add_item("Sort: DPS")
+		sort_btn.add_item("Sort: Cost")
+		sort_btn.theme_type_variation = "StatLabel"
+		hdr.add_child(sort_btn)
+	else:
+		var count_lbl := Label.new()
+		count_lbl.text = "%d design%s" % [picked.size(), "" if picked.size() == 1 else "s"]
+		count_lbl.theme_type_variation = "StatLabel"
+		count_lbl.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
+		hdr.add_child(count_lbl)
+
 	# Tray surface behind the strip.
 	var tray := PanelContainer.new()
 	tray.add_theme_stylebox_override("panel", surface_style(
@@ -357,8 +365,9 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 	col.add_child(tray)
 
 	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_SM)
+	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_SM + 12)
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tray.add_child(scroll)
 
@@ -366,7 +375,8 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 	row.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	scroll.add_child(row)
 
-	sort_btn.item_selected.connect(func(idx: int): _sort_cards(row, idx))
+	if sort_btn != null:
+		sort_btn.item_selected.connect(func(idx: int): _sort_cards(row, idx))
 
 	for entry in picked:
 		var card := RosterCard.new()
@@ -939,6 +949,8 @@ class RosterCard extends PanelContainer:
 	func _get_drag_data(_at_position: Vector2) -> Variant:
 		if entry_path == "":
 			return null
+		if _tex == null and _picker != null and _picker._thumbnail_cache.has(entry_path):
+			_tex = _picker._thumbnail_cache[entry_path]
 		set_drag_preview(RosterPicker.make_drag_preview(_tex, entry_name))
 		return {
 			"type": RosterPicker.DRAG_TYPE,
@@ -983,11 +995,13 @@ class RosterSlot extends PanelContainer:
 		# thumbnail area, not above or below it, or an empty slot is a different
 		# height from a filled one and the grid jumps as you fill it.
 		var thumb_wrap := Control.new()
+		thumb_wrap.custom_minimum_size = Vector2(88, 72)
 		thumb_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		thumb_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(thumb_wrap)
 
 		_thumb = TextureRect.new()
+		_thumb.custom_minimum_size = Vector2(88, 72)
 		_thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		_thumb.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1038,6 +1052,7 @@ class RosterSlot extends PanelContainer:
 			RosterPicker.variant_for_kind(kind), "slot_empty"))
 		if _thumb:
 			_thumb.texture = null
+			_thumb.visible = false
 		if _ghost:
 			_ghost.visible = true
 		# Legend and colour come from the variant table, so the restriction
@@ -1095,8 +1110,11 @@ class RosterSlot extends PanelContainer:
 		# something does.
 		if _ghost:
 			_ghost.visible = false
+		if _tex == null and _picker != null and _picker._thumbnail_cache.has(entry_path):
+			_tex = _picker._thumbnail_cache[entry_path]
 		if _thumb:
 			_thumb.texture = _tex
+			_thumb.visible = true
 		if _label:
 			_label.text = entry_name
 			_label.remove_theme_color_override("font_color")
@@ -1139,6 +1157,8 @@ class RosterSlot extends PanelContainer:
 	func assign(path: String, name_text: String, tex: Texture2D) -> void:
 		entry_path = path
 		entry_name = name_text
+		if tex == null and _picker != null and _picker._thumbnail_cache.has(path):
+			tex = _picker._thumbnail_cache[path]
 		_tex = tex
 		_render_filled()
 
@@ -1151,6 +1171,7 @@ class RosterSlot extends PanelContainer:
 		_tex = tex
 		if _thumb:
 			_thumb.texture = tex
+			_thumb.visible = true
 
 	func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 		if not (data is Dictionary and data.get("type", "") == RosterPicker.DRAG_TYPE):
@@ -1200,6 +1221,8 @@ class RosterSlot extends PanelContainer:
 	func _get_drag_data(_at_position: Vector2) -> Variant:
 		if entry_path == "":
 			return null
+		if _tex == null and _picker != null and _picker._thumbnail_cache.has(entry_path):
+			_tex = _picker._thumbnail_cache[entry_path]
 		set_drag_preview(RosterPicker.make_drag_preview(_tex, entry_name))
 		return {
 			"type": RosterPicker.DRAG_TYPE,
@@ -1258,36 +1281,56 @@ static func calculate_armor_resistance(mat_id: String) -> int:
 
 
 static func format_rich_stats(stats: Dictionary, entry: Dictionary = {}, data: Dictionary = {}) -> String:
-	var fac: String = str(stats.get("factory_queue", "Med")).substr(0, 4).to_upper()
+	var raw_fac: String = str(stats.get("factory_queue", "")).strip_edges().to_upper()
+	var is_def: bool = entry.get("is_defensive", false) or data.get("is_defensive", false)
+	var cls_tag := "MEDIUM"
+	if is_def or "BLDG" in raw_fac:
+		cls_tag = "DEFENCE"
+	elif "LIGHT" in raw_fac:
+		cls_tag = "LIGHT"
+	elif "HEAVY" in raw_fac:
+		cls_tag = "HEAVY"
+	elif "MED" in raw_fac:
+		cls_tag = "MEDIUM"
+	elif raw_fac != "":
+		cls_tag = raw_fac
+	elif entry.get("is_harvester", false):
+		cls_tag = "HARVESTER"
+
 	var arm: int = int(stats.get("armor_resist", 30))
 	var hp: float = float(stats.get("hull_hp", 300.0))
 	var spd: float = float(stats.get("move_speed", 10.0))
 	var dps: float = float(stats.get("dps", 0.0))
 	var rng: float = float(stats.get("longest_range", 0.0))
-	var sens: float = float(stats.get("vision", 160.0))
 	var m: int = int(stats.get("cost_metal", 100))
 	var c: int = int(stats.get("cost_crystal", 0))
 	var is_harv: bool = bool(stats.get("is_harvester", entry.get("is_harvester", false)))
 	var crg: int = int(stats.get("cargo_capacity", 0))
 
 	var lines: Array = []
-	lines.append("FAC:%-4s ARM:%2d%%" % [fac, arm])
-	lines.append("HP:%-5.0f SPD:%4.1f" % [hp, spd])
+	# Line 1: Class / Armor (e.g. [HEAVY] Arm: 18%)
+	lines.append("[%s] Arm: %d%%" % [cls_tag, arm])
+	# Line 2: Durability / Speed (e.g. HP: 1129  Spd: 1.5)
+	lines.append("HP: %.0f  Spd: %.1f" % [hp, spd])
+	# Line 3: Combat (e.g. DPS: 1020  Rng: 100m or CRG: 100t (Unarmed))
 	if is_harv:
+		var cargo_val: int = crg if crg > 0 else 100
 		if dps > 0.0:
-			lines.append("CRG:%-4d RNG:%3.0fm" % [crg, rng])
+			lines.append("CRG: %dt  DPS: %.0f" % [cargo_val, dps])
 		else:
-			lines.append("CRG:%-4d (unarmed)" % crg)
+			lines.append("CRG: %dt (Unarmed)" % cargo_val)
 	else:
 		if dps > 0.0:
-			lines.append("DPS:%-4.0f RNG:%3.0fm" % [dps, rng])
+			lines.append("DPS: %.0f  Rng: %.0fm" % [dps, rng])
+		elif bool(entry.get("has_repair", false)) or bool(stats.get("has_repair", false)):
+			lines.append("Support (Repair)")
 		else:
-			lines.append("unarmed")
-
+			lines.append("(Unarmed)")
+	# Line 4: Cost (e.g. Cost: 1427M / 252C)
 	if c > 0:
-		lines.append("SNS:%3.0fm $%dM %dC" % [sens, m, c])
+		lines.append("Cost: %dM / %dC" % [m, c])
 	else:
-		lines.append("SNS:%3.0fm $%dM" % [sens, m])
+		lines.append("Cost: %dM" % m)
 
 	return "\n".join(PackedStringArray(lines))
 
@@ -1406,9 +1449,13 @@ func set_auto_draft(names: Array) -> void:
 	_auto_names = names.duplicate()
 	if _auto_panel == null and not _auto_names.is_empty():
 		_auto_panel = PanelContainer.new()
-		_auto_panel.add_theme_stylebox_override("panel", surface_style(
-			Color(Tokens.SIGNAL_HAZARD.r, Tokens.SIGNAL_HAZARD.g, Tokens.SIGNAL_HAZARD.b, 0.30),
-			SURFACE_TRAY, SURFACE_EDGE, Tokens.SPACE_SM))
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color("#1e293b")
+		sb.border_color = Color(Tokens.SIGNAL_HAZARD.r, Tokens.SIGNAL_HAZARD.g, Tokens.SIGNAL_HAZARD.b, 0.45)
+		sb.set_border_width_all(1)
+		sb.set_corner_radius_all(SURFACE_RADIUS)
+		sb.set_content_margin_all(Tokens.SPACE_SM)
+		_auto_panel.add_theme_stylebox_override("panel", sb)
 		_auto_label = Label.new()
 		_auto_label.theme_type_variation = "HintLabel"
 		_auto_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1425,8 +1472,10 @@ func _refresh_auto_placard(unit_count: int) -> void:
 	_auto_panel.visible = active
 	if not active:
 		return
-	_auto_label.text = "AUTO-DRAFT ACTIVE - the roster is empty, so the match will field: %s (plus the built-in defaults). Field one design and this stops." % ", ".join(PackedStringArray(_auto_names))
-	_auto_label.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	var count: int = _auto_names.size() if _auto_names.size() > 0 else 8
+	_auto_label.text = "[ AUTO-DRAFT ACTIVE: %d Standard Combat Blueprints Loaded ]" % count
+	_auto_label.add_theme_color_override("font_color", Color("#38bdf8"))
+	_auto_panel.tooltip_text = "Match will field: %s. Assign any custom blueprint to override." % ", ".join(PackedStringArray(_auto_names))
 
 
 # How many unit wells are filled. The launch stage gates on this rather than

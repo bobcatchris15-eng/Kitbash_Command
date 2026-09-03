@@ -1,7 +1,7 @@
 extends RefCounted
 class_name HullMaterialBuilder
 # Shared hull material construction - parameterized ShaderMaterial/shader for every
-# faction and armor material, supporting 3 zones, 13 procedural patterns, tactile micro-surfaces,
+# faction and armor material, supporting 3 zones, 17 procedural patterns, tactile micro-surfaces,
 # and service weathering.
 
 const LiveryScript = preload("res://scripts/livery.gd")

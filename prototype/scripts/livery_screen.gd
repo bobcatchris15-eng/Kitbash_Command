@@ -3,7 +3,7 @@ extends Control
 #
 # Offers full customization across:
 # 1. 5 visual zones (colors and 18 tactile finishes)
-# 2. 13 procedural patterns (racing stripes, chevrons, digital camo, hex grid, hazard bands, etc.)
+# 2. 17 procedural patterns (racing stripes, chevrons, digital camo, hex grid, hazard bands, etc.)
 # 3. Master service weathering dial (factory fresh -> battle hardened -> scavenged relic)
 # 4. Insignia crests, badge styles, tactical callsign numbers, and hazard markings
 # 5. One-click curated theme presets
@@ -60,8 +60,6 @@ var _last_mouse_pos: Vector2 = Vector2.ZERO
 
 # UI controls
 var _tab_container: Control = null
-var _tab_buttons: Array = []
-var _current_tab: int = 0
 var _subject_btn: OptionButton = null
 var _current_subject: int = 0
 
@@ -128,44 +126,56 @@ func _ready() -> void:
 	col.add_child(body)
 
 	# --- Left Column: Customization Deck ---
+	# One continuous scrollable page, not tabs - the tab bar used to switch
+	# between sections that each nearly filled the pane on their own (partly
+	# because _build_tab_* was being called TWICE each, silently doubling
+	# every section's controls). Now every section is stacked and scrolls,
+	# which is also what made room to pull Building Styles out into the
+	# right-hand pane below - it isn't a livery property, it's a per-match
+	# architectural choice, and it doesn't need to compete for a tab slot.
 	var left_plate := _plated_section(body, "CUSTOMIZATION DECK", 600)
-	
-	# Tab selector row
-	var tab_bar := HBoxContainer.new()
-	tab_bar.add_theme_constant_override("separation", 6)
-	left_plate.add_child(tab_bar)
 
-	var tab_titles := ["COLORS & ZONES", "PATTERNS", "FINISHES & WEAR", "DECALS", "PRESETS", "BUILDING STYLES"]
-	for i in range(tab_titles.size()):
-		var t_btn := Button.new()
-		t_btn.text = tab_titles[i]
-		t_btn.toggle_mode = true
-		t_btn.button_pressed = (i == 0)
-		t_btn.custom_minimum_size = Vector2(90, 34)
-		t_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		UIFeedbackScript.wire(t_btn)
-		t_btn.pressed.connect(_on_tab_clicked.bind(i))
-		tab_bar.add_child(t_btn)
-		_tab_buttons.append(t_btn)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# SHOW_ALWAYS, not AUTO: the deck overflows on essentially every screen
+	# size this content is authored for, so the bar should read as "this
+	# pane scrolls" on sight rather than only appear once the player happens
+	# to hover it. Styled explicitly because the default theme's scrollbar
+	# is thin and low-contrast enough against this dark panel to go unnoticed.
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	left_plate.add_child(scroll)
+	var v_bar := scroll.get_v_scroll_bar()
+	v_bar.custom_minimum_size = Vector2(14, 0)
+	var track_style := StyleBoxFlat.new()
+	track_style.bg_color = Tokens.BASE_700
+	track_style.set_corner_radius_all(4)
+	var grabber_style := StyleBoxFlat.new()
+	grabber_style.bg_color = Tokens.ACCENT_INTERACTIVE
+	grabber_style.set_corner_radius_all(4)
+	var grabber_hi_style := StyleBoxFlat.new()
+	grabber_hi_style.bg_color = Tokens.ACCENT_INTERACTIVE.lightened(0.2)
+	grabber_hi_style.set_corner_radius_all(4)
+	v_bar.add_theme_stylebox_override("scroll", track_style)
+	v_bar.add_theme_stylebox_override("grabber", grabber_style)
+	v_bar.add_theme_stylebox_override("grabber_highlight", grabber_hi_style)
+	v_bar.add_theme_stylebox_override("grabber_pressed", grabber_hi_style)
 
-	# Tab Container contents
 	_tab_container = VBoxContainer.new()
-	_tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_tab_container.add_theme_constant_override("separation", Tokens.SPACE_MD)
-	left_plate.add_child(_tab_container)
+	_tab_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tab_container.add_theme_constant_override("separation", Tokens.SPACE_LG)
+	scroll.add_child(_tab_container)
 
+	_build_section_heading(_tab_container, "COLORS & ZONES")
 	_build_tab_colors()
+	_build_section_heading(_tab_container, "PATTERNS")
 	_build_tab_patterns()
+	_build_section_heading(_tab_container, "FINISHES & WEAR")
 	_build_tab_finishes()
+	_build_section_heading(_tab_container, "DECALS")
 	_build_tab_decals()
-	_build_tab_colors()
-	_build_tab_patterns()
-	_build_tab_finishes()
-	_build_tab_decals()
+	_build_section_heading(_tab_container, "PRESETS")
 	_build_tab_presets()
-	_build_tab_building_styles()
-
-	_switch_tab(0)
 
 	# --- Right Column: Interactive 3D Turntable Preview ---
 	var right_plate := _plated_section(body, "TACTICAL PREVIEW", 500)
@@ -240,6 +250,12 @@ func _ready() -> void:
 	preview_hint.theme_type_variation = "HintLabel"
 	preview_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right_plate.add_child(preview_hint)
+
+	# Building Styles lives here, not as a customization-deck tab: it isn't a
+	# livery property (it doesn't touch a vehicle's paint at all), it's the
+	# match's architectural set. Bottom of the preview column is where a
+	# per-match, not per-vehicle, choice reads correctly.
+	_build_tab_building_styles(right_plate)
 
 	# --- Bottom Actions Bar ---
 	var row := HBoxContainer.new()
@@ -641,21 +657,32 @@ func _build_tab_presets() -> void:
 
 
 # ---------------------------------------------------------------------------
-# TAB NAVIGATION
+# SECTION HEADINGS (single-page layout, no tabs)
 # ---------------------------------------------------------------------------
 const BuildingMeshSets = preload("res://scripts/building_mesh_sets.gd")
 var _tab_building_styles_node: Control = null
 
-func _build_tab_building_styles() -> void:
+# A small heading + rule above each stacked section - the tab bar used to
+# carry this labelling job; now that every section is visible at once, each
+# needs its own marker to stay scannable while scrolling.
+func _build_section_heading(parent: Control, text: String) -> void:
+	var heading := Label.new()
+	heading.text = text
+	heading.theme_type_variation = "HeadingLabel"
+	parent.add_child(heading)
+	var rule := HSeparator.new()
+	parent.add_child(rule)
+
+func _build_tab_building_styles(parent: Control) -> void:
 	_tab_building_styles_node = VBoxContainer.new()
-	_tab_building_styles_node.add_theme_constant_override("separation", Tokens.SPACE_MD)
-	_tab_container.add_child(_tab_building_styles_node)
-	
+	_tab_building_styles_node.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	parent.add_child(_tab_building_styles_node)
+
 	var label := Label.new()
 	label.text = "Select Architectural Set:"
 	label.theme_type_variation = "HeadingLabel"
 	_tab_building_styles_node.add_child(label)
-	
+
 	var opt := OptionButton.new()
 	var sets := BuildingMeshSets.get_set_list()
 	for i in range(sets.size()):
@@ -668,20 +695,6 @@ func _build_tab_building_styles() -> void:
 		_apply_live()
 	)
 	_tab_building_styles_node.add_child(opt)
-	
-func _switch_tab(index: int) -> void:
-	_current_tab = index
-	for i in range(_tab_buttons.size()):
-		_tab_buttons[i].button_pressed = (i == index)
-	_tab_colors_node.visible = (index == 0)
-	_tab_patterns_node.visible = (index == 1)
-	_tab_finishes_node.visible = (index == 2)
-	_tab_decals_node.visible = (index == 3)
-	_tab_presets_node.visible = (index == 4)
-	_tab_building_styles_node.visible = (index == 5)
-
-func _on_tab_clicked(index: int) -> void:
-	_switch_tab(index)
 
 
 # ---------------------------------------------------------------------------

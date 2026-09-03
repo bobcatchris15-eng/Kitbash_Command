@@ -93,8 +93,9 @@ uniform float stripe_enabled : hint_range(0.0, 1.0) = 1.0;
 
 // --- Procedural Pattern Engine ---
 // 0=none, 1=stripe, 2=dual_stripe, 3=offset_stripe, 4=chevrons, 5=hazard, 6=hex_grid,
-// 7=digital_camo, 8=splinter_camo, 9=tiger_camo, 10=nose_dip, 11=half_split, 12=gradient
-uniform int pattern_type : hint_range(0, 12) = 1;
+// 7=digital_camo, 8=splinter_camo, 9=tiger_camo, 10=nose_dip, 11=half_split, 12=gradient,
+// 13=checkerboard, 14=zigzag, 15=urban_camo, 16=arrowhead_flash
+uniform int pattern_type : hint_range(0, 16) = 1;
 uniform float pattern_scale : hint_range(0.1, 5.0) = 1.0;
 uniform float pattern_angle : hint_range(-180.0, 180.0) = 0.0;
 uniform float pattern_offset : hint_range(-1.0, 1.0) = 0.0;
@@ -263,8 +264,33 @@ void evaluate_pattern(vec3 norm_coords, vec2 uv_rot, out float pattern_mask, out
 	} else if (pattern_type == 12) {
 		// Airbrush Gradient Fade
 		pattern_mask = smoothstep(0.05, 0.95, z_z);
+	} else if (pattern_type == 13) {
+		// Checkerboard Flash
+		vec2 c_uv = floor(uv_rot * 6.0 * sc);
+		pattern_mask = mod(c_uv.x + c_uv.y, 2.0);
+	} else if (pattern_type == 14) {
+		// Zigzag Lightning Stripe - a stripe whose x-offset sawtooths along y
+		float period = 0.5 / sc;
+		float saw = abs(fract(uv_rot.y / period) - 0.5) * 2.0;
+		float x_off = (saw - 0.5) * period;
+		float dist = abs(uv_rot.x - x_off) * 2.0;
+		float w = 0.10 * sc;
+		pattern_mask = 1.0 - smoothstep(w - soft, w + soft, dist);
+		piping_mask = (smoothstep(w - soft, w + soft, dist) - smoothstep(w + soft * 2.0, w + soft * 5.0, dist)) * pattern_edge_darken;
+	} else if (pattern_type == 15) {
+		// Urban Brick Camo - offset rectangular block camouflage
+		vec2 b_uv = uv_rot * 4.0 * sc;
+		float row = floor(b_uv.y);
+		b_uv.x += mod(row, 2.0) * 0.5;
+		vec2 uc_cell = floor(b_uv);
+		float rand_val = hash2d(uc_cell + vec2(pattern_offset));
+		pattern_mask = step(0.5, rand_val);
+	} else if (pattern_type == 16) {
+		// Arrowhead Flash - single bold forward-pointing arrow marking
+		float chev = abs(uv_rot.x) * 1.2 + uv_rot.y * 2.0 * sc;
+		pattern_mask = 1.0 - smoothstep(0.14 - soft, 0.14 + soft, abs(chev));
 	}
-	
+
 	pattern_mask *= stripe_enabled;
 	piping_mask *= stripe_enabled;
 }
@@ -455,9 +481,22 @@ void fragment() {
 			NORMAL = normalize((VIEW_MATRIX * vec4(final_world_normal, 0.0)).xyz);
 		}
 
-		METALLIC = clamp(armor_metallic * metallic, 0.0, 1.0);
+		// The livery Finish (zone metallic/roughness) overrides the armor
+		// material's own PBR here - a Gunmetal-finished plate has to look
+		// different from a Matte Primer one regardless of what physical armor
+		// it is. armor_metallic/armor_roughness are left declared and set
+		// (armor_paint_visual.gd) but no longer read into METALLIC/ROUGHNESS;
+		// what still comes from the armor TYPE is the physical relief/seam
+		// height field above (pattern_id/cell/relief/seam) - the tactile
+		// normal-map texture is armor-type-specific, the shininess is livery.
+		float zone_metallic = mix(zone_lower_metallic, zone_upper_metallic, upper_mask);
+		float zone_roughness = mix(zone_lower_roughness, zone_upper_roughness, upper_mask);
+		zone_metallic = mix(zone_metallic, zone_stripe_metallic, pattern_mask);
+		zone_roughness = mix(zone_roughness, zone_stripe_roughness, pattern_mask);
+
+		METALLIC = clamp(zone_metallic * metallic, 0.0, 1.0);
 		float seam_roughness = (pattern_id >= 0 && effective_relief > 0.0) ? ((1.0 - h) * 0.18) : 0.0;
-		ROUGHNESS = clamp(armor_roughness + roughness_bias + (tex_roughness - 0.5) * 0.35 + seam_roughness, 0.15, 1.0);
+		ROUGHNESS = clamp(zone_roughness + roughness_bias + (tex_roughness - 0.5) * 0.35 + seam_roughness, 0.15, 1.0);
 
 		ALPHA = alpha_base;
 		EMISSION = color * indirect_lift;

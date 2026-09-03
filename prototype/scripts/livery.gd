@@ -70,7 +70,7 @@ const FINISHES = {
 	"anodised":         {"name": "Anodised Aluminum",       "metallic": 0.82, "roughness": 0.40, "surface_type": 9},
 }
 
-# 13 Procedural pattern types
+# 17 Procedural pattern types
 const PATTERNS := {
 	"none":           {"name": "Solid / Clean Split",     "id_int": 0,  "desc": "Clean two-tone hull without overlay pattern"},
 	"stripe":         {"name": "Centerline Stripe",       "id_int": 1,  "desc": "Single bold racing stripe down the center"},
@@ -85,6 +85,10 @@ const PATTERNS := {
 	"nose_dip":       {"name": "Dipped Nose / Cowl",      "id_int": 10, "desc": "Front cowl / nose accent blocking"},
 	"half_split":     {"name": "Longitudinal Split",      "id_int": 11, "desc": "High-contrast port/starboard color split"},
 	"gradient":       {"name": "Airbrush Gradient Fade",  "id_int": 12, "desc": "Smooth continuous transition along the hull"},
+	"checkerboard":   {"name": "Checkerboard Flash",      "id_int": 13, "desc": "Classic motorsport checker-flag block grid"},
+	"zigzag":         {"name": "Zigzag Lightning Stripe",  "id_int": 14, "desc": "Sharp lightning-bolt racing stripe"},
+	"urban_camo":     {"name": "Urban Brick Camo",        "id_int": 15, "desc": "Offset rectangular block city camouflage"},
+	"arrowhead_flash": {"name": "Arrowhead Flash",        "id_int": 16, "desc": "Single bold forward-pointing arrow marking"},
 }
 
 # 10 Insignia icons

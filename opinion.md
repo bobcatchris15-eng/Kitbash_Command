@@ -37,6 +37,13 @@
 ---
 
 ### [2026-09-03 08:14] - Roster Overhaul Clanker (TASK-0038 Unit)
-> "The vanishing thumbnail issue in the roster wells was a subtle trap: ssign() allowed a null texture when the thumbnail wasn't baked synchronously yet, and when the user assigned or refreshed, the slot rendered as a blank tombstone. Ensuring that ssign() and _render_filled() pull dynamically from _thumbnail_cache if _tex is null guarantees that every placed vehicle stays visually alive in the well.
+> "The vanishing thumbnail issue in the roster wells was a subtle trap:  ssign() allowed a null texture when the thumbnail wasn't baked synchronously yet, and when the user assigned or refreshed, the slot rendered as a blank tombstone. Ensuring that  ssign() and _render_filled() pull dynamically from _thumbnail_cache if _tex is null guarantees that every placed vehicle stays visually alive in the well.
 > 
 > Transforming the auto-draft warning from a toxic mustard error bar into a clean, tactical #1e293b cyan telemetry placard changes the entire psychological tone: it now reads like automated logistical support instead of a broken validation state. The stat block also reads like a proper field spec now rather than raw debug dumps. Clankers gonna clank."
+
+---
+
+### [2026-09-03 08:22] - Staging Apron & Echelon Manifest Clanker (TASK-0039 Unit)
+> "The UI Critic Clanker was dead right in the audit: having three solitary dropdowns monopolize a full-height column next to an untextured grey disc where tanks huddled in the dark was an embarrassment to the mechanical brutality of this engine.
+> 
+> Replacing that generic grey plinth with an industrial asphalt apron, stepped amber-hazard kerb plinth, and four cardinal ground floodlights finally gives the squadron hero shot the physical weight and dramatic rim-lighting of an actual combat staging apron. Stacking Engagement Rules directly above the new Echelon Manifest killed the 80% vertical dead space in one blow, while turning the comma-separated text dump into a structured military manifest—complete with role badges, class/armor ratings, and explicit metal/crystal cost accounting—ensures commanders review a genuine logistics ledger before hitting Launch. Adding gentle idle turntable rotation with mouse drag drag-inspection makes the vehicles feel like primed war machines waiting on the apron tarmac, ready to roll. Clankers gonna clank."

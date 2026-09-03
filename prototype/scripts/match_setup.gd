@@ -49,6 +49,7 @@ const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
 const UIAnimScript = preload("res://scripts/ui_anim.gd")
 const MatchRuleSetScript = preload("res://scripts/match_rule_set.gd")
 const BlueprintThumbnailScript = preload("res://scripts/blueprint_thumbnail.gd")
+const DesignCostingScript = preload("res://scripts/battle/economy/design_costing.gd")
 
 # --- The match's own vocabulary. UNCHANGED from the pre-rebuild screen; these
 # are what the rule set is written from and moving them would change the game
@@ -120,7 +121,9 @@ var _map_tiles: Array = []
 
 var _summary_map: Label
 var _summary_rules: Label
-var _summary_roster: Label
+var _summary_roster: PanelContainer
+var _manifest_list: VBoxContainer
+var _manifest_footer: Label
 var _summary_note: Label
 var _hero_view: SquadronHeroView = null
 
@@ -687,14 +690,23 @@ func _build_launch_stage() -> Control:
 	var page := HBoxContainer.new()
 	page.add_theme_constant_override("separation", Tokens.SPACE_MD)
 
+	# Left column holds Rules and Deployment Manifest stacked vertically
+	# so Rules does not waste 80% vertical dead space.
+	var left_col := VBoxContainer.new()
+	left_col.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	left_col.custom_minimum_size = Vector2(Tokens.SUMMARY_COL_MIN + Tokens.SPACE_XL + 120, 0)
+	left_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_child(left_col)
+
 	var rules_wrap := PanelContainer.new()
 	rules_wrap.add_theme_stylebox_override("panel", UITheme.flat_style(
-		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_LG, "raised"))
-	rules_wrap.custom_minimum_size = Vector2(Tokens.SUMMARY_COL_MIN + Tokens.SPACE_XL, 0)
-	page.add_child(rules_wrap)
+		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_MD, "raised"))
+	rules_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rules_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	left_col.add_child(rules_wrap)
 
 	var rules := VBoxContainer.new()
-	rules.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	rules.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	rules_wrap.add_child(rules)
 
 	var rules_heading := Label.new()
@@ -705,7 +717,7 @@ func _build_launch_stage() -> Control:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", Tokens.SPACE_MD)
-	grid.add_theme_constant_override("v_separation", Tokens.SPACE_MD)
+	grid.add_theme_constant_override("v_separation", Tokens.SPACE_SM)
 	rules.add_child(grid)
 
 	difficulty_btn = _add_dropdown(grid, "AI Difficulty", DIFFICULTY_LABELS)
@@ -733,23 +745,103 @@ func _build_launch_stage() -> Control:
 
 	var summary_wrap := PanelContainer.new()
 	summary_wrap.add_theme_stylebox_override("panel", UITheme.flat_style(
-		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_LG, "raised"))
-	summary_wrap.custom_minimum_size = Vector2(Tokens.SUMMARY_COL_MIN + Tokens.SPACE_XL, 0)
-	summary_wrap.size_flags_horizontal = Control.SIZE_FILL
-	page.add_child(summary_wrap)
+		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_MD, "raised"))
+	summary_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	summary_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left_col.add_child(summary_wrap)
 
 	var summary := VBoxContainer.new()
-	summary.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	summary.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	summary.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	summary_wrap.add_child(summary)
 
 	var summary_heading := Label.new()
-	summary_heading.text = "DEPLOYMENT ORDER"
+	summary_heading.text = "ECHELON DEPLOYMENT MANIFEST"
 	summary_heading.theme_type_variation = "HeadingLabel"
 	summary.add_child(summary_heading)
 
-	_summary_map = _summary_line(summary, "THEATRE")
-	_summary_rules = _summary_line(summary, "RULES")
-	_summary_roster = _summary_line(summary, "ROSTER")
+	var meta_row := HBoxContainer.new()
+	meta_row.add_theme_constant_override("separation", Tokens.SPACE_LG)
+	summary.add_child(meta_row)
+
+	var map_col := VBoxContainer.new()
+	map_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_summary_map = _summary_line(map_col, "THEATRE")
+	meta_row.add_child(map_col)
+
+	var rules_col := VBoxContainer.new()
+	rules_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_summary_rules = _summary_line(rules_col, "PARAMETERS")
+	meta_row.add_child(rules_col)
+
+	# Manifest table container
+	_summary_roster = PanelContainer.new()
+	_summary_roster.add_theme_stylebox_override("panel", UITheme.flat_style(
+		Tokens.BASE_900, Tokens.BASE_600, Tokens.SPACE_SM, "recessed"))
+	_summary_roster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_summary_roster.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	summary.add_child(_summary_roster)
+
+	var manifest_box := VBoxContainer.new()
+	manifest_box.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	manifest_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	manifest_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_summary_roster.add_child(manifest_box)
+
+	# Column headers
+	var col_hdr := HBoxContainer.new()
+	col_hdr.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	var h_role := Label.new()
+	h_role.text = "ROLE"
+	h_role.custom_minimum_size = Vector2(48, 0)
+	h_role.theme_type_variation = "StatLabel"
+	h_role.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col_hdr.add_child(h_role)
+
+	var h_name := Label.new()
+	h_name.text = "DESIGN NAME"
+	h_name.theme_type_variation = "StatLabel"
+	h_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col_hdr.add_child(h_name)
+
+	var h_cls := Label.new()
+	h_cls.text = "CLASS / ARMOR"
+	h_cls.custom_minimum_size = Vector2(110, 0)
+	h_cls.theme_type_variation = "StatLabel"
+	h_cls.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	col_hdr.add_child(h_cls)
+
+	var h_cost := Label.new()
+	h_cost.text = "COST"
+	h_cost.custom_minimum_size = Vector2(90, 0)
+	h_cost.theme_type_variation = "StatLabel"
+	h_cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	col_hdr.add_child(h_cost)
+	manifest_box.add_child(col_hdr)
+
+	# Scrollable list of units
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	manifest_box.add_child(scroll)
+
+	_manifest_list = VBoxContainer.new()
+	_manifest_list.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	_manifest_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_manifest_list)
+
+	# Total deployment cost footer
+	var footer_panel := PanelContainer.new()
+	footer_panel.add_theme_stylebox_override("panel", UITheme.flat_style(
+		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_XS, "flush"))
+	manifest_box.add_child(footer_panel)
+
+	_manifest_footer = Label.new()
+	_manifest_footer.theme_type_variation = "HUDValueLabel"
+	_manifest_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_manifest_footer.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	footer_panel.add_child(_manifest_footer)
 
 	_summary_note = Label.new()
 	_summary_note.theme_type_variation = "HintLabel"
@@ -779,26 +871,170 @@ func _on_rule_changed(_idx: int) -> void:
 	_refresh_summary()
 
 
+func _format_number(val: int) -> String:
+	var s := str(val)
+	var out := ""
+	var count := 0
+	for i in range(s.length() - 1, -1, -1):
+		if count > 0 and count % 3 == 0:
+			out = "," + out
+		out = s[i] + out
+		count += 1
+	return out
+
+
+func _build_manifest_row(path: String) -> Dictionary:
+	var data: Dictionary = {}
+	if bp_manager != null:
+		data = bp_manager.load_blueprint(path)
+	if data.is_empty() and FileAccess.file_exists(path):
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f != null:
+			var parsed = JSON.parse_string(f.get_as_text())
+			if parsed is Dictionary:
+				data = parsed
+			f.close()
+	if data.is_empty():
+		return {}
+
+	var cost: Vector2i = DesignCostingScript.blueprint_materials(data)
+	var is_def: bool = data.get("is_defensive", false) or data.get("hull_type", "").begins_with("foundation")
+	if roster_picker and roster_picker.is_building_path(path):
+		is_def = true
+	var is_harv: bool = (roster_picker and roster_picker.is_harvester_path(path)) or data.get("is_harvester", false)
+	var is_supp: bool = (roster_picker and roster_picker.is_repair_path(path))
+	var queue: String = DesignCostingScript.queue_for_design(data).to_lower()
+
+	var tag := "MED"
+	var tag_col: Color = Color(0.38, 0.65, 0.85)
+	if is_def:
+		tag = "DEF"
+		tag_col = Tokens.SIGNAL_HAZARD
+	elif is_harv:
+		tag = "HARV"
+		tag_col = Tokens.SIGNAL_GO
+	elif is_supp:
+		tag = "SUPP"
+		tag_col = Tokens.SIGNAL_INFO
+	elif "heavy" in queue:
+		tag = "HVY"
+		tag_col = Color(0.88, 0.48, 0.22)
+	elif "light" in queue:
+		tag = "LGT"
+		tag_col = Color(0.85, 0.82, 0.35)
+
+	var row_panel := PanelContainer.new()
+	row_panel.add_theme_stylebox_override("panel", UITheme.flat_style(
+		Tokens.BASE_800, Tokens.BASE_600, 3, "flush", 1))
+	row_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	row_panel.add_child(row)
+
+	var badge := Label.new()
+	badge.text = "[%s]" % tag
+	badge.custom_minimum_size = Vector2(48, 0)
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.theme_type_variation = "StatLabel"
+	badge.add_theme_color_override("font_color", tag_col)
+	row.add_child(badge)
+
+	var name_lbl := Label.new()
+	var dname: String = str(data.get("name", path.get_file().get_basename()))
+	name_lbl.text = dname
+	name_lbl.theme_type_variation = "HUDValueLabel"
+	name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_lbl.tooltip_text = dname
+	row.add_child(name_lbl)
+
+	var mat_id: String = str(data.get("armor_material", data.get("armor", {}).get("material", "hardened_steel")))
+	var arm_res: int = RosterPickerScript.calculate_armor_resistance(mat_id)
+	var cls_name := "DEFENCE" if is_def else ("HARVESTER" if is_harv else queue.capitalize())
+	var cls_lbl := Label.new()
+	cls_lbl.text = "%s · %d%% Arm" % [cls_name, arm_res]
+	cls_lbl.theme_type_variation = "StatLabel"
+	cls_lbl.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
+	cls_lbl.custom_minimum_size = Vector2(110, 0)
+	cls_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(cls_lbl)
+
+	var cost_lbl := Label.new()
+	var cost_str := ""
+	if cost.y > 0:
+		cost_str = "%sM / %sC" % [_format_number(cost.x), _format_number(cost.y)]
+	else:
+		cost_str = "%sM" % _format_number(cost.x)
+	cost_lbl.text = cost_str
+	cost_lbl.theme_type_variation = "StatLabel"
+	cost_lbl.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+	cost_lbl.custom_minimum_size = Vector2(90, 0)
+	cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(cost_lbl)
+
+	return {
+		"node": row_panel,
+		"metal": cost.x,
+		"crystal": cost.y
+	}
+
+
 func _refresh_summary() -> void:
 	if _summary_map == null:
 		return
 	_summary_map.text = "%s  (%s)" % [MapCatalog.get_map_name(_map_id), _map_id]
-	_summary_rules.text = "%s difficulty  ·  %s bank  ·  AI opponent %s" % [
+	_summary_rules.text = "%s diff · %s bank · AI %s" % [
 		DIFFICULTY_LABELS[difficulty_btn.selected],
 		RESOURCE_LABELS[resources_btn.selected],
 		AI_OPPONENT_LABELS[ai_btn.selected],
 	]
+
+	if _manifest_list != null:
+		for child in _manifest_list.get_children():
+			child.queue_free()
+
+		var paths: Array = roster_picker.ordered_paths() if roster_picker else []
+		var is_autodraft := paths.is_empty()
+		if is_autodraft and bp_manager != null:
+			var listed: Array = bp_manager.list_blueprints(true)
+			for b in listed:
+				var bp_path := str(b.get("path", ""))
+				if bp_path != "":
+					paths.append(bp_path)
+				if paths.size() >= AUTOPICK_LIMIT:
+					break
+
+		var total_metal := 0
+		var total_crystal := 0
+
+		if is_autodraft:
+			var notice := PanelContainer.new()
+			notice.add_theme_stylebox_override("panel", UITheme.flat_style(
+				Color(0.12, 0.16, 0.22), Tokens.BASE_500, 4, "flush"))
+			var n_lbl := Label.new()
+			n_lbl.text = "AUTO-DRAFT ACTIVE — Fielded from standard reserves"
+			n_lbl.theme_type_variation = "HintLabel"
+			n_lbl.add_theme_color_override("font_color", Tokens.SIGNAL_INFO)
+			notice.add_child(n_lbl)
+			_manifest_list.add_child(notice)
+
+		for path in paths:
+			var path_str := str(path)
+			if path_str == "":
+				continue
+			var row_data := _build_manifest_row(path_str)
+			if not row_data.is_empty():
+				_manifest_list.add_child(row_data.node)
+				total_metal += int(row_data.metal)
+				total_crystal += int(row_data.crystal)
+
+		if _manifest_footer != null:
+			_manifest_footer.text = "TOTAL ECHELON DEPLOYMENT COST: %s M / %s C" % [
+				_format_number(total_metal), _format_number(total_crystal)
+			]
+
 	var names: Array = roster_picker.ordered_names() if roster_picker else []
-	var units: int = roster_picker.filled_unit_count() if roster_picker else 0
-	var defences: int = roster_picker.filled_defence_count() if roster_picker else 0
-	if names.is_empty():
-		_summary_roster.text = "AUTO-DRAFT - no design hand-picked, so the match fields your first %d saved designs plus the built-in defaults." % AUTOPICK_LIMIT
-	else:
-		_summary_roster.text = "%d units, %d defences\n%s" % [
-			units, defences, ", ".join(PackedStringArray(names))]
-	# An advisory, not a gate. The director force-adds a fallback harvester to a
-	# roster that cannot mine, so this is worth SAYING and not worth blocking -
-	# the screen must not invent a rule the match does not have.
 	var has_harvester := false
 	if roster_picker:
 		for path in roster_picker.ordered_paths():
@@ -1277,10 +1513,12 @@ class SquadronHeroView extends PanelContainer:
 	var _camera: Camera3D = null
 	var _squadron_root: Node3D = null
 	var _active_paths: Array = []
+	var _is_dragging: bool = false
 
 	func _init() -> void:
 		size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		size_flags_vertical = Control.SIZE_EXPAND_FILL
+		mouse_filter = Control.MOUSE_FILTER_STOP
 		add_theme_stylebox_override("panel", UITheme.flat_style(
 			Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_LG, "raised"))
 
@@ -1308,6 +1546,7 @@ class SquadronHeroView extends PanelContainer:
 
 		var vp_cont := SubViewportContainer.new()
 		vp_cont.stretch = true
+		vp_cont.mouse_filter = Control.MOUSE_FILTER_PASS
 		vp_cont.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		vp_cont.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		box.add_child(vp_cont)
@@ -1349,29 +1588,89 @@ class SquadronHeroView extends PanelContainer:
 		w_env.environment = env
 		_subviewport.add_child(w_env)
 
-		# Ground apron plinth
+		# Outer perimeter kerb collar / foundation ring in hazard amber / dark steel
+		var kerb := MeshInstance3D.new()
+		var kmesh := CylinderMesh.new()
+		kmesh.top_radius = 28.5
+		kmesh.bottom_radius = 29.8
+		kmesh.height = 0.55
+		kerb.mesh = kmesh
+		# Plinth sits 15mm below driving surface (y = 0.0) to prevent co-planar z-fighting
+		kerb.position = Vector3(0.0, -0.29, -2.0)
+		var kmat := StandardMaterial3D.new()
+		kmat.albedo_color = Color(0.35, 0.30, 0.15)
+		kmat.roughness = 0.65
+		kmat.metallic = 0.35
+		kerb.material_override = kmat
+		_subviewport.add_child(kerb)
+
+		# Ground apron plinth - industrial dark asphalt tarmac
 		var apron := MeshInstance3D.new()
 		var amesh := CylinderMesh.new()
 		amesh.top_radius = 28.0
-		amesh.bottom_radius = 29.5
-		amesh.height = 0.5
+		amesh.bottom_radius = 28.3
+		amesh.height = 0.50
 		apron.mesh = amesh
 		apron.position = Vector3(0.0, -0.25, -2.0)
 		var amat := StandardMaterial3D.new()
-		amat.albedo_color = Color(0.20, 0.22, 0.25)
-		amat.roughness = 0.85
-		amat.metallic = 0.1
+		amat.albedo_color = Color(0.14, 0.15, 0.16)
+		amat.roughness = 0.90
+		amat.metallic = 0.05
 		apron.material_override = amat
 		_subviewport.add_child(apron)
 
+		# 4 low-profile perimeter ground floodlights at cardinal points around the plinth rim
+		var beacon_coords: Array[Vector3] = [
+			Vector3(0.0, 0.15, -29.0),   # North
+			Vector3(0.0, 0.15, 25.0),    # South
+			Vector3(27.0, 0.15, -2.0),   # East
+			Vector3(-27.0, 0.15, -2.0),  # West
+		]
+		for bpos in beacon_coords:
+			var b_inst := MeshInstance3D.new()
+			var b_mesh := CylinderMesh.new()
+			b_mesh.top_radius = 0.4
+			b_mesh.bottom_radius = 0.6
+			b_mesh.height = 0.3
+			b_inst.mesh = b_mesh
+			b_inst.position = bpos
+			var b_mat := StandardMaterial3D.new()
+			b_mat.albedo_color = Color(0.2, 0.2, 0.22)
+			b_mat.emission_enabled = true
+			b_mat.emission = Color(1.0, 0.85, 0.5)
+			b_mat.emission_energy_multiplier = 1.5
+			b_inst.material_override = b_mat
+			_subviewport.add_child(b_inst)
+
+			var omni := OmniLight3D.new()
+			omni.position = bpos + Vector3(0.0, 0.25, 0.0)
+			omni.light_color = Color(1.0, 0.90, 0.72)
+			omni.light_energy = 0.8
+			omni.omni_range = 15.0
+			omni.omni_attenuation = 1.2
+			_subviewport.add_child(omni)
+
 		_squadron_root = Node3D.new()
 		_subviewport.add_child(_squadron_root)
+
+	func _process(delta: float) -> void:
+		if _squadron_root != null and not _is_dragging:
+			_squadron_root.rotation.y += delta * 0.05
+
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventMouseButton:
+			if event.button_index == MOUSE_BUTTON_LEFT:
+				_is_dragging = event.pressed
+		elif event is InputEventMouseMotion and _is_dragging:
+			if _squadron_root != null:
+				_squadron_root.rotation.y += event.relative.x * 0.008
 
 	func update_squadron(paths: Array) -> void:
 		if _subviewport == null or _squadron_root == null:
 			return
 		if paths == _active_paths and not _squadron_root.get_children().is_empty():
 			return
+		_squadron_root.rotation.y = 0.0
 		_active_paths = paths.duplicate()
 		for child in _squadron_root.get_children():
 			child.queue_free()

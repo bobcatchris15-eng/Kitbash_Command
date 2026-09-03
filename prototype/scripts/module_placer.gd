@@ -3116,7 +3116,12 @@ func _reclassify_module_after_drag(module: Node3D, normal: Vector3, is_mirror: b
 		return
 	var data = module.get_meta("module_data")
 	var category = data.category
-	if category != "armor" and category != "weapon":
+	# resource_harvester is category "module", not "armor"/"weapon" - it
+	# still needs the facet re-measured after a drag (see the
+	# `elif data.type_id == "resource_harvester":` branch below), or its
+	# mount block keeps the facet_size/position from wherever it was
+	# originally dropped instead of the facet it was just dragged onto.
+	if category != "armor" and category != "weapon" and data.type_id != "resource_harvester":
 		return
 	if not hull:
 		return

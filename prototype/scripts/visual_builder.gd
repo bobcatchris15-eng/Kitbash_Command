@@ -5748,29 +5748,38 @@ static func _build_frustum_block_mesh(w_base: float, h_base: float, w_tip: float
 	var t3 = Vector3(-hw1, depth,  hh1)
 
 	# 4 Tapered Side Quads
+	# Winding reversed from how this read at authoring time: SurfaceTool's
+	# generate_normals() (and therefore Godot's own backface culling, which
+	# uses the same front-face convention) computed the exact inverse of
+	# each face's real outward direction here - confirmed by comparing
+	# generate_normals() output against the geometric (v1-v0)x(v2-v0)
+	# normal for all 12 triangles, which were opposite on every single one.
+	# That is why the block never rendered: every face was being culled as
+	# a back face from outside the block.
+	#
 	# Bottom face (-Z side)
-	st.add_vertex(b0); st.add_vertex(t1); st.add_vertex(b1)
-	st.add_vertex(b0); st.add_vertex(t0); st.add_vertex(t1)
+	st.add_vertex(b0); st.add_vertex(b1); st.add_vertex(t1)
+	st.add_vertex(b0); st.add_vertex(t1); st.add_vertex(t0)
 
 	# Right face (+X side)
-	st.add_vertex(b1); st.add_vertex(t2); st.add_vertex(b2)
-	st.add_vertex(b1); st.add_vertex(t1); st.add_vertex(t2)
+	st.add_vertex(b1); st.add_vertex(b2); st.add_vertex(t2)
+	st.add_vertex(b1); st.add_vertex(t2); st.add_vertex(t1)
 
 	# Top face (+Z side)
-	st.add_vertex(b2); st.add_vertex(t3); st.add_vertex(b3)
-	st.add_vertex(b2); st.add_vertex(t2); st.add_vertex(t3)
+	st.add_vertex(b2); st.add_vertex(b3); st.add_vertex(t3)
+	st.add_vertex(b2); st.add_vertex(t3); st.add_vertex(t2)
 
 	# Left face (-X side)
-	st.add_vertex(b3); st.add_vertex(t0); st.add_vertex(b0)
-	st.add_vertex(b3); st.add_vertex(t3); st.add_vertex(t0)
+	st.add_vertex(b3); st.add_vertex(b0); st.add_vertex(t0)
+	st.add_vertex(b3); st.add_vertex(t0); st.add_vertex(t3)
 
 	# Tip / Front face (at y = depth)
-	st.add_vertex(t0); st.add_vertex(t2); st.add_vertex(t1)
-	st.add_vertex(t0); st.add_vertex(t3); st.add_vertex(t2)
+	st.add_vertex(t0); st.add_vertex(t1); st.add_vertex(t2)
+	st.add_vertex(t0); st.add_vertex(t2); st.add_vertex(t3)
 
 	# Base / Back face (at y = 0)
-	st.add_vertex(b0); st.add_vertex(b1); st.add_vertex(b2)
-	st.add_vertex(b0); st.add_vertex(b2); st.add_vertex(b3)
+	st.add_vertex(b0); st.add_vertex(b2); st.add_vertex(b1)
+	st.add_vertex(b0); st.add_vertex(b3); st.add_vertex(b2)
 
 	st.generate_normals()
 	return st.commit()

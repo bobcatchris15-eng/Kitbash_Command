@@ -1441,6 +1441,7 @@ func _place_weapon(type_id: String, pos: Vector3, normal: Vector3, is_mirror: bo
 
 			new_weapon.position = harvester_pos
 			new_weapon.set_meta("facet_size", Vector2(target_x, target_z))
+			new_weapon.set_meta("facet_outline", facet_meas.get("outline", PackedVector2Array()))
 			new_weapon.set_meta("facet", "front")
 			VisualBuilderScript.build_visual(type_id, new_weapon, catalog_data.get("size", Vector3.ONE), catalog_data.color, tweaks)
 
@@ -3215,6 +3216,7 @@ func _reclassify_module_after_drag(module: Node3D, normal: Vector3, is_mirror: b
 
 		module.position = harvester_pos
 		module.set_meta("facet_size", Vector2(target_x, target_z))
+		module.set_meta("facet_outline", facet_meas.get("outline", PackedVector2Array()))
 		module.set_meta("facet", "front")
 
 		VisualBuilderScript.rebuild_visual(module)

@@ -2140,6 +2140,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		# 1. MEASURE FACET OR READ METADATA
 		var facet_w = 2.0
 		var facet_h = 1.0
+		var facet_outline: PackedVector2Array = PackedVector2Array()
 		if parent_node.has_meta("facet_size"):
 			var fs = parent_node.get_meta("facet_size")
 			if fs is Vector2 and fs.x > 0.1 and fs.y > 0.1:
@@ -2152,24 +2153,55 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				if cshape.shape is BoxShape3D:
 					facet_w = cshape.shape.size.x
 					facet_h = cshape.shape.size.y
+		if parent_node.has_meta("facet_outline"):
+			var fo = parent_node.get_meta("facet_outline")
+			if fo is PackedVector2Array and fo.size() >= 3:
+				facet_outline = fo
 
 		# 2. PROCEDURAL SOLID TAPERED MOUNTING BLOCK
+		# When the facet's actual outline is known (module_placer's
+		# _measure_hull_facet convex hull, in the same (x=bx, z=bz, y=normal)
+		# local frame this block is already built in) the block follows that
+		# shape instead of the facet's bounding rectangle - so a block dropped
+		# on a tapered/angled hull facet reads as that facet's shape, not a
+		# rectangle stretched over its bounding box.
 		var mount_inst = MeshInstance3D.new()
 		mount_inst.name = "HarvesterMountBlock"
 		var w_tip = clampf(0.96 * cutter_scale, 0.6, maxf(facet_w, 0.96 * cutter_scale))
 		var h_tip = clampf(0.96 * cutter_scale, 0.6, maxf(facet_h, 0.96 * cutter_scale))
-		mount_inst.mesh = _build_frustum_block_mesh(facet_w, facet_h, w_tip, h_tip, mount_depth)
+		var block_mesh: ArrayMesh = null
+		if not facet_outline.is_empty():
+			block_mesh = _build_frustum_polygon_mesh(facet_outline, facet_w, facet_h, w_tip, h_tip, mount_depth)
+		if block_mesh == null:
+			block_mesh = _build_frustum_block_mesh(facet_w, facet_h, w_tip, h_tip, mount_depth)
+		mount_inst.mesh = block_mesh
 		mount_inst.material_override = PartMaterialsScript.get_material("painted", base_color.darkened(0.25))
 		parent_node.add_child(mount_inst)
 
-		# Perimeter mounting flange trim at the hull contact base
+		# Perimeter mounting flange trim at the hull contact base - same
+		# outline as the block, slightly inflated, so a non-rectangular block
+		# doesn't sit on a mismatched rectangular collar.
 		var flange_inst = MeshInstance3D.new()
 		flange_inst.name = "HarvesterMountFlange"
-		var f_box = BoxMesh.new()
-		f_box.size = Vector3(facet_w + 0.04, 0.04, facet_h + 0.04)
-		flange_inst.mesh = f_box
+		var flange_mesh: ArrayMesh = null
+		if not facet_outline.is_empty():
+			var inflated: PackedVector2Array = PackedVector2Array()
+			inflated.resize(facet_outline.size())
+			for i in range(facet_outline.size()):
+				inflated[i] = facet_outline[i] * 1.03
+			# No taper here (tip == base) - the flange is a straight-sided
+			# collar, not a frustum; `inflated` already carries the outward
+			# margin on both rings.
+			flange_mesh = _build_frustum_polygon_mesh(inflated, facet_w, facet_h, facet_w, facet_h, 0.04)
+		if flange_mesh != null:
+			flange_inst.mesh = flange_mesh
+			flange_inst.position = Vector3.ZERO
+		else:
+			var f_box = BoxMesh.new()
+			f_box.size = Vector3(facet_w + 0.04, 0.04, facet_h + 0.04)
+			flange_inst.mesh = f_box
+			flange_inst.position = Vector3(0, 0.02, 0)
 		flange_inst.material_override = PartMaterialsScript.get_material("painted", base_color.darkened(0.35))
-		flange_inst.position = Vector3(0, 0.02, 0)
 		parent_node.add_child(flange_inst)
 
 		# 3. TRICONE DRILL HEAD WITH PROTECTIVE CAGE SHROUD (resource_harvester_drill.glb)
@@ -5734,6 +5766,75 @@ static func _build_tapered_blade_mesh(thickness: float, root_chord: float, tip_c
 	st.index()
 	st.generate_normals()
 	return st.commit()
+
+## Facet-shaped counterpart to _build_frustum_block_mesh() below: instead of a
+## rectangle sized to the facet's bounding box, the base ring IS the facet's
+## own convex-hull outline (module_placer._measure_hull_facet's "outline"
+## field, already centred and in the module's local (x=bx, z=bz) tangent
+## plane). The tip ring is that same outline non-uniformly scaled per axis by
+## (w_tip/base_w, h_tip/base_h) - the same taper ratio the rectangular
+## builder applies to its own w_base/w_tip - so a block on a trapezoidal or
+## angled facet still narrows toward the cutter head instead of keeping the
+## full facet footprint all the way out.
+## outline points must be CCW as viewed from +Y (Geometry2D.convex_hull's own
+## winding - see _measure_hull_facet's comment); base_w/base_h are the
+## outline's own bounding-box extents, used only to derive the taper ratio.
+static func _build_frustum_polygon_mesh(outline: PackedVector2Array, base_w: float, base_h: float, tip_w: float, tip_h: float, depth: float) -> ArrayMesh:
+	if outline.size() < 3 or depth <= 0.0:
+		return null
+	var sx: float = (tip_w / base_w) if base_w > 0.001 else 1.0
+	var sz: float = (tip_h / base_h) if base_h > 0.001 else 1.0
+
+	var n := outline.size()
+	var base_pts: Array = []
+	var top_pts: Array = []
+	base_pts.resize(n)
+	top_pts.resize(n)
+	var c := Vector2.ZERO
+	for p in outline:
+		c += p
+	c /= float(n)
+	for i in range(n):
+		var p := outline[i]
+		base_pts[i] = Vector3(p.x, 0.0, p.y)
+		top_pts[i] = Vector3(p.x * sx, depth, p.y * sz)
+	var c_base := Vector3(c.x, 0.0, c.y)
+	var c_top := Vector3(c.x * sx, depth, c.y * sz)
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	# Base / back face (fan facing -Y, reversed winding - same convention as
+	# _build_facet_polygon_mesh's underside fan in module_placer.gd).
+	for i in range(n):
+		var p: Vector3 = base_pts[i]
+		var p_next: Vector3 = base_pts[(i + 1) % n]
+		st.add_vertex(c_base); st.add_vertex(p_next); st.add_vertex(p)
+
+	# Tip / front face (fan facing +Y).
+	for i in range(n):
+		var p: Vector3 = top_pts[i]
+		var p_next: Vector3 = top_pts[(i + 1) % n]
+		st.add_vertex(c_top); st.add_vertex(p); st.add_vertex(p_next)
+
+	# Tapered side quads - same winding rule _build_frustum_block_mesh uses
+	# for its rectangular case, (p_i, p_next, t_next)/(p_i, t_next, t_i),
+	# which generalizes directly to any CCW-from-+Y polygon.
+	for i in range(n):
+		var b_i: Vector3 = base_pts[i]
+		var b_next: Vector3 = base_pts[(i + 1) % n]
+		var t_i: Vector3 = top_pts[i]
+		var t_next: Vector3 = top_pts[(i + 1) % n]
+		st.add_vertex(b_i); st.add_vertex(b_next); st.add_vertex(t_next)
+		st.add_vertex(b_i); st.add_vertex(t_next); st.add_vertex(t_i)
+
+	# See _build_frustum_block_mesh()'s comment: an unindexed SurfaceTool
+	# mesh sharing a material with an indexed sibling silently loses its
+	# geometry when bake_module_visual() merges them.
+	st.index()
+	st.generate_normals()
+	return st.commit()
+
 
 ## Procedural solid tapered block mesh (frustum/prism) for front facet mounting hardware.
 ## Snaps to front facet (w_base, h_base) at y=0 and tapers forward to (w_tip, h_tip) at y=depth.

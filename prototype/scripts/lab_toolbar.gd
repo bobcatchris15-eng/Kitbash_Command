@@ -714,9 +714,8 @@ func _populate_compare_menu() -> void:
 
 func _on_compare_item_focused(id: int) -> void:
 	if id < 0 or id >= _compare_blueprint_list.size(): return
-	var root = lab.get_node_or_null("/root/MainLab")
-	if not root or not root.telemetry_rail: return
-	
+	if not lab: return
+
 	var bp_path = _compare_blueprint_list[id].get("path", "")
 	if bp_path == "":
 		bp_path = "user://blueprints/" + _compare_blueprint_list[id]["id"] + ".json"
@@ -743,15 +742,14 @@ func _on_compare_item_focused(id: int) -> void:
 			# missing power/drivetrain since we don't have a live hull
 			# this will just fallback to not showing diffs for those
 		}
-		root.telemetry_rail.compare_against_blueprint(bp_stats)
+		lab.compare_against_blueprint(bp_stats)
 
 func _on_compare_item_pressed(id: int) -> void:
 	_on_compare_item_focused(id)
-	
+
 func _on_compare_popup_hidden() -> void:
-	var root = lab.get_node_or_null("/root/MainLab")
-	if root and root.telemetry_rail:
-		root.telemetry_rail.clear_comparison()
+	if lab:
+		lab.clear_comparison()
 
 func _toolbar_button(parent: Container, label: String, icon_name: String, cb: Callable) -> Button:
 	var b = Button.new()

@@ -1,6 +1,5 @@
 class_name LabDocument
 extends Control
-var telemetry_rail
 var lab_toolbar
 var tweak_callout_manager
 
@@ -20,6 +19,13 @@ const UIFlyoutScript = preload("res://scripts/ui_flyout.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const DesignVerdictScript = preload("res://scripts/design_verdict.gd")
 const ResourceCatalogScript = preload("res://scripts/battle/economy/resource_catalog.gd")
+const DamageResolverScript = preload("res://scripts/damage_resolver.gd")
+const DesignStatsScript = preload("res://scripts/design_stats.gd")
+
+# Folded in from the deleted telemetry_rail.gd - baseline/preview stat cache.
+var _base_stats: Dictionary = {}
+var _previewing: bool = false
+var _cached_hull: Node3D = null
 
 # --- Rail structure (VISUAL/UI plan item 7) ---------------------------------
 # The rail used to be a bare anchored `Panel` in UI_StatBlock.tscn carrying an
@@ -63,6 +69,7 @@ var combat_power_label: Label = null
 var combat_weight_label: Label = null
 var combat_role_label: Label = null
 var combat_parts_label: Label = null
+var combat_armor_label: Label = null
 
 var build_cost_label: Label = null
 var build_materials_label: Label = null
@@ -512,7 +519,6 @@ func _ready():
 	# is built at the END of _ready() - see the call there for why the order
 	# matters.
 	_rail_vbox = $ScrollContainer/VBoxContainer
-	telemetry_rail = preload("res://scripts/telemetry_rail.gd").new(self)
 	lab_toolbar = preload("res://scripts/lab_toolbar.gd").new(self)
 	tweak_callout_manager = preload("res://scripts/tweak_callout_manager.gd").new(self)
 	
@@ -923,8 +929,8 @@ func _build_stats_dock() -> void:
 	overweight_alert_placard.anchor_top = 1.0
 	overweight_alert_placard.anchor_right = 0.5
 	overweight_alert_placard.anchor_bottom = 1.0
-	overweight_alert_placard.offset_left = -115.0
-	overweight_alert_placard.offset_right = 185.0
+	overweight_alert_placard.offset_left = -255.0
+	overweight_alert_placard.offset_right = 45.0
 	overweight_alert_placard.offset_top = -248.0
 	overweight_alert_placard.offset_bottom = -164.0
 	var over_style = _create_beveled_box(Color(0.14, 0.07, 0.07, 0.98), Color(0.92, 0.28, 0.22, 0.95), 4, 6)
@@ -949,6 +955,7 @@ func _build_stats_dock() -> void:
 
 	overweight_detail_label = Label.new()
 	overweight_detail_label.theme_type_variation = "HintLabel"
+	overweight_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	overweight_detail_label.text = "Speed cut by 0.0 m/s (Chassis Overloaded)"
 	ov_vbox.add_child(overweight_detail_label)
 
@@ -959,8 +966,8 @@ func _build_stats_dock() -> void:
 	power_alert_placard.anchor_top = 1.0
 	power_alert_placard.anchor_right = 0.5
 	power_alert_placard.anchor_bottom = 1.0
-	power_alert_placard.offset_left = 195.0
-	power_alert_placard.offset_right = 475.0
+	power_alert_placard.offset_left = 55.0
+	power_alert_placard.offset_right = 335.0
 	power_alert_placard.offset_top = -248.0
 	power_alert_placard.offset_bottom = -164.0
 	var pwr_style = _create_beveled_box(Color(0.14, 0.11, 0.06, 0.98), Color(0.96, 0.68, 0.18, 0.95), 4, 6)
@@ -985,6 +992,7 @@ func _build_stats_dock() -> void:
 
 	power_detail_label = Label.new()
 	power_detail_label.theme_type_variation = "HintLabel"
+	power_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	power_detail_label.text = "Energy systems offline / brownout"
 	pw_vbox.add_child(power_detail_label)
 
@@ -995,8 +1003,8 @@ func _build_stats_dock() -> void:
 	vision_alert_placard.anchor_top = 1.0
 	vision_alert_placard.anchor_right = 0.5
 	vision_alert_placard.anchor_bottom = 1.0
-	vision_alert_placard.offset_left = 485.0
-	vision_alert_placard.offset_right = 765.0
+	vision_alert_placard.offset_left = 345.0
+	vision_alert_placard.offset_right = 625.0
 	vision_alert_placard.offset_top = -248.0
 	vision_alert_placard.offset_bottom = -164.0
 	var vis_style = _create_beveled_box(Color(0.09, 0.11, 0.14, 0.98), Color(0.38, 0.56, 0.72, 0.95), 4, 6)
@@ -1021,6 +1029,7 @@ func _build_stats_dock() -> void:
 
 	vision_detail_label = Label.new()
 	vision_detail_label.theme_type_variation = "HintLabel"
+	vision_detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vision_detail_label.text = "Every weapon's reach fits inside this design's own vision."
 	vs_vbox.add_child(vision_detail_label)
 
@@ -1207,6 +1216,13 @@ func _build_stats_dock() -> void:
 	combat_parts_label.theme_type_variation = "StatLabel"
 	combat_parts_label.text = "Modules: 0 Mounted"
 	sub_row.add_child(combat_parts_label)
+
+	# Armor resistance readout (material + per-damage-type %, mirrors telemetry_rail.gd)
+	combat_armor_label = Label.new()
+	combat_armor_label.theme_type_variation = "StatLabel"
+	combat_armor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	combat_armor_label.text = "Plating: Hardened Steel [K:0% T:0% X:0% E:0%]"
+	c2_vbox.add_child(combat_armor_label)
 
 	# =========================================================================
 	# CLUSTER 3: BUILD GROUP (Width: 210px)
@@ -1435,6 +1451,52 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 	if combat_role_label:
 		combat_role_label.text = "Role: %s" % role_str
 
+	# Armor resistance readout - mirrors telemetry_rail.gd's armor_plan read
+	if combat_armor_label:
+		var armor_material := "hardened_steel"
+		var armor_thickness := 1.0
+		if hull:
+			var plan: Dictionary = hull.get_meta("armor_plan", {})
+			if not plan.is_empty() and not bool(plan.get("empty", true)):
+				var sides: Dictionary = plan.get("sides", {})
+				var best_mat := ""
+				var best_weight := 0.0
+				var thick_weighted_sum := 0.0
+				var thick_weight_total := 0.0
+				for side_key in sides.keys():
+					var side_data: Dictionary = sides[side_key]
+					var mat = side_data.get("material", "")
+					var thick = float(side_data.get("mean_thickness", 0.0))
+					var coverage = float(side_data.get("coverage", 0.0))
+					var area = float(side_data.get("area", 0.0))
+					if coverage <= 0.001 or area <= 0.0 or mat == "":
+						continue
+					var w = coverage * area
+					if w > best_weight:
+						best_weight = w
+						best_mat = mat
+					thick_weighted_sum += w * thick
+					thick_weight_total += w
+				if best_mat != "":
+					armor_material = best_mat
+				if thick_weight_total > 0.0:
+					armor_thickness = thick_weighted_sum / thick_weight_total
+			if armor_material == "hardened_steel" and hull.has_meta("armor_material"):
+				armor_material = hull.get_meta("armor_material")
+			if armor_thickness == 1.0 and hull.has_meta("armor_thickness"):
+				armor_thickness = hull.get_meta("armor_thickness")
+
+		var k_pair = DamageResolverScript.get_material_threshold(armor_material, "kinetic", armor_thickness)
+		var t_pair = DamageResolverScript.get_material_threshold(armor_material, "thermal", armor_thickness)
+		var x_pair = DamageResolverScript.get_material_threshold(armor_material, "explosive", armor_thickness)
+		var e_pair = DamageResolverScript.get_material_threshold(armor_material, "energy", armor_thickness)
+		var k_resist = (1.0 - k_pair.y) * 100.0
+		var t_resist = (1.0 - t_pair.y) * 100.0
+		var x_resist = (1.0 - x_pair.y) * 100.0
+		var e_resist = (1.0 - e_pair.y) * 100.0
+		combat_armor_label.text = "Plating: %s [K:%.0f%% T:%.0f%% X:%.0f%% E:%.0f%%]" % [
+			armor_material.replace("_", " ").capitalize(), k_resist, t_resist, x_resist, e_resist]
+
 	# --- Drive Sliding Overweight Placard ---
 	if overweight_alert_placard:
 		var lost_spd = float(dt.get("speed_lost_to_overload", 0.0))
@@ -1443,13 +1505,14 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 		if overweight_detail_label:
 			overweight_detail_label.text = "-%.1f m/s Speed Penalty (Chassis Overloaded)" % lost_spd if lost_spd > 0 else "Chassis capacity exceeded"
 
-		var target_top = -308.0 if is_over else -248.0
+		var target_top = -384.0 if is_over else -248.0
+		var target_height = 140.0 if is_over else 84.0
 		if overweight_alert_placard.offset_top != target_top:
 			if overweight_tween and overweight_tween.is_valid():
 				overweight_tween.kill()
 			overweight_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 			overweight_tween.tween_property(overweight_alert_placard, "offset_top", target_top, 0.3)
-			overweight_tween.parallel().tween_property(overweight_alert_placard, "offset_bottom", target_top + 84.0, 0.3)
+			overweight_tween.parallel().tween_property(overweight_alert_placard, "offset_bottom", target_top + target_height, 0.3)
 
 		# Ghost opacity when condition is false
 		if is_over:
@@ -1488,13 +1551,14 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 			else:
 				power_detail_label.text = "Energy systems offline - fit generator" if (active_draw > 0.0 and gen <= 0.0) else "Shortfall by %.1f kW (Brownout risk)" % (active_draw - gen)
 
-		var target_top = -308.0 if is_power_alert else -248.0
+		var target_top = -384.0 if is_power_alert else -248.0
+		var target_height = 140.0 if is_power_alert else 84.0
 		if power_alert_placard.offset_top != target_top:
 			if power_tween and power_tween.is_valid():
 				power_tween.kill()
 			power_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 			power_tween.tween_property(power_alert_placard, "offset_top", target_top, 0.3)
-			power_tween.parallel().tween_property(power_alert_placard, "offset_bottom", target_top + 84.0, 0.3)
+			power_tween.parallel().tween_property(power_alert_placard, "offset_bottom", target_top + target_height, 0.3)
 
 		# Ghost opacity when condition is false
 		if is_power_alert:
@@ -1539,13 +1603,14 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 				vision_detail_label.text = "Every weapon's reach fits inside this design's own vision."
 
 		var is_vision_alert = has_weapons and (required.size() > 0 or assisted.size() > 0)
-		var target_top = -308.0 if is_vision_alert else -248.0
+		var target_top = -384.0 if is_vision_alert else -248.0
+		var target_height = 140.0 if is_vision_alert else 84.0
 		if vision_alert_placard.offset_top != target_top:
 			if vision_tween and vision_tween.is_valid():
 				vision_tween.kill()
 			vision_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 			vision_tween.tween_property(vision_alert_placard, "offset_top", target_top, 0.3)
-			vision_tween.parallel().tween_property(vision_alert_placard, "offset_bottom", target_top + 84.0, 0.3)
+			vision_tween.parallel().tween_property(vision_alert_placard, "offset_bottom", target_top + target_height, 0.3)
 
 		# Ghost opacity when condition is false
 		if is_vision_alert:
@@ -1769,7 +1834,7 @@ func _on_part_hovered(type_id: String) -> void:
 					child.visible = false
 					hidden_locomotion.append(child)
 					
-	telemetry_rail.update_preview_stats(ghost, mirror)
+	update_preview_stats(ghost, mirror)
 	
 	# Restore hidden locomotion
 	for child in hidden_locomotion:
@@ -1782,7 +1847,7 @@ func _on_part_hovered(type_id: String) -> void:
 		mirror.queue_free()
 
 func _on_part_unhovered() -> void:
-	telemetry_rail.clear_preview()
+	clear_preview()
 
 
 # Routed through SceneRouter so leaving this screen fades out rather than cutting.
@@ -1790,7 +1855,64 @@ func _on_part_unhovered() -> void:
 # pattern the other router call sites in this file already use - a scene
 # instantiated outside the running game (a test fixture) has no autoloads.
 
-func update_stats(hull: Node3D): telemetry_rail.update_stats(hull)
+func update_stats(hull: Node3D) -> void:
+	# Folded in from the deleted telemetry_rail.gd.
+	_cached_hull = hull
+	if not hull:
+		_base_stats = {}
+		update_stats_display({}, null)
+		return
+	var stats: Dictionary = DesignStatsScript.analyze(hull)
+	_base_stats = stats
+	_previewing = false
+	update_stats_display(stats, hull)
+	_update_toolbar_info(hull, stats)
+
+func update_preview_stats(ghost_mesh: Node3D, mirror_mesh: Node3D = null) -> void:
+	if not _cached_hull or _base_stats.is_empty():
+		return
+	var old_parent_1 = ghost_mesh.get_parent()
+	if old_parent_1:
+		old_parent_1.remove_child(ghost_mesh)
+	_cached_hull.add_child(ghost_mesh)
+	var old_parent_2 = null
+	if mirror_mesh:
+		old_parent_2 = mirror_mesh.get_parent()
+		if old_parent_2:
+			old_parent_2.remove_child(mirror_mesh)
+		_cached_hull.add_child(mirror_mesh)
+	var preview_stats = DesignStatsScript.analyze(_cached_hull)
+	_cached_hull.remove_child(ghost_mesh)
+	if old_parent_1:
+		old_parent_1.add_child(ghost_mesh)
+	if mirror_mesh:
+		_cached_hull.remove_child(mirror_mesh)
+		if old_parent_2:
+			old_parent_2.add_child(mirror_mesh)
+	_previewing = true
+	update_stats_display(preview_stats, _cached_hull)
+	_update_toolbar_info(_cached_hull, preview_stats)
+
+func compare_against_blueprint(bp_stats: Dictionary) -> void:
+	if _base_stats.is_empty():
+		return
+	_previewing = true
+	# bp_stats is accepted for API parity with the old telemetry_rail.gd call,
+	# but has no live consumer: update_stats_display() only renders absolute
+	# values, never a delta against a baseline. Wire it in if delta
+	# highlighting is ever added to the live console.
+	update_stats_display(_base_stats, _cached_hull)
+	_update_toolbar_info(_cached_hull, _base_stats)
+
+func clear_preview() -> void:
+	if _previewing and _cached_hull:
+		_previewing = false
+		update_stats_display(_base_stats, _cached_hull)
+		_update_toolbar_info(_cached_hull, _base_stats)
+
+func clear_comparison() -> void:
+	clear_preview()
+
 func _push_undo(): lab_toolbar._push_undo()
 func _on_delete_pressed(): lab_toolbar._on_delete_pressed()
 func _on_save_pressed(): lab_toolbar._on_save_pressed()

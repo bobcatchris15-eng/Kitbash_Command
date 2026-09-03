@@ -362,8 +362,8 @@ func _update_ghost_mesh(screen_pos: Vector2, type_id: String):
 			_apply_ghost_materials_recursive(ghost_mesh_mirror, _get_foggy_part_material())
 			
 	var lab_doc = root.get_node_or_null("LabDocument")
-	if lab_doc and lab_doc.telemetry_rail:
-		lab_doc.telemetry_rail.update_preview_stats(ghost_mesh, ghost_mesh_mirror)
+	if lab_doc:
+		lab_doc.update_preview_stats(ghost_mesh, ghost_mesh_mirror)
 
 func catalog_data_for(type_id: String) -> Dictionary:
 	return ModuleCatalog.get_module_data(type_id)
@@ -434,8 +434,8 @@ func _destroy_ghost_mesh():
 		var root = get_node_or_null("/root/MainLab")
 		if root:
 			var lab_doc = root.get_node_or_null("LabDocument")
-			if lab_doc and lab_doc.telemetry_rail:
-				lab_doc.telemetry_rail.clear_preview()
+			if lab_doc:
+				lab_doc.clear_preview()
 
 func _raycast_from_screen(screen_pos: Vector2):
 	var camera = get_viewport().get_camera_3d()

@@ -937,41 +937,41 @@ func _animate_locomotion(delta: float) -> void:
 				for fan in child.find_children(VisualBuilderScript.SPIN_PIVOT_TURBINE + "*", "Node3D", true, false):
 					fan.rotate_z(24.0 * powered_rate * delta)
 			"helicopter_rotors":
-				var rotor = child.get_node_or_null("RotorBlades")
+				var rotor = child.get_node_or_null(VisualBuilderScript.PIVOT_ROTOR_BLADES)
 				if rotor:
 					rotor.rotate_y(15.0 * powered_rate * delta)
 			"ornithopter_wing":
 				var t = now_sec * 16.0 * powered_rate
-				var fore = child.get_node_or_null("WingPivotFore")
+				var fore = child.get_node_or_null(VisualBuilderScript.PIVOT_WING_FORE)
 				if fore:
 					fore.rotation.x = sin(t) * 0.65
 					fore.rotation.z = sin(t) * 0.7
-				var hind = child.get_node_or_null("WingPivotHind")
+				var hind = child.get_node_or_null(VisualBuilderScript.PIVOT_WING_HIND)
 				if hind:
 					hind.rotation.x = -sin(t) * 0.65
 					hind.rotation.z = -sin(t) * 0.7
 			"hover_engine":
-				var mid_ring = child.get_node_or_null("HoverRingMid")
+				var mid_ring = child.get_node_or_null(VisualBuilderScript.HOVER_RING_MID)
 				if mid_ring:
 					mid_ring.rotate_x(12.0 * powered_rate * delta)
-				var inner_ring = child.get_node_or_null("HoverRingInner")
+				var inner_ring = child.get_node_or_null(VisualBuilderScript.HOVER_RING_INNER)
 				if inner_ring:
 					inner_ring.rotate_y(18.0 * powered_rate * delta)
 			"plasma_thruster":
 				# PlasmaRing is nested under PodRoot, not a direct child - a
 				# direct-child get_node_or_null() always misses it.
-				var ring = child.find_child("PlasmaRing", true, false)
+				var ring = child.find_child(VisualBuilderScript.PIVOT_PLASMA_RING, true, false)
 				if ring:
 					ring.rotate_z(18.0 * powered_rate * delta)
 			"legs":
 				var phase: float = child.get_meta("leg_phase") if child.has_meta("leg_phase") else 0.0
 				VisualBuilderScript.pose_leg(child, now_sec, phase, ground_rate, delta)
 			"screw_drive":
-				var spin = child.get_node_or_null("ScrewSpin")
+				var spin = child.get_node_or_null(VisualBuilderScript.PIVOT_SCREW_SPIN)
 				if spin:
 					spin.rotate_z(6.0 * ground_rate * dir * delta)
 			"propeller_prop", "pusher_prop", "naval_propeller", "ship_screw", "paddle_wheel", "buoyant_envelope":
-				var prop = child.get_node_or_null("PropBlades")
+				var prop = child.get_node_or_null(VisualBuilderScript.PIVOT_PROP_BLADES)
 				if prop:
 					if child_type_id == "paddle_wheel":
 						prop.rotate_x(10.0 * powered_rate * delta)

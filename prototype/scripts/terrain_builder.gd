@@ -6172,6 +6172,36 @@ static func apply_building_pad_flattening(map_def: Dictionary, ground_node: Node
 				arr_mesh.clear_surfaces()
 				arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
+	# 1.5. Deform and suppress visual GrassShells meshes within pad footprint
+	var grass_shells_node: Node3D = ground_node.get_node_or_null("GrassShells") as Node3D
+	if grass_shells_node != null:
+		var pad_rad_sq: float = (maxf(half_extents.x, half_extents.y) + 1.2) * (maxf(half_extents.x, half_extents.y) + 1.2)
+		for child in grass_shells_node.get_children():
+			if child is MultiMeshInstance3D and child.multimesh != null and child.multimesh.mesh is ArrayMesh:
+				var gmesh: ArrayMesh = child.multimesh.mesh as ArrayMesh
+				if gmesh.get_surface_count() > 0:
+					var garrays: Array = gmesh.surface_get_arrays(0)
+					var gverts: PackedVector3Array = garrays[Mesh.ARRAY_VERTEX]
+					var gcols: PackedColorArray = garrays[Mesh.ARRAY_COLOR]
+					var gupdated := false
+					for i in range(gverts.size()):
+						var gv: Vector3 = gverts[i]
+						var gd2: float = (gv.x - center.x) * (gv.x - center.x) + (gv.z - center.z) * (gv.z - center.z)
+						if gd2 <= max_rad_sq:
+							var new_gy := height_at(map_def, gv.x, gv.z)
+							if absf(gv.y - new_gy) > 0.001:
+								gv.y = new_gy
+								gverts[i] = gv
+								gupdated = true
+						if gd2 <= pad_rad_sq and gcols.size() > i and gcols[i].r > 0.0:
+							gcols[i].r = 0.0
+							gupdated = true
+					if gupdated:
+						garrays[Mesh.ARRAY_VERTEX] = gverts
+						garrays[Mesh.ARRAY_COLOR] = gcols
+						gmesh.clear_surfaces()
+						gmesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, garrays)
+
 	# 2. Deform physics collision HeightMapShape3D
 	var col_shape_node: CollisionShape3D = ground_node.get_node_or_null("CollisionShape3D") as CollisionShape3D
 	if col_shape_node != null and col_shape_node.shape is HeightMapShape3D:

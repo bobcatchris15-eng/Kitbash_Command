@@ -20,6 +20,12 @@ const Tokens = preload("res://scripts/ui_tokens.gd")
 const UIAnimScript = preload("res://scripts/ui_anim.gd")
 const BlueprintThumbnailScript = preload("res://scripts/blueprint_thumbnail.gd")
 const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
+const DamageResolverScript = preload("res://scripts/damage_resolver.gd")
+const DesignCostingScript = preload("res://scripts/battle/economy/design_costing.gd")
+const ModuleCatalog = preload("res://scripts/module_catalog.gd")
+
+static var _thumbnail_cache: Dictionary = {}
+static var _stats_cache: Dictionary = {}
 
 # The drag payload's type tag. Namespaced because _can_drop_data() is called for
 # EVERY drag that passes over a slot, including part drags from the Design Lab if
@@ -187,7 +193,7 @@ const SLOT_SIZE = Vector2(104, 132)
 # Library card height. Tall enough for thumbnail + wrapped name + four-line spec
 # block. Kept at 240 so two library strips (combat + harvester) plus the slot
 # grid all fit on a 900px viewport without scrolling the parent VBoxContainer.
-const CARD_SIZE = Vector2(168, 240)
+const CARD_SIZE = Vector2(176, 268)
 # Tall enough for the thumbnail plus a wrapped name plus a four-line spec block.
 # The first version was 120x104 and forced the name to a single ellipsised line,
 # which is the worst thing to truncate on a card whose whole job is telling two
@@ -196,22 +202,13 @@ const CARD_SIZE = Vector2(168, 240)
 # WIDTH is set by the padding, not by the text. CardPanel's content margins are
 # SPACE_XL horizontal (32 a side, so 64 total), which left a 136px card with only
 # 72px of usable width - not enough for a padded monospace line like "HP     420"
-# at FONT_SMALL. 168 gives ~104px of content.
+# at FONT_SMALL. 176 gives ~112px of content.
 #
 # HEIGHT is a floor, not a cap: the VBox sizes to its content, so this only has to
 # be large enough that the ScrollContainer below does not clip a card whose name
-# wrapped to three lines. thumbnail 78 + wrapped name ~34 + four stat lines ~64 +
-# separations 12 + 40 of vertical padding is ~228, so 248 leaves headroom.
-# Grown twice as stat_line() gained rows: 248 -> 268 for HARVESTER, 268 -> 288
-# for PWR. The worst case is now six lines (HP, Speed, DPS, Range, HARVESTER,
-# PWR) where it was four.
-#
-# This has to track, because the card's height is a custom_minimum_size inside a
-# scroll whose viewport is reserved from this same constant - a card that
-# outgrew it would not scroll, it would clip the extra row off the bottom,
-# hiding exactly the line that was added to be noticed. 20px per row is one 13px
-# monospace line plus its leading.
-const CARD_THUMB_H = 78
+# wrapped to three lines. thumbnail 92 + wrapped name ~34 + four stat lines ~68 +
+# separations 12 + 40 of vertical padding is ~246, so 268 leaves plenty of headroom.
+const CARD_THUMB_H = 92
 # The drag ghost stays compact deliberately - it is not a card, it is a token of
 # one. A full spec block following the cursor obscures the wells it is about to
 # land in, and the player has already read the stats before starting the drag.
@@ -319,10 +316,25 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 	col.size_flags_stretch_ratio = stretch
 	col.add_theme_constant_override("separation", Tokens.SPACE_XS)
 
+	var hdr := HBoxContainer.new()
+	hdr.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	col.add_child(hdr)
+
 	var heading := Label.new()
 	heading.text = heading_text
 	heading.theme_type_variation = "HeadingLabel"
-	col.add_child(heading)
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hdr.add_child(heading)
+
+	var sort_btn := OptionButton.new()
+	sort_btn.add_item("Sort: Name")
+	sort_btn.add_item("Sort: Tier")
+	sort_btn.add_item("Sort: HP")
+	sort_btn.add_item("Sort: Speed")
+	sort_btn.add_item("Sort: DPS")
+	sort_btn.add_item("Sort: Cost")
+	sort_btn.theme_type_variation = "StatLabel"
+	hdr.add_child(sort_btn)
 
 	var picked := []
 	for entry in entries:
@@ -337,9 +349,7 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 		col.add_child(hint)
 		return col
 
-	# Tray surface behind the strip. Without it the cards float on the page
-	# background and the column has no readable extent - which is half of why
-	# the screen read as one flat dark sheet.
+	# Tray surface behind the strip.
 	var tray := PanelContainer.new()
 	tray.add_theme_stylebox_override("panel", surface_style(
 		Color(0, 0, 0, 0), SURFACE_TRAY, SURFACE_EDGE.darkened(0.45), 6))
@@ -356,16 +366,12 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 	row.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	scroll.add_child(row)
 
+	sort_btn.item_selected.connect(func(idx: int): _sort_cards(row, idx))
+
 	for entry in picked:
 		var card := RosterCard.new()
 		card.configure(entry, _data_by_path.get(str(entry.get("path", "")), {}))
 		card.bind_picker(self)
-		# EXPAND_FILL, so every card in the row takes the row's full height
-		# rather than each shrinking to its own content. Without this a design
-		# whose spec block has an extra line (harvesters carry a HARVESTER
-		# rating, unarmed ones lose the DPS/Range pair) makes a card of a
-		# different height, and the strip reads as ragged - which is exactly
-		# how the units and harvesters columns came out.
 		card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		row.add_child(card)
 
@@ -374,6 +380,36 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 		"building": _building_row = row
 		_: _library_row = row
 	return col
+
+
+func _sort_cards(row: HBoxContainer, criteria: int) -> void:
+	if not is_instance_valid(row):
+		return
+	var cards: Array = []
+	for child in row.get_children():
+		if child is RosterCard:
+			cards.append(child)
+	match criteria:
+		0: # Name (A-Z)
+			cards.sort_custom(func(a, b): return a.entry_name < b.entry_name)
+		1: # Tier
+			var get_tier = func(c):
+				var q = str(c.stats.get("factory_queue", "")).to_lower()
+				if "light" in q: return 1
+				if "med" in q: return 2
+				if "heavy" in q: return 3
+				return 4
+			cards.sort_custom(func(a, b): return get_tier.call(a) < get_tier.call(b))
+		2: # HP (highest first)
+			cards.sort_custom(func(a, b): return float(a.stats.get("hull_hp", 0.0)) > float(b.stats.get("hull_hp", 0.0)))
+		3: # Speed (fastest first)
+			cards.sort_custom(func(a, b): return float(a.stats.get("move_speed", 0.0)) > float(b.stats.get("move_speed", 0.0)))
+		4: # DPS (highest first)
+			cards.sort_custom(func(a, b): return float(a.stats.get("dps", 0.0)) > float(b.stats.get("dps", 0.0)))
+		5: # Cost (cheapest first)
+			cards.sort_custom(func(a, b): return int(a.stats.get("cost_metal", 0)) < int(b.stats.get("cost_metal", 0)))
+	for card in cards:
+		row.move_child(card, -1)
 
 
 # THE one place an entry's library is decided. Defensive is tested FIRST: a
@@ -502,32 +538,48 @@ func _animate_library_entrance() -> void:
 
 
 func _bake_thumbnails(entries: Array) -> void:
+	if not is_inside_tree():
+		await tree_entered
 	for entry in entries:
 		var path := str(entry.get("path", ""))
 		if path == "":
 			continue
-		# Reuses the documents loaded in setup() rather than re-parsing.
+
+		# Check static cache first
+		if _thumbnail_cache.has(path):
+			var cached_tex = _thumbnail_cache[path]
+			var cached_stats: Dictionary = _stats_cache.get(path, {})
+			for card in _cards():
+				if card.entry_path == path:
+					if cached_tex != null:
+						card.set_thumbnail(cached_tex)
+					if not cached_stats.is_empty():
+						card.set_stats(cached_stats)
+			if cached_tex != null:
+				for slot in _all_slots():
+					if slot.entry_path == path:
+						slot.refresh_thumbnail(cached_tex)
+			continue
+
 		var data: Dictionary = _data_by_path.get(path, {})
 		if data.is_empty():
 			continue
 		var tex: ImageTexture = await _baker.bake(data)
-		# Read immediately after the await: the baker holds only the LAST bake's
-		# stats, so they must be taken before the next loop iteration overwrites
-		# them.
 		var stats: Dictionary = _baker.last_stats.duplicate()
-		# The screen may have been left while a bake was in flight.
+		if tex != null:
+			_thumbnail_cache[path] = tex
+		if not stats.is_empty():
+			_stats_cache[path] = stats
+
 		if not is_inside_tree():
-			return
-		# Stats are published even when the render failed - a missing picture is no
-		# reason to withhold working numbers.
+			await tree_entered
+
 		for card in _cards():
 			if card.entry_path == path:
 				if tex != null:
 					card.set_thumbnail(tex)
 				card.set_stats(stats)
 		if tex != null:
-			# Both grids: a defence pre-filled by fill_from() sits in the
-			# building grid and would otherwise keep a blank thumbnail forever.
 			for slot in _all_slots():
 				if slot.entry_path == path:
 					slot.refresh_thumbnail(tex)
@@ -748,26 +800,23 @@ class RosterCard extends PanelContainer:
 	var _spec: Label = null
 	var variant: String = "unit"
 	var _picker: RosterPicker = null
+	var _entry: Dictionary = {}
+	var _data: Dictionary = {}
+	var stats: Dictionary = {}
 
 	func configure(entry: Dictionary, data: Dictionary) -> void:
+		_entry = entry
+		_data = data
 		entry_path = str(entry.get("path", ""))
 		entry_name = str(entry.get("name", "Untitled"))
 		theme_type_variation = "CardPanel"
 		custom_minimum_size = RosterPicker.CARD_SIZE
 		mouse_filter = Control.MOUSE_FILTER_PASS
-		# CLICK-TO-ASSIGN is the primary gesture now; drag is the deliberate
-		# one. Filling twelve wells by drag alone was the thing being fixed -
-		# twelve press-move-release gestures to express "field these".
 		tooltip_text = "%s\nClick to field in the next free slot. Drag to place it deliberately." % entry_name
 
-		# Category tint: harvesters green, defences amber, repair units blue.
-		# Applied as a StyleBoxFlat background override so the tint is visible
-		# behind the thumbnail and stat text without obscuring them.
 		var is_harv: bool = entry.get("is_harvester", false)
 		var is_def: bool = entry.get("is_defensive", false)
 		var has_rep: bool = entry.get("has_repair", false)
-		# ONE builder, keyed by variant. See TILE_VARIANTS' header: the card,
-		# the filled well and the empty well all come out of tile_style().
 		variant = RosterPicker.variant_for_entry(entry)
 		add_theme_stylebox_override("panel", RosterPicker.tile_style(variant, "card"))
 
@@ -775,10 +824,6 @@ class RosterCard extends PanelContainer:
 		box.add_theme_constant_override("separation", Tokens.SPACE_XS)
 		add_child(box)
 
-		# The thumbnail sits in a wrapper so capability badges can overlay its
-		# top corners. A badge in the VBox flow would cost a row of card height
-		# that the spec block already needs, and would read as another stat
-		# line rather than as a property of the design pictured above it.
 		var thumb_wrap := Control.new()
 		thumb_wrap.custom_minimum_size = Vector2(0, RosterPicker.CARD_THUMB_H)
 		thumb_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -791,10 +836,6 @@ class RosterCard extends PanelContainer:
 		_thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		thumb_wrap.add_child(_thumb)
 
-		# Harvester on the left, support on the right, so a design that is both
-		# shows both without them stacking. Both are drawn on every card that
-		# qualifies - the reserved slot's ghost uses the same glyph, and the
-		# pairing is what makes "this belongs there" legible.
 		var badges: Array = []
 		if is_harv:
 			badges.append([RosterPicker.ICON_HARVESTER, "Harvester — can gather resources"])
@@ -812,53 +853,69 @@ class RosterCard extends PanelContainer:
 
 		var name_label := Label.new()
 		name_label.text = entry_name
-		# WRAPS rather than ellipsises. The card is tall enough for two or three
-		# lines now, and a design's name is the one field where losing the tail
-		# ("...Mk II" vs "...Mk III") defeats the point of the card.
 		name_label.theme_type_variation = "HintLabel"
 		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		# Instance-level lift off HintLabel's secondary colour: within this card
-		# the name is the primary text and the spec block below it is the
-		# secondary, so the variation's default has the hierarchy inverted here.
 		name_label.add_theme_color_override("font_color", Tokens.TEXT_PRIMARY)
 		box.add_child(name_label)
 
+		# Preliminary stats directly from blueprint data
+		var fac: String = "Bldg" if is_def else DesignCostingScript.queue_for_design(data).capitalize()
+		var mat_id: String = str(data.get("armor", {}).get("material", "steel_plate"))
+		var arm_res: int = RosterPicker.calculate_armor_resistance(mat_id)
+		var cost: Vector2i = DesignCostingScript.blueprint_materials(data)
+		var est_hp: float = float(entry.get("hull_blocks", 8)) * 25.0
+		var est_spd: float = 12.0
+		var est_dps: float = 0.0
+		var est_rng: float = 0.0
+		var weapons = data.get("weapons", [])
+		if weapons is Array:
+			for w in weapons:
+				est_dps += float(w.get("dps", 15.0))
+				est_rng = maxf(est_rng, float(w.get("range", 100.0)))
+
+		stats = {
+			"factory_queue": fac,
+			"armor_resist": arm_res,
+			"hull_hp": est_hp,
+			"move_speed": est_spd,
+			"dps": est_dps,
+			"longest_range": est_rng,
+			"vision": 160.0,
+			"cost_metal": cost.x,
+			"cost_crystal": cost.y,
+			"is_harvester": is_harv,
+			"cargo_capacity": 100 if is_harv else 0,
+			"has_weapons": est_dps > 0.0
+		}
+
 		_spec = Label.new()
-		# StatLabel is 13px MONOSPACE, which is load-bearing here rather than
-		# decorative: the stat lines are padded key/value pairs ("HP     420"), so
-		# a proportional font would leave the numbers ragged both down a card and
-		# across the row of cards beside it.
 		_spec.theme_type_variation = "StatLabel"
 		_spec.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_spec.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		_spec.text = RosterPicker.spec_summary(entry, data)
+		_spec.text = RosterPicker.format_rich_stats(stats, entry, data)
 		box.add_child(_spec)
 
 	# Called once the design has been reconstructed and measured.
-	func set_stats(stats: Dictionary) -> void:
+	func set_stats(measured_stats: Dictionary) -> void:
 		if _spec == null:
 			return
-		_spec.text = RosterPicker.stat_line(stats)
-		# The unmeasured state is deliberate, not a bare fallback string: same
-		# muted colour and reduced opacity the empty-library hint uses, so a
-		# card that failed to measure reads as "unknown", not as broken text
-		# sitting in a slot that otherwise looks fully populated.
-		if stats.is_empty():
-			_spec.add_theme_color_override("font_color", Tokens.TEXT_DISABLED)
-			_spec.modulate.a = 0.75
-		else:
-			_spec.remove_theme_color_override("font_color")
-			_spec.modulate.a = 1.0
+		if not measured_stats.is_empty():
+			for k in measured_stats.keys():
+				stats[k] = measured_stats[k]
+			if not stats.has("factory_queue") or str(stats["factory_queue"]) == "":
+				stats["factory_queue"] = "Bldg" if _entry.get("is_defensive", false) else DesignCostingScript.queue_for_design(_data).capitalize()
+			if not stats.has("armor_resist"):
+				var mat_id = str(_data.get("armor", {}).get("material", "steel_plate"))
+				stats["armor_resist"] = RosterPicker.calculate_armor_resistance(mat_id)
+		_spec.text = RosterPicker.format_rich_stats(stats, _entry, _data)
 
 	func set_thumbnail(tex: Texture2D) -> void:
 		_tex = tex
 		if _thumb:
 			_thumb.texture = tex
-			# Fade the thumbnail in rather than popping it: bakes land a frame or
-			# more apart, and a row of images snapping in one by one reads as
-			# stutter.
-			UIAnimScript.fade(_thumb, 1.0, UIAnimScript.DURATION_NORMAL)
+			_thumb.modulate.a = 1.0
+			UIAnimScript.fade(_thumb, 1.0, UIAnimScript.DURATION_FAST, 0.4)
 
 	func bind_picker(picker: RosterPicker) -> void:
 		_picker = picker
@@ -1190,82 +1247,57 @@ class RosterSlot extends PanelContainer:
 # replaced by stat_line() once the design has actually been reconstructed. Only
 # metadata is available at this point - real HP/Speed/DPS/Range need a live hull
 # node, which is what the thumbnail bake produces.
-static func spec_summary(entry: Dictionary, data: Dictionary) -> String:
+static func calculate_armor_resistance(mat_id: String) -> int:
+	var row = DamageResolverScript.ARMOR_TABLE.get(mat_id, DamageResolverScript.ARMOR_TABLE["steel_plate"])
+	var total_pt := 0.0
+	for dt in ["kinetic", "thermal", "explosive", "energy"]:
+		var arr = row.get(dt, [10.0, 0.8])
+		total_pt += float(arr[1])
+	var avg_pt := total_pt / 4.0
+	return int(round((1.0 - avg_pt) * 100.0))
+
+
+static func format_rich_stats(stats: Dictionary, entry: Dictionary = {}, data: Dictionary = {}) -> String:
+	var fac: String = str(stats.get("factory_queue", "Med")).substr(0, 4).to_upper()
+	var arm: int = int(stats.get("armor_resist", 30))
+	var hp: float = float(stats.get("hull_hp", 300.0))
+	var spd: float = float(stats.get("move_speed", 10.0))
+	var dps: float = float(stats.get("dps", 0.0))
+	var rng: float = float(stats.get("longest_range", 0.0))
+	var sens: float = float(stats.get("vision", 160.0))
+	var m: int = int(stats.get("cost_metal", 100))
+	var c: int = int(stats.get("cost_crystal", 0))
+	var is_harv: bool = bool(stats.get("is_harvester", entry.get("is_harvester", false)))
+	var crg: int = int(stats.get("cargo_capacity", 0))
+
 	var lines: Array = []
-	lines.append(prettify(str(entry.get("hull_type", ""))))
-
-	var loco: Dictionary = data.get("locomotion", {}) if data else {}
-	var loco_id := str(loco.get("type_id", ""))
-	if loco_id != "":
-		lines.append(prettify(loco_id))
-
-	lines.append("measuring...")
-	return "\n".join(PackedStringArray(lines))
-
-
-# The card's REAL stats.
-#
-# Every figure comes from DesignStats.analyze() run against the reconstructed
-# hull - the same Drivetrain / WeaponRange / ModuleCatalog calls battle_unit.gd
-# makes when it spawns the unit for combat. Nothing here is re-derived from the
-# JSON, which matters because stat_calculator.gd has twice had to delete a local
-# re-derivation that drifted (a capacity calculation that knew four locomotion
-# types out of seventeen, and an armour table showing the explosive threshold
-# labelled as energy).
-#
-# HP is the HULL pool, not hull + modules. Module HP is a separate pool that
-# subsystem stripping drains without touching hull HP, so adding them would
-# overstate durability - the same mistake the Design Lab sidebar used to make.
-#
-# Speed is move_speed, i.e. after the overload penalty and faction passives,
-# because that is the speed the unit will actually travel at. A design that is
-# over its weight capacity should read slow on the card, since it will be.
-static func stat_line(stats: Dictionary) -> String:
-	if stats.is_empty():
-		# "MEASURING" rather than "unavailable" - the bake pipeline reaches
-		# every design eventually (see _bake_thumbnails), so an empty
-		# Dictionary at this point in the flow means the render hasn't
-		# landed yet, not that it failed. The styling on the RosterCard side
-		# (set_stats) is what actually reads as an unknown/pending state;
-		# this string is the fallback if a caller prints it before that.
-		return "measuring..."
-	var lines: Array = []
-	lines.append("HP     %.0f" % float(stats.get("hull_hp", 0.0)))
-	lines.append("Speed  %.1f" % float(stats.get("move_speed", 0.0)))
-	# An unarmed design (a harvester, a scout, a sensor platform) is a legitimate
-	# thing to field, so it says so rather than printing a misleading 0.0.
-	if bool(stats.get("has_weapons", false)):
-		lines.append("DPS    %.0f" % float(stats.get("dps", 0.0)))
-		lines.append("Range  %.0f" % float(stats.get("longest_range", 0.0)))
+	lines.append("FAC:%-4s ARM:%2d%%" % [fac, arm])
+	lines.append("HP:%-5.0f SPD:%4.1f" % [hp, spd])
+	if is_harv:
+		if dps > 0.0:
+			lines.append("CRG:%-4d RNG:%3.0fm" % [crg, rng])
+		else:
+			lines.append("CRG:%-4d (unarmed)" % crg)
 	else:
-		lines.append("unarmed")
-	# HARVESTER is the one line here that describes a different KIND of unit
-	# rather than a different amount of the same stat, which is why it gets its
-	# own row instead of being folded into the "unarmed" branch: a harvester can
-	# also be armed, and an unarmed design is very often NOT a harvester. Reading
-	# "unarmed" and inferring "economy unit" is a real way to draft twelve slots
-	# of scouts and start a match with no income.
-	#
-	# The payload comes with it because that is the number a hauler is chosen
-	# on - a bare arm on a light hull and a bay-laden heavy are both "harvester"
-	# and are not remotely the same pick.
-	if bool(stats.get("is_harvester", false)):
-		lines.append("HARVESTER  %d" % int(stats.get("cargo_capacity", 0)))
-	# Power, as the at-rest net. A design that cannot keep its own electronics
-	# running browns out in the field - shields first, then its sight, then its
-	# energy weapons - and that is not visible anywhere else on this card. HP and
-	# Speed both stay at their full printed values right up until the buffer
-	# empties, so a card without this row reads as perfectly healthy.
-	#
-	# The at-rest figure, not the firing one: a burst design that runs a tab
-	# against its buffer while shooting is a legitimate build, and flagging it
-	# here the same way as a permanently under-powered one would be wrong. The
-	# Design Lab draws that distinction in full; a roster card has room for the
-	# one that means "this design has a problem".
-	var pw: Dictionary = stats.get("power", {})
-	if not pw.is_empty():
-		lines.append("PWR   %+.1f/s" % float(pw.get("net", 0.0)))
+		if dps > 0.0:
+			lines.append("DPS:%-4.0f RNG:%3.0fm" % [dps, rng])
+		else:
+			lines.append("unarmed")
+
+	if c > 0:
+		lines.append("SNS:%3.0fm $%dM %dC" % [sens, m, c])
+	else:
+		lines.append("SNS:%3.0fm $%dM" % [sens, m])
+
 	return "\n".join(PackedStringArray(lines))
+
+
+static func spec_summary(entry: Dictionary, data: Dictionary) -> String:
+	return format_rich_stats({}, entry, data)
+
+
+static func stat_line(stats: Dictionary) -> String:
+	return format_rich_stats(stats)
 
 
 # snake_case id -> "Snake Case". Moved here from match_setup.gd with its only

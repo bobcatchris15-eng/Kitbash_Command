@@ -34,6 +34,21 @@ const MunitionPool = preload("res://scripts/munition_pool.gd")
 # the rule and for why it is a static holder rather than an injected instance.
 const SimRNG = preload("res://scripts/battle/sim_rng.gd")
 
+# Weapon VFX styles (WEAPON_VFX_FRAMEWORK.md) — 13 class_name RefCounted singletons (3 skipped due to pre-existing spec issues)
+const WeaponVFXGuidedMissile = preload("res://scripts/vfx/weapon_vfx_guided_missile.gd")
+const WeaponVFXMissilePod = preload("res://scripts/vfx/weapon_vfx_missile_pod.gd")
+const WeaponVFXRocketArtillery = preload("res://scripts/vfx/weapon_vfx_rocket_artillery.gd")
+const WeaponVFXHypervelocityMissile = preload("res://scripts/vfx/weapon_vfx_hypervelocity_missile.gd")
+const WeaponVFXSAMLauncher = preload("res://scripts/vfx/weapon_vfx_sam_launcher.gd")
+const WeaponVFXLoiteringMunition = preload("res://scripts/vfx/weapon_vfx_loitering_munition.gd")
+const WeaponVFXAntiRadiationMissile = preload("res://scripts/vfx/weapon_vfx_anti_radiation_missile.gd")
+const WeaponVFXCruiseMissile = preload("res://scripts/vfx/weapon_vfx_cruise_missile.gd")
+const WeaponVFXArtillery = preload("res://scripts/vfx/weapon_vfx_artillery.gd")
+const WeaponVFXMortarArray = preload("res://scripts/vfx/weapon_vfx_mortar_array.gd")
+const WeaponVFXClusterDispenser = preload("res://scripts/vfx/weapon_vfx_cluster_dispenser.gd")
+const WeaponVFXPlasmaLobber = preload("res://scripts/vfx/weapon_vfx_plasma_lobber.gd")
+const WeaponVFXMK19GrenadeLauncher = preload("res://scripts/vfx/weapon_vfx_mk19_grenade_launcher.gd")
+
 var target: Node3D = null
 var fire_range: float = 12.0
 var fire_rate: float = 1.0 # Shot interval
@@ -1834,38 +1849,16 @@ func _fire_railgun_beam():
 	)
 
 func _fire_artillery():
-	var shell = _make_round_body("bomb", 0.4, Color.SADDLE_BROWN)
-	_effects_parent().add_child(shell)
-
-	var start = get_muzzle_world_pos()
-	var end = _aim_point(target)
-	var tween = create_tween()
-	var last_pos := [start]
-	var puff_mark := [0.0]
-	var callable = func(val: float):
-		if not is_instance_valid(shell): return
-		var current_target = end
-		if is_instance_valid(target):
-			current_target = _aim_point(target)
-		var pos = start.lerp(current_target, val)
-		pos.y += sin(val * PI) * 12.0
-		shell.global_position = pos
-		if val > 0.01:
-			var seg: Vector3 = pos - last_pos[0]
-			if seg.length_squared() > 0.0001:
-				shell.look_at(pos + seg, Vector3.UP)
-			last_pos[0] = pos
-			shell.rotate_object_local(Vector3(0, 0, 1), 0.18)
-		if val > puff_mark[0]:
-			puff_mark[0] = val + 0.2
-			_spawn_flight_mote(pos + Vector3(0, -0.25, 0), Color(0.62, 0.6, 0.58), 0.35, 0.0)
-
-	tween.tween_method(callable, 0.0, 1.0, 0.8)
-	tween.finished.connect(func():
-		if is_instance_valid(shell): shell.queue_free()
-		_deal_aoe_damage(end, 6.0, dps * fire_rate)
-		_spawn_explosion_visual(end, 1.2, Color.ORANGE)
-	)
+	# Use _fire_arcing_shell_at with artillery profile: whistle trail, custom impact
+	var profile = {
+		"body": "bomb", 
+		"trail": "whistle", 
+		"trail_bulk": 0.25,
+		"impact_vfx_callback": Callable(WeaponVFXArtillery, "spawn_artillery_impact").bind(_effects_parent(), Vector3.ZERO)
+	}
+	_fire_arcing_shell_at(0.4, 1.0, Color.SADDLE_BROWN, 6.0, dps * fire_rate, Vector3.ZERO, 0.8, profile)
+	# Breech vent
+	WeaponVFXArtillery.spawn_breech_vent(self, get_muzzle_local_pos())
 
 func _fire_mortar_salvo():
 	var count = 3
@@ -1882,6 +1875,9 @@ func _fire_mortar_salvo():
 			shell.material_override = MunitionPool.emissive(Color.OLIVE, Color.YELLOW)
 			_effects_parent().add_child(shell)
 			
+			# Tube cold-gas vent per "thump"
+			WeaponVFXMortarArray.spawn_tube_vent(self, get_muzzle_local_pos())
+			
 			var start = get_muzzle_world_pos()
 			# SIM. `end` is the AoE centre resolved in the tween's finished
 			# handler below, not just where the shell mesh flies - the salvo's
@@ -1894,12 +1890,16 @@ func _fire_mortar_salvo():
 				var pos = start.lerp(end, val)
 				pos.y += sin(val * PI) * height
 				shell.global_position = pos
+				# Apex whistle at val ≈ 0.5
+				if abs(val - 0.5) < 0.05:
+					WeaponVFXMortarArray.spawn_apex_whistle(_effects_parent(), shell.global_position)
 				
 			tween.tween_method(callable, 0.0, 1.0, 0.6)
 			tween.finished.connect(func():
 				if is_instance_valid(shell): shell.queue_free()
 				_deal_aoe_damage(end, 4.0, (dps * fire_rate) / count)
-				_spawn_explosion_visual(end, 0.5, Color.YELLOW)
+				# Mortar impact VFX replaces _spawn_explosion_visual
+				WeaponVFXMortarArray.spawn_impact(_effects_parent(), end)
 			)
 		)
 
@@ -1958,6 +1958,7 @@ func _fire_swarm_missiles():
 		count = int(data.tweaks.get("grid_size", 4.0))
 	count = max(1, count)
 	var per_missile_damage = (dps * fire_rate) / count
+	var scene = _effects_parent()
 
 	for i in range(count):
 		get_tree().create_timer(i * 0.08).timeout.connect(func():
@@ -1973,6 +1974,9 @@ func _fire_swarm_missiles():
 			missile.speed = _munition_speed(1.50) # missile_pod: 30 / 20
 			missile.salvo_jitter = 1.2
 			missile.setup(target, self, per_missile_damage, damage_class, get_team())
+			# VFX wire-in: configure trail and connect impact signal
+			WeaponVFXMissilePod.configure_missile_trail(missile, 0.85)
+			missile.destroyed.connect(Callable(WeaponVFXMissilePod, "on_missile_impact").bind(scene))
 			_effects_parent().add_child(missile)
 		)
 
@@ -1989,24 +1993,30 @@ const ARC_REFERENCE_DISTANCE: float = 25.0
 # tween/AoE pattern was already inlined three times (artillery, mortar salvo,
 # grenade launcher) and the spigot mortar plus rocket artillery would have
 # made five. Takes the aim offset so a salvo can scatter.
+# Returns the shell Node3D so callers can attach custom trails (e.g. rocket_artillery).
 func _fire_arcing_shell_at(shell_radius: float, arc_height: float, colour: Color,
 						   blast_radius: float, damage: float, aim_offset: Vector3 = Vector3.ZERO,
-						   flight_time: float = 0.8, profile: Dictionary = {}) -> void:
+						   flight_time: float = 0.8, profile: Dictionary = {}) -> Node3D:
 	if not is_instance_valid(target):
-		return
+		return null
 	var parent = _effects_parent()
 	if parent == null:
-		return
+		return null
 	var shell: Node3D
-	if profile.has("body"):
+	# Support custom shell from VFX profile (e.g. plasma_lobber)
+	if profile.has("custom_shell") and is_instance_valid(profile["custom_shell"]):
+		shell = profile["custom_shell"]
+		parent.add_child(shell)
+	elif profile.has("body"):
 		shell = _make_round_body(profile.get("body", "bomb"), shell_radius, colour)
+		parent.add_child(shell)
 	else:
 		var ball = MeshInstance3D.new()
 		ball.mesh = MunitionPool.unit_sphere()
 		ball.scale = Vector3.ONE * shell_radius
 		ball.material_override = MunitionPool.emissive(colour, colour)
 		shell = ball
-	parent.add_child(shell)
+		parent.add_child(shell)
 
 	# TRAIL. `trail_bulk` opts the round into the same GPUParticles3D plume the
 	# guided missiles carry (VFXEffects.make_missile_trail), scaled by that
@@ -2020,13 +2030,19 @@ func _fire_arcing_shell_at(shell_radius: float, arc_height: float, colour: Color
 	# the weaker signature, which is backwards: a saturation MLRS salvo should
 	# be the thing that fills the sky.
 	var trail_bulk: float = float(profile.get("trail_bulk", 0.0))
-	if trail_bulk > 0.0:
+	# If profile has "custom_trail" = true, skip internal trail attachment.
+	# Caller is responsible for attaching the custom trail and calling _detach_trail_on_free.
+	if trail_bulk > 0.0 and not profile.get("custom_trail", false):
 		var plume := VFXEffects.make_missile_trail(shell, trail_bulk)
 		# Rear of the round, pointing back down the flight path. The tween
 		# below look_at()s the shell along its velocity every frame, so this
 		# stays behind the nose through the whole arc including the descent.
 		plume.position = Vector3(0.0, 0.0, shell_radius * 0.8)
 		_detach_trail_on_free(shell, plume)
+	# Artillery "whistle" trail: faint tracer whistle on high arc
+	elif profile.get("trail", "") == "whistle":
+		var trail = WeaponVFXArtillery.make_shell_trail(shell)
+		_detach_trail_on_free(shell, trail)
 
 	var start = get_muzzle_world_pos()
 	var end = _aim_point(target) + aim_offset
@@ -2079,8 +2095,13 @@ func _fire_arcing_shell_at(shell_radius: float, arc_height: float, colour: Color
 	tween.finished.connect(func():
 		if is_instance_valid(shell):
 			shell.queue_free()
-		_deal_aoe_damage(end, blast_radius, damage)
+		# Custom impact VFX callback (overrides default _spawn_explosion_visual)
+		if profile.has("impact_vfx_callback") and profile["impact_vfx_callback"] is Callable:
+			profile["impact_vfx_callback"].call(_effects_parent(), end, blast_radius, damage)
+		else:
+			_deal_aoe_damage(end, blast_radius, damage)
 	)
+	return shell
 
 
 # A GPUParticles3D parented to the round dies WITH the round, which snips the
@@ -2108,6 +2129,29 @@ func _detach_trail_on_free(round_node: Node3D, plume: GPUParticles3D) -> void:
 			if is_instance_valid(plume):
 				plume.queue_free())
 	)
+
+
+# --- Shared VFX Framework Helpers (WEAPON_VFX_FRAMEWORK.md) -------------------
+# Minimal common layer so per-weapon work does not fork the framework.
+
+# Attach a missile-style smoke trail to an arcing round and ensure clean detach.
+func _attach_trail_to_round(round_node: Node3D, trail_bulk: float, shell_radius: float) -> void:
+	var plume := VFXEffects.make_missile_trail(round_node, trail_bulk)
+	plume.position = Vector3(0.0, 0.0, shell_radius * 0.8)
+	_detach_trail_on_free(round_node, plume)
+
+# Single standard detonation entry: AoE damage + ammo impact + visual + decal.
+func _detonate_at(position: Vector3, blast_radius: float, damage: float, color: Color = Color.ORANGE, entropy: float = 1.0) -> void:
+	_deal_aoe_damage(position, blast_radius, damage)
+	# Scorch for significant blasts; crater for very large ones.
+	if blast_radius >= 3.0:
+		VFXEffects.scorch(_effects_parent(), position, blast_radius * 0.7, 0.0, 14.0)
+	if blast_radius >= 6.0:
+		VFXEffects.crater(_effects_parent(), position, blast_radius * 0.5, 45.0)
+	# Use existing _spawn_explosion_visual (generates its own entropy/jitter).
+	# Pass 1.0 as base scale; the function applies its own entropy multiplier.
+	_spawn_explosion_visual(position, 1.0, color)
+
 
 # Spigot mortar: one very large low-velocity bomb, enormous splash, derisory
 # range. payload_size scales both the bomb and the crater it leaves.
@@ -2138,18 +2182,56 @@ func _fire_rocket_artillery():
 
 	for i in range(rails):
 		get_tree().create_timer(i * 0.14).timeout.connect(func():
-			if not is_instance_valid(self):
+			if not is_instance_valid(self) or not is_instance_valid(target):
 				return
+			# Launch flash per rocket
+			WeaponVFXRocketArtillery.spawn_launch_flash(self, get_muzzle_local_pos(), get_muzzle_local_dir())
+			
 			# SIM. This is the dispersion the whole weapon is balanced around -
-			# it becomes _fire_arcing_shell_at's aim_offset, which becomes the
-			# `end` that _deal_aoe_damage() detonates on.
+			# it becomes the aim_offset, which becomes the `end` that _deal_aoe_damage() detonates on.
 			var scatter = SimRNG.scatter_xz(1.0) * spread * 1.6
-			# trail_bulk 2.6: comfortably heavier than the missile_pod rocket's
-			# 1.0, which is the point of the setting. The mote trail stays on
-			# as well - the plume is the volume, the motes are the bright
-			# flecks of burning propellant inside it.
-			_fire_arcing_shell_at(0.25, 0.45, laser_color, 2.4 * spread, per_rocket, scatter, 0.7,
-				{"body": "rocket", "trail": "smoke", "trail_bulk": 2.6})
+			
+			# Local wrapper for rocket artillery with custom trail and saturation impact
+			var parent = _effects_parent()
+			if parent == null:
+				return
+			var shell_radius = 0.25
+			var shell = _make_round_body("rocket", shell_radius, laser_color)
+			parent.add_child(shell)
+			
+			# Custom rocket trail (replaces internal _attach_trail_to_round)
+			var plume = WeaponVFXRocketArtillery.make_rocket_trail(shell, 2.6, shell_radius)
+			shell.trail_plume = plume
+			_detach_trail_on_free(shell, plume)
+			
+			var start = get_muzzle_world_pos()
+			var end = _aim_point(target) + scatter
+			var travel = start.distance_to(end)
+			var reach_mult = maxf(travel / ARC_REFERENCE_DISTANCE, 0.35)
+			var scaled_flight = 0.7 * reach_mult
+			var scaled_apex = 0.45 * 12.0 * reach_mult
+			
+			var tween = create_tween()
+			var last_pos := [start]
+			tween.tween_method(func(val: float):
+				if not is_instance_valid(shell):
+					return
+				var pos = start.lerp(end, val)
+				pos.y += sin(val * PI) * scaled_apex
+				shell.global_position = pos
+				if val > 0.01:
+					var seg: Vector3 = pos - last_pos[0]
+					if seg.length_squared() > 0.0001:
+						shell.look_at(pos + seg, Vector3.UP)
+					last_pos[0] = pos
+			, 0.0, 1.0, scaled_flight)
+			tween.finished.connect(func():
+				if is_instance_valid(shell):
+					shell.queue_free()
+				# Damage + saturation impact VFX
+				_deal_aoe_damage(end, 2.4 * spread, per_rocket)
+				WeaponVFXRocketArtillery.spawn_saturation_impact(_effects_parent(), end, 2.4 * spread, spread)
+			)
 		)
 
 # The six guided launchers all resolve through weapon_missile.gd, so they are
@@ -2183,6 +2265,8 @@ func _fire_hypervelocity_missile():
 			m.speed = _munition_speed(0.55) # hypervelocity: 26 / 48
 			m.setup(target, self, per_dart, damage_class, get_team())
 			_effects_parent().add_child(m)
+			# Rail muzzle flash per dart
+			WeaponVFXHypervelocityMissile.spawn_rail_muzzle_flash(self, get_muzzle_local_pos())
 		)
 
 # SAM: air only. Refuses to engage anything that is not flying, which is
@@ -2191,6 +2275,8 @@ func _fire_hypervelocity_missile():
 func _fire_sam_launcher():
 	if is_instance_valid(target) and _target_is_airborne(target):
 		_spawn_missile(target, dps * fire_rate, 1.15, false, 0.5) # sam_launcher: 30 / 26
+		# VLS cell cold-gas vent
+		WeaponVFXSAMLauncher.spawn_cell_vent(self, get_muzzle_local_pos())
 
 # Loitering munition: climbs, holds, then dives. Modelled as a top-attack
 # missile with a deliberate delay before it starts tracking - the loiter is
@@ -2204,6 +2290,8 @@ func _fire_loitering_munition():
 	get_tree().create_timer(loiter_delay).timeout.connect(func():
 		if is_instance_valid(self) and is_instance_valid(locked):
 			_spawn_missile(locked, dps * fire_rate, 2.71, true, 0.6) # loitering_munition: 38 / 14
+			# Launcher cell eject pop
+			WeaponVFXLoiteringMunition.spawn_launch_pop(self, get_muzzle_local_pos())
 	)
 
 # Anti-radiation: only engages units that actually carry a sensor module.
@@ -2213,6 +2301,8 @@ func _fire_loitering_munition():
 func _fire_anti_radiation_missile():
 	if is_instance_valid(target) and _target_carries_sensors(target):
 		_spawn_missile(target, dps * fire_rate, 1.55, false, 0.5) # anti_radiation_missile: 34 / 22
+		# Seeker uncage vent
+		WeaponVFXAntiRadiationMissile.spawn_launch_vent(self, get_muzzle_local_pos())
 
 # Bunker buster: top-attack, and heavily biased toward structures. Against
 # anything that moves it is clumsy and slow; against a building it is the
@@ -2229,6 +2319,8 @@ func _fire_bunker_buster():
 # announces itself the whole way in.
 func _fire_cruise_missile():
 	_spawn_missile(target, dps * fire_rate, 4.67, false, 0.6) # cruise_missile: 42 / 9
+	# Heavy booster ignition
+	WeaponVFXCruiseMissile.spawn_launch_boost(self, get_muzzle_local_pos())
 
 # --- Shared predicates ------------------------------------------------------
 
@@ -2503,6 +2595,9 @@ func _fire_cluster_dispenser():
 			rec_tween.tween_property(c, "position", orig_pos, 0.15)
 			break
 
+	# Muzzle vent per shot
+	WeaponVFXClusterDispenser.spawn_muzzle_vent(self, get_muzzle_local_pos())
+
 	var dispersion = 1.0
 	var payload_size = 1.0
 	var t_count = 2
@@ -2538,6 +2633,9 @@ func _fire_cluster_dispenser():
 			canister.material_override = MunitionPool.emissive(Color(0.70, 0.40, 0.20), Color.ORANGE_RED)
 			_effects_parent().add_child(canister)
 
+			# Canister trail
+			var trail = WeaponVFXClusterDispenser.make_canister_trail(canister)
+
 			# COSMETIC, and this one is worth being explicit about because it
 			# sits three lines from a SIM draw in the same function. `start`
 			# only ever feeds the canister MESH's tween and the `mid` point the
@@ -2556,6 +2654,9 @@ func _fire_cluster_dispenser():
 			tween.finished.connect(func():
 				if is_instance_valid(canister): canister.queue_free()
 
+				# Airburst pop at midpoint
+				WeaponVFXClusterDispenser.spawn_airburst_pop(_effects_parent(), mid)
+
 				for i in range(submunitions_per_canister):
 					var sub = MeshInstance3D.new()
 					sub.mesh = MunitionPool.unit_sphere()
@@ -2573,7 +2674,8 @@ func _fire_cluster_dispenser():
 					st.finished.connect(func():
 						if is_instance_valid(sub): sub.queue_free()
 						_deal_aoe_damage(scatter_dest, 2.5 * payload_size, per_bomblet_damage)
-						_spawn_explosion_visual(scatter_dest, 0.3 * payload_size, Color.CHOCOLATE)
+						# Bomblet impact VFX replaces _spawn_explosion_visual
+						WeaponVFXClusterDispenser.spawn_bomblet_impact(_effects_parent(), scatter_dest, payload_size)
 					)
 			)
 		)
@@ -2874,39 +2976,18 @@ func _fire_continuous_beam():
 	)
 
 func _fire_plasma_lobber():
-	var plasma = MeshInstance3D.new()
-	plasma.mesh = MunitionPool.unit_sphere()
-	plasma.scale = Vector3(0.35, 0.35, 0.35)
-	plasma.material_override = MunitionPool.emissive(Color.MEDIUM_SPRING_GREEN, Color.MEDIUM_SPRING_GREEN)
-	_effects_parent().add_child(plasma)
+	# Custom plasma shell with ion trail
+	var shell = WeaponVFXPlasmaLobber.make_plasma_shell(0.35, laser_color)
+	_effects_parent().add_child(shell)
+	WeaponVFXPlasmaLobber.attach_ion_trail(shell, 0.35)
 	
-	var start = get_muzzle_world_pos()
-	var end = _aim_point(target)
-	var tween = create_tween()
-	var callable = func(val: float):
-		if not is_instance_valid(plasma): return
-		var pos = start.lerp(end, val)
-		pos.y += sin(val * PI) * 4.0
-		plasma.global_position = pos
-		
-	tween.tween_method(callable, 0.0, 1.0, 0.6)
-	tween.finished.connect(func():
-		if is_instance_valid(plasma): plasma.queue_free()
-		_deal_aoe_damage(end, 4.5, dps * fire_rate)
-		_spawn_explosion_visual(end, 0.8, Color.MEDIUM_SPRING_GREEN)
-
-		var puddle = MeshInstance3D.new()
-		puddle.mesh = MunitionPool.unit_cylinder()
-		puddle.scale = Vector3(2.0, 0.05, 2.0)
-		puddle.material_override = MunitionPool.alpha_emissive(
-			Color(0.1, 0.8, 0.2, 0.4), Color.MEDIUM_SPRING_GREEN)
-		_effects_parent().add_child(puddle)
-		puddle.global_position = end
-
-		var pt = create_tween()
-		pt.tween_property(puddle, "scale", Vector3.ZERO, 1.5)
-		pt.finished.connect(func(): puddle.queue_free())
-	)
+	# Fire arcing shell with custom shell and plasma impact callback
+	var profile = {
+		"body": "bomb",
+		"custom_shell": shell,
+		"impact_vfx_callback": Callable(WeaponVFXPlasmaLobber, "plasma_impact").bind(_effects_parent(), Vector3.ZERO, 4.5, laser_color)
+	}
+	_fire_arcing_shell_at(0.35, 4.0, laser_color, 4.5, dps * fire_rate, Vector3.ZERO, 0.6, profile)
 
 func _fire_flak_cannon():
 	var shell = MeshInstance3D.new()
@@ -2944,27 +3025,36 @@ func _fire_flak_cannon():
 # shallower lob and a much tighter blast than mortar_array - it's a
 # direct-lay weapon that happens to arc, not indirect fire.
 func _fire_grenade_launcher():
-	var grenade = MeshInstance3D.new()
-	grenade.mesh = MunitionPool.unit_sphere()
-	grenade.scale = Vector3(0.16, 0.16, 0.16)
-	grenade.material_override = MunitionPool.emissive(Color(0.35, 0.38, 0.22), Color(0.7, 0.65, 0.2))
 	var parent = _effects_parent()
 	if parent == null: return
-	parent.add_child(grenade)
+	
+	# Muzzle thump
+	WeaponVFXMK19GrenadeLauncher.spawn_muzzle_thump(self, get_muzzle_local_pos())
+	
+	# Custom grenade body
+	var round = Node3D.new()
+	WeaponVFXMK19GrenadeLauncher.make_grenade_body(round)
+	parent.add_child(round)
 
 	var start = get_muzzle_world_pos()
 	var end = _aim_point(target)
 	var tween = create_tween()
 	var callable = func(val: float):
-		if not is_instance_valid(grenade): return
+		if not is_instance_valid(round): return
 		var pos = start.lerp(end, val)
 		pos.y += sin(val * PI) * 1.8 # shallow arc
-		grenade.global_position = pos
+		round.global_position = pos
+	
+	# Flight motes at intervals (0.12s, 0.24s)
+	tween.tween_callback(WeaponVFXMK19GrenadeLauncher.spawn_flight_mote.bind(parent, start.lerp(end, 0.12 / 0.35))).set_delay(0.12)
+	tween.tween_callback(WeaponVFXMK19GrenadeLauncher.spawn_flight_mote.bind(parent, start.lerp(end, 0.24 / 0.35))).set_delay(0.24)
+	
 	tween.tween_method(callable, 0.0, 1.0, 0.35)
 	tween.finished.connect(func():
-		if is_instance_valid(grenade): grenade.queue_free()
+		if is_instance_valid(round): round.queue_free()
 		_deal_aoe_damage(end, 2.2, dps * fire_rate)
-		_spawn_explosion_visual(end, 0.35, Color(0.9, 0.7, 0.2))
+		# MK19 impact VFX replaces _spawn_explosion_visual
+		WeaponVFXMK19GrenadeLauncher.spawn_impact(parent, end, 2.2)
 	)
 
 # Recoilless rifle. The backblast is the point: a real recoilless weapon

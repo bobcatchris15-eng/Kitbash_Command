@@ -1,0 +1,498 @@
+{
+  "tasks": [
+    {
+      "task_id": "TASK-0001",
+      "status": "PASS",
+      "system_intent": "Revamp procedural armor surface shaders with steel doglegs, composite calmed relief, ceramic scales, fine nylon weave, and titanium plate",
+      "depends_on": [],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/shaders/armor_surface.gdshader",
+        "prototype/scripts/armor_paint_visual.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0002",
+      "status": "PASS",
+      "system_intent": "Define USGS cartographic color palette and legendarium tokens in ui_tokens.gd",
+      "depends_on": [],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/ui_tokens.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0003",
+      "status": "PASS",
+      "system_intent": "Implement python USGS topo map contour and relief baker and generate topo PNGs for all 22 maps",
+      "depends_on": ["TASK-0002"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/tools/terrain/bake_usgs_topo.py",
+        "prototype/data/maps/*_topo.png"
+      ]
+    },
+    {
+      "task_id": "TASK-0004",
+      "status": "PASS",
+      "system_intent": "Upgrade Stage 1 Theatre screen with authentic USGS quadrangle map preview, legendarium, sorting, and elevation stats",
+      "depends_on": ["TASK-0003"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/match_setup.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0005",
+      "status": "PASS",
+      "system_intent": "Upgrade Stage 2 Roster screen with thumbnail lifecycle fix, static caching, rich 2-column stats grid, and unit sorting",
+      "depends_on": ["TASK-0004"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/roster_picker.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0006",
+      "status": "PASS",
+      "system_intent": "Implement Stage 3 Launch squadron hero shot in user livery with echelon formation and workbench pedestal",
+      "depends_on": ["TASK-0005"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/match_setup.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0007",
+      "status": "PASS",
+      "system_intent": "Fix refinery dock pad flickering and z-fighting with kerb plinth offset and grass shell suppression in pad footprints",
+      "depends_on": [],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/battle/buildings/structure.gd",
+        "prototype/scripts/terrain_builder.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0008",
+      "status": "PASS",
+      "system_intent": "Add real mathematical topo contour lines, USGS woodland green hash pattern for trees, and rocky hash pattern for obstacles and rocky surface zones",
+      "depends_on": ["TASK-0004"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/tools/terrain/bake_usgs_topo.py",
+        "prototype/scripts/match_setup.gd",
+        "prototype/data/maps/*_topo.png"
+      ]
+    },
+    {
+      "task_id": "TASK-0009",
+      "status": "PASS",
+      "system_intent": "Fix sculpt_grid float32 terrain & props in topo baker, fix camera.current & own_world_3d in BlueprintThumbnail & SquadronHeroView",
+      "depends_on": ["TASK-0008"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/tools/terrain/bake_usgs_topo.py",
+        "prototype/scripts/blueprint_thumbnail.gd",
+        "prototype/scripts/match_setup.gd",
+        "prototype/scripts/roster_picker.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0010",
+      "status": "PASS",
+      "system_intent": "Render accurate water bodies, delta rivers, painted water masks, and submerged terrain in USGS hydro blue with shoreline borders",
+      "depends_on": ["TASK-0009"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/tools/terrain/bake_usgs_topo.py",
+        "prototype/data/maps/*_topo.png"
+      ]
+    },
+    {
+      "task_id": "TASK-0011",
+      "status": "PASS",
+      "system_intent": "Ground vehicles in SquadronHeroView by per-vehicle AABB bottom offset so wheels and tracks rest cleanly on the apron driving surface",
+      "depends_on": ["TASK-0006"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/match_setup.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0012",
+      "status": "PASS",
+      "system_intent": "Purge lingering nitrous_injector comments and implement unit-level abilities in unit.gd (ATTACK_GROUND, deploy_smoke, launch_sensor_beacon, drop_mine)",
+      "depends_on": [],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/drivetrain.gd",
+        "prototype/scripts/battle/units/unit.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0013",
+      "status": "PASS",
+      "system_intent": "Add ability arming states, cursor updating, and order dispatching to match_director.gd",
+      "depends_on": ["TASK-0012"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/battle/match_director.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0014",
+      "status": "PASS",
+      "system_intent": "Add ability row and buttons to HUDCommandCard with contextual illumination and hotkeys",
+      "depends_on": ["TASK-0013"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/hud/hud_command_card.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0015",
+      "status": "PASS",
+      "system_intent": "Make drawers persist open when dragging parts out until another drawer is opened",
+      "depends_on": [],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/drag_drop_manager.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0016",
+      "status": "PASS",
+      "system_intent": "Disable default mirror placement across modules while preserving locomotor symmetry",
+      "depends_on": ["TASK-0015"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scenes/UI_StatBlock.tscn",
+        "prototype/scripts/module_placer.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0017",
+      "status": "PASS",
+      "system_intent": "Weapon VFX Framework Audit — consolidate spawn/trail/impact entry points, add _attach_trail_to_round + _detonate_at helpers, publish contract doc",
+      "depends_on": ["TASK-0016"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/auto_weapon.gd",
+        "prototype/docs/WEAPON_VFX_FRAMEWORK.md"
+      ]
+    },
+    {
+      "task_id": "TASK-0018",
+      "status": "QUEUED",
+      "system_intent": "guided_missile — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.2)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0019",
+      "status": "QUEUED",
+      "system_intent": "missile_pod — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.0, 4× swarm)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0020",
+      "status": "QUEUED",
+      "system_intent": "rocket_artillery — implement per-weapon VFX profile (arcing rocket, trail bulk 2.6, impact scale 2.4, 4-8× salvo)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0021",
+      "status": "QUEUED",
+      "system_intent": "hypervelocity_missile — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.0, 2-4× ripple)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0022",
+      "status": "QUEUED",
+      "system_intent": "sam_launcher — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.0)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0023",
+      "status": "QUEUED",
+      "system_intent": "loitering_munition — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.2, top_attack=true)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0024",
+      "status": "QUEUED",
+      "system_intent": "anti_radiation_missile — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.0)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0025",
+      "status": "QUEUED",
+      "system_intent": "bunker_buster — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.4, top_attack=true)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0026",
+      "status": "QUEUED",
+      "system_intent": "cruise_missile — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.5, long range 4.67s)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0027",
+      "status": "QUEUED",
+      "system_intent": "artillery — implement per-weapon VFX profile (arcing bomb, shell_radius 0.4, arc 12.0, blast 6.0)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0028",
+      "status": "QUEUED",
+      "system_intent": "mortar_array — implement per-weapon VFX profile (3× salvo, shell_radius 0.2, arc 6.0, blast 4.0, no trail)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0029",
+      "status": "QUEUED",
+      "system_intent": "spigot_mortar — implement per-weapon VFX profile (tumble bomb, shell_radius 0.5×payload, blast 5.5×payload)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0030",
+      "status": "QUEUED",
+      "system_intent": "cluster_dispenser — implement per-weapon VFX profile (canister→bomblets, shell_radius 0.12×payload, blast 2.5×payload)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0031",
+      "status": "QUEUED",
+      "system_intent": "plasma_lobber — implement per-weapon VFX profile (sphere + puddle decal, shell_radius 0.35, arc 4.0, blast 4.5)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0032",
+      "status": "QUEUED",
+      "system_intent": "mk19_grenade_launcher — implement per-weapon VFX profile (shallow arc, shell_radius 0.16, arc 1.8, blast 2.2)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0033",
+      "status": "QUEUED",
+      "system_intent": "napalm_mortar — implement per-weapon VFX profile (bomb + burn pool, shell_radius 0.3, arc 7.0, blast 4.0, pool 1.7/2.2)",
+      "depends_on": ["TASK-0017"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0034",
+      "status": "PASS",
+      "system_intent": "Implement 4 new buildings (Base Radar, Advanced Refinery, Fusion Reactor, Optimization Matrix) in BuildingCatalog, PlacementService, HarvesterFSM, and ProductionService",
+      "depends_on": [],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/battle/economy/building_catalog.gd",
+        "prototype/scripts/battle/buildings/placement_service.gd",
+        "prototype/scripts/battle/economy/harvester_fsm.gd",
+        "prototype/scripts/battle/economy/production_service.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0035",
+      "status": "PASS",
+      "system_intent": "Implement 12 distinct base building architectural sets in building_mesh_sets.gd, integrate with Livery persistence and LiveryScreen turntable",
+      "depends_on": ["TASK-0034"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/building_mesh_sets.gd",
+        "prototype/scripts/livery.gd",
+        "prototype/scripts/battle/buildings/building_mesh.gd",
+        "prototype/scripts/livery_screen.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0036",
+      "status": "PASS",
+      "system_intent": "Add build card preview thumbnails (units and structures) and category sorting to HUDProductionDeck",
+      "depends_on": ["TASK-0034"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/hud/hud_production_deck.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0037",
+      "status": "PASS",
+      "system_intent": "Fix visual defects and engine warnings in match_setup.gd: camera look_at node error, stage_theatre glyph warning, apron bounding clamping, and map letterbox replacement",
+      "depends_on": ["TASK-0036"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/match_setup.gd",
+        "prototype/assets/ui/matchsetup/stage_theatre.svg"
+      ]
+    },
+    {
+      "task_id": "TASK-0038",
+      "status": "QUEUED",
+      "system_intent": "Overhaul roster wells and blueprint library cards: preserve thumbnails in filled wells, unify category sorting, fix horizontal card clipping, and add visual stat meters",
+      "depends_on": ["TASK-0037"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/roster_picker.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0039",
+      "status": "QUEUED",
+      "system_intent": "Upgrade 3D squadron staging apron to industrial tarmac with taxiway markings and replace text dump with structured Echelon Manifest Table",
+      "depends_on": ["TASK-0038"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/match_setup.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0040",
+      "status": "QUEUED",
+      "system_intent": "Implement War Room Ops-Table architecture uniting Theatre Recon, 3D Staging Turntable, Roster Tray, and Directives into a single-screen command console",
+      "depends_on": ["TASK-0039"],
+      "model_tier": "flash_lite",
+      "attempts": 0,
+      "target_nodes": [
+        "prototype/scripts/match_setup.gd",
+        "prototype/scenes/MatchSetup.tscn"
+      ]
+    }
+  ],
+  "budget": {
+    "total_clanker_attempts": 14,
+    "tier_distribution": {
+      "flash_lite": 14,
+      "flash": 0,
+      "inherit": 0,
+      "pro": 0
+    },
+    "ceiling": 297
+  },
+  "structural_delta_log": [
+    {
+      "task_id": "TASK-0017",
+      "struct": "YES",
+      "new_symbols": [
+        "auto_weapon._attach_trail_to_round(round_node: Node3D, trail_bulk: float, shell_radius: float) -> void",
+        "auto_weapon._detonate_at(position: Vector3, blast_radius: float, damage: float, color: Color, entropy: float) -> void"
+      ],
+      "new_documents": [
+        "prototype/docs/WEAPON_VFX_FRAMEWORK.md"
+      ],
+      "deleted_symbols": [],
+      "renamed_symbols": [],
+      "requires_reimport": false,
+      "new_autoloads": false,
+      "new_class_names": false
+    }
+  ],
+  "graph_freshness": {
+    "last_indexed_commit": "4af4a0c046ae3e7d61e697a1f81d7d355e4e93fc",
+    "stale_by_commits": 1,
+    "rebuild_scheduled": true,
+    "note": "graphify-out/graph.json built from 4af4a0c0, now 1 framework commit stale — rebuild scheduled"
+  }
+}

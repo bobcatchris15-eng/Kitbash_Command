@@ -135,13 +135,13 @@ func _ready() -> void:
 	tab_bar.add_theme_constant_override("separation", 6)
 	left_plate.add_child(tab_bar)
 
-	var tab_titles := ["COLORS & ZONES", "PATTERNS", "FINISHES & WEAR", "DECALS", "PRESETS"]
+	var tab_titles := ["COLORS & ZONES", "PATTERNS", "FINISHES & WEAR", "DECALS", "PRESETS", "BUILDING STYLES"]
 	for i in range(tab_titles.size()):
 		var t_btn := Button.new()
 		t_btn.text = tab_titles[i]
 		t_btn.toggle_mode = true
 		t_btn.button_pressed = (i == 0)
-		t_btn.custom_minimum_size = Vector2(110, 34)
+		t_btn.custom_minimum_size = Vector2(90, 34)
 		t_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		UIFeedbackScript.wire(t_btn)
 		t_btn.pressed.connect(_on_tab_clicked.bind(i))
@@ -158,7 +158,12 @@ func _ready() -> void:
 	_build_tab_patterns()
 	_build_tab_finishes()
 	_build_tab_decals()
+	_build_tab_colors()
+	_build_tab_patterns()
+	_build_tab_finishes()
+	_build_tab_decals()
 	_build_tab_presets()
+	_build_tab_building_styles()
 
 	_switch_tab(0)
 
@@ -638,6 +643,32 @@ func _build_tab_presets() -> void:
 # ---------------------------------------------------------------------------
 # TAB NAVIGATION
 # ---------------------------------------------------------------------------
+const BuildingMeshSets = preload("res://scripts/building_mesh_sets.gd")
+var _tab_building_styles_node: Control = null
+
+func _build_tab_building_styles() -> void:
+	_tab_building_styles_node = VBoxContainer.new()
+	_tab_building_styles_node.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	_tab_container.add_child(_tab_building_styles_node)
+	
+	var label := Label.new()
+	label.text = "Select Architectural Set:"
+	label.theme_type_variation = "HeadingLabel"
+	_tab_building_styles_node.add_child(label)
+	
+	var opt := OptionButton.new()
+	var sets := BuildingMeshSets.get_set_list()
+	for i in range(sets.size()):
+		opt.add_item(sets[i]["name"], i)
+		if _livery.get("building_mesh_set") == sets[i]["id"]:
+			opt.selected = i
+	UIFeedbackScript.wire(opt)
+	opt.item_selected.connect(func(idx: int):
+		_livery["building_mesh_set"] = sets[idx]["id"]
+		_apply_live()
+	)
+	_tab_building_styles_node.add_child(opt)
+	
 func _switch_tab(index: int) -> void:
 	_current_tab = index
 	for i in range(_tab_buttons.size()):
@@ -647,6 +678,7 @@ func _switch_tab(index: int) -> void:
 	_tab_finishes_node.visible = (index == 2)
 	_tab_decals_node.visible = (index == 3)
 	_tab_presets_node.visible = (index == 4)
+	_tab_building_styles_node.visible = (index == 5)
 
 func _on_tab_clicked(index: int) -> void:
 	_switch_tab(index)

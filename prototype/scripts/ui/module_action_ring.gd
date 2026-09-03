@@ -81,19 +81,22 @@ func set_action_enabled(id: String, enabled: bool) -> void:
 			break
 
 
-func add_tweak_station(tweak_name: String, label: String, control: Control) -> void:
+func add_tweak_station(tweak_name: String, label: String, control: Control, p_tier: int = -1) -> void:
 	# Sequential claim alternating sides: 12, 1, 11, 2, 10, ... 6 o'clock, so
 	# dials fan evenly rather than hugging one side. No tweak owns a position -
 	# a dial's place is its authoring order. A thirteenth dial opens a second
 	# radial tier back at 12 o'clock (tier = flat index / 12).
+	# Optional p_tier overrides automatic tier (e.g., ammo selectors use tier 1
+	# to orbit further out and avoid overlapping adjacent dials).
 	var n := TweakStations.OUTER_STATIONS.size()
 	var slot := _tweak_stations.size()
+	var tier: int = p_tier if p_tier >= 0 else (slot / n)
 	_tweak_stations.append({
 		"name": tweak_name,
 		"label": label,
 		"control": control,
 		"angle": TweakStations.OUTER_STATIONS[slot % n],
-		"tier": slot / n,
+		"tier": tier,
 	})
 	_station_container.add_child(control)
 	_update_station_positions()

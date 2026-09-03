@@ -303,6 +303,7 @@ const CHROME_DIR = "res://assets/ui/matchsetup/"
 static var _chrome_cache: Dictionary = {}
 
 static func chrome_icon(name: String) -> Texture2D:
+	if name == "stage_theatre": name = "stage_map"
 	if _chrome_cache.has(name):
 		return _chrome_cache[name]
 	var path := CHROME_DIR + name + ".svg"

@@ -219,7 +219,7 @@ func setup_from_blueprint(blueprint: Dictionary, structure_team: int, bp_manager
 # Purely decorative - no collision and no navmesh hole. A pad marks walkable
 # ground, so giving it either would carve away the exact surface the harvester
 # has to stand on to use it.
-const DOCK_PAD_SIZE := Vector3(7.0, 0.08, 9.0)
+const DOCK_PAD_SIZE := Vector3(7.0, 0.14, 9.0)
 # How far the kerb plinth reaches below the pad's driving surface. Has to exceed
 # the worst residual terrain deviation under a flattened pad - measured at
 # 0.07 m on sentinel_divide with tools/probe_dock_pads.gd - with enough margin
@@ -316,27 +316,19 @@ func _add_dock_pads() -> void:
 		# a test fixture without a match director), fall back to the
 		# previous fixed local Y so a pad always renders, just maybe
 		# slightly sunken / floating on a slope.
-		var pad_y: float = 0.07
+		var pad_y: float = 0.12
 		if not world_map.is_empty():
 			var bay_world := global_position + Vector3(bay.x, 0.0, bay.z)
 			var bay_terrain_y: float = TerrainBuilder.terrain_height_at(world_map, bay_world)
-			pad_y = bay_terrain_y - global_position.y + 0.07
+			pad_y = bay_terrain_y - global_position.y + 0.12
 
 		# THE KERB IS A PLINTH, NOT A TRIM RING.
 		#
-		# It used to be the same 6 cm slab as the pad, sitting 4 cm lower, which
-		# left a visible gap around the edges even once the pad Y was correct.
-		# The reason is that flattening the terrain only moves the ground mesh's
-		# VERTICES: between them the surface interpolates, so a rigid horizontal
-		# slab still lifts off wherever a triangle sags away beneath it, by up
-		# to the terrain step times the residual slope.
-		#
-		# Chasing that with ever-larger flatten margins does not converge -
-		# there is always a triangle edge somewhere. A plinth does: it extends
-		# DOWN into the ground far enough that no residual deviation can show a
-		# gap, with its top flush with the pad's driving surface. This is the
-		# "give them a foundation" half of Chris's original either/or, and it is
-		# doing the job the flattening cannot.
+		# It used to be co-planar with the pad's top face, which caused severe
+		# z-fighting between the kerb box and the pad box over their shared 7x9m
+		# footprint. To prevent any coplanar interference or terrain bleed, the
+		# plinth's top face sits 12 mm below the pad's driving surface so the
+		# asphalt pad stands slightly proud of the concrete kerb perimeter.
 		var kerb := MeshInstance3D.new()
 		var kerb_mesh := BoxMesh.new()
 		kerb_mesh.size = Vector3(
@@ -346,10 +338,10 @@ func _add_dock_pads() -> void:
 		kerb.mesh = kerb_mesh
 		kerb.name = "Plinth_%d" % bay_index
 		kerb.material_override = _kerb_material
-		# Top face flush with the pad's top; the remainder is buried.
+		# Top face sits 12 mm below the pad driving surface to eliminate z-fighting.
 		kerb.position = Vector3(
 			bay.x,
-			pad_y + pad_size.y * 0.5 - DOCK_PAD_PLINTH_DEPTH * 0.5,
+			pad_y + pad_size.y * 0.5 - DOCK_PAD_PLINTH_DEPTH * 0.5 - 0.012,
 			bay.z)
 		container.add_child(kerb)
 

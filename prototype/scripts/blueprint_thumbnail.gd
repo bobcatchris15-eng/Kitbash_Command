@@ -39,11 +39,18 @@ var _camera: Camera3D = null
 var last_stats: Dictionary = {}
 
 
-func _ready() -> void:
+func _init() -> void:
 	_build_rig()
 
 
+func _ready() -> void:
+	if _viewport == null:
+		_build_rig()
+
+
 func _build_rig() -> void:
+	if _viewport != null:
+		return
 	_viewport = SubViewport.new()
 	_viewport.size = Vector2i(SIZE, SIZE)
 	# TRANSPARENT so the thumbnail composites onto whatever plate the slot uses
@@ -67,6 +74,7 @@ func _build_rig() -> void:
 	# distinguishable at thumbnail size. A pure side or top view collapses one
 	# of the three and makes half the roster look identical.
 	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	_camera.current = true
 	_camera.rotation_degrees = Vector3(-25.0, 35.0, 0.0)
 	_viewport.add_child(_camera)
 
@@ -96,10 +104,9 @@ func _build_rig() -> void:
 # Bakes one blueprint. Returns null if the blueprint could not be reconstructed,
 # so callers can fall back to a text-only card rather than showing a blank slot.
 func bake(blueprint_data: Dictionary) -> ImageTexture:
-	# Cleared FIRST, before any of the early returns below. bake() can bail at
-	# four points, and leaving the previous design's figures in last_stats would
-	# have a failed bake silently attribute one unit's HP and DPS to another.
 	last_stats = {}
+	if _viewport == null:
+		_build_rig()
 	if blueprint_data.is_empty() or _viewport == null:
 		return null
 
@@ -164,6 +171,7 @@ func _frame_model(model: Node3D) -> void:
 # bakes. `rotation_degrees` is passed in because part_thumbnail.gd's rig uses
 # a different three-quarter angle than the blueprint rig.
 static func frame_camera(camera: Camera3D, model: Node3D, rotation_degrees: Vector3, margin: float = 1.15) -> void:
+	camera.current = true
 	var aabb := merged_aabb(model, Transform3D.IDENTITY)
 	camera.rotation_degrees = rotation_degrees
 	if aabb.size == Vector3.ZERO:
@@ -195,6 +203,7 @@ static func frame_camera(camera: Camera3D, model: Node3D, rotation_degrees: Vect
 	camera.position = centre + basis.z * (extent + 8.0)
 	camera.near = 0.05
 	camera.far = extent * 4.0 + 32.0
+	camera.current = true
 
 
 static func merged_aabb(node: Node, xform: Transform3D) -> AABB:

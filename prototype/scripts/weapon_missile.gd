@@ -5,6 +5,15 @@ const Profiler = preload("res://scripts/battle/battle_profiler.gd")
 const MeshAssetLoader = preload("res://scripts/mesh_asset_loader.gd")
 const VFXEffects = preload("res://scripts/vfx_effects.gd")
 const VFXBurstScript = preload("res://scripts/vfx_burst.gd")
+
+# Weapon VFX styles — per-missile trail/impact overrides (WEAPON_VFX_FRAMEWORK.md)
+const WeaponVFXGuidedMissile = preload("res://scripts/vfx/weapon_vfx_guided_missile.gd")
+const WeaponVFXMissilePod = preload("res://scripts/vfx/weapon_vfx_missile_pod.gd")
+const WeaponVFXHypervelocityMissile = preload("res://scripts/vfx/weapon_vfx_hypervelocity_missile.gd")
+const WeaponVFXSAMLauncher = preload("res://scripts/vfx/weapon_vfx_sam_launcher.gd")
+const WeaponVFXLoiteringMunition = preload("res://scripts/vfx/weapon_vfx_loitering_munition.gd")
+const WeaponVFXAntiRadiationMissile = preload("res://scripts/vfx/weapon_vfx_anti_radiation_missile.gd")
+const WeaponVFXCruiseMissile = preload("res://scripts/vfx/weapon_vfx_cruise_missile.gd")
 # Real, interceptable weapon missile (FABLE_REVIEW.md 2.2). Fired by
 # guided_missile / dual_stage_missile / missile_pod instead of the old
 # cosmetic tweened meshes - those never registered in the "missiles" group,
@@ -58,6 +67,9 @@ var _dumb_time: float = 0.0
 var _dumb_heading: Vector3 = Vector3.ZERO
 var _trail: GPUParticles3D = null
 var _impact_pos: Vector3 = Vector3.ZERO
+
+# Signal for missile_pod VFX wire-in: emitted on impact/interception with position and intercepted flag
+signal destroyed(position: Vector3, intercepted: bool)
 
 func setup(missile_target: Node3D, weapon: Node3D, dmg: float, dclass: String, missile_team: int):
 	target = missile_target
@@ -123,11 +135,34 @@ func _ready():
 	add_child(glow)
 	glow.position = Vector3(0, 0, 0.20)
 
-	# Smoke trail: one persistent GPUParticles3D emitter at the rear end.
-	# local_coords = true so it follows the missile; billboard quads with
-	# the smoke flipbook for a dense plume that dissipates in 0.25s.
-	_trail = VFXEffects.make_missile_trail(self)
-	_trail.position = Vector3(0, 0, 0.20)
+	# Smoke trail: per-missile identity trail (WEAPON_VFX_FRAMEWORK.md).
+	# Default falls back to generic missile trail.
+	var launcher_type = owner_weapon.type_id if is_instance_valid(owner_weapon) else ""
+	match launcher_type:
+		"guided_missile":
+			_trail = WeaponVFXGuidedMissile.make_missile_trail(self)
+			_trail.position = Vector3(0, 0, 0.25)
+		"missile_pod":
+			_trail = WeaponVFXMissilePod.configure_missile_trail(self, 0.85)
+			_trail.position = Vector3(0, 0, 0.20)
+		"hypervelocity_missile":
+			_trail = WeaponVFXHypervelocityMissile.make_dart_trail(self)
+			_trail.position = Vector3(0, 0, 0.2)
+		"sam_launcher":
+			_trail = WeaponVFXSAMLauncher.make_missile_trail(self)
+			_trail.position = Vector3(0, 0, 0.4)
+		"loitering_munition":
+			_trail = WeaponVFXLoiteringMunition.make_loiter_trail(self)
+			_trail.position = Vector3(0, 0, 0.35)
+		"anti_radiation_missile":
+			_trail = WeaponVFXAntiRadiationMissile.make_missile_trail(self)
+			_trail.position = Vector3(0, 0, 0.4)
+		"cruise_missile":
+			_trail = WeaponVFXCruiseMissile.make_missile_trail(self)
+			_trail.position = Vector3(0, 0, 0.6)
+		_:
+			_trail = VFXEffects.make_missile_trail(self)
+			_trail.position = Vector3(0, 0, 0.20)
 
 func _physics_process(delta):
 	if is_destroyed: return
@@ -155,6 +190,7 @@ func _missile_tick(delta: float) -> void:
 		if _dumb_time >= DUMB_FLIGHT_TIME:
 			_impact_pos = global_position
 			_spawn_impact_visual()
+			destroyed.emit(_impact_pos, false)
 			destroy_missile(false)
 		return
 
@@ -234,12 +270,39 @@ func _missile_tick(delta: float) -> void:
 		elif target.has_method("take_damage"):
 			target.take_damage(damage_amount, damage_class, _impact_pos)
 		_spawn_impact_visual()
+		destroyed.emit(_impact_pos, false)
 		destroy_missile(false)
 
 func _spawn_impact_visual():
 	if not is_inside_tree(): return
 	var scene = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
-	# Per-spawn entropy — every detonation looks slightly different.
+	var launcher_type = owner_weapon.type_id if is_instance_valid(owner_weapon) else ""
+	
+	# Per-missile impact visuals (WEAPON_VFX_FRAMEWORK.md)
+	match launcher_type:
+		"guided_missile":
+			WeaponVFXGuidedMissile.spawn_tandem_impact(scene, _impact_pos)
+			return
+		"hypervelocity_missile":
+			WeaponVFXHypervelocityMissile.spawn_penetrator_impact(scene, _impact_pos, 1.0)
+			return
+		"sam_launcher":
+			WeaponVFXSAMLauncher.spawn_proximity_burst(scene, _impact_pos)
+			return
+		"loitering_munition":
+			WeaponVFXLoiteringMunition.spawn_shaped_charge_impact(scene, _impact_pos)
+			return
+		"anti_radiation_missile":
+			WeaponVFXAntiRadiationMissile.spawn_impact(scene, _impact_pos)
+			return
+		"cruise_missile":
+			WeaponVFXCruiseMissile.spawn_impact_sequence(scene, _impact_pos)
+			return
+		"missile_pod":
+			# missile_pod impacts handled via signal connection in _fire_swarm_missiles
+			pass
+	
+	# Default generic missile impact (fallback)
 	var entropy := randf_range(0.82, 1.18)
 	var color_shift := Color(randf_range(0.90, 1.0), randf_range(0.85, 1.0), randf_range(0.80, 1.0))
 	var final_color: Color = Color.ORANGE * color_shift
@@ -270,6 +333,9 @@ func _spawn_impact_visual():
 func destroy_missile(intercepted: bool):
 	if is_destroyed: return
 	is_destroyed = true
+	# Emit destroyed signal for VFX wire-in (missile_pod, etc.)
+	destroyed.emit(global_position, intercepted)
+	
 	# Detach the smoke trail so it can drain after the missile is freed.
 	# Reparent to scene root, stop emitting, then free once the last
 	# particles have aged out (lifetime 0.25s).
@@ -282,6 +348,18 @@ func destroy_missile(intercepted: bool):
 		var drain = _trail.create_tween()
 		drain.tween_interval(_trail.lifetime + 0.1)
 		drain.finished.connect(func(): if is_instance_valid(_trail): _trail.queue_free())
+	
+	# Per-missile interception visuals (WEAPON_VFX_FRAMEWORK.md)
+	if intercepted:
+		var launcher_type = owner_weapon.type_id if is_instance_valid(owner_weapon) else ""
+		if launcher_type == "hypervelocity_missile":
+			var scene = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
+			WeaponVFXHypervelocityMissile.spawn_interception_flash(scene, global_position)
+			queue_free()
+			return
+		# guided_missile, sam_launcher, loitering_munition, anti_radiation_missile,
+		# bunker_buster, cruise_missile: keep existing cyan flash logic (no change)
+	
 	if is_inside_tree():
 		var scene = get_tree().current_scene if get_tree().current_scene != null else get_tree().root
 		var exp_color: Color = Color.CYAN if intercepted else Color.ORANGE

@@ -363,6 +363,10 @@ var _selection_rect: Panel = null
 # Same convention OpenRA's sidebar icons use, and the same one the old runtime
 # used for repair/sell.
 var _attack_move_armed := false
+var _barrage_armed: bool = false
+var _smoke_armed: bool = false
+var _beacon_armed: bool = false
+var _mine_armed: bool = false
 var _hud_hint: Label = null
 
 # cell -> Array of units, rebuilt each physics tick. Separation asks this rather
@@ -4417,7 +4421,33 @@ func _unhandled_input(event: InputEvent) -> void:
 			# stationary (no drag).
 			if _right_press_active and not _right_dragged \
 					and event.position.distance_to(_right_press_pos) <= DRAG_CLICK_THRESHOLD:
-				if _attack_move_armed:
+				if is_any_ability_armed():
+					var ground_hit := _raycast(event.position, LayersScript.GROUND_PICK_MASK, false)
+					var target_pos: Vector3 = ground_hit.position if not ground_hit.is_empty() else Vector3.ZERO
+					if not ground_hit.is_empty():
+						var sel = selection.selected if selection != null else []
+						if _barrage_armed:
+							if orders != null:
+								orders.attack_ground(sel, target_pos, event.shift_pressed)
+							_flash("BARRAGE ORDER ISSUED")
+						elif _smoke_armed:
+							for u in sel:
+								if is_instance_valid(u) and u.has_method("deploy_smoke"):
+									u.deploy_smoke(target_pos)
+							_flash("SMOKE SCREEN DEPLOYED")
+						elif _beacon_armed:
+							for u in sel:
+								if is_instance_valid(u) and u.has_method("launch_sensor_beacon"):
+									u.launch_sensor_beacon(target_pos)
+							_flash("RECON BEACON LAUNCHED")
+						elif _mine_armed:
+							for u in sel:
+								if is_instance_valid(u) and u.has_method("drop_mine"):
+									u.drop_mine(target_pos)
+							_flash("MINES DEPLOYED")
+					disarm_all_abilities()
+					return
+				elif _attack_move_armed:
 					_set_armed(false)
 					_issue_at(event.position, true, event.shift_pressed)
 				else:
@@ -4438,6 +4468,10 @@ func _handle_key(event: InputEventKey) -> void:
 
 	if event.is_action_pressed("cmd_attack_move"):
 		_set_armed(not _attack_move_armed)
+	elif event.is_action_pressed("cmd_barrage"):
+		arm_barrage(not _barrage_armed)
+	elif event.is_action_pressed("cmd_smoke"):
+		arm_smoke(not _smoke_armed)
 	elif event.is_action_pressed("cmd_stop"):
 		orders.stop(selection.selected)
 		_flash("STOP")
@@ -4687,6 +4721,26 @@ func _match_build_path() -> String:
 # One threshold, so a slightly shaky click never silently becomes an empty
 # one-pixel drag that clears the selection.
 func _resolve_left_release(at: Vector2, additive: bool) -> void:
+	if is_any_ability_armed():
+		var ground_hit := _raycast(at, LayersScript.GROUND_PICK_MASK, false)
+		if not ground_hit.is_empty():
+			var sel = selection.selected if selection != null else []
+			if _barrage_armed and orders != null:
+				orders.attack_ground(sel, ground_hit.position, additive)
+				_flash("BARRAGE ORDER ISSUED")
+			elif _smoke_armed:
+				for u in sel: if is_instance_valid(u) and u.has_method("deploy_smoke"): u.deploy_smoke(ground_hit.position)
+				_flash("SMOKE SCREEN DEPLOYED")
+			elif _beacon_armed:
+				for u in sel: if is_instance_valid(u) and u.has_method("launch_sensor_beacon"): u.launch_sensor_beacon(ground_hit.position)
+				_flash("RECON BEACON LAUNCHED")
+			elif _mine_armed:
+				for u in sel: if is_instance_valid(u) and u.has_method("drop_mine"): u.drop_mine(ground_hit.position)
+				_flash("MINES DEPLOYED")
+			disarm_all_abilities()
+			get_viewport().set_input_as_handled()
+			return
+
 	var rect := Rect2(_drag_origin, at - _drag_origin).abs()
 	var picked: Array = []
 	if rect.size.length() >= SelectionServiceScript.DRAG_THRESHOLD_PX:
@@ -5124,6 +5178,65 @@ func _set_armed(value: bool) -> void:
 		return
 	if value:
 		cm.set_cursor(cm.CursorType.ATTACK)
+	else:
+		_update_hover_cursor(get_viewport().get_mouse_position())
+
+func disarm_all_abilities() -> void:
+	_attack_move_armed = false
+	_barrage_armed = false
+	_smoke_armed = false
+	_beacon_armed = false
+	_mine_armed = false
+	_flash("")
+	var cm = get_node_or_null("/root/CursorManager")
+	if cm != null:
+		var vp := get_viewport()
+		if vp != null:
+			_update_hover_cursor(vp.get_mouse_position())
+
+func arm_barrage(armed: bool = true) -> void:
+	disarm_all_abilities()
+	_barrage_armed = armed
+	_update_ability_cursor("BARRAGE: RIGHT-CLICK TARGET AREA" if armed else "")
+
+func arm_smoke(armed: bool = true) -> void:
+	disarm_all_abilities()
+	_smoke_armed = armed
+	_update_ability_cursor("DEPLOY SMOKE: RIGHT-CLICK TARGET AREA" if armed else "")
+
+func arm_sensor_beacon(armed: bool = true) -> void:
+	disarm_all_abilities()
+	_beacon_armed = armed
+	_update_ability_cursor("RECON PROBE: RIGHT-CLICK TARGET AREA" if armed else "")
+
+func arm_mine(armed: bool = true) -> void:
+	disarm_all_abilities()
+	_mine_armed = armed
+	_update_ability_cursor("LAY MINES: RIGHT-CLICK TARGET AREA" if armed else "")
+
+func trigger_boost() -> void:
+	var sel = selection.selected if selection != null else []
+	var any_boosted := false
+	for u in sel:
+		if is_instance_valid(u) and u.has_method("activate_boost"):
+			if u.activate_boost():
+				any_boosted = true
+	if any_boosted:
+		_flash("ROCKET BOOSTERS ENGAGED")
+
+func is_any_ability_armed() -> bool:
+	return _barrage_armed or _smoke_armed or _beacon_armed or _mine_armed
+
+func _update_ability_cursor(hint_text: String) -> void:
+	_flash(hint_text)
+	var cm = get_node_or_null("/root/CursorManager")
+	if cm != null:
+		if is_any_ability_armed():
+			cm.set_cursor(cm.CursorType.ATTACK)
+		else:
+			var vp := get_viewport()
+			if vp != null:
+				_update_hover_cursor(vp.get_mouse_position())
 	else:
 		var vp := get_viewport()
 		if vp != null:

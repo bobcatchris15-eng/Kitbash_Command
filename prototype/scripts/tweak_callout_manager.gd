@@ -280,7 +280,7 @@ func _generate_locomotion_radial_tweaks(module: Node3D, data: ModuleDataResource
 		leg_selector.ammo_selected.connect(func(picked: String):
 			_on_leg_picked(picked)
 		)
-		_action_ring.add_tweak_station(ModuleCatalog.LEG_TWEAK_KEY, "Leg Profile", leg_selector)
+		_action_ring.add_tweak_station(ModuleCatalog.LEG_TWEAK_KEY, "Leg Profile", leg_selector, 1)
 
 	lab.is_updating_sliders = false
 
@@ -574,7 +574,7 @@ func _generate_custom_tweaks(module: Node3D, data: ModuleDataResource):
 			data.tweaks[ModuleCatalog.AMMO_TWEAK_KEY] = picked
 			_on_tweak_changed()
 		)
-		_action_ring.add_tweak_station(ModuleCatalog.AMMO_TWEAK_KEY, "Ammo", ammo_selector)
+		_action_ring.add_tweak_station(ModuleCatalog.AMMO_TWEAK_KEY, "Ammo", ammo_selector, 1)
 
 	# drone_carrier's drone_type selector. Added after ammo, so it claims the
 	# next free slot rather than sharing one.
@@ -588,7 +588,7 @@ func _generate_custom_tweaks(module: Node3D, data: ModuleDataResource):
 			data.tweaks["drone_type"] = picked
 			_on_tweak_changed()
 		)
-		_action_ring.add_tweak_station("drone_type", "Drone Type", drone_selector)
+		_action_ring.add_tweak_station("drone_type", "Drone Type", drone_selector, 1)
 
 	if not LabDocument.TWEAK_SPECS.has(type_id):
 		return

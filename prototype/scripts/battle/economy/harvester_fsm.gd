@@ -467,6 +467,14 @@ func _unload(delta: float) -> void:
 	var payout := 0
 	for type_id in cargo_by_type:
 		payout += ResourceCatalogScript.deliver_credits(type_id, int(cargo_by_type[type_id]))
+
+	if _world != null and _world.has_method("structures_of_kinds"):
+		var refineries: Array = _world.structures_of_kinds(_unit.team, ["advanced_refinery"])
+		for r in refineries:
+			if is_instance_valid(r) and not r.is_dead and refinery.global_position.distance_to(r.global_position) <= 25.0:
+				payout = int(round(payout * 1.70))
+				break
+
 	_world.deliver(_unit.team, payout)
 	cargo_by_type.clear()
 	release()

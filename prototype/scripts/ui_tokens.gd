@@ -136,7 +136,7 @@ const HIT_TARGET_MIN = 32
 # this alpha so it reads as an inactive indicator outline rather than a
 # blank gap; DURATION_INSTANT is used for the snap to full opacity so lighting
 # one reads as immediate, not an animated reveal.
-const WARNING_GHOST_OPACITY = 0.16
+const WARNING_GHOST_OPACITY = 0.06
 
 # ---------------------------------------------------------------------------
 # ELEVATION
@@ -333,3 +333,12 @@ const MAP_SPAWN_PLAYER = SIGNAL_GO
 const MAP_SPAWN_ENEMY = SIGNAL_ALERT
 const MAP_GRID = Color(0.290, 0.281, 0.257, 0.35)   # BASE_500 at grid alpha
 const MAP_GRID_DIVISIONS = 8
+
+const MAP_USGS_BUFF = Color(0.957, 0.945, 0.914, 1.0)        # Quadrangle parchment
+const MAP_USGS_WATER = Color(0.557, 0.733, 0.831, 1.0)       # Hydrographic cyan-blue
+const MAP_USGS_WATER_EDGE = Color(0.239, 0.463, 0.600, 1.0)  # Shoreline rule
+const MAP_USGS_CONTOUR_INDEX = Color(0.420, 0.267, 0.137, 1.0) # Index contour sepia
+const MAP_USGS_CONTOUR_INTER = Color(0.651, 0.502, 0.357, 0.8) # Intermediate contour
+const MAP_USGS_WOODLAND = Color(0.820, 0.871, 0.800, 0.45)   # Woodland vegetation tint
+const MAP_USGS_NEATLINE = Color(0.250, 0.240, 0.220, 0.85)   # Quadrangle neatline frame
+const MAP_USGS_GRID = Color(0.300, 0.290, 0.270, 0.35)       # UTM graticule ticks

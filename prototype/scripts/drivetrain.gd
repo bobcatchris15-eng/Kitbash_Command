@@ -660,8 +660,7 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 		# Lab can say an Overdrive Gearbox is why the number moved. 1.0 when
 		# no propulsion part is fitted.
 		"chassis_speed_mult": chassis_speed_mult,
-		# The strongest burst-boost part fitted (nitrous_injector,
-		# booster_rack, ...), or {} when none. NOT applied to move_speed/
+		# The strongest burst-boost part fitted (booster_rack, ...), or {} when none. NOT applied to move_speed/
 		# top_speed above - see the header comment on boost_summary.
 		"boost": boost_summary,
 	}

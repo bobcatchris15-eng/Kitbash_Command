@@ -27,6 +27,7 @@ const NAMES: Array[String] = [
 	"stance_hold", "stance_return", "stance_aggressive",
 	"cancel", "pause", "resume",
 	"alert", "contact", "ready",
+	"smoke", "barrage", "beacon", "mine", "boost",
 ]
 
 static var _cache: Dictionary = {}

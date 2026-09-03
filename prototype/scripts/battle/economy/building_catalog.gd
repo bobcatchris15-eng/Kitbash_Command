@@ -151,7 +151,46 @@ const STATS := {
 		"gives_buildable_area": true, "requires_buildable_area": true,
 		"adjacent_m": DEFAULT_ADJACENT_M,
 	},
+	"base_radar": {
+		"name": "Base Radar Array", "category": "tech", "vision_range": 450.0,
+		"hp": 1200.0, "size": Vector3(6, 9, 6), "color": Color(0.3, 0.65, 0.85),
+		"cost_metal": 280, "cost_crystal": 90, "build_time": 20.0,
+		"energy_capacity": -15.0,
+		"gives_buildable_area": true, "requires_buildable_area": true,
+		"adjacent_m": DEFAULT_ADJACENT_M,
+	},
+	"advanced_refinery": {
+		"name": "Advanced Refinery", "category": "economy", "vision_range": 90.0,
+		"hp": 2200.0, "size": Vector3(8, 7, 8), "color": Color(0.45, 0.75, 0.85),
+		"cost_metal": 350, "cost_crystal": 140, "build_time": 24.0,
+		"gives_buildable_area": true, "requires_buildable_area": true,
+		"requires_adjacent_kind": "refinery",
+		"adjacent_m": 16.0,
+	},
+	"advanced_power_plant": {
+		"name": "Fusion Reactor", "category": "power", "vision_range": 85.0,
+		"hp": 2000.0, "size": Vector3(7, 6, 7), "color": Color(0.95, 0.8, 0.25),
+		"cost_metal": 380, "cost_crystal": 150, "build_time": 22.0,
+		"energy_capacity": 65.0,
+		"gives_buildable_area": true, "requires_buildable_area": true,
+		"adjacent_m": DEFAULT_ADJACENT_M,
+	},
+	"ancillary_facility": {
+		"name": "Optimization Matrix", "category": "production", "vision_range": 80.0,
+		"hp": 1500.0, "size": Vector3(6, 4, 6), "color": Color(0.5, 0.85, 0.55),
+		"cost_metal": 300, "cost_crystal": 120, "build_time": 20.0,
+		"gives_buildable_area": true, "requires_buildable_area": true,
+		"adjacent_m": DEFAULT_ADJACENT_M,
+	},
 }
+
+const ANCILLARY_KINDS: Array[String] = ["ancillary_facility"]
+
+static func is_ancillary(kind: String) -> bool:
+	return kind in ANCILLARY_KINDS
+
+static func get_category(kind: String) -> String:
+	return get_stat(kind, "category", "tech")
 
 # The three tech-tree kinds, in unlock-tier order. Kept alongside STATS as the
 # canonical list rather than re-derived (e.g. "every kind CONTRIBUTORS has no

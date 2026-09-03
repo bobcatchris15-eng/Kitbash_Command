@@ -319,14 +319,40 @@ func _apply_stats(stats: Dictionary, base_stats: Dictionary = {}):
 	var total_dps = stats["dps"]
 	var dt: Dictionary = stats["drivetrain"]
 
+	# Read armor from armor_plan (aggregate per-side) instead of legacy meta
 	var armor_material = "hardened_steel"
 	var armor_thickness = 1.0
 	var faction = "industrialists"
 
 	if hull:
-		if hull.has_meta("armor_material"):
+		var plan: Dictionary = hull.get_meta("armor_plan", {})
+		if not plan.is_empty() and not bool(plan.get("empty", true)):
+			var sides: Dictionary = plan.get("sides", {})
+			var best_mat := ""
+			var best_weight := 0.0
+			var thick_weighted_sum := 0.0
+			var thick_weight_total := 0.0
+			for s in sides:
+				var sd: Dictionary = sides[s]
+				var cov := float(sd.get("coverage", 0.0))
+				var area := float(sd.get("area", 0.0))
+				var mat := str(sd.get("material", ""))
+				var thick := float(sd.get("mean_thickness", 0.0))
+				if cov > 0.001 and area > 0.0 and mat != "":
+					var w := cov * area
+					if w > best_weight:
+						best_weight = w
+						best_mat = mat
+					thick_weighted_sum += w * thick
+					thick_weight_total += w
+			if best_mat != "":
+				armor_material = best_mat
+			if thick_weight_total > 0.0:
+				armor_thickness = thick_weighted_sum / thick_weight_total
+		# Fallback to legacy meta if no plan
+		if armor_material == "hardened_steel" and hull.has_meta("armor_material"):
 			armor_material = hull.get_meta("armor_material")
-		if hull.has_meta("armor_thickness"):
+		if armor_thickness == 1.0 and hull.has_meta("armor_thickness"):
 			armor_thickness = hull.get_meta("armor_thickness")
 		if hull.has_meta("faction"):
 			faction = hull.get_meta("faction")
@@ -562,12 +588,17 @@ func _build_warning_panel(role: String) -> Array:
 # widget or a new show/hide branch.
 func _apply_warning(panel: PanelContainer, title_lbl: Label, detail_lbl: Label, lit: bool,
 		idle_title: String, idle_detail: String, lit_title: String = "", lit_detail: String = "") -> void:
+	print("[TELEMETRY] _apply_warning: panel=%s, lit=%s, idle_title=%s" % [panel.name if panel else "null", lit, idle_title])
 	if lit:
 		panel.modulate = Color(1, 1, 1, 1)
+		title_lbl.modulate = Color(1, 1, 1, 1)
+		detail_lbl.modulate = Color(1, 1, 1, 1)
 		title_lbl.text = lit_title
 		detail_lbl.text = lit_detail
 	else:
 		panel.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
+		title_lbl.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
+		detail_lbl.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
 		title_lbl.text = idle_title
 		detail_lbl.text = idle_detail
 
@@ -678,6 +709,8 @@ func _update_power_readout(pw: Dictionary) -> void:
 	if _power_net_label == null:
 		_build_power_readout()
 
+	print("[TELEMETRY] _update_power_readout: pw=%s" % [pw])
+
 	# clear_hull() calls update_stats(null), and there is nothing to say about
 	# the power budget of a design that does not exist. Branches on has_hull
 	# exactly as the drivetrain readout branches on has_locomotion - the dict is
@@ -728,22 +761,32 @@ func _update_power_readout(pw: Dictionary) -> void:
 	var firing_only: bool = bool(pw.get("firing_deficit_only", false))
 	
 	if excessive_peak:
+		var max_shot := float(pw.get("max_shot_cost", 0.0))
 		_apply_warning(_power_panel, _power_title, _power_detail, true, "", "",
 			"!  PEAK DRAW EXCESSIVE",
-			"A weapon needs %.1f energy to fire, but capacity is only %.1f. It will never fire. Add a Capacitor Bank." % [float(pw.get("max_shot_cost", 0.0)), float(pw.get("storage", 0.0))])
+			"A weapon needs %.1f energy to fire, but capacity is only %.1f. It will never fire. Add a Capacitor Bank." % [max_shot, storage])
 	elif has_deficit:
+		var rest_endurance := float(pw.get("endurance", 0.0))
+		var firing_endurance := float(pw.get("firing_endurance", 0.0))
+		var detail := "A full buffer lasts %.0fs at rest." % rest_endurance
+		if firing_endurance != rest_endurance and firing_endurance != INF:
+			detail += " Sustained fire: %.0fs." % firing_endurance
+		detail += " Shields drop first, then sensors dim, then energy weapons stop. Buildable and fieldable as-is - fit a generator, add storage to ride it out, or drop some electronics."
 		_apply_warning(_power_panel, _power_title, _power_detail, true, "", "",
 			"!  POWER DEFICIT - %.1f /s SHORT" % absf(net),
-			"A full buffer lasts %.0fs with everything running. Shields drop first, then sensors dim, then energy weapons stop. Buildable and fieldable as-is - fit a generator, add storage to ride it out, or drop some electronics." % float(pw.get("endurance", 0.0)))
+			detail)
 	elif firing_only:
-		# Fine at rest and short only while shooting. A legitimate build rather
-		# than a fault - burst damage paid for out of the buffer and recharged
-		# between engagements - so it is stated as a duty cycle, not a warning to
-		# be fixed.
+		var firing_net := absf(float(pw.get("firing_net", 0.0)))
+		var firing_endurance := float(pw.get("firing_endurance", 0.0))
+		var max_shot := float(pw.get("max_shot_cost", 0.0))
+		var burst_shots := int(storage / maxf(max_shot, 1.0))
+		var detail := "Fine at rest, but %.1f /s short while firing - about %.0fs of continuous fire from a full buffer before energy weapons cut out." % [firing_net, firing_endurance]
+		if burst_shots > 0:
+			detail += " ~%d shots burst." % burst_shots
+		detail += " Capacitors buy a longer burst; a generator buys sustain."
 		_apply_warning(_power_panel, _power_title, _power_detail, true, "", "",
 			"!  SUSTAINED FIRE OUTRUNS POWER",
-			"Fine at rest, but %.1f /s short while firing - about %.0fs of continuous fire from a full buffer before energy weapons cut out. Capacitors buy a longer burst; a generator buys sustain." % [
-				absf(float(pw.get("firing_net", 0.0))), float(pw.get("firing_endurance", 0.0))])
+			detail)
 	else:
 		_apply_warning(_power_panel, _power_title, _power_detail, false,
 			"!  POWER DEFICIT", "Generation and storage cover this design's draw.")
@@ -752,6 +795,8 @@ func _update_power_readout(pw: Dictionary) -> void:
 func _update_drivetrain_readout(dt: Dictionary) -> void:
 	if _load_bar == null:
 		_build_drivetrain_readout()
+
+	print("[TELEMETRY] _update_drivetrain_readout: has_locomotion=%s, is_overloaded=%s, load_pct=%.1f" % [dt["has_locomotion"], dt["is_overloaded"], dt["load_ratio"] * 100.0])
 
 	# A design with no running gear yet has no speed and no capacity to be
 	# over. Showing "Top Speed 0.0" and a full-red load bar on a hull the
@@ -928,24 +973,32 @@ func _build_range_readout() -> void:
 	# of the rail where lazily-added children otherwise land (which would put
 	# it below the save/test buttons). Same move_child idiom as the drivetrain
 	# rows above.
+	# Fallback: if dps_label isn't in _rail_vbox, place after the last child
+	# before the diagnostics toggle (which is always near the bottom).
+	var insert_at: int = _rail_vbox.get_child_count() - 1
 	if dps_label and dps_label.get_parent() == _rail_vbox:
-		var at = dps_label.get_index()
-		_rail_vbox.move_child(_range_label, at + 1)
-		_rail_vbox.move_child(_vision_label, at + 2)
-		_rail_vbox.move_child(_spotter_panel, at + 3)
+		insert_at = dps_label.get_index()
+	_rail_vbox.move_child(_range_label, insert_at + 1)
+	_rail_vbox.move_child(_vision_label, insert_at + 2)
+	_rail_vbox.move_child(_spotter_panel, insert_at + 3)
 
 func _update_range_readout(wr: Dictionary) -> void:
 	if _range_label == null:
+		print("[TELEMETRY] _build_range_readout() called")
 		_build_range_readout()
 
 	# A hull with no armed modules yet has no range to report. Showing
 	# "Range: 0.0" on a design the player has only started reads as a fault
 	# rather than as an unfinished build - same reasoning as the drivetrain
 	# readout's no-locomotion case.
+	print("[TELEMETRY] _update_range_readout: has_weapons=%s, wr=%s" % [wr.get("has_weapons", false), wr])
 	if not wr.get("has_weapons", false):
 		_range_label.text = "Range: - (no weapons)"
 		_vision_label.visible = false
-		_spotter_panel.visible = false
+		# Ghost the spotter panel instead of hiding it - the slot must always
+		# occupy its row so the rail doesn't reflow when weapons are added.
+		_apply_warning(_spotter_panel, _spotter_title, _spotter_detail, false,
+			"!  OUT-REACHES ITS OWN VISION", "Every weapon's reach fits inside this design's own vision.")
 		return
 	_vision_label.visible = true
 

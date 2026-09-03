@@ -154,6 +154,18 @@ static func validity(world, team: int, at: Vector3, kind: String,
 
 	if not near_base:
 		return _no(NOT_ADJACENT)
+
+	var req_kind: String = BuildingCatalogScript.get_stat(kind, "requires_adjacent_kind", "")
+	if req_kind != "":
+		var found := false
+		for s in structures:
+			if is_instance_valid(s) and not s.is_dead and s.team == team and s.kind == req_kind:
+				if at.distance_to(s.global_position) <= half + (maxf(s.footprint.x, s.footprint.z) * 0.5) + reach:
+					found = true
+					break
+		if not found:
+			return _no("MUST BE PLACED NEXT TO A " + req_kind.to_upper().replace("_", " "))
+
 	return {"valid": true, "reason": OK}
 
 

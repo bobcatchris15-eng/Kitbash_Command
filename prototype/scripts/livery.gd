@@ -93,6 +93,9 @@ const MASCOT_SHAPES: Array = [
 	"star_snowflake", "star_sunburst", "diamond", "leaf", "star_propeller",
 ]
 
+# Default set
+const DEFAULT_BUILDING_MESH_SET := "standard_industrial"
+
 # Curated themed presets.
 #
 # COLOUR RULE, applied 2026-08-31 and worth keeping to when adding one.
@@ -450,6 +453,7 @@ static func random_livery(livery_seed: int = 0) -> Dictionary:
 	var chosen_pattern: String = RANDOM_PATTERN_POOL[rng.randi() % RANDOM_PATTERN_POOL.size()]
 
 	var out := {
+		"building_mesh_set": DEFAULT_BUILDING_MESH_SET,
 		"pattern": {
 			"type": chosen_pattern,
 			"scale": rng.randf_range(0.8, 1.6),
@@ -518,6 +522,7 @@ static func from_preset(preset_key: String, serial_seed: int = 0) -> Dictionary:
 			"softness": float(p.get("pattern_softness", 0.015)),
 		},
 		"weathering": float(p.get("weathering", 0.2)),
+		"building_mesh_set": str(p.get("building_mesh_set", DEFAULT_BUILDING_MESH_SET)),
 		"accent_emissive": p.get("accent_emissive", Color(1.0, 0.62, 0.18)),
 		"accent_emissive_strength": float(p.get("accent_emissive_strength", 2.2)),
 		"decal": {
@@ -562,6 +567,7 @@ static func to_json(livery: Dictionary) -> Dictionary:
 		"softness": float(pat.get("softness", 0.015)),
 	}
 	out["weathering"] = float(livery.get("weathering", 0.2))
+	out["building_mesh_set"] = str(livery.get("building_mesh_set", DEFAULT_BUILDING_MESH_SET))
 	var dec: Dictionary = livery.get("decal", {})
 	out["decal"] = {
 		"icon": str(dec.get("icon", "gear")),
@@ -610,6 +616,7 @@ static func from_json(data: Dictionary) -> Dictionary:
 
 	# Weathering
 	out["weathering"] = clampf(float(data.get("weathering", 0.2)), 0.0, 1.0)
+	out["building_mesh_set"] = str(data.get("building_mesh_set", DEFAULT_BUILDING_MESH_SET))
 
 	# Decal
 	var dec_data = data.get("decal", {})
@@ -781,3 +788,6 @@ static func decal_serial(livery_id: String) -> String:
 static func decal_show_hazard(livery_id: String) -> bool:
 	var d: Dictionary = for_id(livery_id).get("decal", {})
 	return bool(d.get("show_hazard", true))
+
+static func building_mesh_set(livery_id: String) -> String:
+	return str(for_id(livery_id).get("building_mesh_set", DEFAULT_BUILDING_MESH_SET))

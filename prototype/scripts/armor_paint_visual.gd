@@ -18,20 +18,20 @@ const HOLDER_NAME := "ArmorPaint"
 # is the feature size IN METRES (UVs are metres of facet surface), `relief` how
 # hard the normal is pushed, `seam` the groove width as a fraction of a cell.
 const MATERIAL_FINISH := {
-	"steel_plate": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
-	"composite_plate": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.45, "relief": 0.75, "seam": 0.05},
-	"ceramic_ablative": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.22, "relief": 0.50, "seam": 0.10},
-	"ballistic_nylon": {"metallic": 0.25, "roughness": 0.45, "pattern": 3, "cell": 0.07, "relief": 0.35, "seam": 0.06},
+	"steel_plate": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.65, "relief": 0.22, "seam": 0.045},
+	"composite_plate": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.50, "relief": 0.32, "seam": 0.040},
+	"ceramic_ablative": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.12, "relief": 0.35, "seam": 0.070},
+	"ballistic_nylon": {"metallic": 0.25, "roughness": 0.45, "pattern": 3, "cell": 0.016, "relief": 0.20, "seam": 0.050},
 	# Backward-compatibility aliases
-	"hardened_steel": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
-	"armor_plating": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
-	"reactive_armor": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.45, "relief": 0.75, "seam": 0.05},
-	"spaced_composite": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.45, "relief": 0.75, "seam": 0.05},
-	"ablative_ceramic": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.22, "relief": 0.50, "seam": 0.10},
-	"ablative_foam": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.22, "relief": 0.50, "seam": 0.10},
-	"carbon_fiber": {"metallic": 0.25, "roughness": 0.45, "pattern": 3, "cell": 0.07, "relief": 0.35, "seam": 0.06},
-	"titanium_plate": {"metallic": 0.80, "roughness": 0.38, "pattern": 0, "cell": 0.85, "relief": 0.25, "seam": 0.035},
-	"slat_armor": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.50, "relief": 0.15, "seam": 0.06},
+	"hardened_steel": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.65, "relief": 0.22, "seam": 0.045},
+	"armor_plating": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.65, "relief": 0.22, "seam": 0.045},
+	"reactive_armor": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.50, "relief": 0.32, "seam": 0.040},
+	"spaced_composite": {"metallic": 0.40, "roughness": 0.50, "pattern": 1, "cell": 0.50, "relief": 0.32, "seam": 0.040},
+	"ablative_ceramic": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.12, "relief": 0.35, "seam": 0.070},
+	"ablative_foam": {"metallic": 0.05, "roughness": 0.85, "pattern": 2, "cell": 0.12, "relief": 0.35, "seam": 0.070},
+	"carbon_fiber": {"metallic": 0.25, "roughness": 0.45, "pattern": 3, "cell": 0.016, "relief": 0.20, "seam": 0.050},
+	"titanium_plate": {"metallic": 0.80, "roughness": 0.38, "pattern": 4, "cell": 0.85, "relief": 0.28, "seam": 0.035},
+	"slat_armor": {"metallic": 0.65, "roughness": 0.45, "pattern": 0, "cell": 0.65, "relief": 0.22, "seam": 0.045},
 }
 
 const ARMOR_SHADER = preload("res://shaders/armor_surface.gdshader")

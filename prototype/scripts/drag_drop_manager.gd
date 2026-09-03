@@ -230,7 +230,6 @@ func _update_ghost_mesh_hull(type_id: String):
 
 	if current_ghost_type != type_id or ghost_mesh == null:
 		_destroy_ghost_mesh()
-		_collapse_parts_menu()
 		ghost_mesh = _build_hull_ghost_node(type_id)
 		root.add_child(ghost_mesh)
 		current_ghost_type = type_id
@@ -260,7 +259,6 @@ func _update_ghost_mesh(screen_pos: Vector2, type_id: String):
 
 	if current_ghost_type != type_id or ghost_mesh == null:
 		_destroy_ghost_mesh()
-		_collapse_parts_menu()
 		ghost_mesh = _build_module_ghost_node(type_id)
 		root.add_child(ghost_mesh)
 		current_ghost_type = type_id

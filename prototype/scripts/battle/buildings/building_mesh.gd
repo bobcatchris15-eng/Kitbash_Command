@@ -36,6 +36,7 @@ extends RefCounted
 
 const HullMaterialBuilder = preload("res://scripts/hull_material_builder.gd")
 const LiveryScript = preload("res://scripts/livery.gd")
+const BuildingMeshSets = preload("res://scripts/building_mesh_sets.gd")
 const HullDecalsScript = preload("res://scripts/hull_decals.gd")
 # SKIRMISH_PERF_TROUBLESHOOTING.md §6 item 3. The PackedScene load is
 # the only synchronous resource load on the structure-placement path.
@@ -107,6 +108,13 @@ static func build(parent: Node3D, kind: String, footprint: Vector3,
 	# past it. structure.gd applies the finish once, after the whole building
 	# exists.
 	parent.add_child(inst)
+	
+	# Apply styled building mesh
+	var set_id := LiveryScript.building_mesh_set(faction)
+	if set_id != "" and set_id != "default":
+		var styled := BuildingMeshSets.get_building_mesh(set_id, kind, footprint)
+		# ... (logic to attach/apply style)
+	
 	return inst
 
 

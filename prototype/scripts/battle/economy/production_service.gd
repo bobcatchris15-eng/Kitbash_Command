@@ -86,7 +86,7 @@ func enqueue_unit(team: int, blueprint: Dictionary, cost: int,
 		return {}
 	if not _missing_required_buildings(team, blueprint).is_empty():
 		return {}
-	var job := _make_job(blueprint.get("name", "UNIT"), cost, base_time, contributors)
+	var job := _make_job(blueprint.get("name", "UNIT"), cost, base_time, contributors, team)
 	job["blueprint"] = blueprint
 	job["is_structure"] = false
 	job["slot"] = slot
@@ -108,7 +108,7 @@ func enqueue_structure(team: int, queue_name: String, kind: String,
 	# to already own a lab.
 	if not blueprint.is_empty() and not _missing_required_buildings(team, blueprint).is_empty():
 		return {}
-	var job := _make_job(kind, cost, base_time, contributors)
+	var job := _make_job(kind, cost, base_time, contributors, team)
 	job["kind"] = kind
 	job["blueprint"] = blueprint
 	job["is_structure"] = true
@@ -129,9 +129,14 @@ func _instant_build_cheat() -> bool:
 	return ds != null and ds.instant_build
 
 
-func _make_job(label: String, cost: int, base_time: float, contributors: int) -> Dictionary:
+func _make_job(label: String, cost: int, base_time: float, contributors: int, team: int = -1) -> Dictionary:
 	var index: int = clampi(contributors - 1, 0, SPEED_PCT.size() - 1)
 	var build_time: float = base_time * float(SPEED_PCT[index]) / 100.0
+
+	if team >= 0 and _world != null and _world.has_method("structures_of_kinds"):
+		if not _world.structures_of_kinds(team, ["ancillary_facility"]).is_empty():
+			build_time *= 0.80
+
 	if _instant_build_cheat():
 		build_time = 0.001
 	return {

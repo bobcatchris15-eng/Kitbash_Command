@@ -272,10 +272,27 @@ void evaluate_pattern(vec3 norm_coords, vec2 uv_rot, out float pattern_mask, out
 // Armor Height Field for Physical Tactile Surface
 float height_at(vec2 uv) {
 	if (pattern_id == 0) {
-		// Steel Plate: subtle directional mill grain
-		return sin(uv.y * 24.0) * 0.03;
+		// Steel Plate: Sparse structural panel lines that occasionally dogleg 45 degrees
+		vec2 p = uv / cell;
+		vec2 f = fract(p);
+		// Dogleg jog along seams: 45-degree diagonal offset over a segment
+		float phase_y = fract(p.y * 0.4);
+		float jog_x = 0.0;
+		if (phase_y > 0.35 && phase_y < 0.65) {
+			jog_x = (phase_y < 0.50) ? (phase_y - 0.35) : (0.65 - phase_y);
+		}
+		float phase_x = fract(p.x * 0.4);
+		float jog_y = 0.0;
+		if (phase_x > 0.35 && phase_x < 0.65) {
+			jog_y = (phase_x < 0.50) ? (phase_x - 0.35) : (0.65 - phase_x);
+		}
+		float dx = min(abs(f.x - jog_x), abs(1.0 - f.x + jog_x));
+		float dy = min(abs(f.y - jog_y), abs(1.0 - f.y + jog_y));
+		float seam_dist = min(dx, dy);
+		float panel_groove = smoothstep(0.0, seam * 1.5, seam_dist);
+		return panel_groove * 0.90 + 0.10;
 	} else if (pattern_id == 1) {
-		// Composite Plate: Tessellated triangle matrix with alternating bulges and divots
+		// Composite Plate: Calmed polygonal plate facets with softened bevels
 		vec2 p = uv / cell;
 		vec2 ip = floor(p);
 		vec2 fp = fract(p);
@@ -286,24 +303,39 @@ float height_at(vec2 uv) {
 		if (upper) {
 			d_edge = min(d_hyp, min(1.0 - fp.x, 1.0 - fp.y));
 		}
-
-		int parity = int(mod(ip.x + ip.y + (upper ? 1.0 : 0.0), 2.0));
-		float shape = sin(clamp(d_edge * 3.8, 0.0, 1.0) * 1.5708);
-		float h = (parity == 0) ? shape : (-shape * 0.85);
-
-		float seam_mask = smoothstep(0.0, seam * 2.2, d_edge);
-		return 0.5 + h * 0.45 * seam_mask;
+		// Soft chamfered plate with gentle relief (calmed, not over-deep)
+		float chamfer = smoothstep(0.0, seam * 2.5, d_edge);
+		return 0.5 + chamfer * 0.22;
 	} else if (pattern_id == 2) {
-		// Ceramic Ablative: square tiles with tight grout
-		float e = edge_distance(uv / cell);
-		return smoothstep(0.0, seam * 1.6, e);
+		// Ceramic Ablative: Thin, overlapping mechanical scales (stepped shingle geometry)
+		vec2 p = uv / cell;
+		float row = floor(p.y);
+		p.x += mod(row, 2.0) * 0.5;
+		vec2 fp = fract(p);
+		// Overlapping stepped scale slope
+		float scale_slope = fp.y * 0.70;
+		float side_dist = min(fp.x, 1.0 - fp.x);
+		float side_bevel = smoothstep(0.0, seam * 2.2, side_dist);
+		float overlap_edge = smoothstep(0.0, seam * 1.4, fp.y);
+		return (scale_slope + 0.20) * side_bevel * overlap_edge;
 	} else if (pattern_id == 3) {
-		// Ballistic Nylon / Carbon Fiber: 2x2 twill weave
+		// Ballistic Nylon: Finer micro-scale weave, subtle and tactile
 		vec2 g = uv / cell;
 		float check = mod(floor(g.x) + floor(g.y), 2.0);
-		float warp = sin(fract(g.x) * 3.14159);
-		float weft = sin(fract(g.y) * 3.14159);
-		return mix(weft * 0.9, warp * 0.9, check);
+		float warp = cos(fract(g.x) * 6.28318) * 0.5 + 0.5;
+		float weft = cos(fract(g.y) * 6.28318) * 0.5 + 0.5;
+		return mix(weft, warp, check) * 0.20;
+	} else if (pattern_id == 4) {
+		// Titanium Plate: Heavy aerospace plate with welded seam bead and corner fasteners
+		vec2 p = uv / cell;
+		vec2 fp = fract(p);
+		float d_edge = min(min(fp.x, 1.0 - fp.x), min(fp.y, 1.0 - fp.y));
+		float weld_bead = exp(-pow(d_edge / (seam * 2.8), 2.0)) * 0.30;
+		float plate = smoothstep(0.0, seam * 2.2, d_edge) * 0.70;
+		vec2 corner_vec = min(fp, 1.0 - fp) - vec2(seam * 3.5);
+		float bolt_dist = length(corner_vec);
+		float bolt = (1.0 - smoothstep(0.0, seam * 1.6, bolt_dist)) * 0.35;
+		return plate + weld_bead - bolt;
 	}
 	return 0.0;
 }

@@ -38,7 +38,7 @@ var _slot_parts_label: Label = null
 var _slot_cost_label: Label = null
 var _rail_vbox: VBoxContainer = null
 
-# Alert Placard References (Overweight & Power Deficit sliding warning bezels)
+# Alert Placard References (Overweight, Power Deficit & Vision/Spotter sliding warning bezels)
 var overweight_alert_placard: PanelContainer = null
 var overweight_text_label: Label = null
 var overweight_detail_label: Label = null
@@ -48,6 +48,11 @@ var power_alert_placard: PanelContainer = null
 var power_text_label: Label = null
 var power_detail_label: Label = null
 var power_tween: Tween = null
+
+var vision_alert_placard: PanelContainer = null
+var vision_text_label: Label = null
+var vision_detail_label: Label = null
+var vision_tween: Tween = null
 
 # 4-Cluster UI References
 var combat_hp_label: Label = null
@@ -983,6 +988,42 @@ func _build_stats_dock() -> void:
 	power_detail_label.text = "Energy systems offline / brownout"
 	pw_vbox.add_child(power_detail_label)
 
+	# Sliding Alert Placard 3: Vision / Spotter Warning
+	vision_alert_placard = PanelContainer.new()
+	vision_alert_placard.name = "VisionAlertPlacard"
+	vision_alert_placard.anchor_left = 0.5
+	vision_alert_placard.anchor_top = 1.0
+	vision_alert_placard.anchor_right = 0.5
+	vision_alert_placard.anchor_bottom = 1.0
+	vision_alert_placard.offset_left = 485.0
+	vision_alert_placard.offset_right = 765.0
+	vision_alert_placard.offset_top = -248.0
+	vision_alert_placard.offset_bottom = -164.0
+	var vis_style = _create_beveled_box(Color(0.09, 0.11, 0.14, 0.98), Color(0.38, 0.56, 0.72, 0.95), 4, 6)
+	vision_alert_placard.add_theme_stylebox_override("panel", vis_style)
+	add_child(vision_alert_placard)
+
+	var vs_vbox := VBoxContainer.new()
+	vs_vbox.add_theme_constant_override("separation", 2)
+	vision_alert_placard.add_child(vs_vbox)
+
+	var vs_tab := Label.new()
+	vs_tab.text = "▲ 👁️ OUT-REACHES ITS OWN VISION"
+	vs_tab.theme_type_variation = "StatLabel"
+	vs_tab.add_theme_color_override("font_color", Color(0.55, 0.75, 0.95, 1.0))
+	vs_vbox.add_child(vs_tab)
+
+	vision_text_label = Label.new()
+	vision_text_label.theme_type_variation = "HeadingLabel"
+	vision_text_label.text = "VISION: 0 m | REACH: 0 m"
+	vision_text_label.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 1.0))
+	vs_vbox.add_child(vision_text_label)
+
+	vision_detail_label = Label.new()
+	vision_detail_label.theme_type_variation = "HintLabel"
+	vision_detail_label.text = "Every weapon's reach fits inside this design's own vision."
+	vs_vbox.add_child(vision_detail_label)
+
 	# Main Console Frame: Centered in workspace and detached subtly from bottom with aggressive bevel/chamfer
 	console_root = PanelContainer.new()
 	console_root.name = "DesignCockpitConsole"
@@ -1410,6 +1451,12 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 			overweight_tween.tween_property(overweight_alert_placard, "offset_top", target_top, 0.3)
 			overweight_tween.parallel().tween_property(overweight_alert_placard, "offset_bottom", target_top + 84.0, 0.3)
 
+		# Ghost opacity when condition is false
+		if is_over:
+			overweight_alert_placard.modulate = Color(1, 1, 1, 1)
+		else:
+			overweight_alert_placard.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
+
 	# --- Drive Sliding Power Deficit Placard ---
 	var is_power_alert = (active_draw > 0.0 and gen <= 0.0) or (gen > 0.0 and active_draw > gen)
 
@@ -1420,7 +1467,26 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 			else:
 				power_text_label.text = "DEFICIT: Draw %.1f / Gen %.1f kW" % [active_draw, gen]
 		if power_detail_label:
-			power_detail_label.text = "Energy systems offline - fit generator" if (active_draw > 0.0 and gen <= 0.0) else "Shortfall by %.1f kW (Brownout risk)" % (active_draw - gen)
+			var storage = float(power.get("storage", 0.0))
+			var max_shot_cost = float(power.get("max_shot_cost", 0.0))
+			var has_deficit = bool(power.get("has_deficit", false))
+			var firing_deficit_only = bool(power.get("firing_deficit_only", false))
+			var firing_net = float(power.get("firing_net", 0.0))
+			var firing_endurance = float(power.get("firing_endurance", 0.0))
+			var endurance = float(power.get("endurance", 0.0))
+
+			if max_shot_cost > storage:
+				power_detail_label.text = "A weapon needs %.1f energy to fire, but capacity is only %.1f. It will never fire." % [max_shot_cost, storage]
+			elif has_deficit:
+				power_detail_label.text = "A full buffer lasts %.0fs at rest." % endurance
+				if firing_endurance != endurance and firing_endurance != INF:
+					power_detail_label.text += " Sustained fire: %.0fs." % firing_endurance
+				power_detail_label.text += " Shields drop first, then sensors dim, then energy weapons stop. Buildable and fieldable as-is - fit a generator, add storage to ride it out, or drop some electronics."
+			elif firing_deficit_only:
+				var burst_shots = int(storage / maxf(max_shot_cost, 1.0))
+				power_detail_label.text = "~%d shots burst (floor(storage / max_shot_cost)), %.0fs sustained fire. Capacitors buy burst; a generator buys sustain." % [burst_shots, firing_endurance]
+			else:
+				power_detail_label.text = "Energy systems offline - fit generator" if (active_draw > 0.0 and gen <= 0.0) else "Shortfall by %.1f kW (Brownout risk)" % (active_draw - gen)
 
 		var target_top = -308.0 if is_power_alert else -248.0
 		if power_alert_placard.offset_top != target_top:
@@ -1429,6 +1495,63 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 			power_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 			power_tween.tween_property(power_alert_placard, "offset_top", target_top, 0.3)
 			power_tween.parallel().tween_property(power_alert_placard, "offset_bottom", target_top + 84.0, 0.3)
+
+		# Ghost opacity when condition is false
+		if is_power_alert:
+			power_alert_placard.modulate = Color(1, 1, 1, 1)
+		else:
+			power_alert_placard.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
+
+	# --- Vision / Spotter Sliding Placard ---
+	# wr, has_wpn, longest_rng already declared above
+	var vision = float(wr.get("vision", 0.0))
+	var longest = float(wr.get("longest", 0.0))
+	var required = wr.get("spotter_required", [])
+	var assisted = wr.get("spotter_assisted", [])
+	var has_weapons = has_wpn
+
+	if vision_alert_placard:
+		if vision_text_label:
+			vision_text_label.text = "VISION: %.0f m | REACH: %.0f m" % [vision, longest]
+		if vision_detail_label:
+			if not has_weapons:
+				vision_detail_label.text = "Every weapon's reach fits inside this design's own vision."
+			elif required.size() > 0:
+				var names: Array = []
+				for w in required:
+					names.append("%s (%.0f)" % [w["name"], w["reach"]])
+				var pct = (vision / longest) * 100.0
+				vision_detail_label.text = "%s %s far past this design's own %.0f vision. Without another unit of yours watching the target, it can only shoot as far as it can see - roughly %.0f%% of its reach. Pair it with a scout or a radar mast and it works at full range." % [
+					", ".join(names),
+					"reaches" if names.size() == 1 else "reach",
+					vision,
+					pct
+				]
+			elif assisted.size() > 0:
+				var names: Array = []
+				for w in assisted:
+					names.append("%s (%.0f)" % [w["name"], w["reach"]])
+				var overhang = longest - vision
+				vision_detail_label.text = "%s can shoot further than this design can see (%.0f). Usable as-is, but a spotting unit or a radar mast is what unlocks the last %.0f units of that reach." % [
+					", ".join(names), vision, overhang
+				]
+			else:
+				vision_detail_label.text = "Every weapon's reach fits inside this design's own vision."
+
+		var is_vision_alert = has_weapons and (required.size() > 0 or assisted.size() > 0)
+		var target_top = -308.0 if is_vision_alert else -248.0
+		if vision_alert_placard.offset_top != target_top:
+			if vision_tween and vision_tween.is_valid():
+				vision_tween.kill()
+			vision_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+			vision_tween.tween_property(vision_alert_placard, "offset_top", target_top, 0.3)
+			vision_tween.parallel().tween_property(vision_alert_placard, "offset_bottom", target_top + 84.0, 0.3)
+
+		# Ghost opacity when condition is false
+		if is_vision_alert:
+			vision_alert_placard.modulate = Color(1, 1, 1, 1)
+		else:
+			vision_alert_placard.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
 
 	var mod_count := 0
 	if hull:

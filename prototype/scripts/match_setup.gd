@@ -48,6 +48,7 @@ const RosterPickerScript = preload("res://scripts/roster_picker.gd")
 const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
 const UIAnimScript = preload("res://scripts/ui_anim.gd")
 const MatchRuleSetScript = preload("res://scripts/match_rule_set.gd")
+const BlueprintThumbnailScript = preload("res://scripts/blueprint_thumbnail.gd")
 
 # --- The match's own vocabulary. UNCHANGED from the pre-rebuild screen; these
 # are what the rule set is written from and moving them would change the game
@@ -121,6 +122,7 @@ var _summary_map: Label
 var _summary_rules: Label
 var _summary_roster: Label
 var _summary_note: Label
+var _hero_view: SquadronHeroView = null
 
 var _back_btn: Button
 var _next_btn: Button
@@ -409,19 +411,28 @@ func _build_map_stage() -> Control:
 
 	var rail_wrap := PanelContainer.new()
 	rail_wrap.add_theme_stylebox_override("panel", UITheme.flat_style(
-		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_SM, "flush"))
+		Color("#141713"), Tokens.BASE_500, Tokens.SPACE_SM, "flush"))
 	rail_wrap.custom_minimum_size = Vector2(Tokens.MAP_TILE_MIN.x + Tokens.SPACE_XL, 0)
 	page.add_child(rail_wrap)
 
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rail_wrap.add_child(scroll)
-
 	var rail := VBoxContainer.new()
 	rail.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	rail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(rail)
 
+	var rail_header := HBoxContainer.new()
+	rail_header.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	rail.add_child(rail_header)
+	
+	var sort_btn := OptionButton.new()
+	sort_btn.add_item("Name")
+	sort_btn.add_item("Size")
+	sort_btn.item_selected.connect(_on_sort_selected)
+	rail_header.add_child(sort_btn)
+	
 	for map_id in MAP_IDS:
 		var tile := MapTile.new()
 		tile.configure(str(map_id), self)
@@ -433,34 +444,42 @@ func _build_map_stage() -> Control:
 	_preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_preview.custom_minimum_size = Tokens.MAP_PREVIEW_MIN
 	page.add_child(_preview)
+	var side := VBoxContainer.new()
+	side.custom_minimum_size = Vector2(Tokens.SUMMARY_COL_MIN, 0)
+	side.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	page.add_child(side)
 
-	var facts_wrap := PanelContainer.new()
-	facts_wrap.add_theme_stylebox_override("panel", UITheme.flat_style(
+	var facts_panel := PanelContainer.new()
+	facts_panel.add_theme_stylebox_override("panel", UITheme.flat_style(
 		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_MD, "raised"))
-	facts_wrap.custom_minimum_size = Vector2(Tokens.SUMMARY_COL_MIN, 0)
-	page.add_child(facts_wrap)
+	var facts_box := VBoxContainer.new()
+	facts_box.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	facts_panel.add_child(facts_box)
 
-	var facts := VBoxContainer.new()
-	facts.add_theme_constant_override("separation", Tokens.SPACE_SM)
-	facts_wrap.add_child(facts)
-
+	var facts_hdr := HBoxContainer.new()
+	facts_hdr.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	var facts_icon = UITheme.chrome_rect("stage_theatre", Tokens.SPINE_ICON, Tokens.TEXT_PRIMARY)
+	if facts_icon:
+		facts_hdr.add_child(facts_icon)
 	_map_title = Label.new()
-	_map_title.theme_type_variation = "TitleLabel"
-	_map_title.autowrap_mode = TextServer.AUTOWRAP_WORD
-	facts.add_child(_map_title)
+	_map_title.theme_type_variation = "HeadingLabel"
+	_map_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	facts_hdr.add_child(_map_title)
+	facts_box.add_child(facts_hdr)
 
 	_map_desc = Label.new()
+	_map_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_map_desc.theme_type_variation = "HintLabel"
-	_map_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	facts.add_child(_map_desc)
+	facts_box.add_child(_map_desc)
 
-	facts.add_child(HSeparator.new())
+	facts_box.add_child(HSeparator.new())
 
 	_map_facts = VBoxContainer.new()
 	_map_facts.add_theme_constant_override("separation", Tokens.SPACE_XS)
-	facts.add_child(_map_facts)
+	facts_box.add_child(_map_facts)
 
-	facts.add_child(_build_legend())
+	side.add_child(facts_panel)
+	side.add_child(_build_legend())
 	return page
 
 
@@ -471,15 +490,22 @@ func _build_legend() -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", Tokens.SPACE_XS)
 	var heading := Label.new()
-	heading.text = "SCHEMATIC"
+	heading.text = "TOPOGRAPHIC RECONNAISSANCE"
 	heading.theme_type_variation = "HeadingLabel"
 	box.add_child(heading)
+
+	var sub := Label.new()
+	sub.text = "SERIES 1:25,000 · 7.5 MINUTE QUADRANGLE"
+	sub.theme_type_variation = "StatLabel"
+	box.add_child(sub)
 	var rows := [
 		["pin_spawn", Tokens.MAP_SPAWN_PLAYER, "Your deployment zone"],
 		["pin_spawn", Tokens.MAP_SPAWN_ENEMY, "Hostile deployment zone"],
 		["pin_resource", Tokens.MAP_RESOURCE, "Resource deposit"],
 		["", Tokens.MAP_WATER, "Water"],
 		["", Tokens.MAP_OBSTACLE, "Cover and obstruction"],
+		["", Tokens.MAP_USGS_CONTOUR_INDEX, "Index contour"],
+		["", Tokens.MAP_USGS_CONTOUR_INTER, "Intermediate contour"],
 	]
 	for row_def in rows:
 		var row := HBoxContainer.new()
@@ -530,6 +556,7 @@ func _refresh_map_facts() -> void:
 		return
 	for child in _map_facts.get_children():
 		child.queue_free()
+		
 	var he: Vector2 = MapCatalog.half_extents(map_def)
 	var deposits: Dictionary = {}
 	for node_def in map_def.get("resource_nodes", []):
@@ -538,14 +565,53 @@ func _refresh_map_facts() -> void:
 	var spawns: Array = map_def.get("spawns", [])
 	var waters: Array = map_def.get("water_areas", [])
 	var covers: Array = map_def.get("obstacles", [])
+
+	# Compute accurate elevation stats
+	var min_elev: float = 0.0
+	var max_elev: float = 0.0
+	var terrain = map_def.get("terrain", {})
+	if terrain is Dictionary:
+		var sg = terrain.get("sculpt_grid", {})
+		if sg is Dictionary and sg.has("data") and not sg["data"].is_empty():
+			min_elev = 9999.0
+			max_elev = -9999.0
+			for val in sg["data"]:
+				var fv = float(val)
+				min_elev = minf(min_elev, fv)
+				max_elev = maxf(max_elev, fv)
+		elif terrain.has("height_scale"):
+			var hs = float(terrain.get("height_scale", 20.0))
+			min_elev = -hs * 0.5
+			max_elev = hs
+		elif terrain.has("features"):
+			for f in terrain["features"]:
+				var fh = float(f.get("height", 0.0))
+				min_elev = minf(min_elev, fh)
+				max_elev = maxf(max_elev, fh)
+
+	var relief: float = maxf(0.0, max_elev - min_elev)
+	var ci: float = 5.0
+	if relief < 15.0:
+		ci = 2.0
+	elif relief < 40.0:
+		ci = 5.0
+	elif relief < 100.0:
+		ci = 10.0
+	else:
+		ci = 20.0
+
 	var facts := [
 		["FIELD", "%d x %d m" % [int(he.x * 2.0), int(he.y * 2.0)]],
+		["ELEVATION", "%.0f to %.0f m" % [min_elev, max_elev]],
+		["RELIEF", "%.0f m" % relief],
+		["CONTOUR INT", "%.0f m" % ci],
 		["SPAWNS", str(spawns.size())],
 		["WATER", str(waters.size())],
 		["COVER", str(covers.size())],
 	]
 	for kind in deposits.keys():
 		facts.append([str(kind).to_upper(), str(deposits[kind])])
+
 	for fact in facts:
 		var row := HBoxContainer.new()
 		var key := Label.new()
@@ -668,7 +734,8 @@ func _build_launch_stage() -> Control:
 	var summary_wrap := PanelContainer.new()
 	summary_wrap.add_theme_stylebox_override("panel", UITheme.flat_style(
 		Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_LG, "raised"))
-	summary_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	summary_wrap.custom_minimum_size = Vector2(Tokens.SUMMARY_COL_MIN + Tokens.SPACE_XL, 0)
+	summary_wrap.size_flags_horizontal = Control.SIZE_FILL
 	page.add_child(summary_wrap)
 
 	var summary := VBoxContainer.new()
@@ -688,6 +755,11 @@ func _build_launch_stage() -> Control:
 	_summary_note.theme_type_variation = "HintLabel"
 	_summary_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	summary.add_child(_summary_note)
+
+	_hero_view = SquadronHeroView.new()
+	_hero_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hero_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_child(_hero_view)
 	return page
 
 
@@ -739,6 +811,16 @@ func _refresh_summary() -> void:
 	else:
 		_summary_note.text = "Ready to deploy."
 		_summary_note.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
+
+	if _hero_view != null:
+		var hero_paths: Array = roster_picker.ordered_paths() if roster_picker else []
+		if hero_paths.is_empty() and bp_manager != null:
+			var listed: Array = bp_manager.list_blueprints(true)
+			for b in listed:
+				var bp_path := str(b.get("path", ""))
+				if bp_path != "":
+					hero_paths.append(bp_path)
+		_hero_view.update_squadron(hero_paths)
 
 
 func _add_dropdown(parent: Control, label_text: String, labels: PackedStringArray) -> OptionButton:
@@ -1055,6 +1137,19 @@ class MapSchematic extends Control:
 			var r2 := _rect_for(_vec3(obstacle.get("center", Vector3.ZERO)),
 				_vec2(obstacle.get("half_extents", Vector2.ZERO)))
 			draw_rect(r2, Color(Tokens.MAP_OBSTACLE, 0.55), true)
+			if str(obstacle.get("type", "")) == "rock":
+				_draw_rocky_hash(r2)
+
+		for zone in _def.get("surface_zones", []):
+			var r := _rect_for(_vec3(zone.get("center", Vector3.ZERO)),
+				_vec2(zone.get("half_extents", Vector2.ZERO)))
+			var z_type := str(zone.get("surface_type", zone.get("type", "")))
+			if z_type == "forest":
+				draw_rect(r, Color(Tokens.MAP_USGS_WOODLAND, 0.45), true)
+				_draw_tree_hash(r)
+			elif z_type in ["rocky", "gravel"]:
+				_draw_rocky_hash(r)
+
 
 		for deposit in _def.get("resource_nodes", []):
 			var p := _to_px(_vec3(deposit.get("position", Vector3.ZERO)).x,
@@ -1063,8 +1158,22 @@ class MapSchematic extends Control:
 			draw_arc(p, Tokens.MAP_MARKER_R + 2.0, 0.0, TAU, 16,
 				Color(Tokens.MAP_RESOURCE, 0.5), Tokens.MAP_MARKER_EDGE)
 
-		# Spawns last, on top, and the only markers drawn as a ring plus a
-		# crosshair: they are the two points the player reads first.
+		# Neatline
+		draw_rect(content, Tokens.MAP_USGS_NEATLINE, false, 2.0)
+		
+		# Tick Marks (simplified USGS ticks)
+		var tick_len = 8.0
+		draw_line(content.position, content.position + Vector2(tick_len, 0), Tokens.MAP_USGS_NEATLINE, 2.0)
+		draw_line(content.position, content.position + Vector2(0, tick_len), Tokens.MAP_USGS_NEATLINE, 2.0)
+		
+		# Scale Bar
+		var scale_y = content.position.y + content.size.y - 20
+		draw_line(Vector2(content.position.x + 10, scale_y), Vector2(content.position.x + 60, scale_y), Tokens.MAP_USGS_NEATLINE, 3.0)
+		
+		# North Star
+		draw_string(ThemeDB.fallback_font, content.position + Vector2(content.size.x - 30, 30), "★ N", HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Tokens.MAP_USGS_NEATLINE)
+		
+		# Spawns last, on top
 		var spawns: Array = _def.get("spawns", [])
 		for i in range(spawns.size()):
 			var spawn: Dictionary = spawns[i]
@@ -1073,18 +1182,80 @@ class MapSchematic extends Control:
 			var col: Color = Tokens.MAP_SPAWN_PLAYER if str(spawn.get("id", "")) == "player" \
 				else Tokens.MAP_SPAWN_ENEMY
 			var r3 := Tokens.MAP_MARKER_R * 2.0
-			draw_arc(p2, r3, 0.0, TAU, 24, col, Tokens.MAP_MARKER_EDGE * 1.5)
-			draw_line(p2 - Vector2(r3 * 1.6, 0), p2 + Vector2(r3 * 1.6, 0), col, 1.0)
-			draw_line(p2 - Vector2(0, r3 * 1.6), p2 + Vector2(0, r3 * 1.6), col, 1.0)
+			# Refined markers: filled circle with center cross
+			draw_circle(p2, r3, col)
+			draw_line(p2 - Vector2(r3, 0), p2 + Vector2(r3, 0), Color.WHITE, 1.0)
+			draw_line(p2 - Vector2(0, r3), p2 + Vector2(0, r3), Color.WHITE, 1.0)
+
+	func _draw_rocky_hash(r: Rect2) -> void:
+		var h_step := 10.0
+		var col := Color(0.45, 0.42, 0.38, 0.7)
+		var diag_len := r.size.x + r.size.y
+		var i := 0.0
+		while i < diag_len:
+			var p1 := Vector2(clampf(r.position.x + i, r.position.x, r.position.x + r.size.x),
+				clampf(r.position.y + maxf(0.0, i - r.size.x), r.position.y, r.position.y + r.size.y))
+			var p2 := Vector2(clampf(r.position.x + maxf(0.0, i - r.size.y), r.position.x, r.position.x + r.size.x),
+				clampf(r.position.y + i, r.position.y, r.position.y + r.size.y))
+			draw_line(p1, p2, col, 1.0)
+			i += h_step
+
+	func _draw_tree_hash(r: Rect2) -> void:
+		var t_step := 12.0
+		var col := Color(0.25, 0.42, 0.20, 0.85)
+		var x := r.position.x + 4.0
+		while x < r.position.x + r.size.x:
+			var y := r.position.y + 4.0
+			while y < r.position.y + r.size.y:
+				draw_line(Vector2(x - 2, y), Vector2(x + 2, y), col, 1.0)
+				draw_line(Vector2(x, y - 3), Vector2(x, y + 2), col, 1.0)
+				y += t_step
+			x += t_step
+
 
 
 # Static helpers reachable from the inner classes. An inner class cannot call
 # the outer script's own statics by bare name, and duplicating the precedence
 # chain into each of them is how the tile and the preview would end up showing
 # different pictures of the same map.
+func _on_sort_selected(idx: int) -> void:
+	_sort_tiles(idx)
+
+func _sort_tiles(criteria: int) -> void:
+	if _map_tiles.is_empty():
+		return
+	var sorted := _map_tiles.duplicate()
+	match criteria:
+		0: # Name (A-Z)
+			sorted.sort_custom(func(a, b): return MapCatalog.get_map_name(a.map_id) < MapCatalog.get_map_name(b.map_id))
+		1: # Size (Asc)
+			sorted.sort_custom(func(a, b): 
+				var sa = MapCatalog.half_extents(MapCatalog.get_map(a.map_id))
+				var sb = MapCatalog.half_extents(MapCatalog.get_map(b.map_id))
+				return (sa.x * sa.y) < (sb.x * sb.y))
+		2: # Size (Desc)
+			sorted.sort_custom(func(a, b): 
+				var sa = MapCatalog.half_extents(MapCatalog.get_map(a.map_id))
+				var sb = MapCatalog.half_extents(MapCatalog.get_map(b.map_id))
+				return (sa.x * sa.y) > (sb.x * sb.y))
+		3: # Spawns
+			sorted.sort_custom(func(a, b):
+				var na = MapCatalog.get_map(a.map_id).get("spawns", []).size()
+				var nb = MapCatalog.get_map(b.map_id).get("spawns", []).size()
+				return na > nb)
+		4: # Resources
+			sorted.sort_custom(func(a, b):
+				var ra = MapCatalog.get_map(a.map_id).get("resource_nodes", []).size()
+				var rb = MapCatalog.get_map(b.map_id).get("resource_nodes", []).size()
+				return ra > rb)
+	
+	var rail = _map_tiles[0].get_parent()
+	for tile in sorted:
+		rail.move_child(tile, -1)
+
 class MatchSetupChrome extends RefCounted:
 	static func texture_for(map_id: String) -> Texture2D:
-		for suffix in ["_macro", "_splat", "_height"]:
+		for suffix in ["_topo", "_macro", "_splat", "_height"]:
 			var path := "res://data/maps/%s%s.png" % [map_id, suffix]
 			if ResourceLoader.exists(path):
 				var tex: Texture2D = load(path) as Texture2D
@@ -1098,4 +1269,202 @@ class MatchSetupChrome extends RefCounted:
 			return raw
 		if raw is Array and raw.size() >= 3:
 			return Color(float(raw[0]), float(raw[1]), float(raw[2]))
-		return Tokens.MAP_TERRAIN
+		return Tokens.MAP_USGS_BUFF
+
+
+class SquadronHeroView extends PanelContainer:
+	var _subviewport: SubViewport = null
+	var _camera: Camera3D = null
+	var _squadron_root: Node3D = null
+	var _active_paths: Array = []
+
+	func _init() -> void:
+		size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		size_flags_vertical = Control.SIZE_EXPAND_FILL
+		add_theme_stylebox_override("panel", UITheme.flat_style(
+			Tokens.BASE_800, Tokens.BASE_500, Tokens.SPACE_LG, "raised"))
+
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", Tokens.SPACE_SM)
+		box.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(box)
+
+		var header := HBoxContainer.new()
+		header.add_theme_constant_override("separation", Tokens.SPACE_SM)
+		var icon = UITheme.chrome_rect("stage_launch", Tokens.SPINE_ICON, Tokens.TEXT_PRIMARY)
+		if icon:
+			header.add_child(icon)
+		var title := Label.new()
+		title.text = "SQUADRON FORMATION"
+		title.theme_type_variation = "HeadingLabel"
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		header.add_child(title)
+
+		var livery_tag := Label.new()
+		livery_tag.text = "PLAYER LIVERY"
+		livery_tag.theme_type_variation = "StatLabel"
+		header.add_child(livery_tag)
+		box.add_child(header)
+
+		var vp_cont := SubViewportContainer.new()
+		vp_cont.stretch = true
+		vp_cont.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		vp_cont.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		box.add_child(vp_cont)
+
+		_subviewport = SubViewport.new()
+		_subviewport.transparent_bg = true
+		_subviewport.handle_input_locally = false
+		_subviewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		_subviewport.msaa_3d = Viewport.MSAA_2X
+		_subviewport.own_world_3d = true
+		_subviewport.world_3d = World3D.new()
+		vp_cont.add_child(_subviewport)
+
+		_camera = Camera3D.new()
+		_camera.fov = 40.0
+		_camera.current = true
+		_camera.position = Vector3(0.0, 9.0, 18.0)
+		_camera.look_at_from_position(_camera.position, Vector3(0.0, 0.8, -0.5), Vector3.UP)
+		_subviewport.add_child(_camera)
+
+		var sun := DirectionalLight3D.new()
+		sun.rotation_degrees = Vector3(-42.0, 135.0, 0.0)
+		sun.light_color = Color(0.98, 0.95, 0.90)
+		sun.light_energy = 1.3
+		_subviewport.add_child(sun)
+
+		var fill := DirectionalLight3D.new()
+		fill.rotation_degrees = Vector3(25.0, -45.0, 0.0)
+		fill.light_color = Color(0.65, 0.75, 0.90)
+		fill.light_energy = 0.5
+		_subviewport.add_child(fill)
+
+		var env := Environment.new()
+		env.background_mode = Environment.BG_COLOR
+		env.background_color = Color(0.12, 0.12, 0.13, 1.0)
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		env.ambient_light_color = Color(0.35, 0.35, 0.38)
+		var w_env := WorldEnvironment.new()
+		w_env.environment = env
+		_subviewport.add_child(w_env)
+
+		# Ground apron plinth
+		var apron := MeshInstance3D.new()
+		var amesh := CylinderMesh.new()
+		amesh.top_radius = 28.0
+		amesh.bottom_radius = 29.5
+		amesh.height = 0.5
+		apron.mesh = amesh
+		apron.position = Vector3(0.0, -0.25, -2.0)
+		var amat := StandardMaterial3D.new()
+		amat.albedo_color = Color(0.20, 0.22, 0.25)
+		amat.roughness = 0.85
+		amat.metallic = 0.1
+		apron.material_override = amat
+		_subviewport.add_child(apron)
+
+		_squadron_root = Node3D.new()
+		_subviewport.add_child(_squadron_root)
+
+	func update_squadron(paths: Array) -> void:
+		if _subviewport == null or _squadron_root == null:
+			return
+		if paths == _active_paths and not _squadron_root.get_children().is_empty():
+			return
+		_active_paths = paths.duplicate()
+		for child in _squadron_root.get_children():
+			child.queue_free()
+
+		var valid_paths: Array = []
+		for p in paths:
+			var sp := str(p)
+			if sp != "" and FileAccess.file_exists(sp):
+				valid_paths.append(sp)
+
+		if valid_paths.is_empty():
+			return
+
+		var count := mini(valid_paths.size(), 7)
+		var bp := BlueprintManagerScript.new()
+		add_child(bp)
+
+		var vehicles: Array[Node3D] = []
+		var half_widths: Array[float] = []
+
+		for i in range(count):
+			var path: String = valid_paths[i]
+			var f := FileAccess.open(path, FileAccess.READ)
+			if f == null:
+				continue
+			var text := f.get_as_text()
+			f.close()
+			var json = JSON.parse_string(text)
+			if not (json is Dictionary):
+				continue
+			var vehicle: Node3D = bp.reconstruct_vehicle(json, _squadron_root, false, LiveryScript.PLAYER_ID)
+			if vehicle:
+				vehicles.append(vehicle)
+				# Measure vehicle bounding box at reconstruct position to find half-width
+				var v_box: AABB = BlueprintThumbnailScript.merged_aabb(vehicle, vehicle.transform)
+				var hw: float = v_box.size.x * 0.5 if v_box.size.x > 0.0 else 2.0
+				half_widths.append(hw)
+
+		bp.queue_free()
+
+		if vehicles.is_empty():
+			return
+
+		# Compute non-overlapping adaptive wedge positions
+		var lead_z := 4.5
+		var z_step := 3.8
+		var min_gap := 1.8
+		var pair_ranks = [[1, 2], [3, 4], [5, 6]]
+		var placed_positions: Array[Vector3] = []
+		placed_positions.append(Vector3(0.0, 0.0, lead_z))
+
+		var left_edge: float = -half_widths[0]
+		var right_edge: float = half_widths[0]
+		var row := 1
+
+		for pr in pair_ranks:
+			if pr[0] >= vehicles.size():
+				break
+			var left_idx: int = pr[0]
+			var right_idx: int = pr[1] if pr[1] < vehicles.size() else -1
+			var z_pos := lead_z - float(row) * z_step
+			var top_radius := 28.0
+
+			var left_hw: float = half_widths[left_idx]
+			var left_x := clampf(left_edge - min_gap - left_hw, -top_radius + left_hw, top_radius - left_hw)
+			placed_positions.append(Vector3(left_x, 0.0, z_pos))
+			left_edge = left_x - left_hw
+
+			if right_idx >= 0:
+				var right_hw: float = half_widths[right_idx]
+				var right_x := clampf(right_edge + min_gap + right_hw, -top_radius + right_hw, top_radius - right_hw)
+				placed_positions.append(Vector3(right_x, 0.0, z_pos))
+				right_edge = right_x + right_hw
+			row += 1
+
+		for i in range(vehicles.size()):
+			var vehicle := vehicles[i]
+			var recon_y: float = vehicle.position.y
+			var pos := placed_positions[i]
+			vehicle.position = Vector3(pos.x, recon_y, pos.z)
+
+			var yaw := 0.0
+			if pos.x < -0.5:
+				yaw = deg_to_rad(12.0)
+			elif pos.x > 0.5:
+				yaw = deg_to_rad(-12.0)
+			vehicle.rotation = Vector3(0, yaw, 0)
+
+		var aabb := BlueprintThumbnailScript.merged_aabb(_squadron_root, Transform3D.IDENTITY)
+		if aabb.size != Vector3.ZERO:
+			var centre := aabb.get_center()
+			var extent := maxf(aabb.size.x, aabb.size.z)
+			var dist := extent * 1.05 + 5.0
+			_camera.position = Vector3(centre.x, centre.y + extent * 0.42 + 2.4, centre.z + dist)
+			_camera.look_at(Vector3(centre.x, centre.y + 0.3, centre.z), Vector3.UP)
+			_camera.current = true

@@ -43,7 +43,7 @@ var hull: Node3D
 # over the same click.
 var paint_mode_active: bool = false
 
-var mirror_enabled: bool = true
+var mirror_enabled: bool = false
 var selected_module: Node3D = null
 
 

@@ -73,8 +73,12 @@ const TAB_WIDTH := 148.0
 
 # 148, not 124: MEDIUM MANUFACTORY clipped to "MEDIUM MANUFACTOI" at 124, and a
 # silently truncated build option is worse than a smaller grid.
-const CARD_WIDTH := 148.0
-const CARD_HEIGHT := 46.0
+const CARD_WIDTH := 176.0
+const CARD_HEIGHT := 52.0
+
+# ... (rest of code) ...
+# (Wait, need to do this carefully)
+
 
 var _director: Node = null
 var _local_team: int = 0
@@ -448,32 +452,55 @@ func _rebuild_palette() -> void:
 	_cards.clear()
 	if _director == null:
 		return
-	var items := _items_for(_active)
-	_empty_hint.visible = items.is_empty()
-	if items.is_empty():
-		_empty_hint.text = _empty_reason(_active)
-		return
-	# No live contributor means nothing in this palette can be ordered at all -
-	# ProductionService.enqueue_* refuses at the door. Without this the cards
-	# looked available and a click produced only a flash message, which reads as a
-	# broken button rather than as a missing building.
+
+	if _active == BuildingCatalog.QUEUE_BUILDING:
+		var items := _items_for(_active)
+		var grouped := {}
+		for item in items:
+			var cat = BuildingCatalog.get_category(item.get("kind", "tech"))
+			var cat_name = _category_name(cat)
+			if not grouped.has(cat_name): grouped[cat_name] = []
+			grouped[cat_name].append(item)
+		
+		var sorted_cats = ["PRODUCTION", "POWER & UTILITIES", "ECONOMY", "TECH & INTEL"]
+		for cat in sorted_cats:
+			if not grouped.has(cat): continue
+			var header := Style.label("— %s —" % cat, Style.SZ_MICRO, Style.TEXT_DIM)
+			header.custom_minimum_size = Vector2(CARD_WIDTH * 2 + Style.SP_XS, 16)
+			header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			_palette.add_child(header)
+			for item in grouped[cat]:
+				_add_card_to_palette(item)
+	else:
+		var items := _items_for(_active)
+		_empty_hint.visible = items.is_empty()
+		if items.is_empty():
+			_empty_hint.text = _empty_reason(_active)
+			return
+		for item in items:
+			_add_card_to_palette(item)
+
+func _category_name(cat: String) -> String:
+	match cat:
+		"production": return "PRODUCTION"
+		"power": return "POWER & UTILITIES"
+		"economy": return "ECONOMY"
+		_: return "TECH & INTEL"
+
+func _add_card_to_palette(item: Dictionary) -> void:
 	var kinds: Array = BuildingCatalog.contributors_for(_active)
-	var no_contributor: bool = _director.production != null 		and _director.production.contributor_count(_local_team, _active) <= 0
+	var no_contributor: bool = _director.production != null and _director.production.contributor_count(_local_team, _active) <= 0
 	var gate_reason := ""
 	if no_contributor and not kinds.is_empty():
 		gate_reason = "Needs a %s" % str(kinds[0]).replace("_", " ")
-	for item in items:
-		var card := _make_card(item)
-		if no_contributor:
-			card.disabled = true
-			card.tooltip_text = gate_reason
-			# modulate, not just `disabled`. The disabled StyleBox differs from
-			# normal only by PANEL vs PANEL_RAISE - about 3% luminance - so a
-			# palette that cannot be ordered from looked identical to one that
-			# could. Dimming the whole card is unambiguous at a glance.
-			card.modulate = Color(1, 1, 1, 0.42)
-		_palette.add_child(card)
-		_cards.append({"card": card, "item": item})
+	
+	var card := _make_card(item)
+	if no_contributor:
+		card.disabled = true
+		card.tooltip_text = gate_reason
+		card.modulate = Color(1, 1, 1, 0.42)
+	_palette.add_child(card)
+	_cards.append({"card": card, "item": item})
 
 
 func _empty_reason(queue_name: String) -> String:
@@ -532,29 +559,49 @@ func _make_card(item: Dictionary) -> Button:
 	b.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 	Style.style_button(b)
 
-	var v := VBoxContainer.new()
-	v.set_anchors_preset(Control.PRESET_FULL_RECT)
-	v.offset_left = 6
-	v.offset_right = -6
-	v.offset_top = 4
-	v.offset_bottom = -4
-	v.add_theme_constant_override("separation", 1)
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(v)
+	var hbox := HBoxContainer.new()
+	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hbox.offset_left = 4
+	hbox.offset_right = -4
+	hbox.offset_top = 2
+	hbox.offset_bottom = -2
+	hbox.add_theme_constant_override("separation", 6)
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(hbox)
 
-	var name_lbl := Style.label(str(item["label"]), Style.SZ_SMALL, Style.TEXT)
-	# Ellipsis rather than a hard clip, so a name that still does not fit reads as
-	# truncated instead of as a different word.
+	var thumb := Control.new()
+	thumb.custom_minimum_size = Vector2(42, 42)
+	thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.add_child(thumb)
+	
+	# Thumbnail visual: simple rect with background color + icon
+	var bg := ColorRect.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.2, 0.2, 0.2, 0.5)
+	thumb.add_child(bg)
+	var icon := ColorRect.new()
+	icon.set_anchors_preset(Control.PRESET_CENTER)
+	icon.size = Vector2(24, 24)
+	icon.position = Vector2(9, 9)
+	icon.color = BuildingCatalog.get_stat(item.get("kind", ""), "color", Style.TEXT_DIM) if item.get("structure", false) else Style.TEAM_FRIENDLY
+	thumb.add_child(icon)
+
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 0)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.add_child(v)
+
+	var name_lbl := Style.label(str(item["label"]), Style.SZ_MICRO, Style.TEXT)
 	name_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	v.add_child(name_lbl)
 
 	var meta := HBoxContainer.new()
 	meta.add_theme_constant_override("separation", Style.SP_SM)
-	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(meta)
-	var cost_lbl := Style.label("%d cr" % int(item["cost"]), Style.SZ_MICRO, Style.TEXT_DIM, true)
+	var cost_lbl := Style.label("%d cr" % int(item["cost"]), Style.SZ_MICRO, Style.TEXT_DIM)
 	meta.add_child(cost_lbl)
-	meta.add_child(Style.label("%ds" % int(item["time"]), Style.SZ_MICRO, Style.TEXT_FAINT, true))
+	meta.add_child(Style.label("%ds" % int(item["time"]), Style.SZ_MICRO, Style.TEXT_FAINT))
 
 	b.set_meta("cost_label", cost_lbl)
 	b.set_meta("cost", int(item["cost"]))

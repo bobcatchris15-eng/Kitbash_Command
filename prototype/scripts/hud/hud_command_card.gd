@@ -40,6 +40,13 @@ var _stance_buttons: Dictionary = {}
 var _range_toggle_btn: Button = null
 var _hint: Label = null
 
+var _ability_row: HBoxContainer = null
+var _barrage_btn: Button = null
+var _smoke_btn: Button = null
+var _beacon_btn: Button = null
+var _mine_btn: Button = null
+var _boost_btn: Button = null
+
 # design_id -> {name, units, hp, max_hp}
 var _groups: Dictionary = {}
 var _rows: Dictionary = {}
@@ -89,6 +96,17 @@ func _build() -> void:
 	_add_order("attack", "Attack-move (A), then right-click a destination", _on_attack_move)
 	_range_toggle_btn = _add_toggle_order("contact", "Toggle Range & Vision Indicators (F12)", _on_toggle_range_overlay)
 
+	_ability_row = HBoxContainer.new()
+	_ability_row.add_theme_constant_override("separation", Style.SP_XS)
+	_ability_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(_ability_row)
+	_barrage_btn = _add_ability_btn("barrage", "Barrage Ground Area (B)", _on_barrage)
+	_smoke_btn = _add_ability_btn("smoke", "Deploy Smoke Screen (K)", _on_smoke)
+	_beacon_btn = _add_ability_btn("beacon", "Launch Recon Probe", _on_beacon)
+	_mine_btn = _add_ability_btn("mine", "Deploy Proximity Mines", _on_mine)
+	_boost_btn = _add_ability_btn("boost", "Rocket Booster Sprint", _on_boost)
+	_ability_row.visible = false
+
 	_stance_row = HBoxContainer.new()
 	_stance_row.add_theme_constant_override("separation", Style.SP_XS)
 	_stance_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -98,6 +116,19 @@ func _build() -> void:
 	_add_stance(Stance.Kind.AGGRESSIVE, "stance_aggressive")
 
 	_set_enabled(false)
+
+
+func _add_ability_btn(icon: String, tip: String, handler: Callable) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(0, Style.HIT)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.tooltip_text = tip
+	Style.style_button(b)
+	Icons.on_button(b, icon, Style.TEXT)
+	b.pressed.connect(handler)
+	_ability_row.add_child(b)
+	b.visible = false
+	return b
 
 
 func _add_order(icon: String, tip: String, handler: Callable) -> void:
@@ -176,6 +207,31 @@ func update_selection(units: Array) -> void:
 	_rebuild_rows()
 	_refresh_stance_lamps()
 	_refresh_range_lamp()
+
+	var has_indirect := false
+	var has_smoke := false
+	var has_beacon := false
+	var has_mine := false
+	var has_boost := false
+	for u in units:
+		if not is_instance_valid(u) or ("is_dead" in u and u.is_dead): continue
+		if u.has_method("has_boost_ability") and u.has_boost_ability(): has_boost = true
+		if "hull_node" in u and is_instance_valid(u.hull_node):
+			for c in u.hull_node.get_children():
+				if c.has_meta("module_data"):
+					var tid: String = c.get_meta("module_data").type_id
+					if ModuleCatalog.is_indirect_fire(tid): has_indirect = true
+					elif tid == "smoke_discharger": has_smoke = true
+					elif tid == "sensor_beacon_launcher": has_beacon = true
+					elif tid == "mine_layer": has_mine = true
+	
+	if _barrage_btn: _barrage_btn.visible = has_indirect
+	if _smoke_btn: _smoke_btn.visible = has_smoke
+	if _beacon_btn: _beacon_btn.visible = has_beacon
+	if _mine_btn: _mine_btn.visible = has_mine
+	if _boost_btn: _boost_btn.visible = has_boost
+	if _ability_row:
+		_ability_row.visible = has_indirect or has_smoke or has_beacon or has_mine or has_boost
 
 
 func _rebuild_rows() -> void:
@@ -308,6 +364,9 @@ func _set_enabled(on: bool) -> void:
 		b.disabled = not on
 	for b in _stance_row.get_children():
 		b.disabled = not on
+	if _ability_row:
+		for b in _ability_row.get_children():
+			b.disabled = not on
 
 
 # --- Handlers ---------------------------------------------------------------
@@ -363,6 +422,26 @@ func _on_row_pressed(design_id: String) -> void:
 			live.append(u)
 	if not live.is_empty():
 		_director.selection.set_selection(live)
+
+
+func _on_barrage() -> void:
+	if _director and _director.has_method("arm_barrage"): _director.arm_barrage(true)
+
+
+func _on_smoke() -> void:
+	if _director and _director.has_method("arm_smoke"): _director.arm_smoke(true)
+
+
+func _on_beacon() -> void:
+	if _director and _director.has_method("arm_sensor_beacon"): _director.arm_sensor_beacon(true)
+
+
+func _on_mine() -> void:
+	if _director and _director.has_method("arm_mine"): _director.arm_mine(true)
+
+
+func _on_boost() -> void:
+	if _director and _director.has_method("trigger_boost"): _director.trigger_boost()
 
 
 # --- Identity ---------------------------------------------------------------

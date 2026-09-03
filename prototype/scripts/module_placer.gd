@@ -851,6 +851,20 @@ func _place_hull_from_ui(type_id: String):
 
 	add_child(hull)
 	update_hull_appearance()
+
+	# Seed the authored per-hull-type default armor plan so a fresh hull is
+	# plated immediately, instead of bare until the player opens Armor Station.
+	var HullLoaderScript = preload("res://scripts/hull_loader.gd")
+	var ArmorPaintVisual = preload("res://scripts/armor_paint_visual.gd")
+	var default_spec: Dictionary = HullLoaderScript.get_armor_default(type_id)
+	if not default_spec.is_empty():
+		var armor_assignments: Array = ArmorPaintScript.assignments_from_side_plan(
+			type_id, default_spec, mesh_inst.mesh)
+		hull.set_meta("armor_assignments", armor_assignments)
+		hull.set_meta("armor_plan", ArmorPaintScript.build_plan(
+			type_id, armor_assignments, mesh_inst.mesh, mesh_inst.transform, str(LiveryScript.PLAYER_ID)))
+		ArmorPaintVisual.rebuild(hull, mesh_inst)
+
 	_log("New hull spawned: " + type_id)
 	get_tree().call_group("stat_ui", "update_stats", hull)
 

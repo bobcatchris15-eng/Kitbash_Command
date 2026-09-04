@@ -102,11 +102,43 @@
 
 ## Graph Freshness
 
-- `graphify-out/graph.json` built from commit `4af4a0c046ae3e7d61e697a1f81d7d355e4e93fc`
-- Current HEAD is ~20 new symbols stale (16 VFX profiles + 2 framework helpers + dispatcher wiring — not yet indexed)
-- Graph rebuild scheduled before next fleet dispatch
+- `graphify-out/graph.json` rebuilt from commit `4f17a56c` on 2026-09-04.
+- Structural pass: 2,143 nodes, 4,590 edges, 183 communities.
+- The installed Graphify package reported 34 legacy confidence-schema warnings while preserving the graph output; 1 sensitive file (`ui_tokens.gd`) remains intentionally skipped.
+
+## Semantic Pass — 2026-09-04
+
+- Reviewed the origin delta from `28309ae5` through `4f17a56c` across combat, material, procedural-geometry, Blender export, and project-state changes.
+- Confirmed the semantic through-lines: force-fire ground targeting now exempts only intended terrain contact; `gauss_railgun` is consistently pintle-mounted with widened elevation; non-optics materials are matte/specular-limited; procedural power hardware is composed from anchored discrete primitives; redesigned weapon assets are single-purpose parts and missile-pod payloads are single rockets.
+- Confirmed the Blender export orientation contract is reflected in `add_cone_forward()` and the missile assets; HVM spacing and missile-pod single-rocket architecture are recorded in `pitfalls.md`.
+- No semantic contradiction requiring a code change was found in the pulled delta. Non-code semantic extraction was not delegated to a provider because no Graphify provider key is configured; this inline review is the authoritative semantic pass for this sync.
 
 ## Skill Note
 
 - `godot-particles` skill installed globally
 - Safety scan: Safe / 0 alerts / Low Risk
+
+## Current Work — Visual Direction Consolidation and UI Rebuild
+
+**Human-approved direction:** Kitbash Command is an industrial design simulator: polished, tactile, mechanically legible, and internally distinctive. The prior sincere-world/absurd-units split is superseded. Absurd weapon sounds remain an intentional audio channel.
+
+**Immediate objective:** replace/rebuild the menu and UI system with quality bespoke assets and evaluate the result against the approved internal design language.
+
+**Clonker findings accepted as working evidence:**
+
+- Governing principles: industrial-design simulation, visible mechanics, polished kitbash, tactility in service of operation, legibility over atmosphere, parameter-driven player expression, and jokes as structural/dry details rather than a required tonal binary.
+- Current defects: weak menu composition, undersized/dark Design Lab hero object, flat/dense Match Setup, weak launch confirmation, undersignaled gestures, small dense typography, and incomplete empty/error/focus/narrow-state coverage.
+- Reusable foundation: `ui_shell.gd`, `ui_theme.gd`, `ui_tokens.gd`, `ui_anim.gd`, `ui_feedback.gd`, existing specialized controls, current fonts/icons/textures/shaders, and the data-driven Theatre → Roster → Launch flow.
+
+**Proposed authoring DAG:**
+
+1. Consolidated visual-language brief and document ownership map.
+2. Shared screen shell and token/component architecture.
+3. Bespoke vector asset kit: navigation, state, slot, drag/drop, warning, map, and blueprint marks.
+4. Bespoke raster/material kit: plates, fields, workbench surfaces, and controlled wear.
+5. Bespoke Blender prop kit: 6–12 high-visibility fixtures/controls for menu, Lab, and setup.
+6. Hero composition rebuild: Main Menu, Design Lab, Match Setup.
+7. Typography, motion, lighting, and state coverage pass.
+8. Independent rendered UX/visual audit and correction loop.
+
+**Authoring resources:** Blender, GIMP, Inkscape, and Godot 4.7.1 are available in the project environment. The skills.sh `design-ux` skill was retrieved and injected for independent rendered UX review. The public `extract-design-system` skill was reviewed but not used because it is for reverse-engineering public websites, not this local project.

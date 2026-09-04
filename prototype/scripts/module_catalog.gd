@@ -370,10 +370,9 @@ static func _build_catalog_literal() -> Dictionary:
 			"metal": 80,
 			"crystal": 40,
 			"dps": 99.0,
-			# Frame_built (see get_mount_style() below), so it never
-			# independently traverses in practice - this number only matters
-			# if that override is ever lifted, kept low for consistency with
-			# its long rigid accelerator rail.
+			# Pintle mount (frame_built override lifted per TASK-0045) -
+			# base_traverse kept low for consistency with its long rigid
+			# accelerator rail.
 			"size": Vector3(1.2, 1.2, 5.0),
 			"color": Color.BLUE_VIOLET
 		},
@@ -2377,7 +2376,7 @@ static func get_mount_style(type_id: String, hull_type_id: String = "") -> Strin
 		return "frame_built"
 	if type_id == "basic_cannon":
 		return "turret"
-	if type_id in ["gauss_railgun", "heavy_howitzer"]:
+	if type_id == "heavy_howitzer":
 		return "frame_built"
 	return "pintle"
 
@@ -3919,7 +3918,7 @@ const ELEVATION_LIMITS := {
 	"recoilless_rifle":    {"up": 45.0, "down": 12.0},
 	"anti_materiel_rifle": {"up": 42.0, "down": 15.0},
 	"coil_gun":            {"up": 40.0, "down": 10.0},
-	"gauss_railgun":       {"up": 30.0, "down": 8.0},
+	"gauss_railgun":       {"up": 60.0, "down": 25.0},
 	"flamethrower":        {"up": 40.0, "down": 20.0},
 	"cluster_dispenser":   {"up": 45.0, "down": 8.0},
 	"bunker_buster":       {"up": 40.0, "down": 10.0},

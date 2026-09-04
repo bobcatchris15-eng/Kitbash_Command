@@ -83,3 +83,22 @@
 > 
 > Designers don't need a finicky, CPU-choking micro-voxel intersection slice when kitbashing armor plate and autocannons. They need immediate, unmistakable visual feedback: *this module is in an illegal position.* Swapping the module's entire `MeshInstance3D` hierarchy to an incandescent `_clipping_material()` red aura and cleanly restoring the cached `base_material` the instant clearance is achieved is robust, instantaneous, and readable from orbit. No floating ghost artifacts, no tree-bloating CSG nodes, and no corrupted shared materials. Keep the geometry clean, keep the warnings bold. Clankers gonna clank."
 
+---
+
+### [2026-09-03 21:45] - Procedural Power & Modular Geometry Clanker (TASK-0044 Unit)
+> "Naive single-axis mesh stretching is the original sin of procedural vehicle design. It's the lazy shortcut that immediately breaks player immersion the moment anyone moves a tweak slider past 1.0.
+> 
+> When an engineer or commander adjusts a capacitor bank to pack more energy, they expect more cells, heavier interlinks, and a beefier busbar—not a pair of static cylinders distorted like taffy into grotesque ellipses. And when tweaking a fusion reactor's cooling capacity, watching radiator fins literally decouple from the reactor flank and float out into empty space because someone slapped `scale.x = r_fins` onto an off-center mesh was an insult to the physical weight of this machine.
+> 
+> Real mechanical hardware is discrete and architectural. If you want more capacitance, you machine a longer tray and drop in another pair of standardized cylindrical canisters. If you want higher busbar conductance, the copper conductor grows in thickness above the terminal contacts while the bottom surface stays welded to the cell posts—it doesn't levitate 20 centimeters into the sky. By shifting power modules from naive whole-mesh scaling to discrete procedural composition—iterated canister pairs, flush manifold-anchored cooling fins, displacement-locked exhaust ports, and containment-bounded flywheel rotors—the Design Lab finally reflects the physical reality of militarized heavy engineering. Every part mounts to metal, every bolt has purchase, and every slider tweak preserves mechanical integrity. Clankers gonna clank."
+
+---
+
+### [2026-09-03 21:50] - Railgun Arc & Firing Envelope Clanker (TASK-0045 Unit)
+> "There is nothing more tragic in tactical armor doctrine than mounting a 5-meter electromagnetic accelerator to a battle tank only to discover it's mechanically paraplegic.
+> 
+> The original vision for `gauss_railgun` made intuitive thematic sense on the drawing board: 'A railgun is a massive, rigid spine—make it `frame_built`, so the whole vehicle has to point like a self-propelled gun.' But in practice against live pathfinding, rolling terrain, and dynamic targets, `frame_built` was a death sentence. Setting independent traverse to literally 0.0 meant `auto_weapon.gd` skipped local slewing entirely, leaving the weapon at the mercy of vehicle steering slerps that almost never converged within micro-tolerances. Add an anemic 8-degree depression stop and a 30-degree elevation ceiling, and a railgun tank sitting on a gentle 10-degree ridge slope was utterly incapable of depressing its barrel to punish the armor advancing in the depression below it.
+> 
+> Liberating `gauss_railgun` from the `frame_built` lock into a true pintle mount gives it full horizontal traverse, while expanding the elevation envelope to 60° up and 25° down transforms it from a finicky static display piece into the devastating long-range sniper it was always meant to be. It can now track moving flankers, reach down into gullies, and elevate against high-ground targets without demanding continuous chassis gymnastics. Big guns need room to breathe and traverse. Clankers gonna clank."
+
+

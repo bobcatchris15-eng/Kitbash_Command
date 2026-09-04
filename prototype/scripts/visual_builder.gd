@@ -2296,13 +2296,75 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			core.scale = Vector3(S_PWR, S_PWR, r_len * S_PWR)
 			core.position = Vector3.ZERO
 			parent_node.add_child(core)
+		else:
+			var core_box = BoxMesh.new()
+			core_box.size = Vector3(1.1 * S_PWR, 0.5 * S_PWR, 1.4 * r_len * S_PWR)
+			var core_inst = MeshInstance3D.new()
+			core_inst.mesh = core_box
+			core_inst.material_override = _structural_body_mat(base_color)
+			core_inst.position = Vector3(0, 0.28 * S_PWR, 0)
+			parent_node.add_child(core_inst)
 
-		var rad_mesh = _part("fusion_generator_radiator")
-		if rad_mesh:
-			var rad = _mesh_inst(rad_mesh, base_color.darkened(0.25))
-			rad.scale = Vector3(r_fins * S_PWR, S_PWR, r_len * S_PWR)
-			rad.position = Vector3.ZERO
-			parent_node.add_child(rad)
+		# Radiator fins anchored flush against core flanks (core half-width ~ 0.55 * S_PWR)
+		# Flank arrays do NOT scale outward in X; they remain attached while fin depth,
+		# spacing, and fin count scale along Z with cooling_radiator and reactor_length.
+		var core_flank_x: float = 0.55 * S_PWR
+		var m_width: float = 0.04 * S_PWR
+		var m_len: float = 1.30 * r_len * S_PWR
+		var manifold_box := BoxMesh.new()
+		manifold_box.size = Vector3(m_width, 0.40 * S_PWR, m_len)
+		var rad_mat := _structural_body_mat(base_color.darkened(0.25))
+
+		var fin_depth: float = (0.08 + 0.06 * r_fins) * S_PWR
+		var fin_th: float = 0.025 * S_PWR
+		var fin_h: float = 0.36 * S_PWR
+		var fin_box := BoxMesh.new()
+		fin_box.size = Vector3(fin_depth, fin_h, fin_th)
+
+		var fin_count: int = clampi(int(round(6.0 * r_len * (0.8 + 0.2 * r_fins))), 3, 14)
+		var fin_span: float = 1.15 * r_len * S_PWR
+
+		for side in [-1.0, 1.0]:
+			var mx: float = side * (core_flank_x + m_width * 0.5)
+			var m_inst := MeshInstance3D.new()
+			m_inst.mesh = manifold_box
+			m_inst.material_override = rad_mat
+			m_inst.position = Vector3(mx, 0.28 * S_PWR, 0)
+			parent_node.add_child(m_inst)
+
+			var fx: float = side * (core_flank_x + m_width + fin_depth * 0.5)
+			for k in range(fin_count):
+				var fz: float = (float(k) - float(fin_count - 1) * 0.5) * (fin_span / float(maxi(fin_count - 1, 1)))
+				var fin_inst := MeshInstance3D.new()
+				fin_inst.mesh = fin_box
+				fin_inst.material_override = rad_mat
+				fin_inst.position = Vector3(fx, 0.30 * S_PWR, fz)
+				parent_node.add_child(fin_inst)
+
+		# Central exhaust vent cowl centered on reactor top (never stretched sideways)
+		var cowl_box := BoxMesh.new()
+		var cowl_len: float = 0.85 * r_len * S_PWR
+		cowl_box.size = Vector3(0.42 * S_PWR, 0.10 * S_PWR, cowl_len)
+		var cowl := MeshInstance3D.new()
+		cowl.mesh = cowl_box
+		cowl.material_override = rad_mat
+		cowl.position = Vector3(0, 0.54 * S_PWR, 0)
+		parent_node.add_child(cowl)
+
+		var slat_count: int = clampi(int(round(4.0 * r_len)), 2, 8)
+		var slat_box := BoxMesh.new()
+		slat_box.size = Vector3(0.34 * S_PWR, 0.04 * S_PWR, 0.04 * S_PWR)
+		var slat_mat := StandardMaterial3D.new()
+		slat_mat.albedo_color = Color(0.12, 0.12, 0.14)
+		slat_mat.metallic = 0.8
+		slat_mat.roughness = 0.5
+		for s in range(slat_count):
+			var sz: float = (float(s) - float(slat_count - 1) * 0.5) * (0.70 * cowl_len / float(maxi(slat_count - 1, 1)))
+			var slat := MeshInstance3D.new()
+			slat.mesh = slat_box
+			slat.material_override = slat_mat
+			slat.position = Vector3(0, 0.58 * S_PWR, sz)
+			parent_node.add_child(slat)
 
 	elif type_id == "diesel_generator":
 		# Combustion turbine generator: heavy cast engine block with exhaust stacks and louvers.
@@ -2324,13 +2386,76 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			block.scale = Vector3(disp * S_PWR, disp * S_PWR, disp * S_PWR)
 			block.position = Vector3.ZERO
 			parent_node.add_child(block)
+		else:
+			var block_box = BoxMesh.new()
+			block_box.size = Vector3(1.15 * disp * S_PWR, 0.48 * disp * S_PWR, 1.45 * disp * S_PWR)
+			var block_inst = MeshInstance3D.new()
+			block_inst.mesh = block_box
+			block_inst.material_override = _structural_body_mat(base_color)
+			block_inst.position = Vector3(0, 0.26 * disp * S_PWR, 0)
+			parent_node.add_child(block_inst)
 
-		var vent_mesh = _part("diesel_generator_vents")
-		if vent_mesh:
-			var vents = _mesh_inst(vent_mesh, Color(0.2, 0.2, 0.22))
-			vents.scale = Vector3(fins * S_PWR, disp * S_PWR, fins * S_PWR)
-			vents.position = Vector3.ZERO
-			parent_node.add_child(vents)
+		# Exhaust stacks attached to engine block mounting ports (tracking disp)
+		var stack_r: float = 0.08 * disp * S_PWR
+		var stack_h: float = 0.28 * disp * S_PWR
+		var stack_mesh := CylinderMesh.new()
+		stack_mesh.top_radius = stack_r
+		stack_mesh.bottom_radius = stack_r
+		stack_mesh.height = stack_h
+		stack_mesh.radial_segments = 12
+
+		var stack_mat := StandardMaterial3D.new()
+		stack_mat.albedo_color = Color(0.20, 0.20, 0.22)
+		stack_mat.metallic = 0.85
+		stack_mat.roughness = 0.35
+
+		var block_top_y: float = 0.50 * disp * S_PWR
+		var stack_y: float = block_top_y + stack_h * 0.5
+		var stack_z: float = -0.45 * disp * S_PWR
+		for sx_sign in [-1.0, 1.0]:
+			var sx: float = sx_sign * 0.22 * disp * S_PWR
+			var stack := MeshInstance3D.new()
+			stack.mesh = stack_mesh
+			stack.material_override = stack_mat
+			stack.position = Vector3(sx, stack_y, stack_z)
+			parent_node.add_child(stack)
+
+		# Top radiator grille seated on block top; louver slat density scales with radiator_fins
+		var grille_w: float = 0.60 * disp * S_PWR
+		var grille_l: float = 0.70 * disp * S_PWR
+		var grille_h: float = 0.05 * S_PWR
+		var grille_box := BoxMesh.new()
+		grille_box.size = Vector3(grille_w, grille_h, grille_l)
+		var grille := MeshInstance3D.new()
+		grille.mesh = grille_box
+		grille.material_override = stack_mat
+		grille.position = Vector3(0, block_top_y + grille_h * 0.5, 0.15 * disp * S_PWR)
+		parent_node.add_child(grille)
+
+		var num_slats: int = clampi(int(round(4.0 + 3.0 * fins)), 3, 10)
+		var slat_box := BoxMesh.new()
+		slat_box.size = Vector3(grille_w * 0.85, 0.02 * S_PWR, 0.03 * S_PWR)
+		var slat_mat := StandardMaterial3D.new()
+		slat_mat.albedo_color = Color(0.12, 0.12, 0.14)
+		for s in range(num_slats):
+			var sz: float = (0.15 * disp * S_PWR) + (float(s) - float(num_slats - 1) * 0.5) * (0.8 * grille_l / float(maxi(num_slats - 1, 1)))
+			var slat := MeshInstance3D.new()
+			slat.mesh = slat_box
+			slat.material_override = slat_mat
+			slat.position = Vector3(0, block_top_y + grille_h + 0.01 * S_PWR, sz)
+			parent_node.add_child(slat)
+
+		# Side intake louvers anchored flush against engine block flank (X = ±0.575 * disp * S_PWR)
+		var louver_depth: float = (0.04 + 0.03 * fins) * S_PWR
+		var louver_box := BoxMesh.new()
+		louver_box.size = Vector3(louver_depth, 0.18 * disp * S_PWR, 0.55 * disp * S_PWR)
+		for side in [-1.0, 1.0]:
+			var lx: float = side * (0.575 * disp * S_PWR + louver_depth * 0.5)
+			var louver_inst := MeshInstance3D.new()
+			louver_inst.mesh = louver_box
+			louver_inst.material_override = stack_mat
+			louver_inst.position = Vector3(lx, 0.28 * disp * S_PWR, 0)
+			parent_node.add_child(louver_inst)
 
 	elif type_id == "thermo_generator":
 		# Thermoelectric Stirling generator: compact heat sink casing with copper pipe runners.
@@ -2352,42 +2477,174 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			casing.scale = Vector3(core_d * S_PWR, S_PWR, core_d * S_PWR)
 			casing.position = Vector3.ZERO
 			parent_node.add_child(casing)
+		else:
+			var case_box = BoxMesh.new()
+			case_box.size = Vector3(0.85 * core_d * S_PWR, 0.36 * S_PWR, 0.95 * core_d * S_PWR)
+			var case_inst = MeshInstance3D.new()
+			case_inst.mesh = case_box
+			case_inst.material_override = _structural_body_mat(base_color)
+			case_inst.position = Vector3(0, 0.20 * S_PWR, 0)
+			parent_node.add_child(case_inst)
 
-		var pipe_mesh = _part("thermo_generator_pipes")
-		if pipe_mesh:
-			var pipes = _mesh_inst(pipe_mesh, Color(0.65, 0.45, 0.25))
-			pipes.scale = Vector3(hs_fins * S_PWR, S_PWR, hs_fins * S_PWR)
-			pipes.position = Vector3.ZERO
-			parent_node.add_child(pipes)
+		# Copper heat pipe loop runners wrapping around core casing (radius tracking core_d)
+		var cu_mat := StandardMaterial3D.new()
+		cu_mat.albedo_color = Color(0.75, 0.45, 0.22)
+		cu_mat.metallic = 0.90
+		cu_mat.roughness = 0.20
+
+		var pipe_r: float = 0.035 * S_PWR
+		var pipe_h: float = 0.28 * S_PWR
+		var riser_mesh := CylinderMesh.new()
+		riser_mesh.top_radius = pipe_r
+		riser_mesh.bottom_radius = pipe_r
+		riser_mesh.height = pipe_h
+		riser_mesh.radial_segments = 10
+
+		for i in range(4):
+			var a: float = float(i) * (PI / 2.0) + PI / 4.0
+			var px: float = cos(a) * 0.32 * core_d * S_PWR
+			var pz: float = sin(a) * 0.36 * core_d * S_PWR
+			var riser := MeshInstance3D.new()
+			riser.mesh = riser_mesh
+			riser.material_override = cu_mat
+			riser.position = Vector3(px, 0.30 * S_PWR, pz)
+			parent_node.add_child(riser)
+
+			var runner_len: float = 0.18 * core_d * S_PWR
+			var runner_box := BoxMesh.new()
+			runner_box.size = Vector3(runner_len, 0.04 * S_PWR, 0.04 * S_PWR)
+			var runner := MeshInstance3D.new()
+			runner.mesh = runner_box
+			runner.material_override = cu_mat
+			runner.position = Vector3(px * 0.65, 0.42 * S_PWR, pz * 0.65)
+			runner.rotation.y = -a
+			parent_node.add_child(runner)
+
+		# Micro-cooling heatsink fins anchored flush against core casing flanks (X = ±0.425 * core_d * S_PWR)
+		var fin_w: float = (0.07 + 0.05 * hs_fins) * S_PWR
+		var fin_th: float = 0.025 * S_PWR
+		var fin_h: float = 0.26 * S_PWR
+		var fin_box := BoxMesh.new()
+		fin_box.size = Vector3(fin_w, fin_h, fin_th)
+		var fin_mat := StandardMaterial3D.new()
+		fin_mat.albedo_color = Color(0.38, 0.40, 0.44)
+		fin_mat.metallic = 0.75
+		fin_mat.roughness = 0.40
+
+		var num_fins: int = clampi(int(round(3.0 + 3.0 * hs_fins)), 3, 9)
+		for side in [-1.0, 1.0]:
+			var fx: float = side * (0.425 * core_d * S_PWR + fin_w * 0.5)
+			for k in range(num_fins):
+				var fz: float = (float(k) - float(num_fins - 1) * 0.5) * (0.60 * core_d * S_PWR / float(maxi(num_fins - 1, 1)))
+				var f_inst := MeshInstance3D.new()
+				f_inst.mesh = fin_box
+				f_inst.material_override = fin_mat
+				f_inst.position = Vector3(fx, 0.22 * S_PWR, fz)
+				parent_node.add_child(f_inst)
 
 	elif type_id == "capacitor_bank":
 		# Segmented cylindrical supercapacitor cells with heavy busbars.
 		var cells_t: float = clampf(tweaks.get("bank_capacity", 4.0), 2.0, 6.0)
 		var busbar_t: float = clampf(tweaks.get("busbar_gauge", 1.0), 0.5, 2.0)
-		var cell_scale_z = cells_t / 4.0
+		var num_pairs: int = int(round(cells_t))
 		const S_PWR := 0.40
 
 		var collar = MeshInstance3D.new()
 		var col_box = BoxMesh.new()
-		col_box.size = Vector3(1.0 * S_PWR, 0.16 * S_PWR, 1.2 * cell_scale_z * S_PWR)
+		var tray_z: float = (float(num_pairs) * 0.30 + 0.10) * S_PWR
+		col_box.size = Vector3(1.0 * S_PWR, 0.16 * S_PWR, tray_z)
 		collar.mesh = col_box
 		collar.material_override = _structural_body_mat(base_color)
-		collar.position = Vector3(0, 0.05 * S_PWR, 0)
+		collar.position = Vector3(0, 0.08 * S_PWR, 0)
 		parent_node.add_child(collar)
 
-		var cells_mesh = _part("capacitor_bank_cells")
-		if cells_mesh:
-			var cells = _mesh_inst(cells_mesh, Color(0.22, 0.24, 0.28))
-			cells.scale = Vector3(S_PWR, S_PWR, cell_scale_z * S_PWR)
-			cells.position = Vector3.ZERO
-			parent_node.add_child(cells)
+		var cell_h: float = 0.20 * S_PWR
+		var cell_r: float = 0.07 * S_PWR
+		var cell_mesh := CylinderMesh.new()
+		cell_mesh.top_radius = cell_r
+		cell_mesh.bottom_radius = cell_r
+		cell_mesh.height = cell_h
+		cell_mesh.radial_segments = 16
 
-		var bus_mesh = _part("capacitor_bank_busbar")
-		if bus_mesh:
-			var bus = _mesh_inst(bus_mesh, Color(0.72, 0.55, 0.20))
-			bus.scale = Vector3(busbar_t * S_PWR, busbar_t * S_PWR, cell_scale_z * S_PWR)
-			bus.position = Vector3.ZERO
-			parent_node.add_child(bus)
+		var cell_mat := StandardMaterial3D.new()
+		cell_mat.albedo_color = Color(0.22, 0.24, 0.28)
+		cell_mat.metallic = 0.60
+		cell_mat.roughness = 0.35
+
+		var stud_h: float = 0.025 * S_PWR
+		var stud_r: float = 0.025 * S_PWR
+		var stud_mesh := CylinderMesh.new()
+		stud_mesh.top_radius = stud_r
+		stud_mesh.bottom_radius = stud_r
+		stud_mesh.height = stud_h
+		stud_mesh.radial_segments = 8
+
+		var copper_mat := StandardMaterial3D.new()
+		copper_mat.albedo_color = Color(0.72, 0.55, 0.20)
+		copper_mat.metallic = 0.85
+		copper_mat.roughness = 0.25
+
+		var cell_y: float = 0.16 * S_PWR + cell_h * 0.5
+		var contact_y: float = 0.16 * S_PWR + cell_h
+		var stud_y: float = contact_y + stud_h * 0.5
+
+		const COL_X := 0.096
+		for i in range(num_pairs):
+			var r_z: float = (float(i) - float(num_pairs - 1) * 0.5) * 0.30 * S_PWR
+			for col_sign in [-1.0, 1.0]:
+				var cx: float = col_sign * COL_X
+				var cell_inst := MeshInstance3D.new()
+				cell_inst.mesh = cell_mesh
+				cell_inst.material_override = cell_mat
+				cell_inst.position = Vector3(cx, cell_y, r_z)
+				parent_node.add_child(cell_inst)
+
+				var stud_inst := MeshInstance3D.new()
+				stud_inst.mesh = stud_mesh
+				stud_inst.material_override = copper_mat
+				stud_inst.position = Vector3(cx, stud_y, r_z)
+				parent_node.add_child(stud_inst)
+
+		# Busbars anchored firmly to top contact level (contact_y)
+		var bar_w: float = 0.035 * busbar_t * S_PWR
+		var bar_th: float = 0.025 * busbar_t * S_PWR
+		var bar_len: float = (float(num_pairs - 1) * 0.30 + 0.16) * S_PWR
+		var bar_y: float = contact_y + bar_th * 0.5
+
+		var rail_box := BoxMesh.new()
+		rail_box.size = Vector3(bar_w, bar_th, bar_len)
+		for col_sign in [-1.0, 1.0]:
+			var rail := MeshInstance3D.new()
+			rail.mesh = rail_box
+			rail.material_override = copper_mat
+			rail.position = Vector3(col_sign * COL_X, bar_y, 0)
+			parent_node.add_child(rail)
+
+		var cross_span: float = (2.0 * COL_X + bar_w)
+		var cross_box := BoxMesh.new()
+		cross_box.size = Vector3(cross_span, bar_th, 0.04 * busbar_t * S_PWR)
+
+		var cross_center := MeshInstance3D.new()
+		cross_center.mesh = cross_box
+		cross_center.material_override = copper_mat
+		cross_center.position = Vector3(0, bar_y + bar_th * 0.5, 0)
+		parent_node.add_child(cross_center)
+
+		var z_end: float = float(num_pairs - 1) * 0.5 * 0.30 * S_PWR
+		for end_sign in [-1.0, 1.0]:
+			var cross_end := MeshInstance3D.new()
+			cross_end.mesh = cross_box
+			cross_end.material_override = copper_mat
+			cross_end.position = Vector3(0, bar_y, end_sign * z_end)
+			parent_node.add_child(cross_end)
+
+		var shunt_box := BoxMesh.new()
+		shunt_box.size = Vector3(0.06 * busbar_t * S_PWR, 0.035 * busbar_t * S_PWR, 0.06 * busbar_t * S_PWR)
+		var shunt := MeshInstance3D.new()
+		shunt.mesh = shunt_box
+		shunt.material_override = cell_mat
+		shunt.position = Vector3(0, bar_y + bar_th + 0.0175 * busbar_t * S_PWR, 0)
+		parent_node.add_child(shunt)
 
 	elif type_id == "flywheel_storage":
 		# High-velocity kinetic storage rotor with vacuum containment ring.
@@ -2410,10 +2667,13 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			housing.position = Vector3.ZERO
 			parent_node.add_child(housing)
 
+		# Constrain rotor radius inside containment armor ring (authored rotor radius 0.48 < housing 0.56)
+		# When rotor_mass > containment_armor, cap radial scale and expand vertical mass
+		var rotor_r_scale: float = minf(r_mass, c_armor * 0.95)
 		var rotor_mesh = _part("flywheel_storage_rotor")
 		if rotor_mesh:
 			var rotor = _mesh_inst(rotor_mesh, Color(0.35, 0.37, 0.40))
-			rotor.scale = Vector3(r_mass * S_PWR, r_mass * S_PWR, r_mass * S_PWR)
+			rotor.scale = Vector3(rotor_r_scale * S_PWR, r_mass * S_PWR, rotor_r_scale * S_PWR)
 			rotor.position = Vector3.ZERO
 			parent_node.add_child(rotor)
 
@@ -2421,30 +2681,85 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		# Matrix cell array: low-profile hull-conforming tray with modular packs.
 		var layers_t: float = clampf(tweaks.get("cell_layers", 4.0), 2.0, 6.0)
 		var thick_t: float = clampf(tweaks.get("dielectric_thickness", 1.0), 0.5, 2.0)
-		var layer_scale_z = layers_t / 4.0
+		var num_layers: int = clampi(int(round(layers_t)), 2, 6)
 		const S_PWR := 0.40
 
+		var tray_len: float = (float(num_layers) * 0.32 + 0.12) * S_PWR
 		var collar = MeshInstance3D.new()
 		var col_box = BoxMesh.new()
-		col_box.size = Vector3(1.2 * S_PWR, 0.14 * S_PWR, 1.4 * layer_scale_z * S_PWR)
+		col_box.size = Vector3(1.2 * S_PWR, 0.14 * thick_t * S_PWR, tray_len)
 		collar.mesh = col_box
 		collar.material_override = _structural_body_mat(base_color)
-		collar.position = Vector3(0, 0.05 * S_PWR, 0)
+		collar.position = Vector3(0, 0.07 * thick_t * S_PWR, 0)
 		parent_node.add_child(collar)
 
-		var tray_mesh = _part("solid_state_battery_tray")
-		if tray_mesh:
-			var tray = _mesh_inst(tray_mesh, base_color)
-			tray.scale = Vector3(S_PWR, thick_t * S_PWR, layer_scale_z * S_PWR)
-			tray.position = Vector3.ZERO
-			parent_node.add_child(tray)
+		var tray_box := BoxMesh.new()
+		tray_box.size = Vector3(1.10 * S_PWR, 0.18 * thick_t * S_PWR, tray_len)
+		var tray := MeshInstance3D.new()
+		tray.mesh = tray_box
+		tray.material_override = _structural_body_mat(base_color.darkened(0.15))
+		tray.position = Vector3(0, 0.09 * thick_t * S_PWR, 0)
+		parent_node.add_child(tray)
 
-		var cell_mesh = _part("solid_state_battery_cells")
-		if cell_mesh:
-			var cells = _mesh_inst(cell_mesh, Color(0.18, 0.20, 0.24))
-			cells.scale = Vector3(S_PWR, thick_t * S_PWR, layer_scale_z * S_PWR)
-			cells.position = Vector3.ZERO
-			parent_node.add_child(cells)
+		# Discrete modular cell packs nested along tray (no texture or geometric distortion)
+		var pack_w: float = 0.94 * S_PWR
+		var pack_l: float = 0.24 * S_PWR
+		var pack_h: float = 0.16 * thick_t * S_PWR
+		var pack_box := BoxMesh.new()
+		pack_box.size = Vector3(pack_w, pack_h, pack_l)
+
+		var pack_mat := StandardMaterial3D.new()
+		pack_mat.albedo_color = Color(0.18, 0.20, 0.24)
+		pack_mat.metallic = 0.75
+		pack_mat.roughness = 0.35
+
+		var slit_mat := StandardMaterial3D.new()
+		slit_mat.albedo_color = Color(0.10, 0.12, 0.14)
+		slit_mat.metallic = 0.5
+		slit_mat.roughness = 0.6
+
+		var pack_y: float = 0.09 * thick_t * S_PWR + pack_h * 0.5
+
+		for i in range(num_layers):
+			var pack_z: float = (float(i) - float(num_layers - 1) * 0.5) * 0.32 * S_PWR
+			var p_inst := MeshInstance3D.new()
+			p_inst.mesh = pack_box
+			p_inst.material_override = pack_mat
+			p_inst.position = Vector3(0, pack_y, pack_z)
+			parent_node.add_child(p_inst)
+
+			# Cooling channel slits across pack top
+			var slit_box := BoxMesh.new()
+			slit_box.size = Vector3(pack_w * 0.85, 0.02 * thick_t * S_PWR, 0.03 * S_PWR)
+			for s in range(2):
+				var sz: float = pack_z + (float(s) - 0.5) * 0.10 * S_PWR
+				var slit := MeshInstance3D.new()
+				slit.mesh = slit_box
+				slit.material_override = slit_mat
+				slit.position = Vector3(0, pack_y + pack_h * 0.5 + 0.01 * thick_t * S_PWR, sz)
+				parent_node.add_child(slit)
+
+		# BMS (Battery Management System) control box on flank
+		var bms_box := BoxMesh.new()
+		bms_box.size = Vector3(0.12 * S_PWR, 0.18 * thick_t * S_PWR, 0.40 * S_PWR)
+		var bms := MeshInstance3D.new()
+		bms.mesh = bms_box
+		bms.material_override = _structural_body_mat(base_color.darkened(0.25))
+		bms.position = Vector3(0.56 * S_PWR, 0.10 * thick_t * S_PWR, 0)
+		parent_node.add_child(bms)
+
+		var led_box := BoxMesh.new()
+		led_box.size = Vector3(0.02 * S_PWR, 0.04 * S_PWR, 0.08 * S_PWR)
+		var led_mat := StandardMaterial3D.new()
+		led_mat.albedo_color = Color(0.2, 0.8, 0.4)
+		led_mat.emission_enabled = true
+		led_mat.emission = Color(0.2, 0.8, 0.4)
+		led_mat.emission_energy_multiplier = 2.0
+		var led := MeshInstance3D.new()
+		led.mesh = led_box
+		led.material_override = led_mat
+		led.position = Vector3(0.62 * S_PWR, 0.14 * thick_t * S_PWR, 0)
+		parent_node.add_child(led)
 
 	elif type_id in ["mk19_grenade_launcher", "autocannon", "recoilless_rifle", "coil_gun",
 					 "mine_layer", "smoke_discharger",

@@ -179,13 +179,13 @@ The type scale is fixed. Do not introduce arbitrary font sizes; choose the neare
 |---|---|---|---|
 | `FONT_DISPLAY` | 40 px | Stencil (Special Elite) | Title screen wordmark only |
 | `FONT_TITLE` | 24 px | Stencil | Screen-level titles |
-| `FONT_HEADING` | 17 px | Stencil | Panel/section headers |
-| `FONT_BODY` | 15 px | UI sans (default) | All normal reading text |
-| `FONT_SMALL` | 13 px | UI sans | Secondary/hint text |
-| `FONT_MICRO` | 11 px | Monospace | Dense tabular readouts, footnotes |
+| `FONT_HEADING` | 18 px | Bold UI sans | Operational panel/section headers |
+| `FONT_BODY` | 16 px | UI sans (default) | All normal reading text |
+| `FONT_SMALL` | 14 px | UI sans | Secondary/hint text; mono for numeric readouts |
+| `FONT_MICRO` | 12 px | UI sans | Non-operational footnotes only |
 
 **Face allocation:**
-- **Stencil (Special Elite):** display/title/heading only. Large, short, carrying the aesthetic tone. At body size it becomes unreadable mush.
+- **Stencil (Special Elite):** display/title only. Operational headings use bold UI sans.
 - **UI sans (Inter or similar):** everything else. Clean, legible, fast to parse.
 - **Monospace:** numeric readouts that need tabular alignment (`HUDValueLabel`, `StatLabel`). Prevents a resource counter from changing width as it ticks.
 
@@ -197,10 +197,10 @@ Set `theme_type_variation` — do not override individual font/color properties 
 |---|---|---|
 | `DisplayLabel` | Label | 40 px stencil, primary text colour |
 | `TitleLabel` | Label | 24 px stencil, primary text colour |
-| `HeadingLabel` | Label | 17 px stencil, **amber** (`SIGNAL_HAZARD`) |
-| `HintLabel` | Label | 13 px sans, secondary text colour |
-| `HUDValueLabel` | Label | 17 px monospace, primary text colour |
-| `StatLabel` | Label | 13 px monospace, secondary text colour |
+| `HeadingLabel` | Label | 18 px bold sans, primary text colour; signal colour only for state |
+| `HintLabel` | Label | 14 px sans, secondary text colour |
+| `HUDValueLabel` | Label | 18 px monospace, primary text colour |
+| `StatLabel` | Label | 14 px monospace, secondary text colour |
 | `CardPanel` | PanelContainer | Powdercoat, SPACE_XL/LG padding — for free-floating cards |
 | `HeaderPanel` | PanelContainer | BASE_700 fill + 2 px amber bottom rule — for titled bands |
 | `HUDPanel` | PanelContainer | Powdercoat pressed — recessed in-match chrome |
@@ -310,10 +310,10 @@ Standard easing is `EASE_OUT` with `TRANS_CUBIC`. **Everything is short.** Gritt
 
 | Primitive | Use |
 |---|---|
-| `hover_lift` / `hover_settle` | 1.03 scale. The theme already swaps the plate, so this only adds physicality — a larger scale makes a button in a dense row overlap its neighbours |
-| `button_press_feedback` | Squash-release on press |
+| `hover_lift` / `hover_settle` | 1.015 scale, preserving the authored rest scale |
+| `button_press_feedback` | 0.97 scale squash-release, sharing the hover cancellation channel |
 | `slide_in` | A panel or card entering, from the edge it belongs to |
-| `stagger_in` | A list or grid. Total capped at 0.45 s — at 35 ms per child a 40-row list takes 1.4 s and reads as a loading bug rather than polish |
+| `stagger_in` | A list or grid. Total capped at 0.45 s including the final child's 220 ms entrance |
 | `ring_pop` | The radial menu only. The **one** sanctioned overshoot (`TRANS_BACK`), because a ring springing open is a mechanism |
 | `value_flash` | A number that changed meaningfully. Tweens `font_color`, not `modulate`, so it tints the text rather than the subtree |
 | `shake` | Rejected input. Small and fast so the next target remains easy to acquire |
@@ -421,6 +421,14 @@ This pattern is established in `hud_production_deck.gd` and should be reused for
 ---
 
 ## 9 · What This Guide Does Not Cover
+
+Task 7 checkpoint (2026-09-04): `UITheme.configure_typography()` owns the
+generated theme's type assignments, including sans name fields. Match Setup
+keeps its navigation fixed while stage content scrolls; roster categories stack
+in narrow space. The 960×720 Launch stage still exceeds the right viewport edge
+by 25 px. See `TASK7_UI_POLISH_REPORT.md` for the matrix and remaining blocker.
+The historical showcase lighting description above is superseded by the current
+inspection settings in `RENDER_SETTINGS.md`.
 
 - **Whole-game art direction** — philosophy, camera optics, environment, unit finish, the FX/audio split: see `CORE_DESIGN_LANGUAGE.md`, which is the umbrella document
 - **3D art direction** (hull materials, faction colours, terrain shaders) — see `VISUAL_ART_DIRECTION.md`

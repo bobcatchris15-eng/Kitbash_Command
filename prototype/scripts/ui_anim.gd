@@ -150,9 +150,9 @@ static func stagger_in(parent: Node, from_offset: Vector2 = UITokens.ENTRANCE_OF
 			kids.append(c)
 	if kids.is_empty():
 		return
-	var step: float = STAGGER_STEP
-	if float(kids.size()) * STAGGER_STEP > STAGGER_MAX_TOTAL:
-		step = STAGGER_MAX_TOTAL / float(kids.size())
+	# The cap includes the last child's entrance, not just its start delay.
+	var step: float = minf(STAGGER_STEP,
+		maxf(0.0, STAGGER_MAX_TOTAL - DURATION_NORMAL) / maxf(1.0, kids.size() - 1.0))
 	for i in range(kids.size()):
 		var child: Control = kids[i]
 		var delay: float = step * float(i)

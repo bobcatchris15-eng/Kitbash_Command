@@ -132,6 +132,8 @@ var _next_btn: Button
 var _launch_btn: Button
 var _readiness: Label
 var _narrow_viewport: bool = false
+var _spine_title: Label
+var _map_side: VBoxContainer
 
 # Console Mode (War Room Ops-Table)
 var _ops_table_mode: bool = false
@@ -191,10 +193,19 @@ func _ready() -> void:
 	_stage_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.add_child(_stage_host)
 
-	_stage_pages = [_build_map_stage(), _build_roster_stage(), _build_launch_stage()]
-	for page in _stage_pages:
+	for content: Control in [_build_map_stage(), _build_roster_stage(), _build_launch_stage()]:
+		# Keep the navigation fixed while dense content scrolls at short heights.
+		var page := ScrollContainer.new()
+		page.name = content.name
+		content.name = "Content"
+		page.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		page.follow_focus = true
 		page.set_anchors_preset(Control.PRESET_FULL_RECT)
+		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		_stage_host.add_child(page)
+		page.add_child(content)
+		_stage_pages.append(page)
 
 	_ops_table_page = _build_ops_table()
 	_ops_table_page.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -210,6 +221,8 @@ func _ready() -> void:
 	_goto_stage(0, false)
 	get_viewport().size_changed.connect(_on_viewport_size_changed)
 	_on_viewport_size_changed()
+	UIFeedbackScript.wire_tree(self)
+	(_spine_chips[0] as Button).grab_focus.call_deferred()
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +247,7 @@ func _build_spine() -> Control:
 	band.add_child(row)
 
 	var title := Label.new()
+	_spine_title = title
 	title.text = "MATCH SETTINGS"
 	title.theme_type_variation = "TitleLabel"
 	title.custom_minimum_size = Vector2(Tokens.SUMMARY_COL_MIN, 0)
@@ -303,6 +317,7 @@ func _build_chip(idx: int) -> Button:
 	label.theme_type_variation = "HeadingLabel"
 	label.text = "%d  %s" % [idx + 1, str(stage["title"])]
 	box.add_child(label)
+	chip.custom_minimum_size.x = box.get_combined_minimum_size().x + Tokens.SPACE_MD * 2
 
 	chip.pressed.connect(_on_chip_pressed.bind(idx))
 	UIFeedbackScript.wire(chip, "select")
@@ -324,6 +339,7 @@ func _on_chip_pressed(idx: int) -> void:
 
 
 func _goto_stage(idx: int, animate: bool = true) -> void:
+	var previous_stage := _stage
 	if _ops_table_mode:
 		set_console_mode(false)
 	_stage = clampi(idx, 0, STAGES.size() - 1)
@@ -333,7 +349,7 @@ func _goto_stage(idx: int, animate: bool = true) -> void:
 	if animate:
 		# From the right on the way forward, from the left on the way back, so
 		# the motion agrees with the spine's direction of travel.
-		UIAnimScript.slide_in(_stage_pages[_stage], Vector2(16, 0))
+		UIAnimScript.slide_in(_stage_pages[_stage], Tokens.STAGE_TRANSITION_OFFSET * (1 if _stage >= previous_stage else -1))
 	_caption.text = str(STAGES[_stage]["caption"])
 	_refresh_spine()
 	_refresh_nav()
@@ -466,6 +482,7 @@ func _build_nav() -> Control:
 	_readiness.theme_type_variation = "HintLabel"
 	_readiness.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_readiness.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_readiness.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_readiness.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(_readiness)
 
@@ -511,6 +528,8 @@ func _refresh_readiness() -> void:
 		return
 	var manual_count := roster_picker.filled_unit_count() + roster_picker.filled_defence_count() if roster_picker else 0
 	var has_auto_draft: bool = bp_manager != null and not bp_manager.list_blueprints(true).is_empty()
+	_launch_btn.disabled = manual_count == 0 and not has_auto_draft
+	_launch_btn.tooltip_text = "Save a blueprint in the Design Lab before deploying." if _launch_btn.disabled else "Deploy the reviewed roster"
 	if manual_count > 0:
 		_readiness.text = "READY — %d DESIGN%s FIELD ASSIGNED" % [manual_count, "S" if manual_count != 1 else ""]
 		_readiness.add_theme_color_override("font_color", Tokens.SIGNAL_GO)
@@ -523,11 +542,19 @@ func _refresh_readiness() -> void:
 
 
 func _on_viewport_size_changed() -> void:
-	_narrow_viewport = get_viewport_rect().size.x <= 960.0
+	var width := get_viewport_rect().size.x
+	_narrow_viewport = width <= Tokens.NARROW_VIEWPORT_WIDTH
+	var compact := width <= Tokens.COMPACT_VIEWPORT_WIDTH
 	if _ops_mode_btn != null:
-		_ops_mode_btn.visible = not _narrow_viewport
-	if _narrow_viewport and _ops_table_mode:
+		_ops_mode_btn.visible = not compact
+	if compact and _ops_table_mode:
 		set_console_mode(false)
+	if _spine_title:
+		_spine_title.custom_minimum_size.x = 200 if compact else Tokens.SUMMARY_COL_MIN
+	if _preview:
+		_preview.custom_minimum_size = Vector2(240 if compact else Tokens.MAP_PREVIEW_MIN.x, 300 if compact else Tokens.MAP_PREVIEW_MIN.y)
+	if _map_side:
+		_map_side.custom_minimum_size.x = 260 if compact else Tokens.SUMMARY_COL_MIN
 
 
 func is_narrow_viewport() -> bool:
@@ -599,6 +626,7 @@ func _build_map_stage() -> Control:
 	_preview.custom_minimum_size = Tokens.MAP_PREVIEW_MIN
 	page.add_child(_preview)
 	var side := VBoxContainer.new()
+	_map_side = side
 	side.custom_minimum_size = Vector2(Tokens.SUMMARY_COL_MIN, 0)
 	side.add_theme_constant_override("separation", Tokens.SPACE_MD)
 	page.add_child(side)
@@ -618,6 +646,7 @@ func _build_map_stage() -> Control:
 	_map_title = Label.new()
 	_map_title.theme_type_variation = "HeadingLabel"
 	_map_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_map_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	facts_hdr.add_child(_map_title)
 	facts_box.add_child(facts_hdr)
 
@@ -854,6 +883,7 @@ func _build_roster_stage() -> Control:
 func _on_roster_changed() -> void:
 	if _stage == STAGES.size() - 1 or _ops_table_mode:
 		_refresh_summary()
+	_refresh_readiness()
 
 
 # ---------------------------------------------------------------------------
@@ -1621,6 +1651,11 @@ func _build_ops_table() -> Control:
 # same SceneRouter hop to Battle.tscn. The rebuild is presentation; the output
 # contract is not part of it.
 func _on_start_pressed() -> void:
+	_refresh_readiness()
+	if _launch_btn.disabled:
+		UIAnimScript.shake(_readiness)
+		UIFeedbackScript.play(self, "error")
+		return
 	var match_config = get_node_or_null("/root/MatchConfig")
 	if match_config:
 		# Fixed ids rather than a player choice - see the note at the top of
@@ -2102,21 +2137,17 @@ class SquadronHeroView extends PanelContainer:
 
 		var sun := DirectionalLight3D.new()
 		sun.rotation_degrees = Vector3(-42.0, 135.0, 0.0)
-		sun.light_color = Color(0.98, 0.95, 0.90)
-		sun.light_energy = 1.3
+		sun.light_color = Tokens.INSPECTION_KEY_COLOR
+		sun.light_energy = Tokens.INSPECTION_KEY_ENERGY
 		_subviewport.add_child(sun)
 
 		var fill := DirectionalLight3D.new()
 		fill.rotation_degrees = Vector3(25.0, -45.0, 0.0)
-		fill.light_color = Color(0.65, 0.75, 0.90)
-		fill.light_energy = 0.5
+		fill.light_color = Tokens.INSPECTION_FILL_COLOR
+		fill.light_energy = Tokens.INSPECTION_FILL_ENERGY
 		_subviewport.add_child(fill)
 
-		var env := Environment.new()
-		env.background_mode = Environment.BG_COLOR
-		env.background_color = Color(0.12, 0.12, 0.13, 1.0)
-		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-		env.ambient_light_color = Color(0.35, 0.35, 0.38)
+		var env := UITheme.inspection_environment()
 		var w_env := WorldEnvironment.new()
 		w_env.environment = env
 		_subviewport.add_child(w_env)

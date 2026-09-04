@@ -106,10 +106,10 @@ static func role_colors(role: String, state: String = "normal") -> Dictionary:
 # else on screen.
 const FONT_DISPLAY = 40  # title screen wordmark only
 const FONT_TITLE = 24    # screen titles
-const FONT_HEADING = 17  # panel/section headers
-const FONT_BODY = 15     # default reading size
-const FONT_SMALL = 13    # secondary/hint text
-const FONT_MICRO = 11    # dense tabular readouts, footnotes
+const FONT_HEADING = 18  # operational section headers, bold UI sans
+const FONT_BODY = 16     # default reading size
+const FONT_SMALL = 14    # secondary/hint text
+const FONT_MICRO = 12    # non-operational footnotes only
 
 # ---------------------------------------------------------------------------
 # SPACING - a 4px base grid. Every margin and gap should be one of these.
@@ -233,8 +233,8 @@ const STAGGER_STEP = 0.035
 # Motion paint pass: amplitudes, timing ratios and special-case periods belong
 # here too. UIAnim keeps the original public duration aliases for callers.
 const STAGGER_MAX_TOTAL: float = 0.45
-const HOVER_SCALE: float = 1.03
-const PRESS_SCALE: float = 0.92
+const HOVER_SCALE: float = 1.015
+const PRESS_SCALE: float = 0.97
 const PRESS_ATTACK_RATIO: float = 0.4
 const RING_START_SCALE: float = 0.72
 const RING_FADE_RATIO: float = 0.7
@@ -370,6 +370,20 @@ const MAP_TILE_MIN = Vector2(196, 132)      # one map in the chooser rail
 const MAP_MARKER_R = 6.0         # schematic marker radius, px
 const MAP_MARKER_EDGE = 2.0
 const SUMMARY_COL_MIN = 320
+const COMPACT_VIEWPORT_WIDTH: float = 1280.0
+const NARROW_VIEWPORT_WIDTH: float = 960.0
+const STAGE_TRANSITION_OFFSET := Vector2(SPACE_MD, 0)
+
+# Inspection paint pass: same neutral fill and AgX response for the menu,
+# Lab and squadron preview. Battle keeps its separately measured pipeline.
+const INSPECTION_AMBIENT: float = 0.65
+const INSPECTION_EXPOSURE: float = 1.0
+const INSPECTION_KEY_COLOR := Color(1.0, 0.95, 0.88)
+const INSPECTION_FILL_COLOR := Color(0.78, 0.84, 0.92)
+const INSPECTION_KEY_ENERGY: float = 1.3
+const INSPECTION_FILL_ENERGY: float = 0.5
+const SHOWCASE_SPOT_ENERGY: float = 15.0
+const SHOWCASE_RIM_ENERGY: float = 2.2
 
 const MAP_TERRAIN = BASE_600
 const MAP_WATER = SIGNAL_INFO

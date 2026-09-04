@@ -11,6 +11,42 @@ const MATERIAL_SHADER = preload("res://shaders/ui_material.gdshader")
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const LiveryScript = preload("res://scripts/livery.gd")
 
+# Shared type ownership for the generated theme. Display stays on large titles;
+# operations use sans, and only numeric/telemetry variations use mono.
+static func configure_typography(theme: Theme, ui: Font, bold: Font, display: Font, mono: Font) -> void:
+	if ui:
+		theme.default_font = ui
+		theme.set_font("font", "LineEdit", ui)
+	theme.default_font_size = Tokens.FONT_BODY
+	var sizes := {"Label": Tokens.FONT_BODY, "DisplayLabel": Tokens.FONT_DISPLAY,
+		"TitleLabel": Tokens.FONT_TITLE, "HeadingLabel": Tokens.FONT_HEADING,
+		"HintLabel": Tokens.FONT_SMALL, "HUDValueLabel": Tokens.FONT_HEADING,
+		"StatLabel": Tokens.FONT_SMALL}
+	for type: String in sizes:
+		theme.set_font_size("font_size", type, sizes[type])
+		theme.set_color("font_color", type, Tokens.TEXT_SECONDARY if type in ["HintLabel", "StatLabel"] else Tokens.TEXT_PRIMARY)
+	if display:
+		for type in ["DisplayLabel", "TitleLabel"]: theme.set_font("font", type, display)
+	if bold: theme.set_font("font", "HeadingLabel", bold)
+	if mono:
+		for type in ["HUDValueLabel", "StatLabel"]: theme.set_font("font", type, mono)
+
+static func inspection_environment() -> Environment:
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Tokens.BASE_900
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	env.tonemap_exposure = Tokens.INSPECTION_EXPOSURE
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Tokens.TEXT_PRIMARY
+	env.ambient_light_energy = Tokens.INSPECTION_AMBIENT
+	env.ssao_enabled = true
+	env.ssao_radius = 0.8
+	env.ssao_intensity = 1.2
+	# Inspection needs crisp seams and selection edges, not bloom around them.
+	env.glow_enabled = false
+	return env
+
 # ---------------------------------------------------------------------------
 # MATERIAL VOCABULARY
 # ---------------------------------------------------------------------------

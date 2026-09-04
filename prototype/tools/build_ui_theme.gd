@@ -15,6 +15,7 @@ extends MainLoop
 # screens looked like a mix of two products: they were.
 
 const Tokens = preload("res://scripts/ui_tokens.gd")
+const ThemeHelpers = preload("res://scripts/ui_theme.gd")
 
 func _process(_delta: float) -> bool:
 	build_theme()
@@ -182,8 +183,8 @@ func build_theme() -> void:
 
 	_build_panels(theme)
 	_build_buttons(theme)
-	_build_labels(theme, stencil, ui_bold, mono_reg)
-	_build_inputs(theme, mono_reg)
+	ThemeHelpers.configure_typography(theme, ui_reg, ui_bold, stencil, mono_reg)
+	_build_inputs(theme)
 	_build_bars(theme)
 	_build_misc(theme)
 	# MUST come after the builders above - see _register_variations().
@@ -599,39 +600,7 @@ func _build_buttons(theme: Theme) -> void:
 	theme.set_color("icon_disabled_color", "QueueItemButton", Color(0.45, 0.45, 0.45, 0.7))
 
 
-func _build_labels(theme: Theme, stencil: FontFile, ui_bold: FontFile, mono: FontFile) -> void:
-	theme.set_color("font_color", "Label", Tokens.TEXT_PRIMARY)
-	theme.set_font_size("font_size", "Label", Tokens.FONT_BODY)
-
-	# The stencil face earns its keep here and nowhere else.
-	var display_font = stencil if stencil else ui_bold
-	if display_font:
-		theme.set_font("font", "DisplayLabel", display_font)
-		theme.set_font("font", "TitleLabel", display_font)
-		theme.set_font("font", "HeadingLabel", display_font)
-	theme.set_font_size("font_size", "DisplayLabel", Tokens.FONT_DISPLAY)
-	theme.set_color("font_color", "DisplayLabel", Tokens.TEXT_PRIMARY)
-	theme.set_font_size("font_size", "TitleLabel", Tokens.FONT_TITLE)
-	theme.set_color("font_color", "TitleLabel", Tokens.TEXT_PRIMARY)
-	theme.set_font_size("font_size", "HeadingLabel", Tokens.FONT_HEADING)
-	theme.set_color("font_color", "HeadingLabel", Tokens.SIGNAL_HAZARD)
-
-	theme.set_font_size("font_size", "HintLabel", Tokens.FONT_SMALL)
-	theme.set_color("font_color", "HintLabel", Tokens.TEXT_SECONDARY)
-
-	# Numeric readouts stay on the monospace face for real tabular figures -
-	# a resource counter that changes width as it ticks is a genuine
-	# readability problem at a glance, not a stylistic preference.
-	if mono:
-		theme.set_font("font", "HUDValueLabel", mono)
-		theme.set_font("font", "StatLabel", mono)
-	theme.set_font_size("font_size", "HUDValueLabel", Tokens.FONT_HEADING)
-	theme.set_color("font_color", "HUDValueLabel", Tokens.TEXT_PRIMARY)
-	theme.set_font_size("font_size", "StatLabel", Tokens.FONT_SMALL)
-	theme.set_color("font_color", "StatLabel", Tokens.TEXT_SECONDARY)
-
-
-func _build_inputs(theme: Theme, mono: FontFile) -> void:
+func _build_inputs(theme: Theme) -> void:
 	# A text field is a recess milled into the panel, so it gets the PRESSED
 	# steel plate - inverted bevel, sunk into the frame. Focus keeps the flat
 	# hazard hairline for the same reason buttons do: focus is interface state,
@@ -645,8 +614,6 @@ func _build_inputs(theme: Theme, mono: FontFile) -> void:
 	theme.set_color("font_color", "LineEdit", Tokens.TEXT_PRIMARY)
 	theme.set_color("font_placeholder_color", "LineEdit", Tokens.TEXT_DISABLED)
 	theme.set_color("caret_color", "LineEdit", Tokens.SIGNAL_HAZARD)
-	if mono:
-		theme.set_font("font", "LineEdit", mono)
 
 	theme.set_color("font_color", "CheckBox", Tokens.TEXT_PRIMARY)
 	theme.set_color("font_hover_color", "CheckBox", Tokens.TEXT_PRIMARY)

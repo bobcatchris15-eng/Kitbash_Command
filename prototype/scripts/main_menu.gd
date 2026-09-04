@@ -313,20 +313,7 @@ func _build_3d_background() -> void:
 	# the frame edges and simply disappears into the falloff, which is what
 	# lets a finite slab read as an endless bench.
 	var env_node = WorldEnvironment.new()
-	var env = Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.016, 0.018, 0.021)
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.3
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Tokens.TEXT_PRIMARY
-	env.ambient_light_energy = 0.45
-	env.ssao_enabled = true
-	env.ssao_radius = 1.4
-	env.ssao_intensity = 2.4
-	env.glow_enabled = true
-	env.glow_intensity = 0.5
-	env.glow_bloom = 0.08
+	var env := UITheme.inspection_environment()
 	env_node.environment = env
 	scene.add_child(env_node)
 
@@ -334,8 +321,8 @@ func _build_3d_background() -> void:
 	# cone's inverse-square falloff has to carry the whole image now.
 	var key = SpotLight3D.new()
 	key.position = Vector3(-1.2, 9.5, 5.5)
-	key.light_color = Color(1.0, 0.93, 0.82)
-	key.light_energy = 15.0
+	key.light_color = Tokens.INSPECTION_KEY_COLOR
+	key.light_energy = Tokens.SHOWCASE_SPOT_ENERGY
 	key.spot_range = 28.0
 	key.spot_attenuation = 1.1
 	key.spot_angle = 37.0
@@ -347,8 +334,8 @@ func _build_3d_background() -> void:
 	# the hull's trailing edges and dies before it paints the mat.
 	var rim = OmniLight3D.new()
 	rim.position = Vector3(-8.5, 3.0, -6.5)
-	rim.light_color = Color(0.55, 0.68, 0.85)
-	rim.light_energy = 2.2
+	rim.light_color = Tokens.INSPECTION_FILL_COLOR
+	rim.light_energy = Tokens.SHOWCASE_RIM_ENERGY
 	rim.omni_range = 14.0
 	rim.omni_attenuation = 2.0
 	scene.add_child(rim)

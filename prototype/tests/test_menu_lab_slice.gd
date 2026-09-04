@@ -94,6 +94,19 @@ func _run() -> void:
 	var lab = load("res://scenes/MainLab.tscn").instantiate()
 	root.add_child(lab)
 	await settle()
+	for fixture_name: String in [
+		"LabFixtureConsoleFrame",
+		"LabFixtureDocumentClamp",
+		"LabFixtureRail",
+		"LabInspectionLamp",
+		"LabPartsTray",
+		"LabServicePedestal",
+	]:
+		var fixture: Node = lab.get_node_or_null(fixture_name)
+		check(fixture is Node3D, "Design Lab instances authored fixture: " + fixture_name)
+		if fixture is Node3D:
+			check(fixture.process_mode == Node.PROCESS_MODE_INHERIT, "fixture remains static: " + fixture_name)
+			check(fixture.get_script() == null, "fixture has no runtime script: " + fixture_name)
 	var doc = lab.get_node("UI_StatBlock")
 	check(doc.has_method("set_document_expanded"), "bottom document can retract without losing actions")
 	check(lab.has_signal("placement_feedback"), "placement feedback has a visible state contract")

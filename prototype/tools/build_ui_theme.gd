@@ -75,27 +75,14 @@ func _pad(sb: StyleBox, h: int, v: int) -> StyleBox:
 # bevel and outline inside a 12px margin and keep the centre flat and
 # tileable. texture_margin_* below must match PLATE_MARGIN there or the bevel
 # either gets stretched into a smear or gets sliced through the middle.
-const PLATE_DIR = "res://assets/textures/ui/"
-const PLATE_MARGIN = 12
-
-# The transparent ring around the plate body that carries its baked elevation
-# shadow. Mirrors PAD in tools/generate_ui_plates.py; the two must agree or the
-# 9-slice frame cuts through the shadow instead of around it.
-#
-# WHY THE SHADOW IS IN THE TEXTURE: StyleBoxTexture has no shadow properties,
-# and Godot draws exactly one stylebox per control state, so there is nowhere to
-# stack a shadow-only box behind the plate. Same constraint that made signal
-# colours material modulation rather than borders - see _plate_tinted().
-const PLATE_PAD = 16
-
 func _plate_texture(material: String, state: String) -> Texture2D:
-	var path = PLATE_DIR + "plate_%s_%s.png" % [material, state]
-	if not ResourceLoader.exists(path):
+	var texture := ThemeHelpers.industrial_plate_texture(material, state)
+	if texture == null:
 		# Loud, because the silent version of this failure is a theme that
 		# builds "successfully" and renders every control as a blank box.
-		push_error("build_ui_theme: missing plate %s" % path)
+		push_error("build_ui_theme: missing industrial plate %s/%s" % [material, state])
 		return null
-	return load(path) as Texture2D
+	return texture
 
 # One styleboxed plate. `h`/`v` are content margins - the padding INSIDE the
 # control, unrelated to the 9-slice texture margin.
@@ -106,12 +93,13 @@ func _plate(material: String, state: String, h: int, v: int) -> StyleBox:
 		# render as "no style at all" and make the failure look cosmetic.
 		return _pad(_flat(Tokens.BASE_700, Tokens.BASE_500,
 			Tokens.BORDER_HAIRLINE, Tokens.RADIUS_CONTROL), h, v)
+	var plate_spec: Dictionary = ThemeHelpers.industrial_material_spec(material).get("plate", {})
 	var sb = StyleBoxTexture.new()
 	sb.texture = tex
 	# The unstretched frame now has to cover the shadow pad as well as the bevel,
 	# or the 9-slice stretches the shadow along with the centre and every wide
 	# panel gets a smeared grey band down its sides.
-	var frame := PLATE_MARGIN + PLATE_PAD
+	var frame: int = plate_spec.get("slice", 28)
 	sb.texture_margin_left = frame
 	sb.texture_margin_right = frame
 	sb.texture_margin_top = frame
@@ -122,10 +110,11 @@ func _plate(material: String, state: String, h: int, v: int) -> StyleBox:
 	# layout actually assigned. Without it the visible panel shrinks by
 	# PLATE_PAD on every side and every margin, gutter and column alignment in
 	# every screen silently shifts by 16px.
-	sb.expand_margin_left = PLATE_PAD
-	sb.expand_margin_right = PLATE_PAD
-	sb.expand_margin_top = PLATE_PAD
-	sb.expand_margin_bottom = PLATE_PAD
+	var expand: int = plate_spec.get("expand", 16)
+	sb.expand_margin_left = expand
+	sb.expand_margin_right = expand
+	sb.expand_margin_top = expand
+	sb.expand_margin_bottom = expand
 	return _pad(sb, h, v)
 
 
@@ -155,6 +144,10 @@ func _plate_tinted(material: String, state: String, role: Color,
 
 func build_theme() -> void:
 	print("Building theme -> res://resources/bomber_theme.tres")
+	var manifest := ThemeHelpers.industrial_manifest()
+	if manifest.get("schema", "") != "kitbash-command.ui.industrial.v2":
+		push_error("build_ui_theme: industrial manifest is missing or has an unsupported schema")
+		return
 	var theme = Theme.new()
 
 	var ui_reg = _load_font("res://assets/fonts/UIFont-Regular.ttf")
@@ -187,11 +180,38 @@ func build_theme() -> void:
 	_build_inputs(theme)
 	_build_bars(theme)
 	_build_misc(theme)
+	_build_industrial_assets(theme)
 	# MUST come after the builders above - see _register_variations().
 	_register_variations(theme)
 
 	var err = ResourceSaver.save(theme, "res://resources/bomber_theme.tres")
 	print("  saved" if err == OK else "  FAILED, error %d" % err)
+
+
+# Publish the complete authored kit into the generated Theme. Screens may use
+# the semantic vector/field registries directly, while plate theme types expose
+# reusable four-state 9-slices without duplicating margin or asset-path logic.
+func _build_industrial_assets(theme: Theme) -> void:
+	var manifest := ThemeHelpers.industrial_manifest()
+	var vectors: Dictionary = manifest.get("vectors", {})
+	for key: String in vectors:
+		var icon := ThemeHelpers.industrial_icon(key)
+		if icon != null:
+			theme.set_icon(key, ThemeHelpers.INDUSTRIAL_ICON_TYPE, icon)
+
+	var materials: Dictionary = manifest.get("materials", {})
+	for material: String in materials:
+		var field := ThemeHelpers.industrial_material_field(material)
+		if field != null:
+			theme.set_icon(material, ThemeHelpers.INDUSTRIAL_FIELD_TYPE, field)
+		var material_spec: Dictionary = materials[material]
+		var plate_spec: Dictionary = material_spec.get("plate", {})
+		var type_name: String = material_spec.get("theme_type", "")
+		if plate_spec.is_empty() or type_name.is_empty():
+			continue
+		var states: Dictionary = plate_spec.get("states", {})
+		for state: String in states:
+			theme.set_stylebox(state, type_name, _plate(material, state, 0, 0))
 
 
 # Every theme type variation MUST be registered against its base class or

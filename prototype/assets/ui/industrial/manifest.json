@@ -1,27 +1,224 @@
 {
-  "schema": "kitbash-command.ui.industrial.v1",
+  "schema": "kitbash-command.ui.industrial.v2",
   "grid": 64,
-  "vector_root": "res://assets/ui/industrial/vectors",
   "vectors": {
-    "nav_design_lab": "nav_design_lab.svg",
-    "nav_match_setup": "nav_match_setup.svg",
-    "nav_main_menu": "nav_main_menu.svg",
-    "slot_module": "slot_module.svg",
-    "state_selected": "state_selected.svg",
-    "state_ready": "state_ready.svg",
-    "state_invalid": "state_invalid.svg",
-    "drop_target": "drop_target.svg",
-    "map_spawn_marker": "map_spawn_marker.svg",
-    "blueprint_status": "blueprint_status.svg"
+    "nav_design_lab": {
+      "path": "res://assets/ui/industrial/vectors/nav_design_lab.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "nav_match_setup": {
+      "path": "res://assets/ui/industrial/vectors/nav_match_setup.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "nav_main_menu": {
+      "path": "res://assets/ui/industrial/vectors/nav_main_menu.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "slot_module": {
+      "path": "res://assets/ui/industrial/vectors/slot_module.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "state_selected": {
+      "path": "res://assets/ui/industrial/vectors/state_selected.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "state_ready": {
+      "path": "res://assets/ui/industrial/vectors/state_ready.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "state_invalid": {
+      "path": "res://assets/ui/industrial/vectors/state_invalid.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "drop_target": {
+      "path": "res://assets/ui/industrial/vectors/drop_target.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "map_spawn_marker": {
+      "path": "res://assets/ui/industrial/vectors/map_spawn_marker.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    },
+    "blueprint_status": {
+      "path": "res://assets/ui/industrial/vectors/blueprint_status.svg",
+      "width": 64,
+      "height": 64,
+      "view_box": "0 0 64 64"
+    }
   },
-  "raster_reuse": {
-    "plate_powdercoat": "res://assets/textures/ui/plate_powdercoat_normal.png",
-    "plate_powdercoat_hover": "res://assets/textures/ui/plate_powdercoat_hover.png",
-    "plate_powdercoat_pressed": "res://assets/textures/ui/plate_powdercoat_pressed.png",
-    "plate_moulded": "res://assets/textures/ui/plate_moulded_normal.png",
-    "plate_canvas": "res://assets/textures/ui/plate_canvas_normal.png",
-    "field_steel": "res://assets/textures/ui/field_steel.png",
-    "field_cutting_mat": "res://assets/textures/ui/field_cutting_mat.png",
-    "field_toolbox": "res://assets/textures/ui/field_toolbox.png"
+  "theme_roles": {
+    "surface": "powdercoat",
+    "control": "moulded",
+    "inset": "canvas",
+    "frame": "steel",
+    "primary": "carbon",
+    "danger": "fiberglass",
+    "workbench": "cutting_mat",
+    "parts_dock": "toolbox"
+  },
+  "materials": {
+    "cutting_mat": {
+      "field": {"path": "res://assets/textures/ui/field_cutting_mat.png", "size": [512, 512], "tile": true},
+      "wear": {"wear": 0.10, "grime": 0.18, "scale": 1.2, "vignette": 0.18, "brightness": 0.85}
+    },
+    "cardboard": {
+      "field": {"path": "res://assets/textures/ui/field_cardboard.png", "size": [512, 512], "tile": true},
+      "wear": {"wear": 0.12, "grime": 0.16, "scale": 1.0, "vignette": 0.20, "brightness": 0.85}
+    },
+    "kraft": {
+      "field": {"path": "res://assets/textures/ui/field_kraft.png", "size": [512, 512], "tile": true},
+      "wear": {"wear": 0.14, "grime": 0.18, "scale": 1.0, "vignette": 0.22, "brightness": 0.85}
+    },
+    "cork": {
+      "field": {"path": "res://assets/textures/ui/field_cork.png", "size": [512, 512], "tile": true},
+      "wear": {"wear": 0.16, "grime": 0.14, "scale": 1.1, "vignette": 0.20, "brightness": 0.85}
+    },
+    "chipboard": {
+      "field": {"path": "res://assets/textures/ui/field_chipboard.png", "size": [512, 512], "tile": true},
+      "wear": {"wear": 0.18, "grime": 0.16, "scale": 1.0, "vignette": 0.22, "brightness": 0.85}
+    },
+    "powdercoat": {
+      "theme_type": "IndustrialPlatePowdercoat",
+      "field": {"path": "res://assets/textures/ui/field_powdercoat.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_powdercoat_normal.png",
+          "hover": "res://assets/textures/ui/plate_powdercoat_hover.png",
+          "pressed": "res://assets/textures/ui/plate_powdercoat_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_powdercoat_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.25, "grime": 0.20, "scale": 1.0, "vignette": 0.30, "brightness": 1.0}
+    },
+    "steel": {
+      "theme_type": "IndustrialPlateSteel",
+      "field": {"path": "res://assets/textures/ui/field_steel.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_steel_normal.png",
+          "hover": "res://assets/textures/ui/plate_steel_hover.png",
+          "pressed": "res://assets/textures/ui/plate_steel_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_steel_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.35, "grime": 0.12, "scale": 1.0, "vignette": 0.22, "brightness": 1.0}
+    },
+    "moulded": {
+      "theme_type": "IndustrialPlateMoulded",
+      "field": {"path": "res://assets/textures/ui/field_moulded.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_moulded_normal.png",
+          "hover": "res://assets/textures/ui/plate_moulded_hover.png",
+          "pressed": "res://assets/textures/ui/plate_moulded_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_moulded_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.10, "grime": 0.18, "scale": 0.8, "vignette": 0.18, "brightness": 1.0}
+    },
+    "canvas": {
+      "theme_type": "IndustrialPlateCanvas",
+      "field": {"path": "res://assets/textures/ui/field_canvas.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_canvas_normal.png",
+          "hover": "res://assets/textures/ui/plate_canvas_hover.png",
+          "pressed": "res://assets/textures/ui/plate_canvas_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_canvas_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.06, "grime": 0.30, "scale": 0.7, "vignette": 0.12, "brightness": 1.0}
+    },
+    "carbon": {
+      "theme_type": "IndustrialPlateCarbon",
+      "field": {"path": "res://assets/textures/ui/field_carbon.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_carbon_normal.png",
+          "hover": "res://assets/textures/ui/plate_carbon_hover.png",
+          "pressed": "res://assets/textures/ui/plate_carbon_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_carbon_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.04, "grime": 0.08, "scale": 0.6, "vignette": 0.20, "brightness": 1.0}
+    },
+    "fiberglass": {
+      "theme_type": "IndustrialPlateFiberglass",
+      "field": {"path": "res://assets/textures/ui/field_fiberglass.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_fiberglass_normal.png",
+          "hover": "res://assets/textures/ui/plate_fiberglass_hover.png",
+          "pressed": "res://assets/textures/ui/plate_fiberglass_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_fiberglass_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.15, "grime": 0.14, "scale": 1.0, "vignette": 0.24, "brightness": 1.0}
+    },
+    "toolbox": {
+      "theme_type": "IndustrialPlateToolbox",
+      "field": {"path": "res://assets/textures/ui/field_toolbox.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_toolbox_normal.png",
+          "hover": "res://assets/textures/ui/plate_toolbox_hover.png",
+          "pressed": "res://assets/textures/ui/plate_toolbox_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_toolbox_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.05, "grime": 0.34, "scale": 1.0, "vignette": 0.34, "brightness": 1.0}
+    },
+    "bakelite": {
+      "theme_type": "IndustrialPlateBakelite",
+      "field": {"path": "res://assets/textures/ui/field_bakelite.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_bakelite_normal.png",
+          "hover": "res://assets/textures/ui/plate_bakelite_hover.png",
+          "pressed": "res://assets/textures/ui/plate_bakelite_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_bakelite_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.15, "grime": 0.25, "scale": 1.0, "vignette": 0.35, "brightness": 0.75}
+    },
+    "wood": {
+      "theme_type": "IndustrialPlateWood",
+      "field": {"path": "res://assets/textures/ui/field_wood.png", "size": [512, 512], "tile": true},
+      "plate": {
+        "size": [128, 128], "slice": 28, "expand": 16,
+        "states": {
+          "normal": "res://assets/textures/ui/plate_wood_normal.png",
+          "hover": "res://assets/textures/ui/plate_wood_hover.png",
+          "pressed": "res://assets/textures/ui/plate_wood_pressed.png",
+          "disabled": "res://assets/textures/ui/plate_wood_disabled.png"
+        }
+      },
+      "wear": {"wear": 0.08, "grime": 0.15, "scale": 1.0, "vignette": 0.22, "brightness": 0.52}
+    }
   }
 }

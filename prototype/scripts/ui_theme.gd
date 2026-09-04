@@ -4,8 +4,8 @@ class_name UITheme
 # the shader-backed backdrop, and a few "style this node like X" shortcuts
 # for controls built in code.
 #
-# Everything with a StyleBox belongs in tools/build_ui_theme.gd instead.
-# This file is for what has to happen at runtime.
+# The generated Theme remains the legacy baseline. Runtime semantic factories
+# below let shared shell controls use roles without regenerating that resource.
 
 const MATERIAL_SHADER = preload("res://shaders/ui_material.gdshader")
 const Tokens = preload("res://scripts/ui_tokens.gd")
@@ -289,6 +289,74 @@ static func flat_style(fill: Color = Tokens.BASE_800, edge: Color = Tokens.BASE_
 	sb.set_content_margin_all(margin)
 	Tokens.apply_elevation(sb, tier)
 	return sb
+
+
+# Shared panel/material roles. Material names describe the authored finish;
+# flat styles provide a legible fallback before a screen's asset pass.
+const PANEL_ROLES: Dictionary[String, Dictionary] = {
+	"surface": {"material": "powdercoat", "fill": Tokens.BASE_800, "tier": "raised"},
+	"inset": {"material": "moulded", "fill": Tokens.BASE_900, "tier": "flush"},
+	"header": {"material": "steel", "fill": Tokens.BASE_700, "tier": "raised"},
+	"navigation": {"material": "steel", "fill": Tokens.BASE_800, "tier": "flush"},
+	"floating": {"material": "canvas", "fill": Tokens.BASE_800, "tier": "floating"},
+	"modal": {"material": "powdercoat", "fill": Tokens.BASE_800, "tier": "modal"},
+}
+
+static func panel_style(role: String = "surface") -> StyleBoxFlat:
+	var spec: Dictionary = PANEL_ROLES.get(role, PANEL_ROLES["surface"])
+	return flat_style(spec["fill"], Tokens.BASE_500, Tokens.SPACE_MD, spec["tier"])
+
+static func panel_material(role: String = "surface") -> String:
+	return PANEL_ROLES.get(role, PANEL_ROLES["surface"])["material"]
+
+static func action_style(role: String = "secondary", state: String = "normal") -> StyleBoxFlat:
+	var colors := Tokens.role_colors(role, state)
+	var box := flat_style(colors["fill"], colors["edge"])
+	box.set_corner_radius_all(Tokens.RADIUS_CONTROL)
+	# Persistence is conveyed by geometry as well as hue. Disabled wins over it.
+	if state != "disabled" and role != "disabled":
+		if role == "selected":
+			box.border_width_left = Tokens.SELECTED_RULE_WIDTH
+		elif role == "active":
+			box.border_width_left = Tokens.ACTIVE_RULE_WIDTH
+	return box
+
+static func focus_style() -> StyleBoxFlat:
+	var box := flat_style(Color.TRANSPARENT, Tokens.ACCENT_INTERACTIVE, 0,
+		"flush", Tokens.BORDER_EMPHASIS)
+	box.draw_center = false
+	return box
+
+# A draw hook also covers TextureButton, LinkButton and Slider, which do not
+# all consume a native "focus" StyleBox. It adds no layout or input surface.
+static func ensure_focus(ctrl: Control) -> void:
+	if ctrl is SpinBox:
+		ensure_focus((ctrl as SpinBox).get_line_edit())
+		return
+	ctrl.focus_mode = Control.FOCUS_ALL
+	ctrl.add_theme_stylebox_override("focus", focus_style())
+	var redraw := ctrl.queue_redraw
+	if not ctrl.focus_entered.is_connected(redraw):
+		ctrl.focus_entered.connect(redraw)
+		ctrl.focus_exited.connect(redraw)
+	var draw_focus := _draw_focus.bind(ctrl)
+	if not ctrl.draw.is_connected(draw_focus):
+		ctrl.draw.connect(draw_focus)
+
+static func _draw_focus(ctrl: Control) -> void:
+	if ctrl.has_focus():
+		ctrl.get_theme_stylebox("focus").draw(ctrl.get_canvas_item(), Rect2(Vector2.ZERO, ctrl.size))
+
+static func apply_action(button: Button, role: String = "secondary") -> Button:
+	for state: String in Tokens.CONTROL_STATES:
+		button.add_theme_stylebox_override(state, action_style(role, state))
+	button.add_theme_stylebox_override("hover_pressed", action_style(role, "pressed"))
+	for state: String in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		var key := "font_color" if state == "normal" else "font_%s_color" % state
+		button.add_theme_color_override(key, Tokens.role_colors(role, state)["text"])
+	button.custom_minimum_size.y = maxf(button.custom_minimum_size.y, Tokens.HIT_TARGET_MIN)
+	ensure_focus(button)
+	return button
 
 
 # Authored screen chrome, monochrome white SVG tinted with `modulate` at the

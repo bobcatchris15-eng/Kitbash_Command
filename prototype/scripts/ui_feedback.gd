@@ -20,6 +20,7 @@ class_name UIFeedback
 # commitment, and neither is allowed to change signal colour.
 
 const UIAnimScript = preload("res://scripts/ui_anim.gd")
+const ThemeScript = preload("res://scripts/ui_theme.gd")
 
 # role -> the SFX key played on activation. Hover is the same everywhere: it is a
 # readiness cue, not meaningful state, so it does not vary by what the control
@@ -70,23 +71,28 @@ static func wire(ctrl: Control, role: String = "default") -> Control:
 	if not is_instance_valid(ctrl):
 		return ctrl
 
-	var sfx: String = ROLE_SFX.get(role, ROLE_SFX["default"])
+	ctrl.set_meta(&"ui_feedback_role", role)
+	if ctrl is BaseButton or ctrl is SpinBox or ctrl.focus_mode != Control.FOCUS_NONE:
+		ThemeScript.ensure_focus(ctrl)
 
-	if not ctrl.mouse_entered.is_connected(_on_hover):
-		ctrl.mouse_entered.connect(_on_hover.bind(ctrl))
+	var hover := _on_hover.bind(ctrl)
+	if not ctrl.mouse_entered.is_connected(hover):
+		ctrl.mouse_entered.connect(hover)
 	# mouse_exited is not optional. hover_lift() leaves the control scaled up, so
 	# without a settle it stays lifted permanently after the first hover and the
 	# whole screen slowly inflates as the player moves the cursor over it.
-	if not ctrl.mouse_exited.is_connected(_on_unhover):
-		ctrl.mouse_exited.connect(_on_unhover.bind(ctrl))
+	var unhover := _on_unhover.bind(ctrl)
+	if not ctrl.mouse_exited.is_connected(unhover):
+		ctrl.mouse_exited.connect(unhover)
 
 	# BaseButton covers Button, CheckBox, OptionButton, TextureButton and the
 	# rest; anything else gets hover feedback only, which is correct - a panel has
 	# nothing to press.
 	if ctrl is BaseButton:
 		var btn := ctrl as BaseButton
-		if not btn.pressed.is_connected(_on_pressed):
-			btn.pressed.connect(_on_pressed.bind(ctrl, sfx))
+		var pressed := _on_pressed.bind(ctrl)
+		if not btn.pressed.is_connected(pressed):
+			btn.pressed.connect(pressed)
 	return ctrl
 
 
@@ -107,19 +113,26 @@ static func _on_unhover(ctrl: Control) -> void:
 	UIAnimScript.hover_settle(ctrl)
 
 
-static func _on_pressed(ctrl: Control, sfx: String) -> void:
+static func _on_pressed(ctrl: Control) -> void:
+	if ctrl is BaseButton and (ctrl as BaseButton).disabled:
+		return
+	var role: String = ctrl.get_meta(&"ui_feedback_role", "default")
+	var sfx: String = ROLE_SFX.get(role, ROLE_SFX["default"])
 	play(ctrl, sfx)
 	UIAnimScript.button_press_feedback(ctrl)
 
 
 # Convenience for a whole screen: wires every Button-like descendant at once.
 #
-# Deliberately does NOT recurse into controls that manage their own feedback -
-# ui_dock.gd, ui_flyout.gd and ui_radial_menu.gd already animate themselves via
-# UIAnim, and double-wiring would stack two scale tweens on the same node.
+# Buttons receive sound/motion; other interactive controls receive focus only
+# so editing text or dragging a slider never scales the value under the cursor.
+# Set ui_feedback_managed metadata on a subtree that owns its own response.
 static func wire_tree(root: Node, role: String = "default") -> void:
+	if root.get_meta(&"ui_feedback_managed", false):
+		return
+	if root is BaseButton:
+		wire(root as Control, str(root.get_meta(&"ui_feedback_role", role)))
+	elif root is Control and (root is SpinBox or (root as Control).focus_mode != Control.FOCUS_NONE):
+		ThemeScript.ensure_focus(root as Control)
 	for child in root.get_children():
-		if child is BaseButton:
-			wire(child as BaseButton, role)
-		if child.get_child_count() > 0:
-			wire_tree(child, role)
+		wire_tree(child, role)

@@ -20,6 +20,20 @@ const STAGGER_STEP: float = UITokens.STAGGER_STEP
 const EASE_STANDARD := UITokens.EASE_STANDARD
 const TRANS_STANDARD := UITokens.TRANS_STANDARD
 
+# Scale reactions share one channel so a late hover tween cannot undo a press
+# or settle. Preserve authored scale instead of assuming every control is 1:1.
+static func _scale_tween(node: Control) -> Tween:
+	var previous: Tween = node.get_meta(&"ui_scale_tween") if node.has_meta(&"ui_scale_tween") else null
+	if previous != null and previous.is_valid():
+		previous.kill()
+	if not node.has_meta(&"ui_rest_scale"):
+		node.set_meta(&"ui_rest_scale", node.scale)
+	node.pivot_offset = node.size * 0.5
+	var tween := node.create_tween()
+	tween.set_trans(TRANS_STANDARD).set_ease(EASE_STANDARD)
+	node.set_meta(&"ui_scale_tween", tween)
+	return tween
+
 # Slides a Control in from `from_offset` (relative to its own current/target
 # position) while fading it in - a panel/card's entrance.
 static func slide_in(node: Control, from_offset: Vector2, duration: float = DURATION_NORMAL) -> Tween:
@@ -36,9 +50,10 @@ static func slide_in(node: Control, from_offset: Vector2, duration: float = DURA
 # A quick squash-then-release on press - real tactile feedback instead of
 # just the theme's built-in pressed StyleBox swap.
 static func button_press_feedback(button: Control) -> Tween:
-	var tween = button.create_tween()
-	tween.tween_property(button, "scale", Vector2(0.92, 0.92), DURATION_FAST * 0.4)
-	tween.tween_property(button, "scale", Vector2.ONE, DURATION_FAST * 0.6)
+	var tween := _scale_tween(button)
+	var rest: Vector2 = button.get_meta(&"ui_rest_scale")
+	tween.tween_property(button, "scale", rest * UITokens.PRESS_SCALE, DURATION_FAST * UITokens.PRESS_ATTACK_RATIO)
+	tween.tween_property(button, "scale", rest, DURATION_FAST * (1.0 - UITokens.PRESS_ATTACK_RATIO))
 	return tween
 
 # A radial menu's entrance: scales up from small while fading in, with a
@@ -54,13 +69,13 @@ static func button_press_feedback(button: Control) -> Tween:
 # `scale` about `pivot_offset` and never touches `position`.
 static func ring_pop(node: Control, duration: float = DURATION_FAST) -> Tween:
 	node.pivot_offset = node.size * 0.5
-	node.scale = Vector2(0.72, 0.72)
+	node.scale = Vector2.ONE * UITokens.RING_START_SCALE
 	node.modulate.a = 0.0
 	var tween = node.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(node, "scale", Vector2.ONE, duration) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(node, "modulate:a", 1.0, duration * 0.7)
+	tween.tween_property(node, "modulate:a", 1.0, duration * UITokens.RING_FADE_RATIO)
 	return tween
 
 
@@ -79,7 +94,7 @@ static func roll_up(node: Object, from_value: float, to_value: float, duration: 
 # A status toast's entrance - slides up slightly while fading in.
 static func toast_slide_fade(node: Control, duration: float = DURATION_NORMAL) -> Tween:
 	var start_pos = node.position
-	node.position = start_pos + Vector2(0, 12)
+	node.position = start_pos + UITokens.ENTRANCE_OFFSET
 	node.modulate.a = 0.0
 	var tween = node.create_tween()
 	tween.set_trans(TRANS_STANDARD)
@@ -102,22 +117,17 @@ static func toast_slide_fade(node: Control, duration: float = DURATION_NORMAL) -
 # Sets pivot_offset so the lift is about the control's centre; without it a
 # Control scales from its top-left corner and appears to slide down-right.
 static func hover_lift(node: Control, duration: float = DURATION_INSTANT) -> Tween:
-	node.pivot_offset = node.size * 0.5
-	var tween = node.create_tween()
-	tween.set_trans(TRANS_STANDARD)
-	tween.set_ease(EASE_STANDARD)
-	tween.tween_property(node, "scale", Vector2(1.03, 1.03), duration)
+	var tween := _scale_tween(node)
+	var rest: Vector2 = node.get_meta(&"ui_rest_scale")
+	tween.tween_property(node, "scale", rest * UITokens.HOVER_SCALE, duration)
 	return tween
 
 
 # Returns a hovered control to rest. Separate from hover_lift() rather than a
 # boolean flag, so a call site reads as the event that happened.
 static func hover_settle(node: Control, duration: float = DURATION_INSTANT) -> Tween:
-	node.pivot_offset = node.size * 0.5
-	var tween = node.create_tween()
-	tween.set_trans(TRANS_STANDARD)
-	tween.set_ease(EASE_STANDARD)
-	tween.tween_property(node, "scale", Vector2.ONE, duration)
+	var tween := _scale_tween(node)
+	tween.tween_property(node, "scale", node.get_meta(&"ui_rest_scale"), duration)
 	return tween
 
 
@@ -131,9 +141,9 @@ static func hover_settle(node: Control, duration: float = DURATION_INSTANT) -> T
 # The stagger is capped: at STAGGER_STEP per child a 40-row list would take 1.4s
 # to finish arriving, by which point it reads as a loading bug rather than as
 # polish. Past the cap the remaining children share the last delay.
-const STAGGER_MAX_TOTAL := 0.45
+const STAGGER_MAX_TOTAL := UITokens.STAGGER_MAX_TOTAL
 
-static func stagger_in(parent: Node, from_offset: Vector2 = Vector2(0, 12)) -> void:
+static func stagger_in(parent: Node, from_offset: Vector2 = UITokens.ENTRANCE_OFFSET) -> void:
 	var kids: Array = []
 	for c in parent.get_children():
 		if c is Control:
@@ -183,21 +193,19 @@ static func value_flash(label: Label, role_color: Color,
 # A short horizontal shake for rejected input - a build that cannot be afforded,
 # a slot that cannot accept a drop.
 #
-# Small and fast on purpose. A big shake is comedy, and the interface is on the
-# SINCERE side of the tone split (CORE_DESIGN_LANGUAGE.md section 1) - the
-# absurdity belongs to the units and the weapon audio, not the chrome.
-static func shake(node: Control, amplitude: float = 4.0) -> Tween:
+# Small and fast so rejection is legible without displacing the next target.
+static func shake(node: Control, amplitude: float = UITokens.SHAKE_AMPLITUDE) -> Tween:
 	var home := node.position
 	var tween = node.create_tween()
 	tween.set_trans(Tween.TRANS_SINE)
-	for i in range(3):
+	for i in range(UITokens.SHAKE_STEPS):
 		var dir := 1.0 if i % 2 == 0 else -1.0
-		var falloff := 1.0 - (float(i) / 3.0)
+		var falloff := 1.0 - (float(i) / float(UITokens.SHAKE_STEPS))
 		tween.tween_property(node, "position",
-			home + Vector2(amplitude * dir * falloff, 0.0), DURATION_FAST / 3.0)
+			home + Vector2(amplitude * dir * falloff, 0.0), DURATION_FAST / float(UITokens.SHAKE_STEPS))
 	# Always lands exactly back home rather than at whatever the last step left,
 	# so repeated rejections cannot drift the control across the screen.
-	tween.tween_property(node, "position", home, DURATION_FAST / 3.0)
+	tween.tween_property(node, "position", home, DURATION_FAST / float(UITokens.SHAKE_STEPS))
 	return tween
 
 
@@ -223,7 +231,7 @@ static func fade(node: CanvasItem, target_alpha: float, duration: float = DURATI
 # but the default is overridden per call site since tutorial pulse periods
 # are typically 600-800ms.
 static func spotlight_pulse(node: Node, property: String, low: float, high: float,
-		duration: float = 0.6) -> Tween:
+		duration: float = UITokens.SPOTLIGHT_PERIOD) -> Tween:
 	var half := duration * 0.5
 	var tw := node.create_tween().set_loops()
 	tw.tween_property(node, property, high, half) \

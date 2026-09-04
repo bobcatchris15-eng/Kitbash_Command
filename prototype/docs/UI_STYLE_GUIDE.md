@@ -1,14 +1,16 @@
 # Kitbash Command — UI Style Guide
 _Distilled from the current ui_tokens.gd, ui_theme.gd, build_ui_theme.gd, ui_anim.gd and ui_feedback.gd implementation._
-_Last updated: 2026-08-05_
+_Last updated: 2026-09-04_
 
 ---
 
 ## 1 · Design Philosophy
 
-**The interface is an instrument housing, not a feature.**
+**The interface belongs to an industrial design simulator.**
 
-The units are cartoonish and loud; the terrain is realistic and grounded. The UI's job is to be a quiet, credible piece of military equipment so the saturated, toy-like vehicles on screen stay the loud thing. If the chrome competes for saturation, both lose.
+Controls must be tactile, responsive, mechanically legible, and internally distinctive. The prior sincere-world/absurd-units split is superseded. Humor is optional expression; absurd weapon sounds remain an intentional isolated audio channel. Legibility and a clear path from intent to operation govern the interface.
+
+Exact colors, textures, materials, geometry, and timings throughout this guide describe the **current tunable paint pass**, not permanent identity constraints. The governing language lives in `docs/design/CORE_DESIGN_LANGUAGE.md`; this guide translates it into UI behavior.
 
 Three principles follow from that:
 
@@ -18,9 +20,9 @@ Three principles follow from that:
 
 ---
 
-## 1a · The Two Skins
+## 1a · Existing Presentation Contexts
 
-The interface is unified by a shared structural grammar (5-metric spacing grid, 2px corner radii, programmatic node construction, `UIFeedback` audio/motion coupling) split into two context-specific aesthetic skins:
+Existing screens retain these implementation contexts during migration. Main Menu, Design Lab, and Match Setup now share the contract below; inherited materials do not mandate their future layouts or identity.
 
 1. **Cold-War Combat Information Center (In-Match Battle HUD)**:
    - Codified in `scripts/hud/hud_style.gd` and `scripts/hud/hud_skin.gd`.
@@ -31,6 +33,53 @@ The interface is unified by a shared structural grammar (5-metric spacing grid, 
    - Codified in `scripts/ui_tokens.gd`, `scripts/ui_theme.gd`, and `bomber_theme.tres`.
    - Physical workbench materials: L0 desks (`cutting_mat`, `cardboard`, `kraft`, `cork`, `chipboard`), L1 equipment chrome (`powdercoat`, `steel`, `moulded`, `canvas`, `carbon`, `fiberglass`, `toolbox`, `bakelite`, `wood`), and 3D industrial hardware controls via `UIPropStage`.
    - Used across Main Menu, Design Lab, Armor Station, Modular Hull Builder, Blueprint Library, Roster Picker, Match Setup, Operations, and After-Action Report debrief dossiers.
+
+---
+
+## 1b · Shared Shell Contract
+
+Ownership is explicit:
+
+| Owner | Responsibility |
+|---|---|
+| `ui_tokens.gd` | Stable action/state names, role palette, geometry, spacing, all shared motion timings and amplitudes |
+| `ui_theme.gd` | `action_style`, `apply_action`, `panel_style`, `panel_material`, `focus_style`, `ensure_focus`; existing material APIs remain available |
+| `ui_shell.gd` | `screen_frame`, `action`, `navigation_spine`, existing backdrop/stage/readouts; no gameplay or route changes |
+| `ui_anim.gd` | Motion execution; public duration aliases remain compatible; competing scale reactions cancel and return to authored rest scale |
+| `ui_feedback.gd` | Idempotent sound/motion wiring and focus coverage; existing audio role names remain compatible |
+| Screen scripts | Destination IDs/callbacks, current location, availability, data flow, panel composition and operation logic |
+
+Action roles are `primary`, `secondary`, `info`, `warning`, `error`, `disabled`, `selected`, and `active`. Primary identifies the main operation; secondary is ordinary navigation. Info is informational, warning needs attention, and error indicates failure. Selected is a persistent choice; active is the current destination/operation. Both have distinct edge widths so they remain distinguishable without color alone. These are independent of feedback roles such as `confirm` and `select`.
+
+`UITokens.role_colors(role, state)` returns `fill`, `edge`, and `text`. Normal, hover, pressed and disabled styles share role semantics; hover/press change fill without changing a warning/error edge. Disabled takes precedence. Focus is an independent transparent outline. Unknown roles fall back to secondary. A disabled visual role alone does not alter game state: `UIShell.action(..., "disabled")` also disables the button; other callers own their control's `disabled` property.
+
+Panel roles are `surface`, `inset`, `header`, `navigation`, `floating`, and `modal`. `UITheme.panel_style(role)` supplies a flat fallback with the matching elevation; `panel_material(role)` supplies the authored finish name for `apply_material`. Existing generated theme variations remain valid.
+
+```gdscript
+var frame := UIShell.screen_frame(self)
+var column := VBoxContainer.new()
+frame.add_child(column)
+var destinations: Array[Dictionary] = [
+    {"id": "menu", "label": "Main Menu"},
+    {"id": "lab", "label": "Design Lab"},
+    {"id": "setup", "label": "Match Setup", "disabled": false},
+]
+UIShell.navigation_spine(column, destinations, "lab", _on_destination_requested)
+var save := UIShell.action(column, "Save Design", "primary", "confirm")
+save.pressed.connect(_save_design)
+```
+
+Navigation entries accept `id`, `label`, optional `disabled` and `tooltip`. The callback receives the destination ID. The current destination stays latched until the screen owner accepts navigation and rebuilds it. Frame and spine backgrounds ignore mouse input; their controls retain normal hit targets.
+
+Call `UIFeedback.wire_tree(screen)` after building controls. It gives buttons sound/motion and every focusable descendant shared focus treatment, including sliders, text inputs and texture controls. SpinBox uses its editable LineEdit focus target. Other controls receive focus without scaling during value editing. `UITheme.ensure_focus(control)` supports custom interactive controls. Subtrees that own their feedback may set `ui_feedback_managed` metadata and must provide their own focus coverage. Repeated wiring is safe; an explicit `wire(control, role)` updates the audio role.
+
+Focused regression command from the worktree root (Godot binary is in the main checkout):
+
+```powershell
+& C:/Misc/Kitbash_Command/Godot_v4.7.1-stable_win64_console.exe --headless --path prototype --script res://tests/test_ui_shell_contract.gd
+```
+
+The standalone SceneTree runner prints a check/failure count and exits nonzero on failed checks, following the existing project test style.
 
 ---
 
@@ -267,7 +316,7 @@ Standard easing is `EASE_OUT` with `TRANS_CUBIC`. **Everything is short.** Gritt
 | `stagger_in` | A list or grid. Total capped at 0.45 s — at 35 ms per child a 40-row list takes 1.4 s and reads as a loading bug rather than polish |
 | `ring_pop` | The radial menu only. The **one** sanctioned overshoot (`TRANS_BACK`), because a ring springing open is a mechanism |
 | `value_flash` | A number that changed meaningfully. Tweens `font_color`, not `modulate`, so it tints the text rather than the subtree |
-| `shake` | Rejected input. Small and fast — a big shake is comedy, and the chrome is on the sincere side of the tone split |
+| `shake` | Rejected input. Small and fast so the next target remains easy to acquire |
 | `fade` | Scene transitions and dimming overlays |
 
 **Asymmetry is deliberate.** Leaving a screen takes `DURATION_SLOW`; arriving takes `DURATION_NORMAL`. The player is already waiting to act on the new screen, and a symmetric slow fade-in is what makes a game feel sluggish rather than expensive.
@@ -347,7 +396,7 @@ Two constraints:
 
 **Never let a UI click repeat identically.** `AudioManager.play_sfx()` varies pitch per play; flat repetition is a distinctly cheap-sounding tell.
 
-**Interface audio is on the SINCERE side of the tone split.** `CORE_DESIGN_LANGUAGE.md` §6 puts the absurdity in the *ordnance* — the weapons go "pew pew". Chrome, comms and alerts stay straight. Radio chatter over vocalised weapons is the whole thesis in one moment; a comedy sound on a button would spend the joke in the wrong place.
+**Interface audio communicates operation.** Clicks, confirmation and rejection should be recognizable and synchronized with motion. Absurd weapon sounds remain a separate intentional channel; they do not prescribe a tonal binary for visual surfaces.
 
 ### 8.2 Locked / Unavailable State
 

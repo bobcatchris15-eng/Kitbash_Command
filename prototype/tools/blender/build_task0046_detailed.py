@@ -60,6 +60,13 @@ def add_cyl(bm, pos, radius, height, axis='Z', segments=16):
     elif axis == 'X': rot = mathutils.Matrix.Rotation(math.radians(90), 4, 'Y')
     for v in res['verts']: v.co = rot @ v.co + loc
 
+def add_cone_forward(bm, pos, radius_base, radius_tip, height, segments=16):
+    """Creates a cone along Y pointing forward (+Y). Base at -height/2, tip at +height/2."""
+    res = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=segments, radius1=radius_base, radius2=radius_tip, depth=height)
+    rot = mathutils.Matrix.Rotation(math.radians(-90), 4, 'X')
+    loc = mathutils.Vector(pos)
+    for v in res['verts']: v.co = rot @ v.co + loc
+
 def add_tube_between(bm, p0, p1, radius, segments=8):
     a = mathutils.Vector(p0)
     b = mathutils.Vector(p1)
@@ -113,9 +120,6 @@ def add_heavy_mount(bm, scale=1.0):
         bolt_ring(bm, (x+side*0.06*scale, 0, 0.4*scale), 0.07*scale, 6, 'X')
     add_cyl(bm, (-0.1*scale, -0.15*scale, 0.22*scale), 0.04*scale, 0.08*scale, 'Z', 12)
     add_cyl(bm, (0.1*scale, -0.15*scale, 0.22*scale), 0.04*scale, 0.08*scale, 'Z', 12)
-    # Heavy hydraulic slew drives
-    add_tube_between(bm, (0, -0.3*scale, 0.1*scale), (0.15*scale, -0.05*scale, 0.15*scale), 0.03*scale)
-    add_tube_between(bm, (0, -0.3*scale, 0.1*scale), (-0.15*scale, -0.05*scale, 0.15*scale), 0.03*scale)
 
 # --- REWORKED WEAPONS ---
 
@@ -135,7 +139,7 @@ def build_flamethrower():
     for i in range(3):
         a = (i/3)*math.tau
         add_cyl(bm, (math.cos(a)*0.08, 0.88, math.sin(a)*0.08), 0.02, 0.15, 'Y', 8)
-    add_tube_between(bm, (0, 0.1, -0.07), (0, 0.8, -0.12), 0.015) # Pilot gas line
+    add_tube_between(bm, (0, 0.1, -0.07), (0, 0.8, -0.12), 0.015)
     export_bmesh(bm, "flamethrower_nozzle", "flamethrower_nozzle.glb")
 
 def build_arc_projector():
@@ -146,11 +150,11 @@ def build_arc_projector():
     for side in (-1, 1): add_cyl(bm, (side*0.22, -0.2, -0.15), 0.08, 0.5, 'Y', 16)
     export_bmesh(bm, "arc_projector_body", "arc_projector_body.glb")
     bm = bmesh.new()
-    add_cyl(bm, (0, 0.5, 0), 0.15, 1.0, 'Y', 8) # Octagonal
+    add_cyl(bm, (0, 0.5, 0), 0.15, 1.0, 'Y', 8)
     for i in range(3):
         y = 0.2 + i*0.3
         add_cyl(bm, (0, y, 0), 0.18, 0.05, 'Y', 8)
-        bolt_ring(bm, (0, y, 0.16), 0.16, 8, 'Y') # Ceramic insulator collars
+        bolt_ring(bm, (0, y, 0.16), 0.16, 8, 'Y')
     for i in range(4):
         a = (i/4)*math.tau + math.pi/4
         add_tube_between(bm, (math.cos(a)*0.16, 0.1, math.sin(a)*0.16), (math.cos(a)*0.16, 0.9, math.sin(a)*0.16), 0.015)
@@ -212,7 +216,6 @@ def build_railgun():
         bolt_ring(bm, (0, y, -0.15), 0.03, 4, 'Y', 0.005, 0.06)
         add_box(bm, (0.1, y, 0), (0.02, 0.1, 0.1))
         add_box(bm, (-0.1, y, 0), (0.02, 0.1, 0.1))
-        # Add thick copper busbars between insulators
         if i < 6:
             add_tube_between(bm, (0.12, y, 0), (0.12, y+0.2, 0), 0.015)
             add_tube_between(bm, (-0.12, y, 0), (-0.12, y+0.2, 0), 0.015)
@@ -228,88 +231,207 @@ def build_guided_missile():
     for y in [0.0, 0.4, 0.8]:
         add_cyl(bm, (0, y, 0), 0.13, 0.05, 'Y', 16)
         bolt_ring(bm, (0, y, 0), 0.14, 8, 'Y', 0.006, 0.04)
-        add_tube_between(bm, (0, y, -0.13), (0, 0.8, -0.13), 0.01) # Sensor lines
+        add_tube_between(bm, (0, y, -0.13), (0, 0.8, -0.13), 0.01)
     add_cyl(bm, (0, -0.05, 0), 0.15, 0.1, 'Y', 16)
     export_bmesh(bm, "tow_launch_tube", "tow_launch_tube.glb")
     bm = bmesh.new()
     add_cyl(bm, (0, 0.4, 0), 0.08, 0.6, 'Y', 16)
-    res = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=16, radius1=0.08, radius2=0.02, depth=0.3)
-    rot = mathutils.Matrix.Rotation(math.radians(90), 4, 'X')
-    loc = mathutils.Vector((0, 0.85, 0))
-    for v in res['verts']: v.co = rot @ v.co + loc
-    add_cyl(bm, (0, 1.1, 0), 0.01, 0.2, 'Y', 8)
-    add_box(bm, (0, 0.4, -0.08), (0.02, 0.5, 0.02))
+    add_cone_forward(bm, (0, 0.85, 0), radius_base=0.08, radius_tip=0.02, height=0.3, segments=16)
+    add_cyl(bm, (0, 1.05, 0), 0.01, 0.15, 'Y', 8)
+    for i in range(4):
+        a = (i/4)*math.tau
+        add_box(bm, (math.cos(a)*0.10, 0.2, math.sin(a)*0.10), (0.01, 0.16, 0.08))
     export_bmesh(bm, "tow_missile_warhead", "tow_missile_warhead.glb")
 
 def build_missile_pod():
     bm = bmesh.new(); add_heavy_mount(bm, 0.8); export_bmesh(bm, "missile_pod_pintle_mount", "missile_pod_pintle_mount.glb")
+    
     bm = bmesh.new()
-    add_cyl(bm, (0, 0.3, 0), 0.35, 1.0, 'Y', 24)
-    add_mechanical_greebles(bm, (0, 0.3, 0), (0.35, 1.0, 0.35))
-    res = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=24, radius1=0.35, radius2=0.1, depth=0.3)
-    rot = mathutils.Matrix.Rotation(math.radians(90), 4, 'X')
-    loc = mathutils.Vector((0, -0.35, 0))
-    for v in res['verts']: v.co = rot @ v.co + loc
-    bolt_ring(bm, (0, -0.2, 0), 0.34, 16, 'Y')
-    bolt_ring(bm, (0, 0.8, 0), 0.34, 16, 'Y')
-    export_bmesh(bm, "missile_pod_housing", "missile_pod_housing.glb")
-    bm = bmesh.new()
-    for q in range(19):
-        if q == 0: x, y_off, z = 0, 0, 0
-        elif q < 7: 
-            a = ((q-1)/6) * math.tau
-            x, y_off, z = math.cos(a)*0.12, 0, math.sin(a)*0.12
+    add_cyl(bm, (0, 0.0, 0), 0.28, 0.75, 'Y', 8)
+    add_cyl(bm, (0, -0.38, 0), 0.29, 0.06, 'Y', 8)
+    add_cone_forward(bm, (0, -0.42, 0), 0.29, 0.24, 0.08, 8)
+    add_cyl(bm, (0, 0.36, 0), 0.29, 0.04, 'Y', 8)
+    bolt_ring(bm, (0, 0.37, 0), 0.26, 12, 'Y', 0.008, 0.02)
+    for q in range(7):
+        if q == 0: tx, tz = 0.0, 0.0
         else:
-            a = ((q-7)/12) * math.tau
-            x, y_off, z = math.cos(a)*0.24, 0, math.sin(a)*0.24
-        res = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=12, radius1=0.04, radius2=0.01, depth=0.15)
-        rot = mathutils.Matrix.Rotation(math.radians(90), 4, 'X')
-        loc = mathutils.Vector((x, 0.75, z))
-        for v in res['verts']: v.co = rot @ v.co + loc
-        add_cyl(bm, (x, 0.6, z), 0.04, 0.15, 'Y', 12)
-    export_bmesh(bm, "missile_pod_missile", "missile_pod_missile.glb")
+            ang = ((q - 1) / 6.0) * math.tau
+            tx, tz = math.cos(ang) * 0.15, math.sin(ang) * 0.15
+        add_cyl(bm, (tx, 0.37, tz), 0.048, 0.04, 'Y', 12)
+    add_box(bm, (0, -0.05, -0.22), (0.16, 0.25, 0.12), bevel=0.01)
+    add_cyl(bm, (-0.26, 0.0, 0), 0.06, 0.12, 'X', 16)
+    add_cyl(bm, (0.26, 0.0, 0), 0.06, 0.12, 'X', 16)
+    add_box(bm, (0, 0.0, 0.26), (0.12, 0.65, 0.04), bevel=0.005)
+    add_tube_between(bm, (0.08, -0.3, 0.24), (0.08, 0.3, 0.24), 0.012)
+    export_bmesh(bm, "missile_pod_housing", "missile_pod_housing.glb")
+    
+    bm = bmesh.new()
+    add_cyl(bm, (0, 0.0, 0), 0.042, 0.40, 'Y', 16)
+    add_cone_forward(bm, (0, 0.26, 0), radius_base=0.042, radius_tip=0.005, height=0.14, segments=16)
+    add_cyl(bm, (0, 0.34, 0), 0.012, 0.03, 'Y', 8)
+    add_cyl(bm, (0, -0.21, 0), 0.038, 0.03, 'Y', 12)
+    for i in range(4):
+        a = (i / 4.0) * math.tau
+        fx = math.cos(a) * 0.048
+        fz = math.sin(a) * 0.048
+        add_box(bm, (fx, -0.16, fz), (0.008, 0.08, 0.02))
+    export_bmesh(bm, "missile_pod_missile", "missile_pod_missile.glb", color=(0.42, 0.44, 0.40, 1.0))
 
 def build_sam_launcher():
     bm = bmesh.new()
-    add_box(bm, (0, 0, 0.2), (0.6, 0.8, 0.4), bevel=0.02)
-    add_mechanical_greebles(bm, (0, 0, 0.2), (0.6, 0.8, 0.4))
-    add_cyl(bm, (0, -0.3, 0.5), 0.08, 0.2, 'Z', 16)
-    add_box(bm, (0, -0.3, 0.6), (0.4, 0.1, 0.4), bevel=0.02)
+    add_box(bm, (0, 0, 0.12), (0.50, 0.65, 0.25), bevel=0.02)
+    for side in (-1, 1):
+        add_box(bm, (side * 0.22, 0.0, 0.30), (0.08, 0.40, 0.20), bevel=0.01)
+        add_cyl(bm, (side * 0.22, 0.0, 0.35), 0.07, 0.12, 'X', 16)
+    add_tube_between(bm, (-0.15, -0.25, 0.15), (-0.15, 0.05, 0.32), 0.025)
+    add_tube_between(bm, (0.15, -0.25, 0.15), (0.15, 0.05, 0.32), 0.025)
+    add_box(bm, (0, -0.32, 0.40), (0.28, 0.08, 0.28), bevel=0.015)
+    bolt_ring(bm, (0, -0.33, 0.40), 0.10, 8, 'Y', 0.006, 0.015)
+    add_cyl(bm, (0, -0.32, 0.25), 0.05, 0.15, 'Z', 12)
     export_bmesh(bm, "sam_body", "sam_body.glb")
+    
     bm = bmesh.new()
-    for ix in [-0.2, 0.2]:
-        for iz in [0.2, 0.5]:
-            add_cyl(bm, (ix, 0.5, iz), 0.08, 1.0, 'Y', 16)
-            res = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=16, radius1=0.08, radius2=0.0, depth=0.3)
-            rot = mathutils.Matrix.Rotation(math.radians(90), 4, 'X')
-            loc = mathutils.Vector((ix, 1.15, iz))
-            for v in res['verts']: v.co = rot @ v.co + loc
-            for i in range(4):
-                a = (i/4)*math.tau
-                add_box(bm, (ix + math.cos(a)*0.1, 0.9, iz + math.sin(a)*0.1), (0.02, 0.15, 0.1))
-            for i in range(4):
-                a = (i/4)*math.tau + math.pi/4
-                add_box(bm, (ix + math.cos(a)*0.15, 0.1, iz + math.sin(a)*0.15), (0.02, 0.3, 0.2))
-    export_bmesh(bm, "sam_missile", "sam_missile.glb")
+    add_cyl(bm, (0, 0.30, 0), 0.045, 0.75, 'Y', 16)
+    add_cone_forward(bm, (0, 0.82, 0), radius_base=0.045, radius_tip=0.003, height=0.30, segments=16)
+    add_cyl(bm, (0, 0.98, 0), 0.005, 0.05, 'Y', 8)
+    for i in range(4):
+        a = (i / 4.0) * math.tau
+        cx = math.cos(a) * 0.075
+        cz = math.sin(a) * 0.075
+        add_box(bm, (cx, 0.65, cz), (0.006, 0.10, 0.06), bevel=0.001)
+    add_cyl(bm, (0, -0.15, 0), 0.048, 0.20, 'Y', 16)
+    add_cyl(bm, (0, -0.27, 0), 0.038, 0.05, 'Y', 16)
+    for i in range(4):
+        a = (i / 4.0) * math.tau + (math.pi / 4.0)
+        rot = mathutils.Matrix.Rotation(a, 4, 'Y')
+        v1 = rot @ mathutils.Vector((0.004, 0.05, 0.045))
+        v2 = rot @ mathutils.Vector((-0.004, 0.05, 0.045))
+        v3 = rot @ mathutils.Vector((-0.004, -0.22, 0.045))
+        v4 = rot @ mathutils.Vector((0.004, -0.22, 0.045))
+        v5 = rot @ mathutils.Vector((0.003, -0.10, 0.175))
+        v6 = rot @ mathutils.Vector((-0.003, -0.10, 0.175))
+        v7 = rot @ mathutils.Vector((-0.003, -0.22, 0.175))
+        v8 = rot @ mathutils.Vector((0.003, -0.22, 0.175))
+        for face_indices in [
+            [v1, v2, v3, v4], [v5, v6, v7, v8],
+            [v1, v2, v6, v5], [v3, v4, v8, v7],
+            [v1, v4, v8, v5], [v2, v3, v7, v6]
+        ]:
+            bm_verts = [bm.verts.new(pt) for pt in face_indices]
+            try: bm.faces.new(bm_verts)
+            except: pass
+    export_bmesh(bm, "sam_missile", "sam_missile.glb", color=(0.82, 0.82, 0.78, 1.0))
+
+def build_hypervelocity_missile():
+    bm = bmesh.new()
+    add_box(bm, (0, 0, 0.10), (0.46, 0.55, 0.20), bevel=0.015)
+    for side in (-1, 1):
+        add_box(bm, (side * 0.22, 0.0, 0.22), (0.06, 0.35, 0.18), bevel=0.01)
+        add_cyl(bm, (side * 0.22, 0.0, 0.26), 0.05, 0.08, 'X', 16)
+    add_tube_between(bm, (-0.14, -0.18, 0.08), (-0.14, 0.08, 0.24), 0.02)
+    add_tube_between(bm, (0.14, -0.18, 0.08), (0.14, 0.08, 0.24), 0.02)
+    add_box(bm, (0, -0.22, 0.18), (0.22, 0.12, 0.08))
+    export_bmesh(bm, "hvm_body", "hvm_body.glb")
+    
+    bm = bmesh.new()
+    add_cyl(bm, (0, 0.40, 0), 0.105, 0.95, 'Y', 8)
+    for i in range(4):
+        a = (i / 4.0) * math.tau + (math.pi / 4.0)
+        rx = math.cos(a) * 0.115
+        rz = math.sin(a) * 0.115
+        add_box(bm, (rx, 0.40, rz), (0.015, 0.90, 0.02))
+    for y in [0.05, 0.40, 0.75]:
+        add_cyl(bm, (0, y, 0), 0.12, 0.05, 'Y', 8)
+        bolt_ring(bm, (0, y, 0), 0.115, 8, 'Y', 0.005, 0.02)
+        add_box(bm, (0.13, y, 0), (0.03, 0.04, 0.04))
+        add_box(bm, (-0.13, y, 0), (0.03, 0.04, 0.04))
+    add_cone_forward(bm, (0, 0.90, 0), radius_base=0.108, radius_tip=0.08, height=0.06, segments=8)
+    bolt_ring(bm, (0, 0.89, 0), 0.105, 12, 'Y', 0.005, 0.015)
+    add_cyl(bm, (0, 0.93, 0), 0.04, 0.02, 'Y', 12)
+    add_cyl(bm, (0, -0.10, 0), 0.115, 0.06, 'Y', 8)
+    add_cone_forward(bm, (0, -0.14, 0), 0.11, 0.07, 0.04, 8)
+    add_box(bm, (0, 0.15, 0.12), (0.06, 0.20, 0.04), bevel=0.005)
+    add_tube_between(bm, (0, 0.25, 0.12), (0, 0.70, 0.12), 0.01)
+    export_bmesh(bm, "hvm_canister", "hvm_canister.glb", color=(0.28, 0.30, 0.26, 1.0))
+
+def build_bunker_buster():
+    bm = bmesh.new()
+    add_heavy_mount(bm, 1.1)
+    export_bmesh(bm, "missile_pedestal", "missile_pedestal.glb")
+    
+    bm = bmesh.new()
+    add_box(bm, (0, 0, 0.15), (0.55, 0.80, 0.28), bevel=0.025)
+    add_mechanical_greebles(bm, (0, 0, 0.15), (0.55, 0.80, 0.28))
+    for side in (-1, 1):
+        add_box(bm, (side * 0.28, -0.05, 0.35), (0.10, 0.45, 0.25), bevel=0.015)
+        add_cyl(bm, (side * 0.28, -0.05, 0.42), 0.10, 0.14, 'X', 18)
+        bolt_ring(bm, (side * (0.28 + 0.07), -0.05, 0.42), 0.08, 8, 'X')
+    add_tube_between(bm, (-0.18, -0.30, 0.15), (-0.18, 0.10, 0.38), 0.035)
+    add_tube_between(bm, (0.18, -0.30, 0.15), (0.18, 0.10, 0.38), 0.035)
+    add_box(bm, (0, -0.42, 0.20), (0.42, 0.25, 0.18), bevel=0.02)
+    export_bmesh(bm, "bb_body", "bb_body.glb")
+    
+    bm = bmesh.new()
+    add_cyl(bm, (0, 0.50, 0), 0.15, 0.90, 'Y', 24)
+    add_cyl(bm, (0, 0.98, 0), 0.142, 0.08, 'Y', 24)
+    add_cyl(bm, (0, 1.04, 0), 0.130, 0.06, 'Y', 24)
+    add_cone_forward(bm, (0, 1.19, 0), radius_base=0.130, radius_tip=0.035, height=0.24, segments=24)
+    add_cone_forward(bm, (0, 1.34, 0), radius_base=0.035, radius_tip=0.005, height=0.08, segments=16)
+    add_box(bm, (0, 0.50, 0.155), (0.03, 0.85, 0.015))
+    add_box(bm, (0, 0.50, -0.155), (0.03, 0.85, 0.015))
+    add_box(bm, (0.155, 0.55, 0), (0.02, 0.12, 0.04))
+    add_box(bm, (-0.155, 0.55, 0), (0.02, 0.12, 0.04))
+    add_cyl(bm, (0, 0.0, 0), 0.158, 0.18, 'Y', 24)
+    bolt_ring(bm, (0, 0.06, 0), 0.15, 16, 'Y', 0.007, 0.02)
+    add_cone_forward(bm, (0, -0.14, 0), radius_base=0.14, radius_tip=0.09, height=0.12, segments=20)
+    add_cyl(bm, (0, -0.21, 0), 0.09, 0.04, 'Y', 20)
+    for i in range(4):
+        a = (i / 4.0) * math.tau + (math.pi / 4.0)
+        gx = math.cos(a) * 0.22
+        gz = math.sin(a) * 0.22
+        add_tube_between(bm, (math.cos(a)*0.14, -0.05, math.sin(a)*0.14), (gx, -0.05, gz), 0.015)
+        add_box(bm, (gx, -0.05, gz), (0.02, 0.14, 0.12), bevel=0.002)
+        for ly in [-0.08, -0.05, -0.02]:
+            add_box(bm, (gx, ly, gz), (0.015, 0.008, 0.11))
+    export_bmesh(bm, "bb_penetrator", "bb_penetrator.glb", color=(0.18, 0.19, 0.20, 1.0), metallic=0.55, roughness=0.58)
 
 def build_cruise_missile():
     bm = bmesh.new()
-    add_box(bm, (0, 0, 0.15), (0.8, 1.0, 0.3), bevel=0.02)
-    add_mechanical_greebles(bm, (0, 0, 0.15), (0.8, 1.0, 0.3))
-    add_box(bm, (0, -0.5, 0.15), (0.6, 0.2, 0.2))
-    bolt_ring(bm, (0, -0.5, 0.15), 0.3, 12, 'Z')
+    add_box(bm, (0, 0, 0.12), (0.60, 0.90, 0.22), bevel=0.02)
+    add_mechanical_greebles(bm, (0, 0, 0.12), (0.60, 0.90, 0.22))
+    add_box(bm, (-0.16, 0.25, 0.25), (0.04, 1.20, 0.06), bevel=0.005)
+    add_box(bm, (0.16, 0.25, 0.25), (0.04, 1.20, 0.06), bevel=0.005)
+    add_tube_between(bm, (0, -0.30, 0.12), (0, 0.10, 0.26), 0.035)
+    add_box(bm, (0, -0.45, 0.18), (0.45, 0.22, 0.15), bevel=0.01)
     export_bmesh(bm, "cruise_body", "cruise_body.glb")
+    
     bm = bmesh.new()
-    add_box(bm, (0, 0.6, 0), (0.45, 1.4, 0.45), bevel=0.015)
-    for y in [-0.0, 0.3, 0.6, 0.9, 1.2]:
-        add_box(bm, (0, y, 0), (0.48, 0.05, 0.48), bevel=0.005)
-        bolt_ring(bm, (0, y, 0.24), 0.2, 8, 'Z')
-    add_box(bm, (0, 1.32, 0), (0.44, 0.04, 0.44))
-    add_cyl(bm, (0.24, 1.32, 0), 0.04, 0.1, 'Z', 12)
-    add_box(bm, (0, -0.15, 0), (0.4, 0.1, 0.4))
-    export_bmesh(bm, "cruise_container", "cruise_container.glb")
+    add_box(bm, (0, 0.45, 0), (0.18, 0.85, 0.15), bevel=0.025)
+    add_cyl(bm, (0, 0.45, 0), 0.09, 0.85, 'Y', 16)
+    add_cone_forward(bm, (0, 0.96, 0), radius_base=0.088, radius_tip=0.035, height=0.22, segments=16)
+    add_box(bm, (0, 1.02, -0.04), (0.045, 0.08, 0.04), bevel=0.005)
+    add_cone_forward(bm, (0, 1.09, 0), radius_base=0.035, radius_tip=0.005, height=0.06, segments=16)
+    
+    for side in (-1, 1):
+        wx = side * 0.105
+        add_cyl(bm, (wx, 0.68, 0.02), 0.022, 0.03, 'Z', 12)
+        bolt_ring(bm, (wx, 0.68, 0.02), 0.016, 6, 'Z', 0.003, 0.01)
+        add_box(bm, (wx, 0.35, 0.02), (0.014, 0.60, 0.07), bevel=0.002)
+        add_tube_between(bm, (wx, 0.05, 0.04), (wx, 0.65, 0.04), 0.006)
+    
+    add_box(bm, (0, 0.35, -0.09), (0.07, 0.28, 0.04), bevel=0.005)
+    add_cone_forward(bm, (0, 0.50, -0.09), radius_base=0.04, radius_tip=0.03, height=0.05, segments=12)
+    add_cone_forward(bm, (0, -0.04, 0), radius_base=0.088, radius_tip=0.065, height=0.18, segments=16)
+    bolt_ring(bm, (0, -0.06, 0), 0.075, 12, 'Y', 0.005, 0.015)
+    add_cone_forward(bm, (0, -0.17, 0), radius_base=0.062, radius_tip=0.042, height=0.10, segments=16)
+    for i in range(4):
+        a = (i / 4.0) * math.tau
+        tx = math.cos(a) * 0.075
+        tz = math.sin(a) * 0.075
+        add_box(bm, (tx, -0.08, tz), (0.006, 0.16, 0.06), bevel=0.001)
+    
+    export_bmesh(bm, "cruise_container", "cruise_container.glb", color=(0.70, 0.72, 0.68, 1.0), metallic=0.35, roughness=0.65)
 
-# And basic calls for the rest, elevated with mechanical greebles
 def build_heavy_laser():
     bm = bmesh.new(); add_heavy_mount(bm, 1.2); export_bmesh(bm, "heavy_laser_mount", "heavy_laser_mount.glb")
     bm = bmesh.new(); add_box(bm, (0, -0.3, 0), (0.4, 0.8, 0.35), bevel=0.02); add_mechanical_greebles(bm, (0, -0.3, 0), (0.4, 0.8, 0.35)); export_bmesh(bm, "heavy_laser_housing", "heavy_laser_housing.glb")
@@ -326,15 +448,6 @@ def build_coilgun():
     bm = bmesh.new(); add_box(bm, (0, 0.6, 0), (0.1, 1.2, 0.1), bevel=0.01); add_mechanical_greebles(bm, (0, 0.6, 0), (0.1, 1.2, 0.1)); export_bmesh(bm, "coilgun_rail", "coilgun_rail.glb")
     bm = bmesh.new(); add_cyl(bm, (0, 0, 0), 0.15, 0.08, 'Y', 24); export_bmesh(bm, "coilgun_coil", "coilgun_coil.glb")
     bm = bmesh.new(); add_box(bm, (0, -0.1, -0.2), (0.3, 0.4, 0.15), bevel=0.01); add_mechanical_greebles(bm, (0, -0.1, -0.2), (0.3, 0.4, 0.15)); export_bmesh(bm, "coilgun_capacitors", "coilgun_capacitors.glb")
-
-def build_bunker_buster():
-    bm = bmesh.new(); add_box(bm, (0, 0, 0.15), (0.45, 0.7, 0.3), bevel=0.02); add_mechanical_greebles(bm, (0, 0, 0.15), (0.45, 0.7, 0.3)); export_bmesh(bm, "bb_body", "bb_body.glb")
-    bm = bmesh.new(); add_cyl(bm, (0, 0.6, 0), 0.18, 1.2, 'Y', 20); export_bmesh(bm, "bb_penetrator", "bb_penetrator.glb")
-    bm = bmesh.new(); add_heavy_mount(bm, 1.0); export_bmesh(bm, "missile_pedestal", "missile_pedestal.glb")
-
-def build_hypervelocity_missile():
-    bm = bmesh.new(); add_box(bm, (0, 0, 0.1), (0.35, 0.6, 0.25), bevel=0.015); add_mechanical_greebles(bm, (0, 0, 0.1), (0.35, 0.6, 0.25)); export_bmesh(bm, "hvm_body", "hvm_body.glb")
-    bm = bmesh.new(); add_box(bm, (0, 0.5, 0), (0.25, 1.0, 0.25), bevel=0.01); add_mechanical_greebles(bm, (0, 0.5, 0), (0.25, 1.0, 0.25)); export_bmesh(bm, "hvm_canister", "hvm_canister.glb")
 
 def build_cluster_dispenser():
     bm = bmesh.new(); add_heavy_mount(bm, 1.0); export_bmesh(bm, "cluster_dispenser_mount", "cluster_dispenser_mount.glb")

@@ -3253,12 +3253,39 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 					var singles = ml_spec["default_count"] == 1
 					var n = 1 if singles else ml_count
 					for i in range(n):
-						var t = 0.0 if n == 1 else (float(i) / float(n - 1) - 0.5)
 						var rnd = _mesh_inst(ml_round_mesh, Color(ml_spec["tint"]))
 						rnd.scale = Vector3.ONE * caliber * float(tweaks.get(ml_spec["scale_tweak"], 1.0))
 						rnd.scale.z *= round_bonus_z
-						rnd.position = Vector3(t * 0.20 * caliber, 0.0,
-							float(ml_spec["front_z"]) * caliber)
+						var rx := 0.0
+						var ry := 0.0
+						# HVM gets radial/smart canister layout so tubes never overlap.
+						# Other multi-round launchers (SAM) keep the linear spread.
+						if type_id == "hypervelocity_missile":
+							# Canister footprint ~0.24 wide at caliber=1. Use 0.28 pitch.
+							var pitch: float = 0.28 * caliber
+							match n:
+								1:
+									rx = 0.0; ry = 0.0
+								2:
+									rx = (float(i) - 0.5) * pitch
+									ry = 0.0
+								3:
+									# Inverted triangle: 2 on top, 1 centred below
+									if i < 2:
+										rx = (float(i) - 0.5) * pitch
+										ry = pitch * 0.45
+									else:
+										rx = 0.0; ry = -pitch * 0.45
+								4:
+									# 2x2 quad
+									rx = (float(i % 2) - 0.5) * pitch
+									ry = (float(i / 2) - 0.5) * pitch * 0.85
+						else:
+							# Original linear spread (SAM, etc.)
+							var t = 0.0 if n == 1 else (float(i) / float(n - 1) - 0.5)
+							rx = t * 0.20 * caliber
+							ry = 0.0
+						rnd.position = Vector3(rx, ry, float(ml_spec["front_z"]) * caliber)
 						ml_pivot.add_child(rnd)
 
 			"aa_autocannon":

@@ -128,6 +128,22 @@ func _run() -> void:
 	lab._select_module(part)
 	await settle()
 	check(doc.current_selected_module == part and doc._document_page == "Selected", "selection updates document inspector")
+	var performance_tab: Button = null
+	for tab: Button in doc._document_tabs.get_children():
+		if tab.get_meta(&"destination_id", "") == "Performance":
+			performance_tab = tab
+	check(performance_tab != null, "document exposes Performance navigation")
+	if performance_tab:
+		performance_tab.pressed.emit()
+	check(doc._document_page == "Performance" and doc._document_clusters["Performance"].is_visible_in_tree(), "Performance navigation remains available after selecting a module")
+	doc._select_document_page("Selected")
+	doc.update_stats_display({
+		"weight": 200.0,
+		"drivetrain": {"capacity": 100.0, "carried_weight": 200.0, "has_locomotion": true},
+	}, lab.hull)
+	await settle()
+	var assembly_health := doc.find_child("AssemblyHealthIndicator", true, false) as Label
+	check(assembly_health != null and assembly_health.is_visible_in_tree(), "assembly health remains visible while tuning an overloaded part")
 	var ring = doc.tweak_callout_manager._action_ring
 	check(ring != null and ring._is_open and ring.has_focus(), "radial opens with focus")
 	var mirror_before: bool = lab.mirror_enabled

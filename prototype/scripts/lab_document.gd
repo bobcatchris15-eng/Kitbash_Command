@@ -9,6 +9,7 @@ var _document_body: ScrollContainer
 var _document_tabs: HBoxContainer
 var _document_toggle: Button
 var _operation_label: Label
+var _assembly_health_label: Label
 var _document_clusters: Dictionary = {}
 var tweak_callout_manager
 
@@ -1038,6 +1039,11 @@ func _build_stats_dock() -> void:
 		{"id": "Build", "label": "Build"},
 		{"id": "Selected", "label": "Selected part"},
 	], "Performance", _select_document_page)
+	# navigation_spine's initial destination is intentionally static for scene
+	# navigation. Document pages change in place, so route each press from the
+	# button's current destination instead of that initial value.
+	for tab: Button in _document_tabs.get_children():
+		tab.pressed.connect(_on_document_tab_pressed.bind(tab))
 	_document_body = ScrollContainer.new()
 	_document_body.name = "DocumentPages"
 	_document_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1398,6 +1404,11 @@ func _select_document_page(page: String) -> void:
 		SliceTheme.apply_action(button, "active" if selected else "secondary")
 	_layout_document()
 
+func _on_document_tab_pressed(tab: Button) -> void:
+	var page := str(tab.get_meta(&"destination_id", ""))
+	if not page.is_empty() and page != _document_page:
+		_select_document_page(page)
+
 func _layout_document() -> void:
 	if not is_instance_valid(console_root):
 		return
@@ -1431,6 +1442,14 @@ func _build_operation_strip() -> void:
 	_operation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_operation_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(_operation_label)
+	_assembly_health_label = Label.new()
+	_assembly_health_label.name = "AssemblyHealthIndicator"
+	_assembly_health_label.theme_type_variation = "HintLabel"
+	_assembly_health_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_assembly_health_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_assembly_health_label.add_theme_color_override("font_color", Tokens.SIGNAL_ALERT)
+	_assembly_health_label.visible = false
+	column.add_child(_assembly_health_label)
 	var gestures := Label.new()
 	gestures.text = "Right-drag: orbit   ·   Middle-drag: pan   ·   Wheel: zoom   ·   Click a part: tune"
 	gestures.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1648,6 +1667,7 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 	var required = wr.get("spotter_required", [])
 	var assisted = wr.get("spotter_assisted", [])
 	var has_weapons = has_wpn
+	var is_vision_alert = has_weapons and (required.size() > 0 or assisted.size() > 0)
 
 	if vision_alert_placard:
 		if vision_text_label:
@@ -1677,14 +1697,14 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 			else:
 				vision_detail_label.text = "Every weapon's reach fits inside this design's own vision."
 
-		var is_vision_alert = has_weapons and (required.size() > 0 or assisted.size() > 0)
-
 		# Ghost opacity when condition is false
 		vision_alert_placard.visible = is_vision_alert
 		if is_vision_alert:
 			vision_alert_placard.modulate = Color(1, 1, 1, 1)
 		else:
 			vision_alert_placard.modulate = Color(1, 1, 1, Tokens.WARNING_GHOST_OPACITY)
+
+	_update_assembly_health(is_over, is_power_alert, is_vision_alert)
 
 	var mod_count := 0
 	if hull:
@@ -1732,6 +1752,20 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 	if build_time_label:
 		build_time_label.text = "Build Time: %.1fs" % b_time
 
+
+func _update_assembly_health(is_over: bool, is_power_alert: bool, is_vision_alert: bool) -> void:
+	if not is_instance_valid(_assembly_health_label):
+		return
+	var conditions: PackedStringArray = []
+	if is_over:
+		conditions.append("CHASSIS OVERLOAD")
+	if is_power_alert:
+		conditions.append("POWER DEFICIT")
+	if is_vision_alert:
+		conditions.append("VISION GAP")
+	_assembly_health_label.visible = not conditions.is_empty()
+	if not conditions.is_empty():
+		_assembly_health_label.text = "ASSEMBLY WARNING  /  " + "  ·  ".join(conditions)
 
 func update_inspector(module: Node3D, data = null) -> void:
 	if not is_instance_valid(inspector_title_label):

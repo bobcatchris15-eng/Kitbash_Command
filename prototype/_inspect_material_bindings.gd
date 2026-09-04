@@ -33,7 +33,7 @@ func _init() -> void:
 		"res://data/loadout/bulwark_mbt.json",
 		["res://data/loadout/bulwark_mbt.json",
 		 "res://data/loadout/rattler_scout.json",
-		 "res://data/loadout/wasp_rocket_buggy.json"])
+		 "res://data/loadout/dart_skirmisher.json"])
 	mc.rule_set = rule
 	mc.selected_map_id = "test_range"
 	root.add_child(mc)

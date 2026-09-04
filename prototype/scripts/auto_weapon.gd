@@ -2219,7 +2219,6 @@ func _fire_rocket_artillery():
 			
 			# Custom rocket trail (replaces internal _attach_trail_to_round)
 			var plume = WeaponVFXRocketArtillery.make_rocket_trail(shell, 2.6, shell_radius)
-			shell.trail_plume = plume
 			_detach_trail_on_free(shell, plume)
 			
 			var start = get_muzzle_world_pos()

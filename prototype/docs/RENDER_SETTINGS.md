@@ -1,7 +1,7 @@
 # Render settings — why the environment values are what they are
 
 **Why this file exists.** These notes were written as `#` comments inside
-`Battle.tscn`, `MainLab.tscn` and `HullBuilder.tscn`. **Godot's text scene
+`Battle.tscn`, `MainLab.tscn` and `ModularHullBuilder.tscn`. **Godot's text scene
 format does not support comments.** A `#` line inside a `[node]` block is a
 hard parse error — `_parse_node_tag` rejects it, the whole `.tscn` fails to
 load, and every consumer of it dies with it. In `Battle.tscn` that took out the
@@ -74,7 +74,7 @@ regression `rts_camera.gd`'s original DOF caused.
 `volumetric_fog_enabled = false`. Volumetric fog was tried in `df5270b` as a
 SDFGI substitute; it produced the periodic hitches described in the History
 section and is the single most expensive feature in the file. It is **on** in
-`MainLab.tscn` and `HullBuilder.tscn` because those scenes are close-up with
+`MainLab.tscn` and `ModularHullBuilder.tscn` because those scenes are close-up with
 a single subject, where the depth contribution is one mesh and the cost is
 absorbed by the static-camera frame budget.
 
@@ -100,7 +100,7 @@ follow-up pipeline change.
 
 ---
 
-## MainLab.tscn and HullBuilder.tscn
+## MainLab.tscn and ModularHullBuilder.tscn
 
 Same AgX tonemapper as the battle scene, for visual coherence across modes.
 

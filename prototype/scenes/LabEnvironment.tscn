@@ -3,7 +3,7 @@
 ; WHAT THIS IS, AND WHY
 ;
 ; The shared "workshop floor" for both design-lab screens
-; (MainLab.tscn and HullBuilder.tscn). A self-healing cutting mat at
+; (MainLab.tscn and ModularHullBuilder.tscn). A self-healing cutting mat at
 ; y = -12, sized 50x50 so it reads as a real room floor, with three
 ; kraft-cardboard model-kit boxes scattered around the model's feet
 ; for context. Everything past the floating model is heavily DOF-
@@ -22,9 +22,9 @@
 ;     the heavy DOF blur on the mat made them look like floating
 ;     crates against the green smear. Three remain.
 ;
-; Both MainLab and HullBuilder instance this scene. The hull
+; Both MainLab and ModularHullBuilder instance this scene. The hull
 ; itself stays at lab-specific positions: y = 2.5 (floating, no
-; pedestal) in MainLab, y = 0 in HullBuilder because the user drops
+; pedestal) in MainLab, y = 0 in ModularHullBuilder because the user drops
 ; primitives at ground level there.
 
 [ext_resource type="Shader" path="res://shaders/cutting_mat.gdshader" id="1_mat_shader"]

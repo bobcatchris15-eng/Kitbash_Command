@@ -36,7 +36,7 @@ const MatchConfigScript = preload("res://scripts/match_config.gd")
 const DUMMY_BLUEPRINT_PATHS := [
 	"res://data/loadout/bulwark_mbt.json",
 	"res://data/loadout/rattler_scout.json",
-	"res://data/loadout/wasp_rocket_buggy.json",
+	"res://data/loadout/dart_skirmisher.json",
 ]
 
 # The bundled default when neither the scratch slot nor any saved

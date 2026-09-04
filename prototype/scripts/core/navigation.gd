@@ -62,7 +62,7 @@ const ROUTES := {
 	# UI_ArmorStationPanel.gd). It is not a routable destination
 	# anymore, so the ARMOR_BAY route is removed.
 	HULL_BUILDER: {
-		"scene": "res://scenes/HullBuilder.tscn",
+		"scene": "res://scenes/ModularHullBuilder.tscn",
 		"title": "HULL AUTHORING",
 		"parent": FRONT_DESK,
 		"links": [LAB],

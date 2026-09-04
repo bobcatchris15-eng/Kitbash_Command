@@ -1,0 +1,27 @@
+{
+  "schema": "kitbash-command.ui.industrial.v1",
+  "grid": 64,
+  "vector_root": "res://assets/ui/industrial/vectors",
+  "vectors": {
+    "nav_design_lab": "nav_design_lab.svg",
+    "nav_match_setup": "nav_match_setup.svg",
+    "nav_main_menu": "nav_main_menu.svg",
+    "slot_module": "slot_module.svg",
+    "state_selected": "state_selected.svg",
+    "state_ready": "state_ready.svg",
+    "state_invalid": "state_invalid.svg",
+    "drop_target": "drop_target.svg",
+    "map_spawn_marker": "map_spawn_marker.svg",
+    "blueprint_status": "blueprint_status.svg"
+  },
+  "raster_reuse": {
+    "plate_powdercoat": "res://assets/textures/ui/plate_powdercoat_normal.png",
+    "plate_powdercoat_hover": "res://assets/textures/ui/plate_powdercoat_hover.png",
+    "plate_powdercoat_pressed": "res://assets/textures/ui/plate_powdercoat_pressed.png",
+    "plate_moulded": "res://assets/textures/ui/plate_moulded_normal.png",
+    "plate_canvas": "res://assets/textures/ui/plate_canvas_normal.png",
+    "field_steel": "res://assets/textures/ui/field_steel.png",
+    "field_cutting_mat": "res://assets/textures/ui/field_cutting_mat.png",
+    "field_toolbox": "res://assets/textures/ui/field_toolbox.png"
+  }
+}

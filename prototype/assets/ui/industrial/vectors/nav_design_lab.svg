@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>nav_design_lab</title>
+  <g fill="none" stroke="#EFE9E5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 18h44v30H10z"/><path d="M18 18v-6h28v6"/><path d="M22 28h20M22 36h12"/>
+    <path d="M46 38v14M39 45h14"/>
+  </g>
+</svg>

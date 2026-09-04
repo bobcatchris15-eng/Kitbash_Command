@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>state_invalid</title>
+  <path d="M32 9 57 53H7z" fill="none" stroke="#C84432" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M32 23v14M32 44v1" fill="none" stroke="#C84432" stroke-width="5" stroke-linecap="square"/>
+</svg>

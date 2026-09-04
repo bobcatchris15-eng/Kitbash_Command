@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>drop_target</title>
+  <path d="M14 24v-8h8M42 16h8v8M50 40v8h-8M22 48h-8v-8" fill="none" stroke="#E0AA2E" stroke-width="4" stroke-linecap="square"/>
+  <path d="M32 18v28M22 36l10 10 10-10" fill="none" stroke="#E0AA2E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

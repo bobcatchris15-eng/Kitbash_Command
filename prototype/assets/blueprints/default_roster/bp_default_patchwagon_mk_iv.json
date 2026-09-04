@@ -1,0 +1,388 @@
+{
+	"armor_material": "hardened_steel",
+	"armor_thickness": 1.0,
+	"faction": "industrialists",
+	"hull_scale": {
+		"x": 1.0,
+		"y": 1.0,
+		"z": 1.0
+	},
+	"hull_size": {
+		"x": 3.40000009536743,
+		"y": 1.72500002384186,
+		"z": 6.30000019073486
+	},
+	"hull_type": "tallow_medium_a",
+	"id": "bp_default_patchwagon_mk_iv",
+	"locomotion": {
+		"settings": {
+			"num_axles": 4,
+			"wheel_size": 1.0,
+			"wheels_per_axle": 2
+		},
+		"type_id": "wheels"
+	},
+	"modules": [
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Wheels",
+			"position": {
+				"x": -1.68726992607117,
+				"y": -0.620629906654358,
+				"z": -2.20500016212463
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 0.924238324165344,
+				"y": 0.924238324165344,
+				"z": 0.924238324165344
+			},
+			"scale_flip_x": true,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 34,
+				"dps": 0.0,
+				"hp": 83.0,
+				"weight": 79.0
+			},
+			"tweaks": {
+				"chine_belly_drop": 0.241870045661926,
+				"chine_clear_x": 0.0127300024032593,
+				"chine_flank_height": 1.46962988376617,
+				"chine_half_width": 1.69999992847443,
+				"chine_normal_x": 0.70710688829422,
+				"chine_normal_y": -0.707106649875641,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.707106649875641,
+				"chine_up_y": 0.70710688829422,
+				"kit_anchor_x": 0.830000042915344,
+				"kit_anchor_y": 0.138000011444092,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.0,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": -1.68726992607117,
+				"station_y": -0.620629906654358,
+				"station_z": -2.20500016212463,
+				"wheel_size": 1.0,
+				"wheels_per_axle": 2
+			},
+			"type_id": "wheels",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Wheels",
+			"position": {
+				"x": -1.45810163021088,
+				"y": -0.849798321723938,
+				"z": 2.20500016212463
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 0.924238324165344,
+				"y": 0.924238324165344,
+				"z": 0.924238324165344
+			},
+			"scale_flip_x": true,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 34,
+				"dps": 0.0,
+				"hp": 83.0,
+				"weight": 79.0
+			},
+			"tweaks": {
+				"chine_belly_drop": 0.0127016305923462,
+				"chine_clear_x": 0.24189829826355,
+				"chine_flank_height": 1.1189983189106,
+				"chine_half_width": 1.69999992847443,
+				"chine_normal_x": 0.707106828689575,
+				"chine_normal_y": -0.707106828689575,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.707106828689575,
+				"chine_up_y": 0.707106828689575,
+				"kit_anchor_x": 0.830000042915344,
+				"kit_anchor_y": 0.138000011444092,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.0,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": -1.45810163021088,
+				"station_y": -0.849798321723938,
+				"station_z": 2.20500016212463,
+				"wheel_size": 1.0,
+				"wheels_per_axle": 2
+			},
+			"type_id": "wheels",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Wheels",
+			"position": {
+				"x": 1.45803499221802,
+				"y": -0.84977000951767,
+				"z": -2.20500016212463
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 0.924238324165344,
+				"y": 0.924238324165344,
+				"z": 0.924238324165344
+			},
+			"scale_flip_x": false,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 34,
+				"dps": 0.0,
+				"hp": 83.0,
+				"weight": 79.0
+			},
+			"tweaks": {
+				"chine_belly_drop": 0.0127299427986145,
+				"chine_clear_x": 0.241964936256409,
+				"chine_flank_height": 1.69876998662949,
+				"chine_half_width": 1.69999992847443,
+				"chine_normal_x": 0.732442617416382,
+				"chine_normal_y": -0.680828809738159,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.680828809738159,
+				"chine_up_y": 0.732442617416382,
+				"kit_anchor_x": -0.830000042915344,
+				"kit_anchor_y": 0.138000011444092,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.0,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": 1.45803499221802,
+				"station_y": -0.84977000951767,
+				"station_z": -2.20500016212463,
+				"wheel_size": 1.0,
+				"wheels_per_axle": 2
+			},
+			"type_id": "wheels",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Wheels",
+			"position": {
+				"x": 1.4452999830246,
+				"y": -0.862499952316284,
+				"z": 2.20500016212463
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 0.924238324165344,
+				"y": 0.924238324165344,
+				"z": 0.924238324165344
+			},
+			"scale_flip_x": false,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 34,
+				"dps": 0.0,
+				"hp": 83.0,
+				"weight": 79.0
+			},
+			"tweaks": {
+				"chine_belly_drop": 0.0,
+				"chine_clear_x": 0.254699945449829,
+				"chine_flank_height": 1.13169994950294,
+				"chine_half_width": 1.69999992847443,
+				"chine_normal_x": 0.194596186280251,
+				"chine_normal_y": -0.980883479118347,
+				"chine_seated": 1.0,
+				"chine_up_x": 0.980883479118347,
+				"chine_up_y": 0.194596186280251,
+				"kit_anchor_x": -0.830000042915344,
+				"kit_anchor_y": 0.138000011444092,
+				"kit_anchor_z": 0.0,
+				"kit_reach": 0.0,
+				"mount_rise": 0.0,
+				"node_scale_x": 1.0,
+				"node_scale_y": 1.0,
+				"node_scale_z": 1.0,
+				"station_x": 1.4452999830246,
+				"station_y": -0.862499952316284,
+				"station_z": 2.20500016212463,
+				"wheel_size": 1.0,
+				"wheels_per_axle": 2
+			},
+			"type_id": "wheels",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 1.0,
+				"z": 0.0
+			},
+			"mount_style": "",
+			"name": "Repair Welder Array",
+			"position": {
+				"x": 0.0,
+				"y": 0.269199848175049,
+				"z": 0.5
+			},
+			"rotation": {
+				"x": 0.0,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 1.0,
+				"z": 1.0
+			},
+			"scale_flip_x": false,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 20,
+				"cost_metal": 40,
+				"dps": 0.0,
+				"hp": 100.0,
+				"weight": 70.0
+			},
+			"tweaks": {},
+			"type_id": "repair_array",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "top",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 0.957826316356659,
+				"z": 0.287347912788391
+			},
+			"mount_style": "pintle",
+			"name": "Smoke Discharger",
+			"position": {
+				"x": -1.0,
+				"y": 0.727499604225159,
+				"z": -1.75
+			},
+			"rotation": {
+				"x": 0.291456818580627,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 0.999999940395355,
+				"z": 0.999999940395355
+			},
+			"scale_flip_x": false,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 14,
+				"dps": 0.0,
+				"hp": 40.0,
+				"weight": 28.5
+			},
+			"tweaks": {},
+			"type_id": "smoke_discharger",
+			"yaw_offset": 0.0
+		},
+		{
+			"facet": "top",
+			"facet_size": {},
+			"mount_normal": {
+				"x": 0.0,
+				"y": 0.957826316356659,
+				"z": 0.287347912788391
+			},
+			"mount_style": "pintle",
+			"name": "Smoke Discharger",
+			"position": {
+				"x": 1.0,
+				"y": 0.727499604225159,
+				"z": -1.75
+			},
+			"rotation": {
+				"x": 0.291456818580627,
+				"y": 0.0,
+				"z": 0.0
+			},
+			"scale": {
+				"x": 1.0,
+				"y": 0.999999940395355,
+				"z": 0.999999940395355
+			},
+			"scale_flip_x": false,
+			"sponson": false,
+			"stats": {
+				"cost_crystal": 0,
+				"cost_metal": 14,
+				"dps": 0.0,
+				"hp": 40.0,
+				"weight": 28.5
+			},
+			"tweaks": {},
+			"type_id": "smoke_discharger",
+			"yaw_offset": 0.0
+		}
+	],
+	"name": "PatchWagon Mk IV",
+	"nose_taper": 1.0,
+	"version": 1.0
+}

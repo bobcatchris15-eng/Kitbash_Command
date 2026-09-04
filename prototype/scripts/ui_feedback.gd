@@ -39,10 +39,6 @@ const ROLE_SFX := {
 	# Destructive. Deliberately the warning tone rather than a click: deleting a
 	# design should not sound like changing a dropdown.
 	"danger": "warning_banner",
-	# Latched and rotary controls use their own release/change sounds where
-	# needed, but still need a defined activation role for keyboard input.
-	"toggle_on": "ui_toggle_on",
-	"dial": "ui_tick",
 }
 
 
@@ -83,13 +79,6 @@ static func wire(ctrl: Control, role: String = "default") -> Control:
 	# whole screen slowly inflates as the player moves the cursor over it.
 	if not ctrl.mouse_exited.is_connected(_on_unhover):
 		ctrl.mouse_exited.connect(_on_unhover.bind(ctrl))
-	# Focus is the keyboard/controller equivalent of hover. Treating it as the
-	# same readiness state keeps every modality visually legible without
-	# replacing native Control focus and accessibility semantics.
-	if not ctrl.focus_entered.is_connected(_on_focus):
-		ctrl.focus_entered.connect(_on_focus.bind(ctrl))
-	if not ctrl.focus_exited.is_connected(_on_unfocus):
-		ctrl.focus_exited.connect(_on_unfocus.bind(ctrl))
 
 	# BaseButton covers Button, CheckBox, OptionButton, TextureButton and the
 	# rest; anything else gets hover feedback only, which is correct - a panel has
@@ -115,17 +104,6 @@ static func _on_hover(ctrl: Control) -> void:
 static func _on_unhover(ctrl: Control) -> void:
 	# Unconditional, unlike _on_hover's disabled check: a control that became
 	# disabled WHILE hovered still has to come back down, or it stays stuck lifted.
-	UIAnimScript.hover_settle(ctrl)
-
-
-static func _on_focus(ctrl: Control) -> void:
-	if ctrl is BaseButton and (ctrl as BaseButton).disabled:
-		return
-	play(ctrl, "hover")
-	UIAnimScript.hover_lift(ctrl)
-
-
-static func _on_unfocus(ctrl: Control) -> void:
 	UIAnimScript.hover_settle(ctrl)
 
 

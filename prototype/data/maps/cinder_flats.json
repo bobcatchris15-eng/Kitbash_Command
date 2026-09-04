@@ -1,0 +1,622 @@
+{
+  "schema_version": 1.0,
+  "name": "Cinder Flats",
+  "description": "A dark volcanic plain split down the middle by a wide impassable lava channel. A single bridge near the south end is the fast crossing; a cooling shallows near the north is the slow one. Each island has its own metal and crystal seams; the lava banks are rimmed with oil. Hold the bridge, hold the map.",
+  "map_half_extents": 400.0,
+  "ground_color": [
+    0.18,
+    0.13,
+    0.11
+  ],
+  "spawns": [
+    {
+      "id": "player",
+      "hq": [
+        -300.0,
+        0.0,
+        280.0
+      ],
+      "factory": [
+        -315.0,
+        0.0,
+        280.0
+      ],
+      "refinery": [
+        -285.0,
+        0.0,
+        280.0
+      ],
+      "harvester": [
+        -300.0,
+        0.0,
+        295.0
+      ]
+    },
+    {
+      "id": "enemy",
+      "hq": [
+        300.0,
+        0.0,
+        -280.0
+      ],
+      "factory": [
+        285.0,
+        0.0,
+        -280.0
+      ],
+      "refinery": [
+        315.0,
+        0.0,
+        -280.0
+      ],
+      "harvester": [
+        300.0,
+        0.0,
+        -265.0
+      ]
+    }
+  ],
+  "base_zones": [
+    {
+      "id": "player",
+      "center": [
+        -300.0,
+        0.0,
+        280.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ]
+    },
+    {
+      "id": "enemy",
+      "center": [
+        300.0,
+        0.0,
+        -280.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ]
+    }
+  ],
+  "resource_nodes": [
+    {
+      "type": "metal",
+      "position": [
+        -280.0,
+        0.0,
+        220.0
+      ],
+      "amount": 1400
+    },
+    {
+      "type": "metal",
+      "position": [
+        -220.0,
+        0.0,
+        100.0
+      ],
+      "amount": 1100
+    },
+    {
+      "type": "crystal",
+      "position": [
+        -260.0,
+        0.0,
+        150.0
+      ],
+      "amount": 900
+    },
+    {
+      "type": "crystal",
+      "position": [
+        -180.0,
+        0.0,
+        -50.0
+      ],
+      "amount": 700
+    },
+    {
+      "type": "lumber",
+      "position": [
+        -250.0,
+        0.0,
+        -50.0
+      ],
+      "amount": 1000
+    },
+    {
+      "type": "lumber",
+      "position": [
+        -220.0,
+        0.0,
+        -200.0
+      ],
+      "amount": 800
+    },
+    {
+      "type": "oil",
+      "position": [
+        -150.0,
+        0.0,
+        220.0
+      ],
+      "amount": 600
+    },
+    {
+      "type": "metal",
+      "position": [
+        280.0,
+        0.0,
+        -220.0
+      ],
+      "amount": 1400
+    },
+    {
+      "type": "metal",
+      "position": [
+        220.0,
+        0.0,
+        -100.0
+      ],
+      "amount": 1100
+    },
+    {
+      "type": "crystal",
+      "position": [
+        260.0,
+        0.0,
+        -150.0
+      ],
+      "amount": 900
+    },
+    {
+      "type": "crystal",
+      "position": [
+        180.0,
+        0.0,
+        50.0
+      ],
+      "amount": 700
+    },
+    {
+      "type": "lumber",
+      "position": [
+        250.0,
+        0.0,
+        50.0
+      ],
+      "amount": 1000
+    },
+    {
+      "type": "lumber",
+      "position": [
+        220.0,
+        0.0,
+        200.0
+      ],
+      "amount": 800
+    },
+    {
+      "type": "oil",
+      "position": [
+        150.0,
+        0.0,
+        -220.0
+      ],
+      "amount": 600
+    }
+  ],
+  "water_areas": [
+    {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        30.0,
+        360.0
+      ]
+    }
+  ],
+  "water_blobs": [],
+  "shallow_water_areas": [
+    {
+      "center": [
+        0.0,
+        0.0,
+        -300.0
+      ],
+      "half_extents": [
+        28.0,
+        30.0
+      ]
+    }
+  ],
+  "cliffs": [],
+  "surface_zones": [
+    {
+      "center": [
+        -200.0,
+        0.0,
+        150.0
+      ],
+      "half_extents": [
+        160.0,
+        200.0
+      ],
+      "surface_type": "volcanic"
+    },
+    {
+      "center": [
+        200.0,
+        0.0,
+        -150.0
+      ],
+      "half_extents": [
+        160.0,
+        200.0
+      ],
+      "surface_type": "volcanic"
+    },
+    {
+      "center": [
+        -50.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        40.0,
+        360.0
+      ],
+      "surface_type": "scree"
+    },
+    {
+      "center": [
+        50.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        40.0,
+        360.0
+      ],
+      "surface_type": "scree"
+    }
+  ],
+  "obstacles": [],
+  "bridges": [
+    {
+      "center": [
+        0.0,
+        0.0,
+        250.0
+      ],
+      "half_extents": [
+        10.0,
+        30.0
+      ],
+      "deck_height": 1.5,
+      "rotation_deg": 0.0
+    }
+  ],
+  "props": [
+    {
+      "type": "spire",
+      "pos": [
+        -220.0,
+        0.0,
+        -200.0
+      ],
+      "scale": 4.257354632036282,
+      "variant": 0,
+      "yaw": 4.045876082806898
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -200.0,
+        0.0,
+        250.0
+      ],
+      "scale": 3.0861956305217064,
+      "variant": 3,
+      "yaw": 2.8494179493547014
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -260.0,
+        0.0,
+        -50.0
+      ],
+      "scale": 2.9195868186659975,
+      "variant": 0,
+      "yaw": 2.7833164714144787
+    },
+    {
+      "type": "spire",
+      "pos": [
+        220.0,
+        0.0,
+        200.0
+      ],
+      "scale": 3.4089405622366855,
+      "variant": 2,
+      "yaw": 1.77572414961034
+    },
+    {
+      "type": "spire",
+      "pos": [
+        200.0,
+        0.0,
+        -250.0
+      ],
+      "scale": 4.205017462230846,
+      "variant": 0,
+      "yaw": 1.2786212181372605
+    },
+    {
+      "type": "spire",
+      "pos": [
+        260.0,
+        0.0,
+        50.0
+      ],
+      "scale": 3.0147389076075384,
+      "variant": 0,
+      "yaw": 6.170089142015484
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -300.0,
+        0.0,
+        0.0
+      ],
+      "scale": 4.258774014544312,
+      "variant": 1,
+      "yaw": 4.628504868122159
+    },
+    {
+      "type": "spire",
+      "pos": [
+        300.0,
+        0.0,
+        0.0
+      ],
+      "scale": 3.866782238809738,
+      "variant": 3,
+      "yaw": 1.859775473559221
+    }
+  ],
+  "roads": [],
+  "world_scale": 1.0,
+  "terrain": {
+    "generator": "v2",
+    "height_scale": 24.0,
+    "pixels_per_unit": 1.0,
+    "features": [
+      {
+        "type": "hill",
+        "center": [
+          -220.0,
+          0.0,
+          280.0
+        ],
+        "radius": 70.0,
+        "falloff": 80.0,
+        "height": 18.0
+      },
+      {
+        "type": "hill",
+        "center": [
+          -260.0,
+          0.0,
+          100.0
+        ],
+        "radius": 55.0,
+        "falloff": 65.0,
+        "height": 14.0
+      },
+      {
+        "type": "hill",
+        "center": [
+          -200.0,
+          0.0,
+          -100.0
+        ],
+        "radius": 50.0,
+        "falloff": 60.0,
+        "height": 12.0
+      },
+      {
+        "type": "hill",
+        "center": [
+          -300.0,
+          0.0,
+          -250.0
+        ],
+        "radius": 60.0,
+        "falloff": 70.0,
+        "height": 16.0
+      },
+      {
+        "type": "hill",
+        "center": [
+          220.0,
+          0.0,
+          -280.0
+        ],
+        "radius": 70.0,
+        "falloff": 80.0,
+        "height": 18.0
+      },
+      {
+        "type": "hill",
+        "center": [
+          260.0,
+          0.0,
+          -100.0
+        ],
+        "radius": 55.0,
+        "falloff": 65.0,
+        "height": 14.0
+      },
+      {
+        "type": "hill",
+        "center": [
+          200.0,
+          0.0,
+          100.0
+        ],
+        "radius": 50.0,
+        "falloff": 60.0,
+        "height": 12.0
+      },
+      {
+        "type": "hill",
+        "center": [
+          300.0,
+          0.0,
+          250.0
+        ],
+        "radius": 60.0,
+        "falloff": 70.0,
+        "height": 16.0
+      }
+    ],
+    "post_pass": {
+      "noise": {
+        "frequency": 0.011,
+        "amplitude": 3.0,
+        "octaves": 3
+      }
+    },
+    "surfacemap": "res://data/maps/cinder_flats_surface.png",
+    "heightmap": "res://data/maps/cinder_flats_height.png"
+  },
+  "hills": [
+    {
+      "center": [
+        -220.0,
+        0.0,
+        280.0
+      ],
+      "radius": 70.0,
+      "falloff": 80.0,
+      "height": 18.0
+    },
+    {
+      "center": [
+        -260.0,
+        0.0,
+        100.0
+      ],
+      "radius": 55.0,
+      "falloff": 65.0,
+      "height": 14.0
+    },
+    {
+      "center": [
+        -200.0,
+        0.0,
+        -100.0
+      ],
+      "radius": 50.0,
+      "falloff": 60.0,
+      "height": 12.0
+    },
+    {
+      "center": [
+        -300.0,
+        0.0,
+        -250.0
+      ],
+      "radius": 60.0,
+      "falloff": 70.0,
+      "height": 16.0
+    },
+    {
+      "center": [
+        220.0,
+        0.0,
+        -280.0
+      ],
+      "radius": 70.0,
+      "falloff": 80.0,
+      "height": 18.0
+    },
+    {
+      "center": [
+        260.0,
+        0.0,
+        -100.0
+      ],
+      "radius": 55.0,
+      "falloff": 65.0,
+      "height": 14.0
+    },
+    {
+      "center": [
+        200.0,
+        0.0,
+        100.0
+      ],
+      "radius": 50.0,
+      "falloff": 60.0,
+      "height": 12.0
+    },
+    {
+      "center": [
+        300.0,
+        0.0,
+        250.0
+      ],
+      "radius": 60.0,
+      "falloff": 70.0,
+      "height": 16.0
+    }
+  ],
+  "environment": {
+    "sky_color": [
+      0.08,
+      0.06,
+      0.05
+    ],
+    "horizon_color": [
+      0.22,
+      0.12,
+      0.08
+    ],
+    "sun_color": [
+      1.4,
+      0.55,
+      0.25
+    ],
+    "sun_energy": 1.321,
+    "ambient_light_energy": 0.6,
+    "ambient_light_color": [
+      0.3,
+      0.2,
+      0.18
+    ],
+    "tonemap_exposure": 0.952,
+    "sun_elevation_deg": 22.0,
+    "sun_azimuth_deg": 120.0,
+    "fog_enabled": true,
+    "fog_density": 0.0007,
+    "fog_aerial_perspective": 0.6,
+    "volumetric_fog_enabled": true,
+    "volumetric_fog_density": 0.0002,
+    "dof_blur_far_enabled": false,
+    "dof_blur_far_distance": 260.0,
+    "fog_sky_affect": 0.3,
+    "fog_height_density": 0.01,
+    "fog_sun_scatter": 0.15
+  }
+}

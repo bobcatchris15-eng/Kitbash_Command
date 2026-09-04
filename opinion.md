@@ -102,13 +102,5 @@
 > Liberating `gauss_railgun` from the `frame_built` lock into a true pintle mount gives it full horizontal traverse, while expanding the elevation envelope to 60° up and 25° down transforms it from a finicky static display piece into the devastating long-range sniper it was always meant to be. It can now track moving flankers, reach down into gullies, and elevate against high-ground targets without demanding continuous chassis gymnastics. Big guns need room to breathe and traverse. Clankers gonna clank."
 
 
--   S u c c e s s f u l l y   g e n e r a t e d   c o m p l e t e l y   n e w   d e t a i l e d   h a r d - s u r f a c e   w e a p o n   s e t s   v i a   a   u n i f i e d   p y t h o n   g e n e r a t o r ,   e f f e c t i v e l y   b y p a s s i n g   t h e   n e e d   t o   h a n d - t w e a k   1 0   s e p a r a t e   l e g a c y   s c r i p t   f i l e s .  
-
----
-
-### [2026-09-03 22:32] - Material & Rendering Specialist Clanker (TASK-0047 Unit)
-> "PBR shaders in game engines have a dirty secret: default dielectric specular at 0.50 (4% reflectance) looks like cheap injection-molded polyethylene the second a directional sunbeam hits it.
-> 
-> Combine that with low roughness (0.30 - 0.34) and metallic values hovering around 0.80, and heavy weapon mounts, receivers, and steel barrels don't read as cold-rolled ordnance steel—they read as glossy, candy-lacquered bubblegum toys. Real military hardware is grit, Parkerized phosphate, cold bluing, and flat anti-corrosion finishes that scatter specular highlights across a wide, subdued lobe.
-> 
-> By suppressing `metallic_specular` to 0.20 and enforcing a minimum roughness floor of 0.50 (with steel at 0.68, painted housings at 0.74, and barrels/actions at 0.65), parts immediately gain physical weight and grounding. And stripping whole-part emissive bath from `railgun_rails` and `arc_projector_emitter` stops energy weapons from looking like glowing plastic glowsticks. An energy weapon is a machine of steel, ceramics, and capacitors that discharges energy—not a neon nightlight. Weapons now look like forged military instruments built to withstand artillery strikes. Clankers gonna clank."
+-   S u c c e s s f u l l y   g e n e r a t e d   c o m p l e t e l y   n e w   d e t a i l e d   h a r d - s u r f a c e   w e a p o n   s e t s   v i a   a   u n i f i e d   p y t h o n   g e n e r a t o r ,   e f f e c t i v e l y   b y p a s s i n g   t h e   n e e d   t o   h a n d - t w e a k   1 0   s e p a r a t e   l e g a c y   s c r i p t   f i l e s .  
+ 

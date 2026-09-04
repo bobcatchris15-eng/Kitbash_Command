@@ -1,0 +1,1086 @@
+{
+  "schema_version": 1.0,
+  "name": "The Iron Square",
+  "description": "A small city's commercial district. Two story residential buildings screen the player's approach; a strip mall and grocery anchor the enemy's. A refinery and grain elevator straddle the central plaza. The ground isn't flat: a gentle hill on each side and a sunken basin at the central plaza give the city real shape. Combat happens in alleys, between parked cars and fire escapes. Bring short-range weapons and stay indoors.",
+  "map_half_extents": 400.0,
+  "ground_color": [
+    0.36,
+    0.32,
+    0.28
+  ],
+  "spawns": [
+    {
+      "id": "player",
+      "hq": [
+        -280.0,
+        0.0,
+        0.0
+      ],
+      "factory": [
+        -295.0,
+        0.0,
+        0.0
+      ],
+      "refinery": [
+        -265.0,
+        0.0,
+        0.0
+      ],
+      "harvester": [
+        -280.0,
+        0.0,
+        15.0
+      ]
+    },
+    {
+      "id": "enemy",
+      "hq": [
+        280.0,
+        0.0,
+        0.0
+      ],
+      "factory": [
+        265.0,
+        0.0,
+        0.0
+      ],
+      "refinery": [
+        295.0,
+        0.0,
+        0.0
+      ],
+      "harvester": [
+        280.0,
+        0.0,
+        15.0
+      ]
+    }
+  ],
+  "base_zones": [
+    {
+      "id": "player",
+      "center": [
+        -280.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ]
+    },
+    {
+      "id": "enemy",
+      "center": [
+        280.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ]
+    }
+  ],
+  "resource_nodes": [
+    {
+      "type": "metal",
+      "position": [
+        -220.0,
+        0.0,
+        -150.0
+      ],
+      "amount": 1200
+    },
+    {
+      "type": "metal",
+      "position": [
+        220.0,
+        0.0,
+        150.0
+      ],
+      "amount": 1200
+    },
+    {
+      "type": "metal",
+      "position": [
+        -30.0,
+        0.0,
+        30.0
+      ],
+      "amount": 1500
+    },
+    {
+      "type": "crystal",
+      "position": [
+        30.0,
+        0.0,
+        -30.0
+      ],
+      "amount": 1100
+    },
+    {
+      "type": "oil",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "amount": 800
+    },
+    {
+      "type": "lumber",
+      "position": [
+        -260.0,
+        0.0,
+        200.0
+      ],
+      "amount": 900
+    },
+    {
+      "type": "lumber",
+      "position": [
+        260.0,
+        0.0,
+        -200.0
+      ],
+      "amount": 900
+    }
+  ],
+  "water_areas": [],
+  "water_blobs": [],
+  "shallow_water_areas": [],
+  "cliffs": [],
+  "surface_zones": [
+    {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        380.0,
+        380.0
+      ],
+      "surface_type": "cobble"
+    },
+    {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        60.0,
+        60.0
+      ],
+      "surface_type": "dirt"
+    }
+  ],
+  "obstacles": [],
+  "bridges": [],
+  "props": [
+    {
+      "type": "building",
+      "building_id": "grain_elevator_concrete_tower",
+      "model": "grain_elevator_concrete_tower",
+      "pos": [
+        -30.0,
+        0.0,
+        30.0
+      ],
+      "scale": 1.0,
+      "yaw": 0.5
+    },
+    {
+      "type": "building",
+      "building_id": "warehouse_small_quonset",
+      "model": "warehouse_small_quonset",
+      "pos": [
+        30.0,
+        0.0,
+        30.0
+      ],
+      "scale": 1.0,
+      "yaw": 2.5
+    },
+    {
+      "type": "building",
+      "building_id": "gas_station_fuel_canopy",
+      "model": "gas_station_fuel_canopy",
+      "pos": [
+        0.0,
+        0.0,
+        -30.0
+      ],
+      "scale": 1.0,
+      "yaw": 1.5
+    },
+    {
+      "type": "building",
+      "building_id": "house_suburban_bungalow",
+      "model": "house_suburban_bungalow",
+      "pos": [
+        -220.0,
+        0.0,
+        -100.0
+      ],
+      "scale": 1.0,
+      "yaw": 3.07
+    },
+    {
+      "type": "building",
+      "building_id": "house_ranch_brick",
+      "model": "house_ranch_brick",
+      "pos": [
+        -180.0,
+        0.0,
+        -60.0
+      ],
+      "scale": 1.0,
+      "yaw": 5.79
+    },
+    {
+      "type": "building",
+      "building_id": "cozy_cottage",
+      "model": "cozy_cottage",
+      "pos": [
+        -240.0,
+        0.0,
+        20.0
+      ],
+      "scale": 1.0,
+      "yaw": 5.51
+    },
+    {
+      "type": "building",
+      "building_id": "house_two_story_colonial",
+      "model": "house_two_story_colonial",
+      "pos": [
+        -200.0,
+        0.0,
+        80.0
+      ],
+      "scale": 1.0,
+      "yaw": 4.61
+    },
+    {
+      "type": "building",
+      "building_id": "house_split_level",
+      "model": "house_split_level",
+      "pos": [
+        -260.0,
+        0.0,
+        140.0
+      ],
+      "scale": 1.0,
+      "yaw": 4.99
+    },
+    {
+      "type": "building",
+      "building_id": "farmhouse_two_story",
+      "model": "farmhouse_two_story",
+      "pos": [
+        -160.0,
+        0.0,
+        180.0
+      ],
+      "scale": 1.0,
+      "yaw": 5.56
+    },
+    {
+      "type": "building",
+      "building_id": "villa_modern_estate",
+      "model": "villa_modern_estate",
+      "pos": [
+        -220.0,
+        0.0,
+        220.0
+      ],
+      "scale": 1.0,
+      "yaw": 0.53
+    },
+    {
+      "type": "building",
+      "building_id": "shed_tool_wood",
+      "model": "shed_tool_wood",
+      "pos": [
+        -150.0,
+        0.0,
+        -120.0
+      ],
+      "scale": 1.0,
+      "yaw": 0.22
+    },
+    {
+      "type": "building",
+      "building_id": "supermarket_anchor_store",
+      "model": "supermarket_anchor_store",
+      "pos": [
+        220.0,
+        0.0,
+        100.0
+      ],
+      "scale": 1.0,
+      "yaw": 4.3
+    },
+    {
+      "type": "building",
+      "building_id": "strip_mall_retail_row",
+      "model": "strip_mall_retail_row",
+      "pos": [
+        180.0,
+        0.0,
+        60.0
+      ],
+      "scale": 1.0,
+      "yaw": 2.69
+    },
+    {
+      "type": "building",
+      "building_id": "clinic_urgent_care",
+      "model": "clinic_urgent_care",
+      "pos": [
+        240.0,
+        0.0,
+        -20.0
+      ],
+      "scale": 1.0,
+      "yaw": 1.26
+    },
+    {
+      "type": "building",
+      "building_id": "library_municipal",
+      "model": "library_municipal",
+      "pos": [
+        200.0,
+        0.0,
+        -100.0
+      ],
+      "scale": 1.0,
+      "yaw": 3.67
+    },
+    {
+      "type": "building",
+      "building_id": "fast_food_burger_drive_thru",
+      "model": "fast_food_burger_drive_thru",
+      "pos": [
+        260.0,
+        0.0,
+        140.0
+      ],
+      "scale": 1.0,
+      "yaw": 5.45
+    },
+    {
+      "type": "building",
+      "building_id": "gas_station_fuel_canopy",
+      "model": "gas_station_fuel_canopy",
+      "pos": [
+        180.0,
+        0.0,
+        180.0
+      ],
+      "scale": 1.0,
+      "yaw": 3.09
+    },
+    {
+      "type": "building",
+      "building_id": "windmill_aeromotor",
+      "model": "windmill_aeromotor",
+      "pos": [
+        220.0,
+        0.0,
+        220.0
+      ],
+      "scale": 1.0,
+      "yaw": 3.47
+    },
+    {
+      "type": "building",
+      "building_id": "shed_tool_wood",
+      "model": "shed_tool_wood",
+      "pos": [
+        160.0,
+        0.0,
+        -120.0
+      ],
+      "scale": 1.0,
+      "yaw": 6.24
+    },
+    {
+      "type": "building",
+      "building_id": "church_chapel_bell_tower",
+      "model": "church_chapel_bell_tower",
+      "pos": [
+        -330.0,
+        0.0,
+        0.0
+      ],
+      "scale": 1.0,
+      "yaw": 1.5
+    },
+    {
+      "type": "building",
+      "building_id": "school_brick_elementary",
+      "model": "school_brick_elementary",
+      "pos": [
+        330.0,
+        0.0,
+        0.0
+      ],
+      "scale": 1.0,
+      "yaw": 2.5
+    },
+    {
+      "type": "building",
+      "building_id": "city_hall_colonnade",
+      "model": "city_hall_colonnade",
+      "pos": [
+        0.0,
+        0.0,
+        330.0
+      ],
+      "scale": 1.0,
+      "yaw": 0.0
+    },
+    {
+      "type": "building",
+      "building_id": "police_station_lockup",
+      "model": "police_station_lockup",
+      "pos": [
+        0.0,
+        0.0,
+        -330.0
+      ],
+      "scale": 1.0,
+      "yaw": 3.14
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -159.92509366447314,
+        0.0,
+        -219.7569550531138
+      ],
+      "scale": 1.9008582726836163,
+      "variant": 10,
+      "yaw": 5.7916522568893125
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -243.73952253916255,
+        0.0,
+        142.1634288532439
+      ],
+      "scale": 1.74894243486699,
+      "variant": 28,
+      "yaw": 6.22850495171694
+    },
+    {
+      "type": "tree",
+      "pos": [
+        324.1614640266225,
+        0.0,
+        -138.80191906043493
+      ],
+      "scale": 2.247896711917923,
+      "variant": 24,
+      "yaw": 5.081044879292287
+    },
+    {
+      "type": "tree",
+      "pos": [
+        361.860139724507,
+        0.0,
+        -154.6571691221039
+      ],
+      "scale": 1.761721279242449,
+      "variant": 23,
+      "yaw": 6.180542907798292
+    },
+    {
+      "type": "tree",
+      "pos": [
+        74.00734299270704,
+        0.0,
+        20.96914312122601
+      ],
+      "scale": 2.1863694541540086,
+      "variant": 25,
+      "yaw": 6.1950346110608026
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -243.7910790911392,
+        0.0,
+        318.82851060286987
+      ],
+      "scale": 2.213552614717387,
+      "variant": 28,
+      "yaw": 5.265715320215109
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -218.18201528241963,
+        0.0,
+        30.470356061416965
+      ],
+      "scale": 2.1378129758822766,
+      "variant": 11,
+      "yaw": 0.40172033044214056
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -123.10554320444288,
+        0.0,
+        107.26257802004636
+      ],
+      "scale": 1.875895069386547,
+      "variant": 14,
+      "yaw": 1.291050774018335
+    },
+    {
+      "type": "tree",
+      "pos": [
+        368.4696933764154,
+        0.0,
+        -271.1283060893681
+      ],
+      "scale": 1.917120020534187,
+      "variant": 21,
+      "yaw": 5.433407613962605
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -231.1305517733652,
+        0.0,
+        167.95336210448932
+      ],
+      "scale": 1.797147882343279,
+      "variant": 19,
+      "yaw": 2.999172351646503
+    },
+    {
+      "type": "tree",
+      "pos": [
+        261.955198585949,
+        0.0,
+        -263.3820853809277
+      ],
+      "scale": 2.3021633006032434,
+      "variant": 26,
+      "yaw": 1.2045022047924325
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -216.70627623272955,
+        0.0,
+        -68.81593368766096
+      ],
+      "scale": 1.8191077835511473,
+      "variant": 0,
+      "yaw": 0.2824785641888421
+    },
+    {
+      "type": "tree",
+      "pos": [
+        324.42890716183524,
+        0.0,
+        113.35058797699872
+      ],
+      "scale": 2.1517824118852737,
+      "variant": 7,
+      "yaw": 2.924037883408283
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -177.68334969352364,
+        0.0,
+        88.18229437214097
+      ],
+      "scale": 1.917567150952034,
+      "variant": 28,
+      "yaw": 1.963140266062561
+    },
+    {
+      "type": "tree",
+      "pos": [
+        89.55641472953539,
+        0.0,
+        -234.39653077262804
+      ],
+      "scale": 1.8556672574632438,
+      "variant": 32,
+      "yaw": 2.9655803045221143
+    },
+    {
+      "type": "tree",
+      "pos": [
+        352.74133720261943,
+        0.0,
+        160.06932233615896
+      ],
+      "scale": 1.5033433843704846,
+      "variant": 18,
+      "yaw": 0.43983663648196003
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -159.22617583924261,
+        0.0,
+        151.71895938531384
+      ],
+      "scale": 1.6682874061696669,
+      "variant": 5,
+      "yaw": 0.8269681233594237
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -134.30474163242627,
+        0.0,
+        9.465763263810231
+      ],
+      "scale": 1.5060271875083018,
+      "variant": 21,
+      "yaw": 3.1396118730623743
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -276.03045512887905,
+        0.0,
+        -349.0039890267836
+      ],
+      "scale": 1.6533481991726706,
+      "variant": 25,
+      "yaw": 5.246513166286935
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -88.06402985376627,
+        0.0,
+        329.54067694907474
+      ],
+      "scale": 1.921613931557967,
+      "variant": 14,
+      "yaw": 2.8814359954756266
+    },
+    {
+      "type": "tree",
+      "pos": [
+        370.64576505875004,
+        0.0,
+        -378.3922202471173
+      ],
+      "scale": 1.9899924708481818,
+      "variant": 27,
+      "yaw": 4.329710850396982
+    },
+    {
+      "type": "tree",
+      "pos": [
+        144.66770969994968,
+        0.0,
+        -25.34615104310575
+      ],
+      "scale": 1.9350966363178261,
+      "variant": 0,
+      "yaw": 2.9731965538118943
+    },
+    {
+      "type": "tree",
+      "pos": [
+        166.1875572194482,
+        0.0,
+        -43.145491514601304
+      ],
+      "scale": 1.7123955677661273,
+      "variant": 25,
+      "yaw": 4.882095194630013
+    },
+    {
+      "type": "tree",
+      "pos": [
+        307.8150403821263,
+        0.0,
+        -110.74568799629361
+      ],
+      "scale": 1.6287651873824536,
+      "variant": 3,
+      "yaw": 4.404190095576572
+    },
+    {
+      "type": "tree",
+      "pos": [
+        272.6491400071193,
+        0.0,
+        -97.70705366399415
+      ],
+      "scale": 2.24806334422476,
+      "variant": 2,
+      "yaw": 0.772999366020775
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -355.18014402024454,
+        0.0,
+        -263.29478840489475
+      ],
+      "scale": 2.242125351165596,
+      "variant": 27,
+      "yaw": 6.010163357433279
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -140.29095487029542,
+        0.0,
+        260.11967045302845
+      ],
+      "scale": 1.571711389655125,
+      "variant": 20,
+      "yaw": 4.905899421221061
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -212.56706883772597,
+        0.0,
+        39.173236585211555
+      ],
+      "scale": 1.8289056077996997,
+      "variant": 26,
+      "yaw": 3.6045428644559894
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -132.86589909086348,
+        0.0,
+        268.46043414939584
+      ],
+      "scale": 1.9905557623486572,
+      "variant": 30,
+      "yaw": 1.9761627058090379
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -181.21980089747277,
+        0.0,
+        249.54330637494047
+      ],
+      "scale": 1.8087487185762288,
+      "variant": 1,
+      "yaw": 0.09662517703091844
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -306.91353150625656,
+        0.0,
+        275.988960094984
+      ],
+      "scale": 1.9937087211599474,
+      "variant": 32,
+      "yaw": 4.775060459684431
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -264.69519581204406,
+        0.0,
+        276.8843366642426
+      ],
+      "scale": 2.3303663500456917,
+      "variant": 26,
+      "yaw": 3.7515712205676506
+    },
+    {
+      "type": "tree",
+      "pos": [
+        70.2907972991668,
+        0.0,
+        -108.28321753505412
+      ],
+      "scale": 2.2001130412910337,
+      "variant": 1,
+      "yaw": 0.599709087316974
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -202.01329399673895,
+        0.0,
+        375.4008724343007
+      ],
+      "scale": 2.1362546624450784,
+      "variant": 30,
+      "yaw": 2.2487752926725553
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -159.09950726408235,
+        0.0,
+        -6.692016222745849
+      ],
+      "scale": 1.6660611472234559,
+      "variant": 20,
+      "yaw": 5.8384142083996995
+    },
+    {
+      "type": "tree",
+      "pos": [
+        204.49694900579834,
+        0.0,
+        -105.64030336271111
+      ],
+      "scale": 1.9844995149668763,
+      "variant": 8,
+      "yaw": 4.680839529160188
+    },
+    {
+      "type": "tree",
+      "pos": [
+        139.76358759958998,
+        0.0,
+        17.77790774907038
+      ],
+      "scale": 2.0054009103581216,
+      "variant": 27,
+      "yaw": 4.113555274688743
+    },
+    {
+      "type": "tree",
+      "pos": [
+        -274.68447281685366,
+        0.0,
+        -355.1709810615914
+      ],
+      "scale": 1.9839486494893934,
+      "variant": 34,
+      "yaw": 4.618834345485488
+    },
+    {
+      "type": "tree",
+      "pos": [
+        79.36502067372868,
+        0.0,
+        -154.31843082508766
+      ],
+      "scale": 2.162274646184765,
+      "variant": 21,
+      "yaw": 1.5947835894784108
+    }
+  ],
+  "roads": [
+    {
+      "start": [
+        -300.0,
+        0.0,
+        50.0
+      ],
+      "end": [
+        300.0,
+        0.0,
+        50.0
+      ],
+      "width": 10.0,
+      "surface": "dirt"
+    },
+    {
+      "start": [
+        -300.0,
+        0.0,
+        -50.0
+      ],
+      "end": [
+        300.0,
+        0.0,
+        -50.0
+      ],
+      "width": 10.0,
+      "surface": "dirt"
+    },
+    {
+      "start": [
+        -50.0,
+        0.0,
+        -300.0
+      ],
+      "end": [
+        -50.0,
+        0.0,
+        300.0
+      ],
+      "width": 8.0,
+      "surface": "dirt"
+    },
+    {
+      "start": [
+        50.0,
+        0.0,
+        -300.0
+      ],
+      "end": [
+        50.0,
+        0.0,
+        300.0
+      ],
+      "width": 8.0,
+      "surface": "dirt"
+    }
+  ],
+  "world_scale": 1.0,
+  "terrain": {
+    "generator": "v2",
+    "height_scale": 22.0,
+    "pixels_per_unit": 1.0,
+    "features": [
+      {
+        "type": "hill",
+        "center": [
+          -220.0,
+          0.0,
+          0.0
+        ],
+        "radius": 120.0,
+        "falloff": 140.0,
+        "height": 14.0
+      },
+      {
+        "type": "hill",
+        "center": [
+          220.0,
+          0.0,
+          0.0
+        ],
+        "radius": 120.0,
+        "falloff": 140.0,
+        "height": 14.0
+      },
+      {
+        "type": "lake",
+        "center": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "radius": 60.0,
+        "depth": 6.0,
+        "shoreline_falloff": 10.0,
+        "half_extents": [
+          70.0,
+          50.0
+        ]
+      },
+      {
+        "type": "plateau",
+        "center": [
+          0.0,
+          -200.0
+        ],
+        "half_extents": [
+          50.0,
+          30.0
+        ],
+        "height": 8.0,
+        "wall_falloff": 4.0
+      },
+      {
+        "type": "plateau",
+        "center": [
+          0.0,
+          200.0
+        ],
+        "half_extents": [
+          50.0,
+          30.0
+        ],
+        "height": 8.0,
+        "wall_falloff": 4.0
+      }
+    ],
+    "post_pass": {
+      "noise": {
+        "frequency": 0.011,
+        "amplitude": 3.0,
+        "octaves": 3
+      }
+    },
+    "surfacemap": "res://data/maps/the_iron_square_surface.png",
+    "heightmap": "res://data/maps/the_iron_square_height.png"
+  },
+  "hills": [
+    {
+      "center": [
+        -220.0,
+        0.0,
+        0.0
+      ],
+      "radius": 120.0,
+      "falloff": 140.0,
+      "height": 14.0
+    },
+    {
+      "center": [
+        220.0,
+        0.0,
+        0.0
+      ],
+      "radius": 120.0,
+      "falloff": 140.0,
+      "height": 14.0
+    }
+  ],
+  "environment": {
+    "sky_color": [
+      0.18,
+      0.22,
+      0.3
+    ],
+    "horizon_color": [
+      0.4,
+      0.42,
+      0.45
+    ],
+    "sun_color": [
+      1.0,
+      0.95,
+      0.85
+    ],
+    "sun_energy": 1.193,
+    "ambient_light_energy": 0.95,
+    "ambient_light_color": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "tonemap_exposure": 1.02,
+    "sun_elevation_deg": 42.0,
+    "sun_azimuth_deg": 80.0,
+    "fog_enabled": true,
+    "fog_density": 0.0007,
+    "fog_aerial_perspective": 0.6,
+    "volumetric_fog_enabled": false,
+    "volumetric_fog_density": 0.0,
+    "dof_blur_far_enabled": false,
+    "dof_blur_far_distance": 260.0,
+    "fog_sky_affect": 0.3,
+    "fog_height_density": 0.01,
+    "fog_sun_scatter": 0.15
+  }
+}

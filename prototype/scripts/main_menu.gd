@@ -29,11 +29,21 @@ const DesignStatsScript = preload("res://scripts/design_stats.gd")
 # pressed handler routes through it instead of the legacy scene path.
 const TestRangeLauncherScript = preload("res://scripts/test_range_launcher.gd")
 const TwoPhaseTutorialManagerScript = preload("res://scripts/tutorial_two_phase/two_phase_tutorial_manager.gd")
-const UIButtonScript = preload("res://scripts/ui/controls/ui_button.gd")
 
 const TITLE := "KITBASH COMMAND"
 const TAGLINE := "Design bureau and proving ground"
 const SHOWCASE_CYCLE_INTERVAL := 30.0
+
+const FALLBACK_HULL_TYPES := [
+	"brenntal_medium_a",
+	"block_heavy_meridian_a",
+	"wedge_scout_meridian_a",
+	"flying_wing_hull",
+	"super_heavy_hull",
+	"kestrel_scout_a",
+	"tri_hull",
+	"bunker_main_meridian"
+]
 
 # UX_REDESIGN_PLAN.md's target information architecture: three activities plus
 # a system layer, replacing seven equal-weight cards with none of them
@@ -91,9 +101,15 @@ const GROUPS := [
 			},
 			{
 				"title": "HULL AUTHORING",
-				"desc": "Build modular grid-snapped hulls and weld them into combat-ready forms.",
+				"desc": "Shape new hull forms from primitives.",
+				"scene": "res://scenes/HullBuilder.tscn",
+				"badge": "CAD // MESH"
+			},
+			{
+				"title": "BLOCK HULL BUILDER",
+				"desc": "Modular grid-based brick hull suite with strict snapping and CSG weld.",
 				"scene": "res://scenes/ModularHullBuilder.tscn",
-				"badge": "CAD // BLOCKS"
+				"badge": "CAD // BLOCKS (NEW)"
 			},
 			{
 				"title": "TERRAIN SCULPT",
@@ -226,8 +242,7 @@ func _gather_showcase_items() -> void:
 		var path := str(entry.get("path", ""))
 		if path != "":
 			var full_bp: Dictionary = mgr.load_blueprint(path)
-			var hull_id := str(full_bp.get("hull_type", ""))
-			if not full_bp.is_empty() and hull_id != "" and ModuleCatalogScript.hull_exists(hull_id):
+			if not full_bp.is_empty():
 				blueprint_entries.append({
 					"type": "blueprint",
 					"name": entry.get("name", "UNNAMED DESIGN"),
@@ -237,6 +252,14 @@ func _gather_showcase_items() -> void:
 				})
 	blueprint_entries.sort_custom(func(a, b): return a["mtime"] > b["mtime"])
 	_showcase_items.append_array(blueprint_entries)
+
+	# 2. Add Standard Hull Chassis types so there is always a rich variety
+	for hull_id in FALLBACK_HULL_TYPES:
+		_showcase_items.append({
+			"type": "hull",
+			"name": _prettify(hull_id).to_upper() + " CHASSIS",
+			"hull_type": hull_id
+		})
 
 	_current_showcase_index = 0
 
@@ -608,8 +631,8 @@ func _build_3d_showcase_model(item: Dictionary, parent: Node3D) -> void:
 		var mgr = BlueprintManagerScript.new()
 		var vehicle = mgr.reconstruct_vehicle(bp, model_root, true)
 		if vehicle == null:
-			push_warning("MainMenu: showcase skipped blueprint '%s' because it could not be reconstructed" % str(bp.get("name", "UNNAMED DESIGN")))
-			return
+			var hull_id := str(bp.get("hull_type", "brenntal_medium_a"))
+			_build_hull_mesh_node(hull_id, model_root)
 		else:
 			# Kept for the SpecPlacard sync below - the SAME live node
 			# DesignStats.analyze() reads elsewhere (the Lab rail, the battle
@@ -701,7 +724,10 @@ func _build_top_ribbon(parent: Control) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(spacer)
 
-	var records_btn = UIButtonScript.new().configure("RECORDS", "default", "", Vector2(100, 28), "Open the Blueprint Library")
+	var records_btn = Button.new()
+	records_btn.text = "RECORDS"
+	records_btn.custom_minimum_size = Vector2(100, 28)
+	UIFeedbackScript.wire(records_btn)
 	records_btn.pressed.connect(func():
 		var router = get_node_or_null("/root/SceneRouter")
 		if router: router.goto("res://scenes/BlueprintLibrary.tscn")
@@ -709,7 +735,10 @@ func _build_top_ribbon(parent: Control) -> void:
 	)
 	hbox.add_child(records_btn)
 
-	var livery_btn = UIButtonScript.new().configure("LIVERY", "default", "", Vector2(100, 28), "Open paint and finish authoring")
+	var livery_btn = Button.new()
+	livery_btn.text = "LIVERY"
+	livery_btn.custom_minimum_size = Vector2(100, 28)
+	UIFeedbackScript.wire(livery_btn)
 	livery_btn.pressed.connect(func():
 		var router = get_node_or_null("/root/SceneRouter")
 		if router: router.goto("res://scenes/Livery.tscn")
@@ -717,14 +746,21 @@ func _build_top_ribbon(parent: Control) -> void:
 	)
 	hbox.add_child(livery_btn)
 
-	var settings_btn = UIButtonScript.new().configure("SYSTEM", "default", "", Vector2(100, 28), "Open settings and system controls")
+	var settings_btn = Button.new()
+	settings_btn.text = "SYSTEM"
+	settings_btn.custom_minimum_size = Vector2(100, 28)
+	UIFeedbackScript.wire(settings_btn)
 	settings_btn.pressed.connect(func():
 		var system_layer = get_node_or_null("/root/SystemLayer")
 		if system_layer: system_layer.open()
 	)
 	hbox.add_child(settings_btn)
 
-	var quit_btn = UIButtonScript.new().configure("EXIT", "danger", "DangerButton", Vector2(80, 28), "Quit Kitbash Command")
+	var quit_btn = Button.new()
+	quit_btn.text = "EXIT"
+	quit_btn.custom_minimum_size = Vector2(80, 28)
+	quit_btn.theme_type_variation = "DangerButton"
+	UIFeedbackScript.wire(quit_btn)
 	quit_btn.pressed.connect(func(): get_tree().quit())
 	hbox.add_child(quit_btn)
 

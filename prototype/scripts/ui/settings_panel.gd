@@ -20,7 +20,6 @@ const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
 const InputServiceScript = preload("res://scripts/core/input_service.gd")
 const MeshIconScript = preload("res://scripts/ui/mesh_icon.gd")
 const UIShell = preload("res://scripts/ui_shell.gd")
-const UIButtonScript = preload("res://scripts/ui/controls/ui_button.gd")
 
 const TOGGLE_MESH := "res://assets/models/ui/ui_toggle_switch.glb"
 const ROTARY_MESH := "res://assets/models/ui/ui_rotary_selector.glb"
@@ -108,7 +107,9 @@ func _build() -> void:
 	title.theme_type_variation = "HeadingLabel"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
-	var close_btn := UIButtonScript.new().configure("CLOSE", "default", "", Vector2(0, Tokens.HIT_TARGET_MIN), "Return to the System menu")
+	var close_btn := Button.new()
+	close_btn.text = "CLOSE"
+	UIFeedbackScript.wire(close_btn)
 	close_btn.pressed.connect(func(): close_requested.emit())
 	header.add_child(close_btn)
 
@@ -270,8 +271,10 @@ func _build_option(row: Control, key: String, spec: Dictionary) -> void:
 
 
 func _add_reset(parent: Control, section: String) -> void:
-	var btn := UIButtonScript.new().configure("RESET %s" % section.to_upper())
+	var btn := Button.new()
+	btn.text = "RESET %s" % section.to_upper()
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_END
+	UIFeedbackScript.wire(btn)
 	btn.pressed.connect(func():
 		_settings.reset_section(section)
 		_rebuild())
@@ -297,8 +300,10 @@ func _build_controls_tier(parent: Control) -> void:
 		for action in _input_svc.actions_in_group(group):
 			_build_binding_row(parent, action)
 
-		var reset := UIButtonScript.new().configure("RESET %s" % _input_svc.GROUP_LABELS.get(group, group).to_upper())
+		var reset := Button.new()
+		reset.text = "RESET %s" % _input_svc.GROUP_LABELS.get(group, group).to_upper()
 		reset.size_flags_horizontal = Control.SIZE_SHRINK_END
+		UIFeedbackScript.wire(reset)
 		reset.pressed.connect(func():
 			_input_svc.reset_group(group)
 			_rebuild())
@@ -315,7 +320,10 @@ func _build_binding_row(parent: Control, action: String) -> void:
 	label.custom_minimum_size = Vector2(220, 0)
 	row.add_child(label)
 
-	var btn := UIButtonScript.new().configure(_input_svc.binding_label_all(action), "select", "", Vector2(180, Tokens.HIT_TARGET_MIN), "Change this binding")
+	var btn := Button.new()
+	btn.text = _input_svc.binding_label_all(action)
+	btn.custom_minimum_size = Vector2(180, Tokens.HIT_TARGET_MIN)
+	UIFeedbackScript.wire(btn, "select")
 	btn.pressed.connect(func(): _begin_rebind(action, btn))
 	row.add_child(btn)
 

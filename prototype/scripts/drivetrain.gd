@@ -207,15 +207,6 @@ const TWEAK_RESPONSE := {
 	"tracked_treads": [
 		{"keys": ["tread_width", "width", "size"], "ref": 1.0, "thrust": -0.35, "capacity": 1.0},
 	],
-	# Heavy quad tracks are two module nodes whose meshes contain the selected
-	# four or six independent pods. Unlike axle/leg counts, track_count does
-	# not spawn more child nodes, so both pod count and width need an explicit
-	# response here. More contact patch raises carrying capacity; the extra
-	# rotating mass mildly reduces thrust.
-	"heavy_quad_tracks": [
-		{"keys": ["track_count", "pod_count", "count"], "ref": 4.0, "thrust": -0.20, "capacity": 1.0},
-		{"keys": ["tread_width", "width", "size"], "ref": 1.0, "thrust": -0.35, "capacity": 1.0},
-	],
 	# Capacity already grows linearly with leg count (more load-bearing
 	# contact points), so capacity says nothing here. Thrust is where the
 	# tradeoff Chris asked for lives: each added leg is more mechanical mass
@@ -395,8 +386,9 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	var armor_wt_mult: float = 1.0
 	var weight: float = ModuleCatalog.compute_hull_weight(hull_type, thickness, material, hull_scale, armor_wt_mult)
 	# Painted armor is real bolt-on mass too (ArmorPaint: painted area x
-	# thickness x per-material density), and counts as carried load. Only the
-	# bare structural hull and its locomotion are the free drivetrain baseline.
+	# thickness x per-material density). It counts as CARRIED weight - the
+	# locomotor hauls every plate - which is what makes a max-thickness
+	# turtle trade speed for protection instead of getting free threshold.
 	# It was weightless until 2026-08-25 ("cosmetic likenesses"), which made
 	# 3.0x everywhere the free optimum.
 	var armor_weight := 0.0
@@ -406,9 +398,9 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	# The hull's own armor plate. compute_hull_weight() scales structural
 	# mass by volume and ignores the material/thickness sliders, so a hull
 	# set to ablative 3.0 used to weigh exactly what hardened 1.0 did. The
-	# declared plating now charges the same per-m2 rate as a painted facet over
-	# the hull's whole exterior and counts as carried load. The bare hull is
-	# free; armor added to it is not.
+	# declared plating now charges the same per-m2 rate as a painted facet,
+	# over the hull's whole exterior - and counts as CARRIED weight, so a
+	# big hull with thicker armor is genuinely more encumbered.
 	var hull_armor_weight := 0.0
 	if is_instance_valid(hull_node):
 		var plate_area: float = ArmorPaint.hull_total_area(hull_type, hull_scale)
@@ -425,8 +417,8 @@ static func analyze(hull_node: Node3D, locomotion_type: String = "", locomotion_
 	# locomotion) while `weight` still reports the full design mass to the
 	# rest of the game.
 	#   `loco_weight`     - one or more locomotion children, summed
-	#   `carried_weight`  - armor, weapons, generators, sensors, harvesters and
-	#                       propulsion; bare hull structure and locomotion excluded
+	#   `carried_weight`  - painted armor + the hull's own armor plate,
+	#                       weapons/generators/sensors/harvesters/propulsion
 	var loco_weight: float = 0.0
 	var carried_weight: float = armor_weight + hull_armor_weight
 

@@ -67,6 +67,36 @@ const LOG_PATH := "res://scratch/author_default_designs.log"
 # The player's starting Blueprint Library. `dir` LIBRARY_DIR.
 const LIBRARY := [
 	{
+		"id": "bp_default_gravelgulper_no_7", "file": "bp_default_gravelgulper_no_7",
+		"name": "GravelGulper No. 7", "role": "resource gathering",
+		# Tallow & Vance build trucks; a Container Carrier is what a hauler is.
+		"hull": "tallow_transport_a", "loco": "wheels",
+		# num_axles is TOTAL wheel stations, not axle pairs (SIDE_PAIRS), and 8 is
+		# the Lab slider's maximum - right for an 8.9m hauler.
+		"loco_settings": {"wheel_size": 1.1, "num_axles": 8, "wheels_per_axle": 2},
+		"armor": "hardened_steel", "thickness": 0.8, "faction": "industrialists",
+		"mounts": [
+			# Exactly one extractor: unit.gd sets is_harvester from this type_id.
+			{"type": "resource_harvester", "x": 0.0, "z": 0.8},
+			{"type": "resource_bay", "x": -1.0, "z": 2.9},
+			{"type": "resource_bay", "x": 1.0, "z": 2.9},
+			{"type": "sensor_suite", "x": 0.0, "z": -1.6},
+			{"type": "heavy_machine_gun", "x": 0.9, "z": -3.0},
+		],
+	},
+	{
+		"id": "bp_default_patchwagon_mk_iv", "file": "bp_default_patchwagon_mk_iv",
+		"name": "PatchWagon Mk IV", "role": "field repair",
+		"hull": "tallow_medium_a", "loco": "wheels",
+		"loco_settings": {"wheel_size": 1.0, "num_axles": 4, "wheels_per_axle": 2},
+		"armor": "hardened_steel", "thickness": 1.0, "faction": "industrialists",
+		"mounts": [
+			{"type": "repair_array", "x": 0.0, "z": 0.6},
+			{"type": "smoke_discharger", "x": -1.0, "z": -1.8},
+			{"type": "smoke_discharger", "x": 1.0, "z": -1.8},
+		],
+	},
+	{
 		"id": "bp_default_boghammer_m60", "file": "bp_default_boghammer_m60",
 		"name": "BogHammer M60", "role": "main battle tank",
 		# was block_heavy_meridian_a (retired). Brenntal Schwerbau's Breakthrough
@@ -154,6 +184,21 @@ const LIBRARY := [
 			{"type": "smoke_discharger", "x": 1.1, "z": 3.2},
 		],
 	},
+	{
+		"id": "bp_default_marshsled_m86", "file": "bp_default_marshsled_m86",
+		"name": "MarshSled M86", "role": "hover missile sled",
+		# was kestrel_scout_a. A hover sled carrying a cruise missile wants a
+		# flat load deck, not a recon fuselage - Tallow's Flatbed is exactly that.
+		"hull": "tallow_medium_b", "loco": "hover_engine",
+		"loco_settings": {"emv_level": 1.7},
+		"armor": "hardened_steel", "thickness": 0.8, "faction": "technocrats",
+		"mounts": [
+			{"type": "cruise_missile", "x": 0.0, "z": 0.6},
+			{"type": "missile_pod", "x": -1.1, "z": -1.6},
+			{"type": "missile_pod", "x": 1.1, "z": -1.6},
+			{"type": "heavy_machine_gun", "x": 0.0, "z": -2.6},
+		],
+	},
 ]
 
 # The bundled battle roster. `dir` LOADOUT_DIR.
@@ -219,6 +264,17 @@ const LOADOUT := [
 		"mounts": [
 			{"type": "heavy_laser", "x": 0.0, "z": -0.8},
 			{"type": "sensor_suite", "x": 0.0, "z": 1.6},
+		],
+	},
+	{
+		"id": "default_wasp_rocket_buggy", "file": "wasp_rocket_buggy",
+		"name": "Wasp Rocket Buggy", "role": "rocket skirmisher",
+		"hull": "tallow_light_a", "loco": "wheels",
+		"loco_settings": {"wheel_size": 1.0, "num_axles": 4, "wheels_per_axle": 1},
+		"armor": "hardened_steel", "thickness": 0.6, "faction": "technocrats",
+		"mounts": [
+			{"type": "missile_pod", "x": 0.0, "z": 0.5},
+			{"type": "sensor_suite", "x": 0.0, "z": -1.4},
 		],
 	},
 	{

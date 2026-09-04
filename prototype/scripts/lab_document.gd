@@ -1409,11 +1409,11 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 	var has_loco = bool(dt.get("has_locomotion", false))
 	var is_over = bool(dt.get("is_overloaded", false))
 	if not is_over and has_loco and cap > 0.0:
-		if carried > cap or (carried / cap) >= 1.0:
+		if carried > cap or wt > cap or (carried / cap) >= 1.0:
 			is_over = true
 
 	if combat_weight_label:
-		combat_weight_label.text = "Payload: %.1f / %.1f kg | Total: %.1f kg" % [carried, cap, wt]
+		combat_weight_label.text = "Mass: %.1f / %.1f kg" % [wt, cap]
 		combat_weight_label.add_theme_color_override("font_color", Tokens.SIGNAL_ALERT if is_over else Tokens.TEXT_PRIMARY)
 
 	var is_harv: bool = bool(stats.get("is_harvester", false))

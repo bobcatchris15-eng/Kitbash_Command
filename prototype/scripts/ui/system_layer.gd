@@ -23,7 +23,6 @@ const Tokens = preload("res://scripts/ui_tokens.gd")
 const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
 const SettingsPanelScript = preload("res://scripts/ui/settings_panel.gd")
 const MatchRuleSetScript = preload("res://scripts/match_rule_set.gd")
-const UIButtonScript = preload("res://scripts/ui/controls/ui_button.gd")
 
 const LAYER_INDEX := 120
 
@@ -95,7 +94,6 @@ func open() -> void:
 	_menu_host.visible = true
 	_rebuild_menu()
 	_set_visible(true)
-	_focus_first_entry.call_deferred()
 	UIFeedbackScript.play(_root, "ui_menu_open")
 	# Only pause if something else has not already. Stomping an existing pause
 	# means close() would unpause a tree that was deliberately frozen - the
@@ -217,17 +215,14 @@ func _rebuild_menu() -> void:
 
 
 func _add_entry(label: String, action: Callable, role: String = "default") -> void:
-	var variation := "DangerButton" if role == "danger" else "ListButton"
-	var btn := UIButtonScript.new().configure(label, role, variation, Vector2(0, 40))
+	var btn := Button.new()
+	btn.text = label
+	btn.custom_minimum_size = Vector2(0, 40)
+	if role == "danger":
+		btn.theme_type_variation = "DangerButton"
+	UIFeedbackScript.wire(btn, role)
 	btn.pressed.connect(action)
 	_menu_box.add_child(btn)
-
-
-func _focus_first_entry() -> void:
-	for child in _menu_box.get_children():
-		if child is BaseButton and not child.disabled and child.visible:
-			child.grab_focus()
-			return
 
 
 # Duck-typed the same way handle_cancel() is: a match is any scene that declares

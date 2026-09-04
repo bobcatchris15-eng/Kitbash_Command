@@ -38,7 +38,7 @@ func _initialize() -> void:
 	var rs = rule_script.skirmish(_map, load("res://scripts/livery.gd").PLAYER_ID, "", [
 		"res://data/loadout/bulwark_mbt.json",
 		"res://data/loadout/rattler_scout.json",
-		"res://data/loadout/dart_skirmisher.json",
+		"res://data/loadout/wasp_rocket_buggy.json",
 		"res://data/loadout/vulture_harvester.json",
 		"res://data/loadout/raptor_striker.json",
 	])

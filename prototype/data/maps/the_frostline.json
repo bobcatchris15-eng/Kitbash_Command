@@ -1,0 +1,632 @@
+{
+  "schema_version": 1.0,
+  "name": "The Frostline",
+  "description": "A flat ice plain. A frozen river runs the length of the map, slightly recessed and slightly slipperier than the surrounding ice. Scattered boulders and spires are the only cover. The cleanest map in the set: long sight lines, fast movement, and nowhere to hide. Bring artillery.",
+  "map_half_extents": 400.0,
+  "ground_color": [
+    0.78,
+    0.84,
+    0.88
+  ],
+  "spawns": [
+    {
+      "id": "player",
+      "hq": [
+        -320.0,
+        0.0,
+        -280.0
+      ],
+      "factory": [
+        -335.0,
+        0.0,
+        -280.0
+      ],
+      "refinery": [
+        -305.0,
+        0.0,
+        -280.0
+      ],
+      "harvester": [
+        -320.0,
+        0.0,
+        -265.0
+      ]
+    },
+    {
+      "id": "enemy",
+      "hq": [
+        320.0,
+        0.0,
+        280.0
+      ],
+      "factory": [
+        305.0,
+        0.0,
+        280.0
+      ],
+      "refinery": [
+        335.0,
+        0.0,
+        280.0
+      ],
+      "harvester": [
+        320.0,
+        0.0,
+        295.0
+      ]
+    }
+  ],
+  "base_zones": [
+    {
+      "id": "player",
+      "center": [
+        -320.0,
+        0.0,
+        -280.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ]
+    },
+    {
+      "id": "enemy",
+      "center": [
+        320.0,
+        0.0,
+        280.0
+      ],
+      "half_extents": [
+        25.0,
+        25.0
+      ]
+    }
+  ],
+  "resource_nodes": [
+    {
+      "type": "metal",
+      "position": [
+        -200.0,
+        0.0,
+        -150.0
+      ],
+      "amount": 1200
+    },
+    {
+      "type": "metal",
+      "position": [
+        200.0,
+        0.0,
+        150.0
+      ],
+      "amount": 1200
+    },
+    {
+      "type": "crystal",
+      "position": [
+        100.0,
+        0.0,
+        -200.0
+      ],
+      "amount": 1100
+    },
+    {
+      "type": "crystal",
+      "position": [
+        -100.0,
+        0.0,
+        200.0
+      ],
+      "amount": 1100
+    },
+    {
+      "type": "oil",
+      "position": [
+        -150.0,
+        0.0,
+        100.0
+      ],
+      "amount": 800
+    },
+    {
+      "type": "oil",
+      "position": [
+        150.0,
+        0.0,
+        -100.0
+      ],
+      "amount": 800
+    },
+    {
+      "type": "lumber",
+      "position": [
+        -300.0,
+        0.0,
+        200.0
+      ],
+      "amount": 600
+    },
+    {
+      "type": "lumber",
+      "position": [
+        300.0,
+        0.0,
+        -200.0
+      ],
+      "amount": 600
+    },
+    {
+      "type": "crystal",
+      "position": [
+        -360.86345015792506,
+        0.0,
+        -251.18351837911902
+      ],
+      "amount": 1100
+    },
+    {
+      "type": "crystal",
+      "position": [
+        286.5012321010798,
+        0.0,
+        224.36418112656133
+      ],
+      "amount": 1100
+    }
+  ],
+  "water_areas": [],
+  "water_blobs": [],
+  "shallow_water_areas": [
+    {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        50.0,
+        380.0
+      ]
+    }
+  ],
+  "cliffs": [],
+  "surface_zones": [
+    {
+      "center": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "half_extents": [
+        380.0,
+        380.0
+      ],
+      "surface_type": "ice"
+    }
+  ],
+  "obstacles": [],
+  "bridges": [],
+  "props": [
+    {
+      "type": "boulder",
+      "pos": [
+        -162.4059181522001,
+        0.0,
+        -120.53058934630144
+      ],
+      "scale": 2.0058480463640063,
+      "variant": 2,
+      "yaw": 3.3487381374209972
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -146.94027814991136,
+        0.0,
+        -86.858534733612
+      ],
+      "scale": 2.4923973324894075,
+      "variant": 21,
+      "yaw": 0.8252877250340241
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -169.94742966236723,
+        0.0,
+        -121.68509148310014
+      ],
+      "scale": 3.2654023743269027,
+      "variant": 19,
+      "yaw": 6.0735587066267644
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -125.29018767219128,
+        0.0,
+        -108.0363426340655
+      ],
+      "scale": 2.1324037830428537,
+      "variant": 28,
+      "yaw": 3.4809730122004505
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        78.08704807029432,
+        0.0,
+        126.34880797807556
+      ],
+      "scale": 2.9238657399434476,
+      "variant": 31,
+      "yaw": 4.882406472543194
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        122.07949334970766,
+        0.0,
+        136.95874910090137
+      ],
+      "scale": 2.127012190938018,
+      "variant": 11,
+      "yaw": 2.308339781688851
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        124.41219277828876,
+        0.0,
+        150.94719507831095
+      ],
+      "scale": 2.191764984096597,
+      "variant": 7,
+      "yaw": 5.340306286233064
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        100.87740196128736,
+        0.0,
+        154.71496487517717
+      ],
+      "scale": 2.047742839678947,
+      "variant": 9,
+      "yaw": 2.9175897091542136
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        193.2914041762084,
+        0.0,
+        -169.44555257250713
+      ],
+      "scale": 2.84673267963243,
+      "variant": 27,
+      "yaw": 0.6226480032685267
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        180.62659817665215,
+        0.0,
+        -129.21443308484464
+      ],
+      "scale": 2.1528821180780766,
+      "variant": 27,
+      "yaw": 2.963842413225467
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        183.6958090303252,
+        0.0,
+        -155.08122905391684
+      ],
+      "scale": 3.223831314014651,
+      "variant": 9,
+      "yaw": 3.0199882941897975
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        203.49637317132834,
+        0.0,
+        -130.00736098667034
+      ],
+      "scale": 2.5832376965018833,
+      "variant": 34,
+      "yaw": 2.4386130293276684
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -224.6115190359169,
+        0.0,
+        157.15965984970143
+      ],
+      "scale": 2.6181730097830767,
+      "variant": 8,
+      "yaw": 4.780178377369257
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -216.37773353920304,
+        0.0,
+        187.0938800146909
+      ],
+      "scale": 3.2051845353363677,
+      "variant": 13,
+      "yaw": 2.190424673684779
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -231.22853794275878,
+        0.0,
+        170.52974998960354
+      ],
+      "scale": 3.28061966311558,
+      "variant": 28,
+      "yaw": 4.425648940827535
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -212.32748658211992,
+        0.0,
+        195.99176556839717
+      ],
+      "scale": 3.321549493128142,
+      "variant": 11,
+      "yaw": 0.6609492085182731
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -44.603186048757806,
+        0.0,
+        311.826076094403
+      ],
+      "scale": 2.05012738705692,
+      "variant": 32,
+      "yaw": 4.451693330023469
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -47.118662000031435,
+        0.0,
+        304.4581832085
+      ],
+      "scale": 2.41551189621598,
+      "variant": 15,
+      "yaw": 0.07489366183926267
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -65.57845334585419,
+        0.0,
+        310.1478539412313
+      ],
+      "scale": 2.3731142317665697,
+      "variant": 5,
+      "yaw": 0.2386670972996547
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        -69.98905855614554,
+        0.0,
+        290.03625561819376
+      ],
+      "scale": 3.0889926614428873,
+      "variant": 31,
+      "yaw": 0.5387177632357725
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        237.41242200932393,
+        0.0,
+        63.42970859649717
+      ],
+      "scale": 2.850053679385681,
+      "variant": 26,
+      "yaw": 5.26224736378612
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        225.27962179073538,
+        0.0,
+        38.51121031681821
+      ],
+      "scale": 2.628925113389894,
+      "variant": 15,
+      "yaw": 5.000695943989751
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        273.96836125344043,
+        0.0,
+        31.555956773368443
+      ],
+      "scale": 3.0158254180426196,
+      "variant": 8,
+      "yaw": 6.143316646971813
+    },
+    {
+      "type": "boulder",
+      "pos": [
+        232.96413372724635,
+        0.0,
+        69.68605788955098
+      ],
+      "scale": 2.532443686311015,
+      "variant": 14,
+      "yaw": 3.6922901373746795
+    },
+    {
+      "type": "spire",
+      "pos": [
+        -200.0,
+        0.0,
+        0.0
+      ],
+      "scale": 4.0,
+      "variant": 3,
+      "yaw": 1.4118576434270718
+    },
+    {
+      "type": "spire",
+      "pos": [
+        150.0,
+        0.0,
+        0.0
+      ],
+      "scale": 4.0,
+      "variant": 3,
+      "yaw": 4.160617983631444
+    },
+    {
+      "type": "spire",
+      "pos": [
+        0.0,
+        0.0,
+        200.0
+      ],
+      "scale": 4.0,
+      "variant": 1,
+      "yaw": 0.7973717185359374
+    },
+    {
+      "type": "spire",
+      "pos": [
+        0.0,
+        0.0,
+        -200.0
+      ],
+      "scale": 4.0,
+      "variant": 3,
+      "yaw": 4.536227094925707
+    }
+  ],
+  "roads": [],
+  "world_scale": 1.0,
+  "terrain": {
+    "generator": "v2",
+    "height_scale": 24.0,
+    "pixels_per_unit": 1.0,
+    "features": [
+      {
+        "type": "ridge",
+        "points": [
+          [
+            -330.0,
+            -380.0
+          ],
+          [
+            -330.0,
+            380.0
+          ]
+        ],
+        "width": 70.0,
+        "height": 18.0,
+        "falloff": 45.0
+      },
+      {
+        "type": "ridge",
+        "points": [
+          [
+            330.0,
+            -380.0
+          ],
+          [
+            330.0,
+            380.0
+          ]
+        ],
+        "width": 70.0,
+        "height": 18.0,
+        "falloff": 45.0
+      },
+      {
+        "type": "plateau",
+        "center": [
+          -180.0,
+          180.0
+        ],
+        "half_extents": [
+          45.0,
+          35.0
+        ],
+        "height": 10.0,
+        "wall_falloff": 4.0
+      },
+      {
+        "type": "plateau",
+        "center": [
+          180.0,
+          -180.0
+        ],
+        "half_extents": [
+          45.0,
+          35.0
+        ],
+        "height": 10.0,
+        "wall_falloff": 4.0
+      }
+    ],
+    "post_pass": {
+      "noise": {
+        "frequency": 0.011,
+        "amplitude": 3.0,
+        "octaves": 3
+      }
+    },
+    "surfacemap": "res://data/maps/the_frostline_surface.png",
+    "heightmap": "res://data/maps/the_frostline_height.png"
+  },
+  "environment": {
+    "sky_color": [
+      0.55,
+      0.65,
+      0.78
+    ],
+    "horizon_color": [
+      0.78,
+      0.82,
+      0.88
+    ],
+    "sun_color": [
+      1.0,
+      0.98,
+      0.92
+    ],
+    "sun_energy": 1.0,
+    "ambient_light_energy": 1.1,
+    "ambient_light_color": [
+      0.65,
+      0.7,
+      0.78
+    ],
+    "tonemap_exposure": 0.952,
+    "sun_elevation_deg": 25.0,
+    "sun_azimuth_deg": 200.0,
+    "fog_enabled": true,
+    "fog_density": 0.0007,
+    "fog_aerial_perspective": 0.6,
+    "volumetric_fog_enabled": false,
+    "volumetric_fog_density": 0.0,
+    "dof_blur_far_enabled": false,
+    "dof_blur_far_distance": 260.0,
+    "fog_sky_affect": 0.3,
+    "fog_height_density": 0.01,
+    "fog_sun_scatter": 0.15
+  }
+}

@@ -2104,6 +2104,8 @@ class SquadronHeroView extends PanelContainer:
 		title.text = "SQUADRON FORMATION"
 		title.theme_type_variation = "HeadingLabel"
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# Let the heading wrap before its minimum width pushes Launch offscreen.
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		header.add_child(title)
 
 		var livery_tag := Label.new()

@@ -45,6 +45,13 @@ func record(subject: Node, state: String) -> void:
 		"viewport": [root.size.x, root.size.y], "capture": "unavailable-headless",
 		"offscreen": Audit.find_offscreen_controls(subject, Rect2(Vector2.ZERO, Vector2(root.size)), []),
 		"overflow": Audit.find_overflowing_panels(subject, [])}
+	if subject.name == "MatchSetup" and subject._stage == 2:
+		var page: Control = subject._stage_pages[2]
+		var content := page.get_child(0) as Control
+		row.launch_geometry = {"page": page.get_global_rect(),
+			"content": content.get_global_rect(), "content_min": content.get_combined_minimum_size(),
+			"rules_min": (content.get_child(0) as Control).get_combined_minimum_size(),
+			"hero": subject._hero_view.get_global_rect(), "hero_min": subject._hero_view.get_combined_minimum_size()}
 	# Persist the attempted row BEFORE drawing, so a native renderer crash leaves evidence.
 	if DisplayServer.get_name() != "headless":
 		row.capture = "pending"
@@ -191,6 +198,11 @@ func setup_matrix() -> void:
 			setup._goto_stage(stage, false)
 			await settle()
 			fits(setup._stage_pages[stage], "setup stage %d" % stage)
+			if stage == 2:
+				var page := setup._stage_pages[stage] as ScrollContainer
+				var content := page.get_child(0) as Control
+				check(content.size.x <= page.size.x + 1.0, "launch content fits its scroll viewport without horizontal clipping")
+				fits(setup._hero_view, "launch squadron preview")
 			fits(setup._nav_bar, "setup navigation")
 			for chip in setup._spine_chips: fits(chip, "stage chip")
 			await record(setup, ["default", "empty", "launch"][stage] + ("-narrow" if dimensions != SIZES[0] else ""))

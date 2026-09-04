@@ -51,12 +51,14 @@
 | **TASK-0039** | Upgrade 3D squadron staging apron to industrial tarmac and replace text dump with structured Echelon Manifest Table | `prototype/scripts/match_setup.gd` | **PASS** | `flash` | 1 | TASK-0038 |
 | **TASK-0040** | Implement War Room Ops-Table console mode toggle and view synchronization uniting Theatre Recon, 3D Staging Turntable, Roster Tray, and Directives into a single-screen command console | `prototype/scripts/match_setup.gd`, `prototype/scenes/MatchSetup.tscn` | **PASS** | `flash` | 1 | TASK-0039 |
 | **TASK-0041** | Add visible scroll bar underneath roster picker library strips and pulsating hazard-yellow aura outline/highlight to selected modules in Design Lab | `prototype/scripts/roster_picker.gd`, `prototype/scripts/module_volume.gd`, `prototype/scripts/module_placer.gd` | **PASS** | `flash` | 1 | TASK-0040 |
+| **TASK-0042** | Implement tactical force-fire ground targeting across direct and indirect weapons via Ctrl+RMB, G key toggle, and HUD Command Card button | `prototype/scripts/battle/match_director.gd`, `prototype/scripts/battle/units/unit.gd`, `prototype/scripts/hud/hud_command_card.gd`, `prototype/scripts/auto_weapon.gd`, `prototype/scripts/module_catalog.gd` | **PASS** | `flash` | 1 | TASK-0041 |
+| **TASK-0043** | Highlight entire clipping modules red with _clipping_material() in Design Lab and eliminate weird offset CSG boolean intersection clone meshes | `prototype/scripts/module_placer.gd` | **PASS** | `flash` | 1 | TASK-0042 |
 
 ## Fleet Budget
 
-- Total Clanker Attempts: 44
-- Tier Distribution: `flash_lite: 43`, `flash: 1`
-- Budget Ceiling: 3× task count (44 tasks × 3 = 132 attempts max) — **WELL UNDER CEILING** (44/132)
+- Total Clanker Attempts: 46
+- Tier Distribution: `flash_lite: 43`, `flash: 3`
+- Budget Ceiling: 3× task count (46 tasks × 3 = 138 attempts max) — **WELL UNDER CEILING** (46/138)
 
 ## Structural Delta Log
 

@@ -507,18 +507,44 @@
         "prototype/scripts/module_volume.gd",
         "prototype/scripts/module_placer.gd"
       ]
+    },
+    {
+      "task_id": "TASK-0042",
+      "status": "PASS",
+      "system_intent": "Implement tactical force-fire ground targeting across direct and indirect weapons via Ctrl+RMB, G key toggle, and HUD Command Card button",
+      "depends_on": ["TASK-0041"],
+      "model_tier": "flash",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/battle/match_director.gd",
+        "prototype/scripts/battle/units/unit.gd",
+        "prototype/scripts/hud/hud_command_card.gd",
+        "prototype/scripts/auto_weapon.gd",
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0043",
+      "status": "PASS",
+      "system_intent": "Highlight entire clipping modules red with _clipping_material() in Design Lab and eliminate weird offset CSG boolean intersection clone meshes",
+      "depends_on": ["TASK-0042"],
+      "model_tier": "flash",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/module_placer.gd"
+      ]
     }
   ],
   "budget": {
-    "total_clanker_attempts": 44,
+    "total_clanker_attempts": 46,
     "tier_distribution": {
       "flash_lite": 43,
-      "flash": 1,
+      "flash": 3,
       "inherit": 0,
       "pro": 0
     },
-    "ceiling": 132,
-    "ceiling_note": "3x task count (44 tasks x 3 = 132) — WELL UNDER CEILING (44/132)"
+    "ceiling": 138,
+    "ceiling_note": "3x task count (46 tasks x 3 = 138) — WELL UNDER CEILING (46/138)"
   },
   "structural_delta_log": [
     {

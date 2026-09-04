@@ -1431,30 +1431,33 @@ func _apply_movement(delta: float, boost_mult: float = 1.0) -> void:
 	var is_auto_engaging := current_order == null and combat_tgt != null and stance != StanceScript.Kind.HOLD_POSITION
 
 	if is_attack_ground_order:
-		var indirect_weapons := []
-		for c in hull_node.get_children():
-			if c.has_meta("module_data"):
-				var d = c.get_meta("module_data")
-				if ModuleCatalog.is_indirect_fire(d.type_id):
-					indirect_weapons.append(c)
+		var weapons := []
+		if hull_node != null and is_instance_valid(hull_node):
+			for c in hull_node.get_children():
+				if c.has_meta("module_data"):
+					var d = c.get_meta("module_data")
+					if ModuleCatalog.is_weapon(d.type_id):
+						weapons.append(c)
 		
 		var max_range := 0.0
-		for w in indirect_weapons:
+		for w in weapons:
 			if "fire_range" in w and float(w.fire_range) > 0.0:
 				max_range = maxf(max_range, float(w.fire_range))
 			else:
 				var d = w.get_meta("module_data")
 				var r: float = ModuleCatalog.get_base_range(d.type_id)
 				max_range = maxf(max_range, r if r > 0.0 else 30.0)
-		if max_range <= 0.0: max_range = 30.0
+		if max_range <= 0.0:
+			max_range = 30.0
 		
-		var dist := global_position.distance_to(current_order.position)
+		var unit_pos := global_position if is_inside_tree() else position
+		var dist := unit_pos.distance_to(current_order.position)
 		if dist > max_range:
 			destination = current_order.position
 		else:
 			velocity.x = 0.0
 			velocity.z = 0.0
-			var to_target := current_order.position - global_position
+			var to_target := current_order.position - unit_pos
 			to_target.y = 0.0
 			if to_target.length_squared() > 0.01:
 				var current_yaw := rotation.y
@@ -1477,6 +1480,8 @@ func _apply_movement(delta: float, boost_mult: float = 1.0) -> void:
 					rotation.y = SteeringScript.turn_toward(current_yaw, target_yaw, TURN_RATE * delta)
 			return
 		destination = _internal_destination
+	elif is_attack_ground_order:
+		destination = current_order.position
 	elif current_order != null and current_order.has_destination():
 		# ATTACK-MOVE stops for a fight. The order resumes on its own once nothing
 		# hostile is in reach, because this is re-evaluated every tick rather than
@@ -2988,23 +2993,38 @@ func set_range_overlay_visible(value: bool) -> void:
 			_visible_overlay.visible = false
 
 func _maintain_attack_ground_target(pos: Vector3) -> void:
+	if hull_node == null or not is_instance_valid(hull_node):
+		return
+	var marker: Node3D = null
 	for child in hull_node.get_children():
-		if child.has_meta("module_data"):
-			var d = child.get_meta("module_data")
-			if ModuleCatalog.is_indirect_fire(d.type_id):
-				if child.has_method("set_forced_target"):
-					var has_forced = child.has_method("_has_forced_target") and child._has_forced_target()
-					if not has_forced:
-						var marker = Node3D.new()
-						marker.name = "GroundTargetPoint"
-						var p: Node = get_tree().current_scene if get_tree() != null else (get_parent() if get_parent() != null else self)
-						if p:
-							p.add_child(marker)
-							marker.global_position = pos
-							child.set_forced_target(marker)
-							var t = get_tree()
+		if child.has_method("set_forced_target"):
+			var has_forced: bool = child.has_method("_has_forced_target") and child._has_forced_target()
+			if not has_forced:
+				if marker == null:
+					marker = Node3D.new()
+					marker.name = "GroundTargetPoint"
+					var p: Node = null
+					if is_inside_tree():
+						var t := get_tree()
+						if t != null and t.current_scene != null:
+							p = t.current_scene
+						else:
+							p = get_parent() if get_parent() != null else self
+					else:
+						p = get_parent() if get_parent() != null else self
+					if p != null:
+						p.add_child(marker)
+						var target_point := pos + Vector3(0, 0.25, 0)
+						if marker.is_inside_tree():
+							marker.global_position = target_point
+						else:
+							marker.position = target_point
+						if is_inside_tree():
+							var t := get_tree()
 							if t != null:
-								t.create_timer(4.0).timeout.connect(func(): if is_instance_valid(marker): marker.queue_free())
+								t.create_timer(8.0).timeout.connect(func(): if is_instance_valid(marker): marker.queue_free())
+				if marker != null:
+					child.set_forced_target(marker)
 
 func deploy_smoke(target_pos = null) -> void:
 	for child in hull_node.get_children():

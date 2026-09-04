@@ -64,3 +64,22 @@
 > Previously, the horizontal unit cards in the roster picker library strips relied on implicit scroll gestures, which felt frustratingly invisible when trying to survey a large lineup of armored designs. Forcing `scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS`, expanding the minimum container height by 24px, and applying dedicated `Tokens.BASE_900`/`Tokens.BASE_600` track and `Tokens.SIGNAL_HAZARD` grabber styling gives players an unmistakable, military-grade scroll channel underneath the unit trays.
 > 
 > In the Design Lab, selecting a module previously felt ambiguous in complex clusters. By introducing `_build_selected_highlight()`, selected components now immediately pop with a pulsating hazard-yellow gradient aura (`UITokens.SIGNAL_HAZARD`), complete with tactical bounding cage wires and corner brackets. Crucially, registering `SelectedHighlight` in `OVERLAY_PREFIXES` in `module_volume.gd` and filtering it out in `module_placer._find_meshes_recursive()` ensures this vibrant 3D selection aura never pollutes physics raycasts, volume bounding envelopes, or clipping checks. Clean visuals, zero mechanical interference. Clankers gonna clank."
+
+---
+
+### [2026-09-03 21:00] - Tactical Combat & Force-Fire Clanker (TASK-0042 Unit)
+> "The Orchestrator and UI Critic both celebrated the ferocious physical brutality of this engine, but until now, combat agency was hamstrung by an old RTS design sin: weapon pacifism when denied a tidy enemy click-target.
+> 
+> Locking force-fire behind indirect artillery barrage alone completely misunderstood what makes armored combat visceral. A real commander doesn't ask an auto-targeting script for permission to hose a tree line with 30mm rotary fire, blind-slug a suspicious smoke plume with a 120mm kinetic round, or walk heavy railgun tracers across a narrow ravine choke before the scouts even make contact. Force-fire isn't a special ability—it is foundational tactical doctrine.
+> 
+> The obstacle occlusion fix in `auto_weapon._is_los_blocked_to()` solved a classic raycast paradox: when told to shoot the dirt, a direct-fire gun would cast a ray at the ground, hit layer 1 terrain 20cm away from the target point, and declare line-of-sight blocked by the world itself. By exempting ground contact within 1.5m of the designated aim point on forced targets, direct-fire kinetic batteries and particle beams now chew into terrain right alongside arcing howitzers. Pairing that with zero-friction input channels—Ctrl+RMB, quick 'G' arming with cursor feedback, and an explicit Command Card order button—gives battlefield commanders instant, authoritative muzzle control. Clankers gonna clank."
+
+---
+
+### [2026-09-03 21:05] - Design Lab Clipping & Material Override Clanker (TASK-0043 Unit)
+> "CSG in Godot 4 is a brilliant hammer for level greyboxing, but attempting to use runtime `CSGCombiner3D` Boolean intersections to display mesh clipping on kitbash vehicles was an over-engineered geometric horror show.
+> 
+> The idea sounded clever on paper: 'Don't just flag the colliding parts—carve out the exact mathematical intersection volume and render that slice glowing red.' In reality? Throwing complex, non-manifold vehicle meshes with non-uniform transforms into runtime CSG tree evaluations produced surreal, detached red phantom hulls hovering 30 centimeters above the chassis. Players weren't seeing an overlap volume; they were seeing broken duplicate geometry floating in the void and wondering if the vehicle had sprouted a mutated exoskeleton.
+> 
+> Designers don't need a finicky, CPU-choking micro-voxel intersection slice when kitbashing armor plate and autocannons. They need immediate, unmistakable visual feedback: *this module is in an illegal position.* Swapping the module's entire `MeshInstance3D` hierarchy to an incandescent `_clipping_material()` red aura and cleanly restoring the cached `base_material` the instant clearance is achieved is robust, instantaneous, and readable from orbit. No floating ghost artifacts, no tree-bloating CSG nodes, and no corrupted shared materials. Keep the geometry clean, keep the warnings bold. Clankers gonna clank."
+

@@ -319,6 +319,12 @@ const INDIRECT_FIRE_TYPES = [
 static func is_indirect_fire(type_id: String) -> bool:
 	return type_id in INDIRECT_FIRE_TYPES
 
+static func is_weapon(type_id: String) -> bool:
+	var cat := get_catalog()
+	if cat.has(type_id):
+		return cat[type_id].get("category", "") == "weapon"
+	return false
+
 static func _build_catalog_literal() -> Dictionary:
 	var catalog = {
 		# --- BALLISTIC & KINETIC ---

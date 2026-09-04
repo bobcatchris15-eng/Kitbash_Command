@@ -2908,13 +2908,8 @@ func check_all_clipping():
 		return
 		
 	var clipping_root = hull.get_node_or_null("ClippingVolumes")
-	if not clipping_root:
-		clipping_root = Node3D.new()
-		clipping_root.name = "ClippingVolumes"
-		hull.add_child(clipping_root)
-	else:
-		for child in clipping_root.get_children():
-			child.queue_free()
+	if clipping_root:
+		clipping_root.queue_free()
 			
 	var modules = []
 	for child in hull.get_children():
@@ -2961,78 +2956,19 @@ func check_all_clipping():
 				clipping_set[my_module] = true
 				clipping_set[other_module] = true
 				clipping_detected = true
-				
-				# Generate CSG Intersection.
-				#
-				# THE OPERATION LIVES ON group_b, NOT ON THE ROOT. A CSG tree is
-				# evaluated by folding each child into the accumulated result using
-				# THAT CHILD's operation; the root's own operation only describes
-				# how the root would merge into a CSG parent, and this root has no
-				# CSG parent. Setting the root to INTERSECTION and leaving both
-				# children on UNION therefore computed A UNION B - a solid red
-				# duplicate of both clipping modules, hovering over the vehicle,
-				# which is exactly the "second instance of everything that's
-				# clipping" Chris reported on 2026-08-13.
-				var intersection_root = CSGCombiner3D.new()
-				# We don't want the CSG to be solid, we want it glowing red.
-				var csg_mat = _clipping_material()
-				intersection_root.material_override = csg_mat
-				clipping_root.add_child(intersection_root)
-
-				# Group A is the BASE of the fold - first child, so its own
-				# operation is never consulted.
-				var group_a = CSGCombiner3D.new()
-				group_a.operation = CSGShape3D.OPERATION_UNION
-				intersection_root.add_child(group_a)
-				var meshes_a = []
-				_find_meshes_recursive(my_module, meshes_a)
-				for m_inst in meshes_a:
-					var csg_m = CSGMesh3D.new()
-					csg_m.mesh = m_inst.mesh
-					csg_m.global_transform = m_inst.global_transform
-					group_a.add_child(csg_m)
-					
-				# Group B carries the INTERSECTION - folding B into A is what
-				# leaves only the overlapping volume behind.
-				var group_b = CSGCombiner3D.new()
-				group_b.operation = CSGShape3D.OPERATION_INTERSECTION
-				intersection_root.add_child(group_b)
-				var meshes_b = []
-				_find_meshes_recursive(other_module, meshes_b)
-				for m_inst in meshes_b:
-					var csg_m = CSGMesh3D.new()
-					csg_m.mesh = m_inst.mesh
-					csg_m.global_transform = m_inst.global_transform
-					group_b.add_child(csg_m)
-				
-	# Restore all visual materials (since we no longer override them for clipping)
-	# The clipping VERDICT is drawn by the CSG intersection volumes above, not by
-	# recolouring the modules, so this loop only ever restores - it read
-	# clipping_set/module_data/catalog into locals it never used.
+	# Apply clipping material override to clipping modules; restore base material for clean modules.
+	# SWAP the override, never MUTATE it, to avoid mutating shared part materials.
 	for m in modules:
+		var is_clipped: bool = clipping_set.get(m, false)
 		var meshes = []
 		_find_meshes_recursive(m, meshes)
-
-		# SWAP the override, never MUTATE it. Two separate reasons, both real:
-		#
-		# 1. Materials are now shared per role+tint (part_materials.gd), for
-		#    the sake of bake_module_visual()'s identity-keyed merge. Writing
-		#    albedo_color on one part's material here would repaint every
-		#    other part in the scene that happens to share that role - one
-		#    clipping module would turn the entire vehicle red.
-		#
-		# 2. Even before sharing, the "not clipping" branch flattened EVERY
-		#    mesh in the module to the catalog colour on every single pass -
-		#    and this runs on every placement, drag, rotation and tweak. So
-		#    the per-part colours the builders carefully assign (dark barrel,
-		#    pale lens, warm brass) survived only until the first clipping
-		#    check, which is to say never. Remembering the original override
-		#    and restoring THAT is what lets per-part material roles actually
-		#    reach the screen in the Design Lab.
 		for mesh in meshes:
 			if not mesh.has_meta("base_material"):
 				mesh.set_meta("base_material", mesh.material_override)
-			mesh.material_override = mesh.get_meta("base_material")
+			if is_clipped:
+				mesh.material_override = _clipping_material()
+			else:
+				mesh.material_override = mesh.get_meta("base_material")
 
 	_refresh_firing_arc()
 

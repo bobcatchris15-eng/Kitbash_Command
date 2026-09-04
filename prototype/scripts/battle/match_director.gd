@@ -363,6 +363,7 @@ var _selection_rect: Panel = null
 # Same convention OpenRA's sidebar icons use, and the same one the old runtime
 # used for repair/sell.
 var _attack_move_armed := false
+var _attack_ground_armed: bool = false
 var _barrage_armed: bool = false
 var _smoke_armed: bool = false
 var _beacon_armed: bool = false
@@ -4421,7 +4422,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			# stationary (no drag).
 			if _right_press_active and not _right_dragged \
 					and event.position.distance_to(_right_press_pos) <= DRAG_CLICK_THRESHOLD:
-				if is_any_ability_armed():
+				if event.ctrl_pressed or _attack_ground_armed:
+					var ground_hit := _raycast(event.position, LayersScript.GROUND_PICK_MASK, false)
+					if not ground_hit.is_empty():
+						var sel: Array = selection.selected if selection != null else []
+						if sel.is_empty() and focus_unit != null and is_instance_valid(focus_unit):
+							sel = [focus_unit]
+						if not sel.is_empty() and orders != null:
+							orders.attack_ground(sel, ground_hit.position, event.shift_pressed)
+							_flash("FORCE FIRE ORDER ISSUED")
+					if _attack_ground_armed:
+						disarm_all_abilities()
+					_right_press_pos = Vector2.ZERO
+					_right_press_active = false
+					_right_dragged = false
+					return
+				elif is_any_ability_armed():
 					var ground_hit := _raycast(event.position, LayersScript.GROUND_PICK_MASK, false)
 					var target_pos: Vector3 = ground_hit.position if not ground_hit.is_empty() else Vector3.ZERO
 					if not ground_hit.is_empty():
@@ -4466,7 +4482,10 @@ func _handle_key(event: InputEventKey) -> void:
 			selection.recall_group(i)
 			return
 
-	if event.is_action_pressed("cmd_attack_move"):
+	if not event.echo and event.keycode == KEY_G:
+		arm_attack_ground(not _attack_ground_armed)
+		return
+	elif event.is_action_pressed("cmd_attack_move"):
 		_set_armed(not _attack_move_armed)
 	elif event.is_action_pressed("cmd_barrage"):
 		arm_barrage(not _barrage_armed)
@@ -4721,6 +4740,19 @@ func _match_build_path() -> String:
 # One threshold, so a slightly shaky click never silently becomes an empty
 # one-pixel drag that clears the selection.
 func _resolve_left_release(at: Vector2, additive: bool) -> void:
+	if _attack_ground_armed:
+		var ground_hit := _raycast(at, LayersScript.GROUND_PICK_MASK, false)
+		if not ground_hit.is_empty():
+			var sel: Array = selection.selected if selection != null else []
+			if sel.is_empty() and focus_unit != null and is_instance_valid(focus_unit):
+				sel = [focus_unit]
+			if not sel.is_empty() and orders != null:
+				orders.attack_ground(sel, ground_hit.position, additive)
+				_flash("FORCE FIRE ORDER ISSUED")
+		disarm_all_abilities()
+		get_viewport().set_input_as_handled()
+		return
+
 	if is_any_ability_armed():
 		var ground_hit := _raycast(at, LayersScript.GROUND_PICK_MASK, false)
 		if not ground_hit.is_empty():
@@ -5165,14 +5197,8 @@ func _hide_selection_rect() -> void:
 func _set_armed(value: bool) -> void:
 	_attack_move_armed = value
 	_flash("ATTACK-MOVE: RIGHT-CLICK A DESTINATION" if value else "")
-	# X7 (Tactile Interface Programme Part 2.4): the hint label was the only
-	# feedback that attack-move was armed, and the player is looking at the
-	# battlefield, not at the hint. CursorManager is an autoload and has been
-	# since the old runtime; arming sets the cursor to ATTACK immediately so
-	# the cue lands without waiting for the next mouse motion. On disarm the
-	# cursor is re-resolved from the current hover position, which is what
-	# the next click will actually do. The flash text stays as the
-	# accessible-channel fallback under the captions setting.
+	if not is_inside_tree():
+		return
 	var cm = get_node_or_null("/root/CursorManager")
 	if cm == null:
 		return
@@ -5183,16 +5209,24 @@ func _set_armed(value: bool) -> void:
 
 func disarm_all_abilities() -> void:
 	_attack_move_armed = false
+	_attack_ground_armed = false
 	_barrage_armed = false
 	_smoke_armed = false
 	_beacon_armed = false
 	_mine_armed = false
 	_flash("")
+	if not is_inside_tree():
+		return
 	var cm = get_node_or_null("/root/CursorManager")
 	if cm != null:
 		var vp := get_viewport()
 		if vp != null:
 			_update_hover_cursor(vp.get_mouse_position())
+
+func arm_attack_ground(armed: bool = true) -> void:
+	disarm_all_abilities()
+	_attack_ground_armed = armed
+	_update_ability_cursor("FORCE FIRE: CLICK OR RIGHT-CLICK GROUND" if armed else "")
 
 func arm_barrage(armed: bool = true) -> void:
 	disarm_all_abilities()
@@ -5225,10 +5259,12 @@ func trigger_boost() -> void:
 		_flash("ROCKET BOOSTERS ENGAGED")
 
 func is_any_ability_armed() -> bool:
-	return _barrage_armed or _smoke_armed or _beacon_armed or _mine_armed
+	return _barrage_armed or _smoke_armed or _beacon_armed or _mine_armed or _attack_ground_armed
 
 func _update_ability_cursor(hint_text: String) -> void:
 	_flash(hint_text)
+	if not is_inside_tree():
+		return
 	var cm = get_node_or_null("/root/CursorManager")
 	if cm != null:
 		if is_any_ability_armed():

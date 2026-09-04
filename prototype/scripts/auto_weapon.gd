@@ -696,7 +696,15 @@ func _is_los_blocked_to(candidate: Node3D) -> bool:
 
 	var result = space_state.intersect_ray(query)
 	if not result.is_empty():
-		return true
+		if candidate == _forced_target or candidate.name == "GroundTargetPoint":
+			var col = result.get("collider")
+			var is_terrain: bool = (col is CollisionObject3D and (col.collision_layer & 1) != 0)
+			if is_terrain and result.position.distance_to(ray_end) <= 1.5:
+				pass # Do not treat intended ground impact point as an occluding obstacle
+			else:
+				return true
+		else:
+			return true
 
 	# Own-hull self-occlusion (DECISIONS_NEEDED.md 2026-07-17 "sponson
 	# weapons may be able to shoot through their own hull"): a battle-spawned

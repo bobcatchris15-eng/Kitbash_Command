@@ -38,6 +38,7 @@ var _order_row: HBoxContainer = null
 var _stance_row: HBoxContainer = null
 var _stance_buttons: Dictionary = {}
 var _range_toggle_btn: Button = null
+var _force_fire_btn: Button = null
 var _hint: Label = null
 
 var _ability_row: HBoxContainer = null
@@ -94,6 +95,7 @@ func _build() -> void:
 	_add_order("stop", "Stop (S)", _on_stop)
 	_add_order("hold", "Hold position", _on_hold)
 	_add_order("attack", "Attack-move (A), then right-click a destination", _on_attack_move)
+	_force_fire_btn = _add_order("attack", "Force Fire / Attack Ground (G or Ctrl+RMB)", _on_force_fire)
 	_range_toggle_btn = _add_toggle_order("contact", "Toggle Range & Vision Indicators (F12)", _on_toggle_range_overlay)
 
 	_ability_row = HBoxContainer.new()
@@ -131,7 +133,7 @@ func _add_ability_btn(icon: String, tip: String, handler: Callable) -> Button:
 	return b
 
 
-func _add_order(icon: String, tip: String, handler: Callable) -> void:
+func _add_order(icon: String, tip: String, handler: Callable) -> Button:
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(0, Style.HIT)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -140,6 +142,7 @@ func _add_order(icon: String, tip: String, handler: Callable) -> void:
 	Icons.on_button(b, icon, Style.TEXT)
 	b.pressed.connect(handler)
 	_order_row.add_child(b)
+	return b
 
 
 func _add_toggle_order(icon: String, tip: String, handler: Callable) -> Button:
@@ -362,6 +365,8 @@ func _refresh_range_lamp() -> void:
 func _set_enabled(on: bool) -> void:
 	for b in _order_row.get_children():
 		b.disabled = not on
+	if _force_fire_btn != null:
+		_force_fire_btn.disabled = not on
 	for b in _stance_row.get_children():
 		b.disabled = not on
 	if _ability_row:
@@ -393,6 +398,11 @@ func _on_attack_move() -> void:
 	# right-click in the world.
 	if _director != null and _director.has_method("_set_armed"):
 		_director._set_armed(true)
+
+
+func _on_force_fire() -> void:
+	if _director != null and _director.has_method("arm_attack_ground"):
+		_director.arm_attack_ground(true)
 
 
 func _on_toggle_range_overlay() -> void:

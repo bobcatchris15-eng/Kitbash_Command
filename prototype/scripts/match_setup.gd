@@ -130,6 +130,8 @@ var _hero_view: SquadronHeroView = null
 var _back_btn: Button
 var _next_btn: Button
 var _launch_btn: Button
+var _readiness: Label
+var _narrow_viewport: bool = false
 
 # Console Mode (War Room Ops-Table)
 var _ops_table_mode: bool = false
@@ -206,6 +208,8 @@ func _ready() -> void:
 
 	_sync_map_selection()
 	_goto_stage(0, false)
+	get_viewport().size_changed.connect(_on_viewport_size_changed)
+	_on_viewport_size_changed()
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +263,7 @@ func _build_spine() -> Control:
 	_ops_mode_btn = Button.new()
 	_ops_mode_btn.theme_type_variation = "TabButton"
 	_ops_mode_btn.custom_minimum_size = Vector2(240, Tokens.HIT_TARGET_MIN + Tokens.SPACE_SM)
-	_ops_mode_btn.focus_mode = Control.FOCUS_NONE
+	_ops_mode_btn.focus_mode = Control.FOCUS_ALL
 	_ops_mode_btn.toggle_mode = true
 	_ops_mode_btn.text = "[MODE: WAR ROOM OPS-TABLE]"
 	_ops_mode_btn.pressed.connect(_toggle_console_mode)
@@ -274,7 +278,7 @@ func _build_chip(idx: int) -> Button:
 	chip.theme_type_variation = "TabButton"
 	chip.custom_minimum_size = Vector2(0, Tokens.HIT_TARGET_MIN + Tokens.SPACE_SM)
 	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	chip.focus_mode = Control.FOCUS_NONE
+	chip.focus_mode = Control.FOCUS_ALL
 	chip.clip_text = true
 	# toggle_mode so TabButton's pressed plate can express "this is the stage
 	# you are on" - the variation inverts the bevel for the active tab.
@@ -335,6 +339,7 @@ func _goto_stage(idx: int, animate: bool = true) -> void:
 	_refresh_nav()
 	if _stage == STAGES.size() - 1:
 		_refresh_summary()
+	_refresh_readiness()
 
 
 func _toggle_console_mode() -> void:
@@ -342,6 +347,9 @@ func _toggle_console_mode() -> void:
 
 
 func set_console_mode(enabled: bool) -> void:
+	if enabled and _narrow_viewport:
+		UIFeedbackScript.play(_ops_mode_btn, "reject")
+		return
 	_ops_table_mode = enabled
 	if _stage_host != null:
 		_stage_host.visible = not _ops_table_mode
@@ -360,6 +368,7 @@ func set_console_mode(enabled: bool) -> void:
 	else:
 		_caption.text = str(STAGES[_stage]["caption"])
 		_refresh_nav()
+	_refresh_readiness()
 
 
 func _sync_roster_parent() -> void:
@@ -452,6 +461,14 @@ func _build_nav() -> Control:
 	_launch_btn.pressed.connect(_on_start_pressed)
 	row.add_child(_launch_btn)
 
+	_readiness = Label.new()
+	_readiness.name = "MatchSetupReadiness"
+	_readiness.theme_type_variation = "HintLabel"
+	_readiness.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_readiness.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_readiness.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_readiness)
+
 	UIFeedbackScript.wire(_back_btn)
 	UIFeedbackScript.wire(_next_btn, "select")
 	UIFeedbackScript.wire(_launch_btn, "confirm")
@@ -461,7 +478,7 @@ func _build_nav() -> Control:
 func _nav_button(text: String, glyph: String, trailing: bool) -> Button:
 	var btn := Button.new()
 	btn.custom_minimum_size = Tokens.NAV_BUTTON_MIN
-	btn.focus_mode = Control.FOCUS_NONE
+	btn.focus_mode = Control.FOCUS_ALL
 	var icon := UITheme.chrome_icon(glyph)
 	if icon != null:
 		btn.icon = icon
@@ -482,6 +499,39 @@ func _refresh_nav() -> void:
 	_next_btn.visible = not last
 	_launch_btn.visible = last
 	_back_btn.text = "MAIN MENU" if _stage == 0 else "BACK"
+	_refresh_readiness()
+
+
+func _refresh_readiness() -> void:
+	if _readiness == null:
+		return
+	if _stage < STAGES.size() - 1:
+		_readiness.text = "STEP %d OF %d — %s" % [_stage + 1, STAGES.size(), str(STAGES[_stage]["caption"])]
+		_readiness.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
+		return
+	var manual_count := roster_picker.filled_unit_count() + roster_picker.filled_defence_count() if roster_picker else 0
+	var has_auto_draft: bool = bp_manager != null and not bp_manager.list_blueprints(true).is_empty()
+	if manual_count > 0:
+		_readiness.text = "READY — %d DESIGN%s FIELD ASSIGNED" % [manual_count, "S" if manual_count != 1 else ""]
+		_readiness.add_theme_color_override("font_color", Tokens.SIGNAL_GO)
+	elif has_auto_draft:
+		_readiness.text = "READY — AUTO-DRAFT WILL FIELD STANDARD RESERVES"
+		_readiness.add_theme_color_override("font_color", Tokens.SIGNAL_INFO)
+	else:
+		_readiness.text = "BLOCKED — SAVE A BLUEPRINT OR RETURN TO THE DESIGN LAB"
+		_readiness.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+
+
+func _on_viewport_size_changed() -> void:
+	_narrow_viewport = get_viewport_rect().size.x <= 960.0
+	if _ops_mode_btn != null:
+		_ops_mode_btn.visible = not _narrow_viewport
+	if _narrow_viewport and _ops_table_mode:
+		set_console_mode(false)
+
+
+func is_narrow_viewport() -> bool:
+	return _narrow_viewport
 
 
 func _on_back_pressed() -> void:
@@ -508,6 +558,7 @@ func _on_next_pressed() -> void:
 # as the hull roster.
 func _build_map_stage() -> Control:
 	var page := HBoxContainer.new()
+	page.name = "StageTheatre"
 	page.add_theme_constant_override("separation", Tokens.SPACE_MD)
 
 	MAP_IDS = MapCatalog.get_map_ids()
@@ -768,6 +819,7 @@ func _sync_map_selection() -> void:
 # leftovers from testing stay in the Blueprint Library.
 func _build_roster_stage() -> Control:
 	var page := VBoxContainer.new()
+	page.name = "StageRoster"
 	page.add_theme_constant_override("separation", Tokens.SPACE_SM)
 
 	_stage_roster_host = VBoxContainer.new()
@@ -813,6 +865,7 @@ func _on_roster_changed() -> void:
 # the previous two stages took.
 func _build_launch_stage() -> Control:
 	var page := HBoxContainer.new()
+	page.name = "StageLaunch"
 	page.add_theme_constant_override("separation", Tokens.SPACE_MD)
 
 	# Left column holds Rules and Deployment Manifest stacked vertically

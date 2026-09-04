@@ -34,6 +34,9 @@ prototype/.tools/
 # Local tool config (not project source)
 .antigravitycli/
 .claude/
+.worktrees/
+.agents/
+skills-lock.json
 
 # Python bytecode
 __pycache__/

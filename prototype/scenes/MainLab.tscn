@@ -59,7 +59,11 @@ ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
 sky_material = SubResource("ProceduralSkyMaterial_x3k")
 
 [sub_resource type="Environment" id="Environment_x3k"]
-background_mode = 2
+background_mode = 1
+background_color = Color(0.075, 0.075, 0.059, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.937, 0.914, 0.898, 1)
+ambient_light_energy = 0.65
 sky = SubResource("Sky_x3k")
 tonemap_mode = 4
 tonemap_exposure = 1.0
@@ -70,7 +74,7 @@ glow_enabled = true
 glow_intensity = 0.85
 glow_bloom = 0.06
 adjustment_enabled = true
-adjustment_saturation = 1.18
+adjustment_saturation = 0.94
 adjustment_contrast = 1.06
 
 [sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_lab"]

@@ -176,47 +176,52 @@ var _showcase_timer: float = 0.0
 
 func _ready() -> void:
 	_gather_showcase_items()
+	var backdrop := ColorRect.new()
+	backdrop.color = Tokens.BASE_900
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(backdrop)
+	var frame := UIShell.screen_frame(self, Tokens.SPACE_LG, Tokens.SPACE_LG)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", Tokens.SPACE_MD)
+	frame.add_child(column)
+	_build_top_ribbon(column)
 
-	# Build live 3D Hangar SubViewport background if not running headless
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", Tokens.SPACE_LG)
+	column.add_child(body)
+	_build_destination_console(body)
+
+	var showcase := VBoxContainer.new()
+	showcase.name = "Showcase"
+	showcase.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	showcase.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	body.add_child(showcase)
+	var caption := Label.new()
+	caption.text = "INSPECTION TABLE   /   LIVE ASSEMBLY"
+	caption.theme_type_variation = "HeadingLabel"
+	showcase.add_child(caption)
+	_showcase_host = Control.new()
+	_showcase_host.name = "ShowcaseViewport"
+	_showcase_host.custom_minimum_size = Vector2(0, 200)
+	_showcase_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_showcase_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_showcase_host.clip_contents = true
+	showcase.add_child(_showcase_host)
 	if DisplayServer.get_name() != "headless":
 		_build_3d_background()
-
-	# Main 2D UI Overlay
-	var frame := UIShell.screen_frame(self)
-
-	var root_vbox = VBoxContainer.new()
-	root_vbox.add_theme_constant_override("separation", Tokens.SPACE_MD)
-	frame.add_child(root_vbox)
-
-	# Top Navigation Ribbon
-	_build_top_ribbon(root_vbox)
-
-	# Center Middle Space for 3D Turntable & Upper-Right Spec Placard
-	var mid_row = HBoxContainer.new()
-	mid_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	mid_row.add_theme_constant_override("separation", Tokens.SPACE_LG)
-	root_vbox.add_child(mid_row)
-
-	var center_space = Control.new()
-	center_space.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mid_row.add_child(center_space)
-
-	_build_status_column(mid_row)
-
-	# Bottom Command Deck Band (Height: 224)
-	_build_bottom_deck(root_vbox)
-
-	# Initial 3D & Placard sync
+	_build_status_column(showcase)
 	_update_showcase_display()
-
-	# THE FIRST MUSIC CALL THE GAME HAS EVER MADE. AudioManager.play_music()
-	# existed for the whole life of the project with zero callers anywhere, so
-	# the menu track shipped unreachable. Safe to call unconditionally: the
-	# manager no-ops on a repeat request and when running headless.
+	UIFeedbackScript.wire_tree(self)
+	var primary := find_child("DesignLabAction", true, false) as Button
+	primary.grab_focus.call_deferred()
 	var audio := get_node_or_null("/root/AudioManager")
 	if audio != null:
 		audio.play_music("menu")
+
+var _showcase_host: Control
+var _destination_column: VBoxContainer
 
 func _process(delta: float) -> void:
 	if is_instance_valid(_turntable_node):
@@ -289,7 +294,7 @@ func _build_3d_background() -> void:
 	vp_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vp_container.stretch = true
 	vp_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(vp_container)
+	_showcase_host.add_child(vp_container)
 
 	var vp = SubViewport.new()
 	vp.size = Vector2i(1920, 1080)
@@ -313,7 +318,9 @@ func _build_3d_background() -> void:
 	env.background_color = Color(0.016, 0.018, 0.021)
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.3
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_DISABLED
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Tokens.TEXT_PRIMARY
+	env.ambient_light_energy = 0.45
 	env.ssao_enabled = true
 	env.ssao_radius = 1.4
 	env.ssao_intensity = 2.4
@@ -348,10 +355,10 @@ func _build_3d_background() -> void:
 
 	# Camera framed at center turntable - Zoomed way farther out
 	var cam = Camera3D.new()
-	cam.position = Vector3(1.2, 4.8, 15.5)
-	cam.rotation_degrees = Vector3(-16, 12, 0)
+	cam.position = Vector3(5.0, 5.0, 10.0)
 	cam.fov = 46.0
 	scene.add_child(cam)
+	cam.look_at(Vector3(-3.4, 0.6, 0.0))
 
 	# Turntable Base & Model Container.
 	# 2026-08-25: shifted left of the viewport centre (-3.4) so the showcased
@@ -684,269 +691,120 @@ func _apply_unpainted_scale_model_material(node: Node, mat: StandardMaterial3D =
 	for child in node.get_children():
 		_apply_unpainted_scale_model_material(child, mat)
 
-var _active_tab: String = "DEPLOY"
-var _category_flows: Dictionary = {}
-
+# The destination table remains the route authority; layout is screen-owned.
 func _build_top_ribbon(parent: Control) -> void:
-	var ribbon = PanelContainer.new()
-	ribbon.theme_type_variation = "HeaderPanel"
-	ribbon.custom_minimum_size = Vector2(0, 36)
-	parent.add_child(ribbon)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UITheme.panel_style("header"))
+	parent.add_child(panel)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	panel.add_child(row)
+	var title := Label.new()
+	title.text = TITLE
+	title.theme_type_variation = "TitleLabel"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(title)
+	var system := UIShell.action(row, "Settings", "secondary")
+	system.pressed.connect(func():
+		var layer := get_node_or_null("/root/SystemLayer")
+		if layer: layer.open())
+	var quit_button := UIShell.action(row, "Exit", "secondary")
+	quit_button.pressed.connect(func(): get_tree().quit())
 
-	var margin = MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", Tokens.SPACE_MD)
-	margin.add_theme_constant_override("margin_right", Tokens.SPACE_MD)
-	margin.add_theme_constant_override("margin_top", Tokens.SPACE_XS)
-	margin.add_theme_constant_override("margin_bottom", Tokens.SPACE_XS)
-	ribbon.add_child(margin)
+func _build_destination_console(parent: Control) -> void:
+	var panel := PanelContainer.new()
+	panel.name = "DestinationConsole"
+	panel.custom_minimum_size.x = 340
+	panel.add_theme_stylebox_override("panel", UITheme.panel_style("surface"))
+	parent.add_child(panel)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	panel.add_child(scroll)
+	_destination_column = VBoxContainer.new()
+	_destination_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_destination_column.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	scroll.add_child(_destination_column)
+	var label := Label.new()
+	label.text = "DESIGN BUREAU"
+	label.theme_type_variation = "HeadingLabel"
+	_destination_column.add_child(label)
+	var hint := Label.new()
+	hint.text = "Build a machine. Put it to work."
+	hint.theme_type_variation = "HintLabel"
+	_destination_column.add_child(hint)
+	_add_destination(GROUPS[1]["items"][0], "primary", "DesignLabAction")
+	_add_destination(GROUPS[0]["items"][2], "secondary", "TestRangeAction")
+	_add_destination(GROUPS[0]["items"][0], "secondary", "MatchSetupAction")
+	_destination_column.add_child(HSeparator.new())
+	# Secondary destinations stay one click away in a vertically scrolling console.
+	for group_index in [1, 0, 2]:
+		var group: Dictionary = GROUPS[group_index]
+		var heading := Label.new()
+		heading.text = "WORKSHOP" if group_index == 1 else ("CAMPAIGN" if group_index == 0 else "LEARN")
+		heading.theme_type_variation = "HintLabel"
+		_destination_column.add_child(heading)
+		for item: Dictionary in group["items"]:
+			if item["title"] in ["DESIGN LAB", "PROVING GROUND", "SKIRMISH"]:
+				continue
+			_add_destination(item)
+	var livery := UIShell.action(_destination_column, "Livery", "secondary")
+	livery.pressed.connect(func(): _navigate_to("res://scenes/Livery.tscn"))
 
-	var hbox = HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", Tokens.SPACE_MD)
-	margin.add_child(hbox)
+func _add_destination(item: Dictionary, role: String = "secondary", node_name: String = "") -> void:
+	var button := UIShell.action(_destination_column, str(item["title"]).capitalize(), role)
+	if node_name != "":
+		button.name = node_name
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.tooltip_text = item["desc"]
+	button.set_meta("destination", item["scene"])
+	button.pressed.connect(func(): _activate_destination(item))
+	if role == "primary":
+		var description := Label.new()
+		description.text = "Fit parts, tune mechanisms, save your design."
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		description.theme_type_variation = "HintLabel"
+		_destination_column.add_child(description)
 
-	var mark := WordmarkScript.new()
-	mark.lockup = WordmarkScript.Lockup.HORIZONTAL
-	mark.part_number = "DESIGN BUREAU & PROVING GROUND"
-	hbox.add_child(mark)
+func _activate_destination(item: Dictionary) -> void:
+	if item.get("tutorial", false):
+		var tutorial := get_node_or_null("/root/TwoPhaseTutorialManager")
+		if tutorial:
+			tutorial.begin()
+			return
+	if item.get("launcher", "") == "TestRangeLauncher":
+		var launcher := TestRangeLauncherScript.new()
+		add_child(launcher)
+		if launcher.launch("main_menu"):
+			return
+		launcher.queue_free()
+		return
+	_navigate_to(item["scene"])
 
-	var sep = Label.new()
-	sep.text = "//"
-	sep.theme_type_variation = "HintLabel"
-	hbox.add_child(sep)
-
-	var status = Label.new()
-	status.text = "STATUS: OPERATIONAL"
-	status.theme_type_variation = "HintLabel"
-	status.add_theme_color_override("font_color", Tokens.SIGNAL_GO)
-	hbox.add_child(status)
-
-	var spacer = Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(spacer)
-
-	var records_btn = Button.new()
-	records_btn.text = "RECORDS"
-	records_btn.custom_minimum_size = Vector2(100, 28)
-	UIFeedbackScript.wire(records_btn)
-	records_btn.pressed.connect(func():
-		var router = get_node_or_null("/root/SceneRouter")
-		if router: router.goto("res://scenes/BlueprintLibrary.tscn")
-		else: get_tree().change_scene_to_file("res://scenes/BlueprintLibrary.tscn")
-	)
-	hbox.add_child(records_btn)
-
-	var livery_btn = Button.new()
-	livery_btn.text = "LIVERY"
-	livery_btn.custom_minimum_size = Vector2(100, 28)
-	UIFeedbackScript.wire(livery_btn)
-	livery_btn.pressed.connect(func():
-		var router = get_node_or_null("/root/SceneRouter")
-		if router: router.goto("res://scenes/Livery.tscn")
-		else: get_tree().change_scene_to_file("res://scenes/Livery.tscn")
-	)
-	hbox.add_child(livery_btn)
-
-	var settings_btn = Button.new()
-	settings_btn.text = "SYSTEM"
-	settings_btn.custom_minimum_size = Vector2(100, 28)
-	UIFeedbackScript.wire(settings_btn)
-	settings_btn.pressed.connect(func():
-		var system_layer = get_node_or_null("/root/SystemLayer")
-		if system_layer: system_layer.open()
-	)
-	hbox.add_child(settings_btn)
-
-	var quit_btn = Button.new()
-	quit_btn.text = "EXIT"
-	quit_btn.custom_minimum_size = Vector2(80, 28)
-	quit_btn.theme_type_variation = "DangerButton"
-	UIFeedbackScript.wire(quit_btn)
-	quit_btn.pressed.connect(func(): get_tree().quit())
-	hbox.add_child(quit_btn)
-
-
-func _build_bottom_deck(parent: Control) -> void:
-	var deck = PanelContainer.new()
-	deck.theme_type_variation = "CardPanel"
-	deck.custom_minimum_size = Vector2(0, 224)
-	deck.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	parent.add_child(deck)
-
-	var inner := VBoxContainer.new()
-	inner.add_theme_constant_override("separation", Tokens.SPACE_SM)
-	deck.add_child(inner)
-
-	var tab_row := HBoxContainer.new()
-	tab_row.add_theme_constant_override("separation", Tokens.SPACE_XS)
-	tab_row.custom_minimum_size = Vector2(0, 32)
-	inner.add_child(tab_row)
-
-	var content_deck = Control.new()
-	content_deck.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	inner.add_child(content_deck)
-
-	for group in GROUPS:
-		var sec_name: String = group["section"]
-		var tab_btn = Button.new()
-		tab_btn.text = sec_name
-		tab_btn.toggle_mode = true
-		tab_btn.button_pressed = (sec_name == _active_tab)
-		tab_btn.custom_minimum_size = Vector2(150, 32)
-		tab_btn.theme_type_variation = "TabButton"
-		UIFeedbackScript.wire(tab_btn, "select")
-		tab_row.add_child(tab_btn)
-
-		var scroll = ScrollContainer.new()
-		scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		scroll.visible = (sec_name == _active_tab)
-		content_deck.add_child(scroll)
-		_category_flows[sec_name] = scroll
-
-		var flow = HBoxContainer.new()
-		flow.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		flow.add_theme_constant_override("separation", Tokens.SPACE_MD)
-		scroll.add_child(flow)
-
-		for item in group["items"]:
-			_add_deck_card(flow, item["title"], item["desc"],
-				item["scene"], item["badge"], item.get("tutorial", false),
-				item.get("launcher", ""))
-
-		tab_btn.pressed.connect(func():
-			_active_tab = sec_name
-			for s in _category_flows:
-				_category_flows[s].visible = (s == sec_name)
-			for b in tab_row.get_children():
-				if b is Button:
-					b.button_pressed = (b.text == sec_name)
-		)
-
-
-func _add_deck_card(parent: Control, title_text: String, description: String, scene_path: String, badge_text: String, is_tutorial: bool = false, launcher_name: String = "") -> void:
-	var btn = Button.new()
-	btn.custom_minimum_size = Vector2(300, 140)
-	btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	btn.theme_type_variation = "NavCard"
-	parent.add_child(btn)
-
-	var margin = MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_theme_constant_override("margin_left", Tokens.SPACE_MD)
-	margin.add_theme_constant_override("margin_right", Tokens.SPACE_MD)
-	margin.add_theme_constant_override("margin_top", Tokens.SPACE_SM)
-	margin.add_theme_constant_override("margin_bottom", Tokens.SPACE_SM)
-	btn.add_child(margin)
-
-	var vbox = VBoxContainer.new()
-	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_theme_constant_override("separation", Tokens.SPACE_XS)
-	margin.add_child(vbox)
-
-	var top_row = HBoxContainer.new()
-	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(top_row)
-
-	var name_label = Label.new()
-	name_label.text = title_text
-	name_label.theme_type_variation = "HeadingLabel"
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	top_row.add_child(name_label)
-
-	var badge = Label.new()
-	badge.text = badge_text
-	badge.theme_type_variation = "HintLabel"
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
-	top_row.add_child(badge)
-
-	vbox.add_child(HSeparator.new())
-
-	var desc_label = Label.new()
-	desc_label.text = description
-	desc_label.theme_type_variation = "HintLabel"
-	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(desc_label)
-
-	# Persistent launch affordance — makes the card read as clickable at rest
-	var launch_affordance = Label.new()
-	launch_affordance.text = "SELECT >"
-	launch_affordance.theme_type_variation = "HintLabel"
-	launch_affordance.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
-	launch_affordance.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	launch_affordance.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	launch_affordance.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(launch_affordance)
-
-	UIFeedbackScript.wire(btn)
-	btn.pressed.connect(func():
-		if is_tutorial:
-			var tutorial = get_node_or_null("/root/TwoPhaseTutorialManager")
-			if tutorial:
-				tutorial.begin()
-		if launcher_name != "":
-			if launcher_name == "TestRangeLauncher":
-				var launcher = TestRangeLauncherScript.new()
-				add_child(launcher)
-				if launcher.launch("main_menu"):
-					return
-				launcher.queue_free()
-		var router = get_node_or_null("/root/SceneRouter")
-		if router:
-			router.goto(scene_path)
-		else:
-			get_tree().change_scene_to_file(scene_path)
-	)
-
+func _navigate_to(scene_path: String) -> void:
+	var router := get_node_or_null("/root/SceneRouter")
+	if router:
+		router.goto(scene_path)
+	else:
+		get_tree().change_scene_to_file(scene_path)
 
 func _build_status_column(parent: Control) -> void:
-	var col = VBoxContainer.new()
-	# 460 -> 400: FRONT_DESK renders five short rows; 460 left a wide blank
-	# margin down the panel's whole right edge and pushed the turntable further
-	# under the card than it needed to be.
-	col.custom_minimum_size = Vector2(400, 0)
-	col.size_flags_horizontal = Control.SIZE_SHRINK_END
-	col.add_theme_constant_override("separation", Tokens.SPACE_SM)
-	parent.add_child(col)
-
-	var heading_hbox = HBoxContainer.new()
-	col.add_child(heading_hbox)
-
-	var heading = Label.new()
-	heading.text = "SPECIFICATION PLACARD"
+	var heading_row := HBoxContainer.new()
+	heading_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	parent.add_child(heading_row)
+	var heading := Label.new()
+	heading.text = "DESIGN RECORD"
 	heading.theme_type_variation = "HeadingLabel"
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	heading_hbox.add_child(heading)
-
-	# Manual Cycle Button
-	var cycle_btn = Button.new()
-	cycle_btn.text = "ROTATE HULL ▶"
-	cycle_btn.custom_minimum_size = Vector2(130, 28)
-	UIFeedbackScript.wire(cycle_btn)
-	cycle_btn.pressed.connect(func():
+	heading_row.add_child(heading)
+	var cycle := UIShell.action(heading_row, "Next design", "secondary")
+	cycle.tooltip_text = "Inspect the next saved design or stock chassis"
+	cycle.pressed.connect(func():
 		_showcase_timer = 0.0
-		_next_showcase_item()
-	)
-	heading_hbox.add_child(cycle_btn)
-
-	# SpecPlacard.Level.FRONT_DESK: the same widget the Lab rail, the battle
-	# selection panel and the after-action report render, at the detail level
-	# this screen wants (UX_REDESIGN_PLAN.md's "unifying component"). Replaces
-	# a hand-built stat table that was this screen's own private vocabulary.
-	#
-	# NO vertical EXPAND_FILL. The old line stretched the panel over the entire
-	# mid-row height (~700 px) to hold five rows' worth of ~250 px content -
-	# the dead space the player read as "empty card". A PanelContainer without
-	# an expand flag hugs its content; the space it gives back shows the
-	# turntable backdrop instead of blank CardPanel.
+		_next_showcase_item())
 	_spec_placard = SpecPlacardScript.new()
 	_spec_placard.level = SpecPlacardScript.Level.FRONT_DESK
-	col.add_child(_spec_placard)
+	parent.add_child(_spec_placard)
 
 func _update_placard_ui(item: Dictionary) -> void:
 	if _spec_placard == null:

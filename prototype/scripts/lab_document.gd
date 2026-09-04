@@ -1,6 +1,15 @@
 class_name LabDocument
 extends Control
+const SliceShell = preload("res://scripts/ui_shell.gd")
+const SliceTheme = preload("res://scripts/ui_theme.gd")
 var lab_toolbar
+var _document_expanded := true
+var _document_page := "Performance"
+var _document_body: ScrollContainer
+var _document_tabs: HBoxContainer
+var _document_toggle: Button
+var _operation_label: Label
+var _document_clusters: Dictionary = {}
 var tweak_callout_manager
 
 var stats_dock: Control = null
@@ -530,7 +539,7 @@ func _ready():
 	#   Library -> plain Button  (MOULDED). Its cyan appears nowhere in
 	#              ui_tokens.gd; it was the last survivor of the old sci-fi accent.
 	save_button.text = "SAVE BLUEPRINT"
-	test_button.text = "TEST IN ARENA"
+	test_button.text = "PROVING GROUND"
 	test_button.theme_type_variation = ""
 	library_button.text = "BLUEPRINT LIBRARY"
 	delete_button.text = "DISCARD PART"
@@ -1006,31 +1015,41 @@ func _build_stats_dock() -> void:
 	vision_detail_label.text = "Every weapon's reach fits inside this design's own vision."
 	vs_vbox.add_child(vision_detail_label)
 
-	# Main Console Frame: Centered in workspace and detached subtly from bottom with aggressive bevel/chamfer
+	# Bottom-edge document: a latched handle and focused pages.
 	console_root = PanelContainer.new()
 	console_root.name = "DesignCockpitConsole"
-	console_root.anchor_left = 0.5
-	console_root.anchor_top = 1.0
-	console_root.anchor_right = 0.5
-	console_root.anchor_bottom = 1.0
-	# Centered cleanly in the workbench view (width 1050px)
-	console_root.offset_left = -380.0
-	console_root.offset_right = 670.0
-	console_root.offset_top = -224.0
-	console_root.offset_bottom = -14.0
-	console_root.custom_minimum_size = Vector2(1050, 210)
+	console_root.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	console_root.mouse_filter = Control.MOUSE_FILTER_STOP
-	var main_box_style = _create_beveled_box(Color(0.07, 0.08, 0.09, 0.98), Color(0.48, 0.54, 0.58, 0.95), 10, 8)
-	console_root.add_theme_stylebox_override("panel", main_box_style)
+	console_root.add_theme_stylebox_override("panel", SliceTheme.panel_style("surface"))
 	add_child(console_root)
-
+	var document_column := VBoxContainer.new()
+	document_column.add_theme_constant_override("separation", Tokens.SPACE_XS)
+	console_root.add_child(document_column)
+	var handle_row := HBoxContainer.new()
+	document_column.add_child(handle_row)
+	_document_toggle = SliceShell.action(handle_row, "Design document  /  Hide", "secondary")
+	_document_toggle.name = "DocumentToggle"
+	_document_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_document_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_document_toggle.pressed.connect(func(): set_document_expanded(not _document_expanded))
+	_document_tabs = SliceShell.navigation_spine(document_column, [
+		{"id": "Design", "label": "Design"},
+		{"id": "Performance", "label": "Performance"},
+		{"id": "Build", "label": "Build"},
+		{"id": "Selected", "label": "Selected part"},
+	], "Performance", _select_document_page)
+	_document_body = ScrollContainer.new()
+	_document_body.name = "DocumentPages"
+	_document_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_document_body.follow_focus = true
+	_document_body.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	document_column.add_child(_document_body)
 	var hbox := HBoxContainer.new()
 	hbox.name = "ConsoleHBox"
-	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hbox.add_theme_constant_override("separation", 8)
-	console_root.add_child(hbox)
-
-	var cluster_style = _create_beveled_box(Color(0.11, 0.13, 0.14, 0.90), Color(0.32, 0.36, 0.40, 0.85), 6, 8)
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	_document_body.add_child(hbox)
+	var cluster_style := SliceTheme.panel_style("inset")
 
 	# =========================================================================
 	# CLUSTER 1: NAME AND SAVE / LOAD GROUP (Width: 245px)
@@ -1105,7 +1124,7 @@ func _build_stats_dock() -> void:
 
 	if test_button:
 		test_button.reparent(c1_vbox)
-		test_button.text = "TEST IN ARENA"
+		test_button.text = "PROVING GROUND"
 		test_button.custom_minimum_size = Vector2(0, 22)
 		UIFeedbackScript.wire(test_button)
 
@@ -1339,8 +1358,91 @@ func _build_stats_dock() -> void:
 	if dps_label and dps_label.get_parent() == null: add_child(dps_label)
 	if cost_label and cost_label.get_parent() == null: add_child(cost_label)
 
+	_document_clusters = {"Design": c1, "Performance": c2, "Build": c3, "Selected": c4}
+	for cluster: PanelContainer in _document_clusters.values():
+		cluster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for button: Button in [save_button, library_button, test_button, delete_button]:
+		SliceTheme.apply_action(button, "error" if button == delete_button else ("primary" if button == save_button else "secondary"))
+	for readout: Label in [combat_hp_label, combat_dps_label, combat_speed_label, combat_range_label, build_cost_label]:
+		readout.theme_type_variation = "HUDValueLabel"
+	for label: Label in [inspector_title_label, inspector_subtitle_label, inspector_stats_label, factory_name_label, combat_power_label, combat_weight_label]:
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size.x = 160
+	# Warnings occupy the performance page rather than the model's canvas.
+	for warning: PanelContainer in [overweight_alert_placard, power_alert_placard, vision_alert_placard]:
+		warning.reparent(c2_vbox)
+		warning.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		warning.custom_minimum_size = Vector2.ZERO
+		warning.add_theme_stylebox_override("panel", SliceTheme.panel_style("inset"))
 	lab_toolbar._build_toolbar()
+	_build_operation_strip()
+	resized.connect(_layout_document)
+	_layout_document()
+	UIFeedbackScript.wire_tree(self)
 
+
+
+# Task 4 screen composition. Geometry remains local to the Lab.
+func set_document_expanded(expanded: bool) -> void:
+	_document_expanded = expanded
+	_document_body.visible = expanded
+	_document_tabs.visible = expanded
+	_document_toggle.text = "Design document  /  Hide" if expanded else "Design document  /  Show"
+	_layout_document()
+
+func _select_document_page(page: String) -> void:
+	_document_page = page
+	for button: Button in _document_tabs.get_children():
+		var selected := button.text == ("Selected part" if page == "Selected" else page)
+		button.set_pressed_no_signal(selected)
+		SliceTheme.apply_action(button, "active" if selected else "secondary")
+	_layout_document()
+
+func _layout_document() -> void:
+	if not is_instance_valid(console_root):
+		return
+	var viewport_size := get_viewport_rect().size
+	console_root.offset_left = 330.0
+	console_root.offset_right = -Tokens.SPACE_MD
+	console_root.offset_bottom = -Tokens.SPACE_MD
+	var height := minf(300.0, viewport_size.y * 0.38) if _document_expanded else 52.0
+	console_root.offset_top = -Tokens.SPACE_MD - height
+	var wide := viewport_size.x >= 1500.0
+	for page: String in _document_clusters:
+		_document_clusters[page].visible = page == _document_page or (wide and page == "Design")
+	console_root.custom_minimum_size = Vector2.ZERO
+
+func _build_operation_strip() -> void:
+	var panel := PanelContainer.new()
+	panel.name = "OperationStrip"
+	panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	panel.offset_left = 330
+	panel.offset_right = -Tokens.SPACE_MD
+	panel.offset_top = Tokens.TOOLBAR_HEIGHT + Tokens.SPACE_SM
+	panel.add_theme_stylebox_override("panel", SliceTheme.panel_style("inset"))
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(panel)
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(column)
+	_operation_label = Label.new()
+	_operation_label.name = "OperationStatus"
+	_operation_label.text = "ASSEMBLE  /  Drag a part from the parts bin onto a hull face"
+	_operation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_operation_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_operation_label)
+	var gestures := Label.new()
+	gestures.text = "Right-drag: orbit   ·   Middle-drag: pan   ·   Wheel: zoom   ·   Click a part: tune"
+	gestures.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	gestures.theme_type_variation = "HintLabel"
+	gestures.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(gestures)
+	var placer := get_parent()
+	placer.placement_feedback.connect(_show_placement_feedback)
+
+func _show_placement_feedback(message: String, rejected: bool) -> void:
+	_operation_label.text = ("CANNOT FIT  /  " if rejected else "FITTED  /  ") + message
+	_operation_label.add_theme_color_override("font_color", Tokens.SIGNAL_ALERT if rejected else Tokens.TEXT_PRIMARY)
 
 func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 	if stats.is_empty():
@@ -1492,16 +1594,9 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 		if overweight_detail_label:
 			overweight_detail_label.text = "-%.1f m/s Speed Penalty (Chassis Overloaded)" % lost_spd if lost_spd > 0 else "Chassis capacity exceeded"
 
-		var target_top = -384.0 if is_over else -248.0
-		var target_height = 140.0 if is_over else 84.0
-		if overweight_alert_placard.offset_top != target_top:
-			if overweight_tween and overweight_tween.is_valid():
-				overweight_tween.kill()
-			overweight_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-			overweight_tween.tween_property(overweight_alert_placard, "offset_top", target_top, 0.3)
-			overweight_tween.parallel().tween_property(overweight_alert_placard, "offset_bottom", target_top + target_height, 0.3)
 
 		# Ghost opacity when condition is false
+		overweight_alert_placard.visible = is_over
 		if is_over:
 			overweight_alert_placard.modulate = Color(1, 1, 1, 1)
 		else:
@@ -1538,16 +1633,9 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 			else:
 				power_detail_label.text = "Energy systems offline - fit generator" if (active_draw > 0.0 and gen <= 0.0) else "Shortfall by %.1f kW (Brownout risk)" % (active_draw - gen)
 
-		var target_top = -384.0 if is_power_alert else -248.0
-		var target_height = 140.0 if is_power_alert else 84.0
-		if power_alert_placard.offset_top != target_top:
-			if power_tween and power_tween.is_valid():
-				power_tween.kill()
-			power_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-			power_tween.tween_property(power_alert_placard, "offset_top", target_top, 0.3)
-			power_tween.parallel().tween_property(power_alert_placard, "offset_bottom", target_top + target_height, 0.3)
 
 		# Ghost opacity when condition is false
+		power_alert_placard.visible = is_power_alert
 		if is_power_alert:
 			power_alert_placard.modulate = Color(1, 1, 1, 1)
 		else:
@@ -1590,16 +1678,9 @@ func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 				vision_detail_label.text = "Every weapon's reach fits inside this design's own vision."
 
 		var is_vision_alert = has_weapons and (required.size() > 0 or assisted.size() > 0)
-		var target_top = -384.0 if is_vision_alert else -248.0
-		var target_height = 140.0 if is_vision_alert else 84.0
-		if vision_alert_placard.offset_top != target_top:
-			if vision_tween and vision_tween.is_valid():
-				vision_tween.kill()
-			vision_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-			vision_tween.tween_property(vision_alert_placard, "offset_top", target_top, 0.3)
-			vision_tween.parallel().tween_property(vision_alert_placard, "offset_bottom", target_top + target_height, 0.3)
 
 		# Ghost opacity when condition is false
+		vision_alert_placard.visible = is_vision_alert
 		if is_vision_alert:
 			vision_alert_placard.modulate = Color(1, 1, 1, 1)
 		else:
@@ -1926,7 +2007,17 @@ func _on_blueprint_name_tooltip_update(new_text: String) -> void:
 		blueprint_name_edit.tooltip_text = new_text
 func _on_roll_name_pressed(): lab_toolbar._on_roll_name_pressed()
 
-func on_module_selected(module: Node3D): tweak_callout_manager.on_module_selected(module)
+func on_module_selected(module: Node3D):
+	tweak_callout_manager.on_module_selected(module)
+	if not is_instance_valid(_operation_label):
+		return
+	_operation_label.remove_theme_color_override("font_color")
+	if is_instance_valid(module) and module.has_meta("module_data"):
+		var data = module.get_meta("module_data")
+		_operation_label.text = "TUNE  /  %s  ·  Drag to move  ·  Arrows + Enter: ring actions  ·  Esc: close" % data.type_id.replace("_", " ").capitalize()
+		_select_document_page("Selected")
+	else:
+		_operation_label.text = "ASSEMBLE  /  Drag a part from the parts bin onto a hull face"
 func _on_size_value_changed(value: float): tweak_callout_manager._on_size_value_changed(value)
 func _on_count_value_changed(value: float): tweak_callout_manager._on_count_value_changed(value)
 func _on_wheels_per_axle_changed(value: float): tweak_callout_manager._on_wheels_per_axle_changed(value)

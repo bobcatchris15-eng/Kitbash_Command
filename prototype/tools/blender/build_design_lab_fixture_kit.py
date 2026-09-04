@@ -45,8 +45,14 @@ MATERIALS = (
 
 
 def gv(point: tuple[float, float, float]) -> tuple[float, float, float]:
-    """Godot X/Y/Z to Blender X/Z/Y, preserving the project convention."""
-    return (point[0], point[2], point[1])
+    """Map Godot X/Y/Z to Blender space without reflecting triangle winding.
+
+    Blender's glTF exporter maps its coordinates as X/Z/-Y into glTF's
+    X/Y/Z. Negating Godot Z here therefore produces the documented Godot
+    X-right, Y-up, +Z-forward result. The previous Y/Z swap had determinant
+    -1, so every hand-authored face was mirrored and rendered inside out.
+    """
+    return (point[0], -point[2], point[1])
 
 
 def clear_scene() -> None:
@@ -109,13 +115,13 @@ def cylinder_y(bm: bmesh.types.BMesh, centre: tuple[float, float, float], radius
         top.append(bm.verts.new(gv((centre[0] + x, centre[1] + height / 2, centre[2] + z))))
     for index in range(segments):
         next_index = (index + 1) % segments
-        face(bm, [bottom[index], bottom[next_index], top[next_index], top[index]], material)
+        face(bm, [top[index], top[next_index], bottom[next_index], bottom[index]], material)
     bottom_centre = bm.verts.new(gv((centre[0], centre[1] - height / 2, centre[2])))
     top_centre = bm.verts.new(gv((centre[0], centre[1] + height / 2, centre[2])))
     for index in range(segments):
         next_index = (index + 1) % segments
-        face(bm, [bottom[next_index], bottom[index], bottom_centre], material)
-        face(bm, [top[index], top[next_index], top_centre], material)
+        face(bm, [bottom_centre, bottom[index], bottom[next_index]], material)
+        face(bm, [top_centre, top[next_index], top[index]], material)
 
 
 def tube(bm: bmesh.types.BMesh, start: tuple[float, float, float], end: tuple[float, float, float],
@@ -124,15 +130,20 @@ def tube(bm: bmesh.types.BMesh, start: tuple[float, float, float], end: tuple[fl
     start_v, end_v = mathutils.Vector(gv(start)), mathutils.Vector(gv(end))
     direction = end_v - start_v
     midpoint = (start_v + end_v) / 2.0
-    before_faces = set(bm.faces)
-    bmesh.ops.create_cone(
+    for vertex in bm.verts:
+        vertex.tag = False
+    cone = bmesh.ops.create_cone(
         bm, cap_ends=True, cap_tris=True, segments=segments,
         radius1=radius, radius2=radius, depth=direction.length,
         matrix=mathutils.Matrix.Translation(midpoint) @ direction.to_track_quat("Z", "Y").to_matrix().to_4x4(),
     )
-    for new_face in bm.faces:
-        if new_face not in before_faces:
-            new_face.material_index = material
+    for vertex in cone["verts"]:
+        vertex.tag = True
+    new_faces = [new_face for new_face in bm.faces if all(vertex.tag for vertex in new_face.verts)]
+    for vertex in cone["verts"]:
+        vertex.tag = False
+    for new_face in new_faces:
+        new_face.material_index = material
 
 
 def bolt(bm: bmesh.types.BMesh, point: tuple[float, float, float], radius: float = 0.045) -> None:
@@ -262,8 +273,23 @@ def validate(obj: bpy.types.Object, specification: FixtureSpec) -> None:
         raise RuntimeError(f"{specification.name}: forward axis is not +Z")
     if [material.name for material in obj.data.materials] != [item[0] for item in MATERIALS]:
         raise RuntimeError(f"{specification.name}: material slots do not match fixture convention")
+    if not obj.data.polygons:
+        raise RuntimeError(f"{specification.name}: fixture has no surface polygons")
     if any(polygon.normal.length < 0.99 for polygon in obj.data.polygons):
         raise RuntimeError(f"{specification.name}: invalid outward normals")
+    if any(polygon.material_index < 0 or polygon.material_index >= len(obj.data.materials)
+           for polygon in obj.data.polygons):
+        raise RuntimeError(f"{specification.name}: polygon has an invalid material slot")
+    signed_volumes = [0.0 for _material in obj.data.materials]
+    for triangle in obj.data.loop_triangles:
+        a, b, c = (obj.data.vertices[index].co for index in triangle.vertices)
+        signed_volumes[triangle.material_index] += a.dot(b.cross(c)) / 6.0
+    for material_index, volume in enumerate(signed_volumes):
+        if volume <= 1e-6:
+            material_name = obj.data.materials[material_index].name
+            raise RuntimeError(
+                f"{specification.name}: {material_name} primitive has inward or degenerate winding ({volume})"
+            )
     triangle_count = len(obj.data.loop_triangles)
     if triangle_count > specification.triangle_limit:
         raise RuntimeError(f"{specification.name}: {triangle_count} triangles exceeds {specification.triangle_limit}")

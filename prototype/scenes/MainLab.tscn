@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://cxabmain1234"]
+[gd_scene load_steps=15 format=3 uid="uid://cxabmain1234"]
 
 ; WHAT THIS IS, AND WHY
 ;
@@ -50,6 +50,7 @@
 [ext_resource type="Script" path="res://scripts/part_thumbnail.gd" id="8_thumbs"]
 [ext_resource type="PackedScene" uid="uid://cxabpaintsta01" path="res://scenes/PaintStationEnvironment.tscn" id="9_paint_station"]
 [ext_resource type="PackedScene" uid="uid://cxabarmstat01" path="res://scenes/UI_ArmorStationPanel.tscn" id="10_armor_station"]
+[ext_resource type="PackedScene" path="res://assets/models/ui/lab_console_frame.glb" id="11_fixture_console"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_x3k"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -112,6 +113,11 @@ light_color = Color(0.78, 0.84, 0.92, 1)
 light_energy = 0.5
 
 [node name="LabEnvironment" parent="." instance=ExtResource("3_lab_env")]
+
+; A static, high-visibility gantry behind the floating hull proves the authored
+; fixture kit is live in the Design Lab without participating in placement.
+[node name="LabFixtureConsoleFrame" parent="." instance=ExtResource("11_fixture_console")]
+position = Vector3(0, 2, -3.4)
 
 [node name="PaintStationEnvironment" parent="." instance=ExtResource("9_paint_station")]
 visible = false

@@ -102,8 +102,10 @@
 
 ## Graph Freshness
 
-- `graphify-out/graph.json` rebuilt from commit `4f17a56c` on 2026-09-04.
-- Structural pass: 2,143 nodes, 4,590 edges, 183 communities.
+- Main checkout graph was rebuilt from commit `4f17a56c` on 2026-09-04 before the UI branch began.
+- Industrial UI rebuild worktree graph was rebuilt after integration on 2026-09-04.
+- Rebuilt worktree structural pass: 1,961 nodes, 4,634 edges, 146 communities.
+- Graphify 0.9.46 emitted the package/skill version warning, skipped sensitive `ui_tokens.gd`, and reported 166 zero-node non-code/config files; no graph failure occurred.
 - The installed Graphify package reported 34 legacy confidence-schema warnings while preserving the graph output; 1 sensitive file (`ui_tokens.gd`) remains intentionally skipped.
 
 ## Semantic Pass — 2026-09-04
@@ -142,3 +144,13 @@
 8. Independent rendered UX/visual audit and correction loop.
 
 **Authoring resources:** Blender, GIMP, Inkscape, and Godot 4.7.1 are available in the project environment. The skills.sh `design-ux` skill was retrieved and injected for independent rendered UX review. The public `extract-design-system` skill was reviewed but not used because it is for reverse-engineering public websites, not this local project.
+
+## Clanker Mode Skill Update — 2026-09-04
+
+- The current provider-neutral Clanker Mode reference is installed at `C:\Users\chris\.codex\skills\clanker-mode`; it supersedes the older duplicate under `C:\Users\chris\.agents\skills\clanker-mode`.
+- Integrated operating changes: bounded Clinker task-state expectations, explicit Routing Clonker classification for uncertain routing, harness-first model selection, Antigravity headless workers as an additional execution pool, and machine-readable worker receipts.
+- `agy models` currently exposes `gemini-3.8-flash-{low,medium,high}`. Use the exact discovered slug; keep effort/model selection task-shaped and do not treat model slugs as durable project truth.
+- First Antigravity receipt: read-only adversarial audit attempted with `gemini-3.8-flash-high`; the default permission policy denied repository reads, so no findings were accepted. A second strictly read-only rerun was attempted with the documented override, but produced no usable response receipt; no findings were accepted and no project mutation was observed.
+- Routing calibration: high-tier host Clinker for cross-screen UI architecture and final acceptance; Terra/Luna for bounded asset/mechanical work; Antigravity Flash for compact inspection, test, or repair packets; independent Clunker review remains required for release blockers and goal drift.
+- Human routing preference: default to lower-capability workers with strictly bounded context and explicit file allowlists. The most common Clinker/Clonker should be a lightweight headless packet, not a broad-context high-tier session.
+- OpenCode is a candidate additional headless pool using the user's `opencode run ... --file ...` pattern, with Big Pickle preferred when the local CLI exposes it. `opencode` is not installed or discoverable on this host as of this checkpoint, so no OpenCode receipt or model slug is being claimed; revisit only after installation/availability is confirmed.

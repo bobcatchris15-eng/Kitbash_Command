@@ -115,7 +115,7 @@ static func spawn_tandem_impact(parent: Node3D, world_pos: Vector3) -> GPUPartic
 		22.0                           # light_energy (bright, brief)
 	)
 	jet.global_position = world_pos
-	jet.basis = Basis.looking_at(Vector3.DOWN, Vector3.FORWARD)  # jet points DOWN into target
+	jet.rotation = Basis.looking_at(Vector3.DOWN, Vector3.FORWARD)  # jet points DOWN into target
 
 	# Stage 2: Fireball — follows ~0.06s after jet, broader thermal bloom.
 	# Use a short timer on the scene to sequence the second flash.

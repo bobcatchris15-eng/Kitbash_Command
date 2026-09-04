@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>nav_main_menu</title>
+  <g fill="none" stroke="#EFE9E5" stroke-width="4" stroke-linejoin="round">
+    <path d="M10 28 32 12l22 16v24H10z"/><path d="M24 52V36h16v16"/><path d="M18 28h28"/>
+  </g>
+</svg>

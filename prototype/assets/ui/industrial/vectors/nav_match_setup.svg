@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>nav_match_setup</title>
+  <g fill="none" stroke="#EFE9E5" stroke-width="4" stroke-linejoin="round">
+    <path d="M10 14h44v36H10z"/><path d="M16 22h14v10H16zM34 22h14v10H34zM16 38h32"/>
+  </g><path d="M18 44h10M36 44h10" fill="none" stroke="#E0AA2E" stroke-width="4" stroke-linecap="round"/>
+</svg>

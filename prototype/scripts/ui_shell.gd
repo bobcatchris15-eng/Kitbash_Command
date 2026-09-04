@@ -1,6 +1,7 @@
 class_name UIShell
 extends RefCounted
-# One layout primitive for the out-of-match screens.
+# Shared industrial-design screen structure. Screens own routes and game data;
+# this file owns the frame, destination controls and structural readouts.
 #
 # HISTORY, because the name promises more than the file delivers: this started
 # as a full shell toolkit - build_screen() to scaffold a full-bleed frame with a
@@ -20,6 +21,7 @@ extends RefCounted
 
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
+const Feedback = preload("res://scripts/ui_feedback.gd")
 const UIPropStageScript = preload("res://scripts/ui/ui_prop_stage.gd")
 
 
@@ -46,8 +48,8 @@ const UIPropStageScript = preload("res://scripts/ui/ui_prop_stage.gd")
 # spacing tokens exist to enforce. The canonical value is the one the two
 # already-correct screens use, which is also the frame UI_STYLE_GUIDE.md's
 # main-menu layout section describes.
-const SCREEN_MARGIN_H := Tokens.SPACE_XL + Tokens.SPACE_LG
-const SCREEN_MARGIN_V := Tokens.SPACE_LG
+const SCREEN_MARGIN_H := Tokens.SCREEN_MARGIN_H
+const SCREEN_MARGIN_V := Tokens.SCREEN_MARGIN_V
 
 
 # Full-bleed steel backdrop. Returns it so a caller that wants a non-default
@@ -154,12 +156,50 @@ static func screen_frame(parent: Node, margin_h: int = SCREEN_MARGIN_H,
 		margin_v: int = SCREEN_MARGIN_V) -> MarginContainer:
 	var frame := MarginContainer.new()
 	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.add_theme_constant_override("margin_left", margin_h)
 	frame.add_theme_constant_override("margin_right", margin_h)
 	frame.add_theme_constant_override("margin_top", margin_v)
 	frame.add_theme_constant_override("margin_bottom", margin_v)
 	parent.add_child(frame)
 	return frame
+
+
+# Entries: {id: String, label: String, disabled?: bool, tooltip?: String}.
+# Emits intent through on_navigate(id); only the owning screen changes scenes.
+# The current destination stays latched until the owner rebuilds the spine.
+static func navigation_spine(parent: Node, destinations: Array[Dictionary],
+		current: String, on_navigate: Callable) -> HBoxContainer:
+	var spine := HBoxContainer.new()
+	spine.name = "NavigationSpine"
+	spine.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	spine.add_theme_constant_override("separation", Tokens.NAVIGATION_GAP)
+	parent.add_child(spine)
+	for destination: Dictionary in destinations:
+		var id: String = destination.get("id", "")
+		var button := action(spine, destination.get("label", id),
+			"active" if id == current else "secondary", "select")
+		button.set_meta(&"destination_id", id)
+		button.tooltip_text = destination.get("tooltip", "")
+		button.disabled = destination.get("disabled", false)
+		button.toggle_mode = true
+		button.set_pressed_no_signal(id == current)
+		button.pressed.connect(func() -> void:
+			button.set_pressed_no_signal(id == current)
+			if not button.disabled and id != current and on_navigate.is_valid():
+				on_navigate.call(id)
+		)
+	return spine
+
+static func action(parent: Node, text: String, role: String = "secondary",
+		feedback_role: String = "default") -> Button:
+	var button := Button.new()
+	button.text = text
+	UITheme.apply_action(button, role)
+	button.disabled = role == "disabled"
+	parent.add_child(button)
+	Feedback.wire(button, feedback_role)
+	return button
 
 
 # A label/value pair for a specification readout. Value uses the tabular

@@ -228,6 +228,8 @@ var _library_row: HBoxContainer = null
 var _harvester_row: HBoxContainer = null
 var _building_row: HBoxContainer = null
 var _counter: Label = null
+var _library_sections: BoxContainer
+var _tray_sections: BoxContainer
 var _capacity: int = 12
 var _data_by_path: Dictionary = {}
 var _harvester_paths: Dictionary = {}  # path -> entry, for slot validation
@@ -267,7 +269,8 @@ func setup(entries: Array, capacity: int) -> void:
 			_repair_paths[path] = true
 
 	# --- Top row: three library strips side by side ---
-	var lib_row := HBoxContainer.new()
+	var lib_row := BoxContainer.new()
+	_library_sections = lib_row
 	lib_row.add_theme_constant_override("separation", Tokens.SPACE_MD)
 	lib_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(lib_row)
@@ -282,7 +285,8 @@ func setup(entries: Array, capacity: int) -> void:
 	# that the libraries plus one grid "all fit on a 900px viewport without
 	# scrolling". Side by side both are two rows tall, so the defence loadout
 	# costs width - which the tray has - instead of height, which it does not.
-	var trays := HBoxContainer.new()
+	var trays := BoxContainer.new()
+	_tray_sections = trays
 	trays.add_theme_constant_override("separation", Tokens.SPACE_MD)
 	trays.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(trays)
@@ -299,6 +303,16 @@ func setup(entries: Array, capacity: int) -> void:
 	_update_counter()
 
 	_bake_thumbnails(entries)
+	resized.connect(_fit_columns)
+	_fit_columns()
+
+func _fit_columns() -> void:
+	# Match Setup owns the vertical scroll viewport; the picker reflows its
+	# categories and wells without squeezing thumbnail labels below reading size.
+	var narrow := size.x < Tokens.NARROW_VIEWPORT_WIDTH
+	_library_sections.vertical = narrow
+	_tray_sections.vertical = narrow
+	_slot_grid.columns = 4 if narrow else 6
 
 
 # One library column. The three categories differ only in which entries they

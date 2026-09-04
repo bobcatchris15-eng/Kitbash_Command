@@ -1,4 +1,5 @@
 extends Node3D
+signal placement_feedback(message: String, rejected: bool)
 const ModuleDataResource = preload("res://scripts/module_data.gd")
 
 
@@ -270,6 +271,18 @@ func _ready():
 	# @onready references would still be null.
 	call_deferred("_restore_test_session")
 	call_deferred("_check_first_time_instructions")
+	call_deferred("_frame_inspection_view")
+
+func _frame_inspection_view() -> void:
+	# DesignerCamera reparents itself after its first frame.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var camera := get_viewport().get_camera_3d()
+	if camera and camera.get_parent() is Node3D:
+		camera.get_parent().rotation_degrees = Vector3(-24, -32, 0)
+		camera.set("_distance", 9.0)
+		camera.position.z = 9.0
+		camera.h_offset = -1.6
 
 func _restore_test_session() -> void:
 	var bp_manager = get_node_or_null("BlueprintManager")
@@ -916,6 +929,7 @@ func _place_weapon_from_ui(type_id: String, pos: Vector3, normal: Vector3, would
 	if refusal == "" and would_clip and category != "locomotion":
 		refusal = "%s would overlap a part already fitted." % catalog_data.get("name", type_id)
 	if refusal != "":
+		placement_feedback.emit(refusal + " Move to a clear mounting face.", true)
 		var bm_toast = get_node_or_null("BlueprintManager")
 		if bm_toast and bm_toast.has_method("_show_toast"):
 			bm_toast._show_toast(refusal, true)
@@ -944,6 +958,7 @@ func _place_weapon_from_ui(type_id: String, pos: Vector3, normal: Vector3, would
 			if primary and mirror:
 				primary.set_meta("mirrored_counterpart", mirror)
 				mirror.set_meta("mirrored_counterpart", primary)
+	placement_feedback.emit("%s fitted. Select it to tune or reposition." % catalog_data.get("name", type_id), false)
 
 ## Lightweight per-instance geometry update for locomotion tweaks that DON'T
 ## change how many module instances exist (wheel_size, wheels_per_axle,

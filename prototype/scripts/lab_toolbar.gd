@@ -4,12 +4,14 @@ extends RefCounted
 const UIStampScript = preload("res://scripts/ui_stamp.gd")
 const BlueprintNamerScript = preload("res://scripts/blueprint_namer.gd")
 const BlueprintManagerScript = preload("res://scripts/blueprint_manager.gd")
+const UITheme = preload("res://scripts/ui_theme.gd")
 const TestRangeLauncherScript = preload("res://scripts/test_range_launcher.gd")
 const MeshIconScript = preload("res://scripts/ui/mesh_icon.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const UIFeedbackScript = preload("res://scripts/ui_feedback.gd")
 const UIIconsScript = preload("res://scripts/ui_icons.gd")
 const UIShell = preload("res://scripts/ui_shell.gd")
+const SliceTheme = preload("res://scripts/ui_theme.gd")
 const PanTransitionOverlayScript = preload("res://scripts/pan_transition.gd")
 
 var lab: Node
@@ -293,6 +295,8 @@ func _on_armor_station_back(root: Node) -> void:
 # The three swaps. They all run in one frame behind the smear so the
 # player sees a single gesture, not three independent ones.
 func _apply_paint_mode_swap(root: Node) -> void:
+	if is_instance_valid(lab._operation_label):
+		lab._operation_label.text = "ARMOR STATION  /  Choose a material, then paint the hull facets"
 	var parts_menu: Control = root.get_node_or_null("UI_PartsMenu")
 	if parts_menu:
 		parts_menu.visible = false
@@ -317,6 +321,8 @@ func _apply_paint_mode_swap(root: Node) -> void:
 
 # The three reverse swaps. Also runs in one frame.
 func _apply_build_mode_swap(root: Node) -> void:
+	if is_instance_valid(lab._operation_label):
+		lab._operation_label.text = "ASSEMBLE  /  Drag a part from the parts bin onto a hull face"
 	var parts_menu: Control = root.get_node_or_null("UI_PartsMenu")
 	if parts_menu:
 		parts_menu.visible = true
@@ -405,6 +411,10 @@ func _build_toolbar() -> void:
 	var bar = PanelContainer.new()
 	bar.name = "Toolbar"
 	bar.theme_type_variation = "HeaderPanel"
+	var header_style := SliceTheme.panel_style("header")
+	header_style.content_margin_top = Tokens.SPACE_XS
+	header_style.content_margin_bottom = Tokens.SPACE_XS
+	bar.add_theme_stylebox_override("panel", header_style)
 	bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	bar.offset_left = 0.0
 	bar.offset_right = 0.0
@@ -419,7 +429,28 @@ func _build_toolbar() -> void:
 	# XS, not SM: the slots carry their own dividers now, so the gap between them
 	# only has to keep the rules off the content.
 	row.add_theme_constant_override("separation", Tokens.SPACE_XS)
-	bar.add_child(row)
+	# Focus-following overflow keeps every operation reachable on narrow windows.
+	var toolbar_scroll := ScrollContainer.new()
+	toolbar_scroll.name = "ToolbarScroll"
+	toolbar_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	toolbar_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	toolbar_scroll.follow_focus = true
+	bar.add_child(toolbar_scroll)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toolbar_scroll.add_child(row)
+	var mode_label := Label.new()
+	var lab_nav_icon := TextureRect.new()
+	lab_nav_icon.name = "DesignLabNavigationIcon"
+	lab_nav_icon.texture = UITheme.industrial_icon("nav_design_lab")
+	lab_nav_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	lab_nav_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	lab_nav_icon.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+	lab_nav_icon.modulate = Tokens.TEXT_PRIMARY
+	lab_nav_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(lab_nav_icon)
+	mode_label.text = "DESIGN LAB"
+	mode_label.theme_type_variation = "HeadingLabel"
+	row.add_child(mode_label)
 
 	# --- INFO SLOTS ---------------------------------------------------------
 	# Chris's model for the top bar: mostly transparent slots, each holding either
@@ -538,6 +569,9 @@ func _build_toolbar() -> void:
 	_toolbar_row = row
 
 	UIFeedbackScript.wire_tree(row)
+	for child in row.get_children():
+		if child is Button:
+			SliceTheme.apply_action(child, "secondary")
 
 	# The row must survive a viewport narrower than its natural width. Deferred
 	# for the same reason _verify_toolbar_height is: size is not final until
@@ -603,6 +637,9 @@ func _apply_toolbar_density() -> void:
 	# is the rect the bar is actually anchored into, which is the constraint the
 	# overflow audit checks against too.
 	var avail: float = toolbar.get_parent_area_size().x
+	for label in [_slot_hull_label, _slot_parts_label, _slot_cost_label]:
+		if is_instance_valid(label):
+			label.get_parent().visible = avail >= 1500
 	# Before the first layout there is no parent area yet. Measuring against
 	# zero would collapse everything to the tightest tier and stay there.
 	if avail <= 0.0:

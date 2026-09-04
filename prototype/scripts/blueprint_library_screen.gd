@@ -204,10 +204,24 @@ func _build_ui() -> void:
 	vbox.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	margin.add_child(vbox)
 
-	var header = Label.new()
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	var blueprint_icon := UITheme.industrial_icon("blueprint_status")
+	if blueprint_icon != null:
+		var icon_rect := TextureRect.new()
+		icon_rect.name = "BlueprintStatusIcon"
+		icon_rect.texture = blueprint_icon
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_rect.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		header_row.add_child(icon_rect)
+	var header := Label.new()
 	header.text = "BLUEPRINT LIBRARY"
 	header.theme_type_variation = "TitleLabel"
-	vbox.add_child(header)
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_row.add_child(header)
+	vbox.add_child(header_row)
 
 	var scroll = ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL

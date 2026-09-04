@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://cxabmain1234"]
+[gd_scene load_steps=20 format=3 uid="uid://cxabmain1234"]
 
 ; WHAT THIS IS, AND WHY
 ;
@@ -50,6 +50,12 @@
 [ext_resource type="Script" path="res://scripts/part_thumbnail.gd" id="8_thumbs"]
 [ext_resource type="PackedScene" uid="uid://cxabpaintsta01" path="res://scenes/PaintStationEnvironment.tscn" id="9_paint_station"]
 [ext_resource type="PackedScene" uid="uid://cxabarmstat01" path="res://scenes/UI_ArmorStationPanel.tscn" id="10_armor_station"]
+[ext_resource type="PackedScene" path="res://assets/models/ui/lab_console_frame.glb" id="11_fixture_console"]
+[ext_resource type="PackedScene" path="res://assets/models/ui/lab_document_clamp.glb" id="12_fixture_document"]
+[ext_resource type="PackedScene" path="res://assets/models/ui/lab_fixture_rail.glb" id="13_fixture_rail"]
+[ext_resource type="PackedScene" path="res://assets/models/ui/lab_inspection_lamp.glb" id="14_fixture_lamp"]
+[ext_resource type="PackedScene" path="res://assets/models/ui/lab_parts_tray.glb" id="15_fixture_tray"]
+[ext_resource type="PackedScene" path="res://assets/models/ui/lab_service_pedestal.glb" id="16_fixture_pedestal"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_x3k"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -59,18 +65,20 @@ ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
 sky_material = SubResource("ProceduralSkyMaterial_x3k")
 
 [sub_resource type="Environment" id="Environment_x3k"]
-background_mode = 2
+background_mode = 1
+background_color = Color(0.075, 0.075, 0.059, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.937, 0.914, 0.898, 1)
+ambient_light_energy = 0.65
 sky = SubResource("Sky_x3k")
 tonemap_mode = 4
 tonemap_exposure = 1.0
 ssao_enabled = true
 ssao_radius = 0.8
-ssao_intensity = 1.8
-glow_enabled = true
-glow_intensity = 0.85
-glow_bloom = 0.06
+ssao_intensity = 1.2
+glow_enabled = false
 adjustment_enabled = true
-adjustment_saturation = 1.18
+adjustment_saturation = 0.94
 adjustment_contrast = 1.06
 
 [sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_lab"]
@@ -100,9 +108,47 @@ environment = SubResource("Environment_x3k")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 0, 0)
+light_color = Color(1, 0.95, 0.88, 1)
+light_energy = 1.3
 shadow_enabled = true
 
+[node name="InspectionFill" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(25, -45, 0)
+light_color = Color(0.78, 0.84, 0.92, 1)
+light_energy = 0.5
+
 [node name="LabEnvironment" parent="." instance=ExtResource("3_lab_env")]
+
+; A static, high-visibility gantry behind the floating hull proves the authored
+; fixture kit is live in the Design Lab without participating in placement.
+[node name="LabFixtureConsoleFrame" parent="." instance=ExtResource("11_fixture_console")]
+position = Vector3(0, 2, -3.4)
+
+; The remaining fixture kit pieces are static set dressing. They stay low,
+; offset from the hull silhouette, and carry no collision or processing so the
+; active assembly and existing drag/camera interactions remain untouched.
+[node name="LabFixtureDocumentClamp" parent="." instance=ExtResource("12_fixture_document")]
+position = Vector3(-3.05, 1.92, 0.8)
+rotation_degrees = Vector3(0, -12, 0)
+scale = Vector3(0.65, 0.65, 0.65)
+
+[node name="LabFixtureRail" parent="." instance=ExtResource("13_fixture_rail")]
+position = Vector3(0, 2.26, -3.02)
+scale = Vector3(0.75, 0.75, 0.75)
+
+[node name="LabInspectionLamp" parent="." instance=ExtResource("14_fixture_lamp")]
+position = Vector3(-3.1, 1.92, -1.65)
+rotation_degrees = Vector3(0, 20, 0)
+scale = Vector3(0.7, 0.7, 0.7)
+
+[node name="LabPartsTray" parent="." instance=ExtResource("15_fixture_tray")]
+position = Vector3(3.0, 1.92, 0.95)
+rotation_degrees = Vector3(0, -16, 0)
+scale = Vector3(0.65, 0.65, 0.65)
+
+[node name="LabServicePedestal" parent="." instance=ExtResource("16_fixture_pedestal")]
+position = Vector3(3.55, 0.05, -2.15)
+scale = Vector3(0.65, 0.65, 0.65)
 
 [node name="PaintStationEnvironment" parent="." instance=ExtResource("9_paint_station")]
 visible = false

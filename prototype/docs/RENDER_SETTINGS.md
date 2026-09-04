@@ -1,5 +1,27 @@
 # Render settings — why the environment values are what they are
 
+## Task 7 inspection paint pass — 2026-09-04
+
+Current tunable values, pending rendered review:
+
+- Menu and Match Setup squadron preview use `UITheme.inspection_environment()`:
+  AgX, exposure 1.0, warm neutral ambient 0.65, SSAO radius 0.8/intensity 1.2,
+  no bloom or volumetric fog. This exposes unlit faces and keeps seams crisp.
+- Menu retains its local spot/rim geometry and energies 15.0/2.2, now using
+  shared warm key / neutral-cool fill tokens.
+- MainLab (including Armor Station) keeps AgX and ambient 0.65, reduces SSAO
+  intensity to 1.2, disables bloom, and adds an unshadowed inspection fill.
+  Key/fill energies are 1.3/0.5, colors `(1, .95, .88)` / `(.78, .84, .92)`.
+  These scene values mirror the shared inspection tokens; no new scene script
+  or resource loader was introduced. Existing camera/DOF behavior is unchanged.
+- Battle and HullBuilder rendering are unchanged. The historical claim below
+  that MainLab uses volumetric fog is stale: the current scene does not enable it.
+
+The prior rendered Task 4 capture crashed with Windows exit `-1073740791`
+(`0xC0000409`). Per the user's checkpoint instruction, Task 7 did **not** retry
+rendered capture. Headless import and scene probes validate resource/state
+contracts, not lighting appearance or GPU performance. See the Task 7 report.
+
 **Why this file exists.** These notes were written as `#` comments inside
 `Battle.tscn`, `MainLab.tscn` and `HullBuilder.tscn`. **Godot's text scene
 format does not support comments.** A `#` line inside a `[node]` block is a

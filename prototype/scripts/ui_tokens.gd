@@ -14,11 +14,9 @@ extends RefCounted
 # appear nowhere in the theme at all. A design system that only covers half
 # the screen isn't one, so the literals had to collect somewhere.
 #
-# DIRECTION (Chris): units are cartoonish and semi-zany, terrain is serious
-# and realistic, and all of it is played completely straight. The interface
-# is on the serious side of that split. Its job is to be a quiet, credible
-# instrument housing so the saturated toy-like units read as the loud thing
-# on screen. If the UI competes with the units for saturation, both lose.
+# Industrial design simulator: tactile, mechanically legible controls share
+# one semantic language. Values below are a tunable paint pass, not identity
+# constraints. Absurd weapon audio remains an independent expression channel.
 
 # ---------------------------------------------------------------------------
 # PALETTE
@@ -68,6 +66,37 @@ const ACCENT_INTERACTIVE = SIGNAL_HAZARD       # amber — selected, active, cli
 const ACCENT_CATEGORY    = BASE_500            # muted warm grey — category grouping
 const ACCENT_HARVESTER   = SIGNAL_INFO         # steel blue — harvester bay identity only
 
+# SHARED ROLE CONTRACT. Stable names; tune appearance without changing screens.
+const ACTION_ROLES: Array[String] = [
+	"primary", "secondary", "info", "warning", "error", "disabled", "selected", "active",
+]
+const CONTROL_STATES: Array[String] = ["normal", "hover", "pressed", "disabled"]
+const ROLE_PALETTE: Dictionary[String, Dictionary] = {
+	"primary": {"fill": SIGNAL_HAZARD_DIM, "edge": ACCENT_INTERACTIVE, "text": TEXT_PRIMARY},
+	"secondary": {"fill": BASE_700, "edge": BASE_500, "text": TEXT_PRIMARY},
+	"info": {"fill": BASE_700, "edge": SIGNAL_INFO, "text": TEXT_PRIMARY},
+	"warning": {"fill": SIGNAL_HAZARD_DIM, "edge": SIGNAL_HAZARD, "text": TEXT_PRIMARY},
+	"error": {"fill": SIGNAL_ALERT_DIM, "edge": SIGNAL_ALERT, "text": TEXT_PRIMARY},
+	"disabled": {"fill": BASE_900, "edge": BASE_500, "text": TEXT_DISABLED},
+	"selected": {"fill": SIGNAL_HAZARD_DIM, "edge": ACCENT_INTERACTIVE, "text": TEXT_PRIMARY},
+	"active": {"fill": BASE_600, "edge": ACCENT_INTERACTIVE, "text": TEXT_PRIMARY},
+}
+const ROLE_HOVER_MIX: float = 0.35
+const ROLE_PRESSED_MIX: float = 0.35
+const SELECTED_RULE_WIDTH: int = 3
+const ACTIVE_RULE_WIDTH: int = 5
+
+static func role_colors(role: String, state: String = "normal") -> Dictionary:
+	var resolved := "disabled" if state == "disabled" or role == "disabled" else role
+	var colors: Dictionary = ROLE_PALETTE.get(resolved, ROLE_PALETTE["secondary"]).duplicate()
+	if resolved != "disabled":
+		var fill: Color = colors["fill"]
+		if state == "hover":
+			colors["fill"] = fill.lerp(BASE_600, ROLE_HOVER_MIX)
+		elif state == "pressed":
+			colors["fill"] = fill.lerp(BASE_900, ROLE_PRESSED_MIX)
+	return colors
+
 # ---------------------------------------------------------------------------
 # TYPE SCALE
 # ---------------------------------------------------------------------------
@@ -77,10 +106,10 @@ const ACCENT_HARVESTER   = SIGNAL_INFO         # steel blue — harvester bay id
 # else on screen.
 const FONT_DISPLAY = 40  # title screen wordmark only
 const FONT_TITLE = 24    # screen titles
-const FONT_HEADING = 17  # panel/section headers
-const FONT_BODY = 15     # default reading size
-const FONT_SMALL = 13    # secondary/hint text
-const FONT_MICRO = 11    # dense tabular readouts, footnotes
+const FONT_HEADING = 18  # operational section headers, bold UI sans
+const FONT_BODY = 16     # default reading size
+const FONT_SMALL = 14    # secondary/hint text
+const FONT_MICRO = 12    # non-operational footnotes only
 
 # ---------------------------------------------------------------------------
 # SPACING - a 4px base grid. Every margin and gap should be one of these.
@@ -112,6 +141,10 @@ const SPACE_SM = 8
 const SPACE_MD = 12
 const SPACE_LG = 20
 const SPACE_XL = 32
+
+const SCREEN_MARGIN_H: int = SPACE_XL + SPACE_LG
+const SCREEN_MARGIN_V: int = SPACE_LG
+const NAVIGATION_GAP: int = SPACE_SM
 
 # ---------------------------------------------------------------------------
 # GEOMETRY
@@ -196,6 +229,19 @@ const DURATION_SLOW = 0.4      # scene fade, full-screen overlay
 # in ~0.4s, which reads as one gesture sweeping down the list. Much larger and
 # the last row arrives late enough to feel like a loading bug.
 const STAGGER_STEP = 0.035
+
+# Motion paint pass: amplitudes, timing ratios and special-case periods belong
+# here too. UIAnim keeps the original public duration aliases for callers.
+const STAGGER_MAX_TOTAL: float = 0.45
+const HOVER_SCALE: float = 1.015
+const PRESS_SCALE: float = 0.97
+const PRESS_ATTACK_RATIO: float = 0.4
+const RING_START_SCALE: float = 0.72
+const RING_FADE_RATIO: float = 0.7
+const ENTRANCE_OFFSET := Vector2(0, SPACE_MD)
+const SHAKE_AMPLITUDE: float = 4.0
+const SHAKE_STEPS: int = 3
+const SPOTLIGHT_PERIOD: float = 0.6
 
 const EASE_STANDARD := Tween.EASE_OUT
 const TRANS_STANDARD := Tween.TRANS_CUBIC
@@ -324,6 +370,20 @@ const MAP_TILE_MIN = Vector2(196, 132)      # one map in the chooser rail
 const MAP_MARKER_R = 6.0         # schematic marker radius, px
 const MAP_MARKER_EDGE = 2.0
 const SUMMARY_COL_MIN = 320
+const COMPACT_VIEWPORT_WIDTH: float = 1280.0
+const NARROW_VIEWPORT_WIDTH: float = 960.0
+const STAGE_TRANSITION_OFFSET := Vector2(SPACE_MD, 0)
+
+# Inspection paint pass: same neutral fill and AgX response for the menu,
+# Lab and squadron preview. Battle keeps its separately measured pipeline.
+const INSPECTION_AMBIENT: float = 0.65
+const INSPECTION_EXPOSURE: float = 1.0
+const INSPECTION_KEY_COLOR := Color(1.0, 0.95, 0.88)
+const INSPECTION_FILL_COLOR := Color(0.78, 0.84, 0.92)
+const INSPECTION_KEY_ENERGY: float = 1.3
+const INSPECTION_FILL_ENERGY: float = 0.5
+const SHOWCASE_SPOT_ENERGY: float = 15.0
+const SHOWCASE_RIM_ENERGY: float = 2.2
 
 const MAP_TERRAIN = BASE_600
 const MAP_WATER = SIGNAL_INFO

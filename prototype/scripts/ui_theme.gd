@@ -4,12 +4,129 @@ class_name UITheme
 # the shader-backed backdrop, and a few "style this node like X" shortcuts
 # for controls built in code.
 #
-# Everything with a StyleBox belongs in tools/build_ui_theme.gd instead.
-# This file is for what has to happen at runtime.
+# The generated Theme remains the legacy baseline. Runtime semantic factories
+# below let shared shell controls use roles without regenerating that resource.
 
 const MATERIAL_SHADER = preload("res://shaders/ui_material.gdshader")
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const LiveryScript = preload("res://scripts/livery.gd")
+const INDUSTRIAL_MANIFEST_PATH := "res://assets/ui/industrial/manifest.json"
+const INDUSTRIAL_ICON_TYPE := "IndustrialIcons"
+const INDUSTRIAL_FIELD_TYPE := "IndustrialFields"
+
+static var _industrial_manifest_cache: Dictionary = {}
+static var _industrial_icon_cache: Dictionary = {}
+static var _industrial_plate_cache: Dictionary = {}
+
+
+# The authored industrial manifest is the production registry for vectors,
+# material fields, state plates, 9-slice geometry and weathering defaults.
+# Keeping path and material metadata together prevents the runtime helper and
+# generated Theme from silently drifting onto two different asset libraries.
+static func industrial_manifest() -> Dictionary:
+	if not _industrial_manifest_cache.is_empty():
+		return _industrial_manifest_cache
+	var file := FileAccess.open(INDUSTRIAL_MANIFEST_PATH, FileAccess.READ)
+	if file == null:
+		push_error("UITheme: missing industrial manifest '%s'" % INDUSTRIAL_MANIFEST_PATH)
+		return {}
+	var parsed = JSON.parse_string(file.get_as_text())
+	if not parsed is Dictionary:
+		push_error("UITheme: invalid industrial manifest JSON")
+		return {}
+	_industrial_manifest_cache = parsed
+	return _industrial_manifest_cache
+
+
+static func industrial_vector_spec(key: String) -> Dictionary:
+	return industrial_manifest().get("vectors", {}).get(key, {})
+
+
+static func industrial_material_spec(material: String) -> Dictionary:
+	return industrial_manifest().get("materials", {}).get(material, {})
+
+
+static func industrial_material_for_role(role: String) -> String:
+	return industrial_manifest().get("theme_roles", {}).get(role, "")
+
+
+static func industrial_icon(key: String) -> Texture2D:
+	if _industrial_icon_cache.has(key):
+		return _industrial_icon_cache[key]
+	var spec := industrial_vector_spec(key)
+	var path: String = spec.get("path", "")
+	var texture: Texture2D = null
+	if not path.is_empty() and ResourceLoader.exists(path):
+		texture = load(path) as Texture2D
+	else:
+		push_warning("UITheme: missing industrial vector '%s'" % key)
+	_industrial_icon_cache[key] = texture
+	return texture
+
+
+static func industrial_plate_texture(material: String, state: String) -> Texture2D:
+	var cache_key := "%s/%s" % [material, state]
+	if _industrial_plate_cache.has(cache_key):
+		return _industrial_plate_cache[cache_key]
+	var spec := industrial_material_spec(material)
+	var path: String = spec.get("plate", {}).get("states", {}).get(state, "")
+	var texture: Texture2D = null
+	if not path.is_empty() and ResourceLoader.exists(path):
+		texture = load(path) as Texture2D
+	else:
+		push_warning("UITheme: missing industrial plate '%s'" % cache_key)
+	_industrial_plate_cache[cache_key] = texture
+	return texture
+
+
+static func industrial_material_field(material: String) -> Texture2D:
+	if _field_cache.has(material):
+		return _field_cache[material]
+	var spec := industrial_material_spec(material)
+	var path: String = spec.get("field", {}).get("path", "")
+	var texture: Texture2D = null
+	if not path.is_empty() and ResourceLoader.exists(path):
+		texture = load(path) as Texture2D
+	else:
+		push_warning("UITheme: missing industrial material field '%s'" % material)
+	_field_cache[material] = texture
+	return texture
+
+# Shared type ownership for the generated theme. Display stays on large titles;
+# operations use sans, and only numeric/telemetry variations use mono.
+static func configure_typography(theme: Theme, ui: Font, bold: Font, display: Font, mono: Font) -> void:
+	if ui:
+		theme.default_font = ui
+		theme.set_font("font", "LineEdit", ui)
+	theme.default_font_size = Tokens.FONT_BODY
+	var sizes := {"Label": Tokens.FONT_BODY, "DisplayLabel": Tokens.FONT_DISPLAY,
+		"TitleLabel": Tokens.FONT_TITLE, "HeadingLabel": Tokens.FONT_HEADING,
+		"HintLabel": Tokens.FONT_SMALL, "HUDValueLabel": Tokens.FONT_HEADING,
+		"StatLabel": Tokens.FONT_SMALL}
+	for type: String in sizes:
+		theme.set_font_size("font_size", type, sizes[type])
+		theme.set_color("font_color", type, Tokens.TEXT_SECONDARY if type in ["HintLabel", "StatLabel"] else Tokens.TEXT_PRIMARY)
+	if display:
+		for type in ["DisplayLabel", "TitleLabel"]: theme.set_font("font", type, display)
+	if bold: theme.set_font("font", "HeadingLabel", bold)
+	if mono:
+		for type in ["HUDValueLabel", "StatLabel"]: theme.set_font("font", type, mono)
+
+static func inspection_environment() -> Environment:
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Tokens.BASE_900
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	env.tonemap_exposure = Tokens.INSPECTION_EXPOSURE
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Tokens.TEXT_PRIMARY
+	env.ambient_light_energy = Tokens.INSPECTION_AMBIENT
+	env.ssao_enabled = true
+	env.ssao_radius = 0.8
+	env.ssao_intensity = 1.2
+	# Inspection needs crisp seams and selection edges, not bloom around them.
+	env.glow_enabled = false
+	return env
 
 # ---------------------------------------------------------------------------
 # MATERIAL VOCABULARY
@@ -39,62 +156,11 @@ const MATERIALS = [
 	"bakelite", "wood",
 ]
 
-const FIELD_DIR = "res://assets/textures/ui/"
-
-# Per-material shader defaults. Kept here rather than at call sites so that
-# "canvas" looks like canvas everywhere without every caller remembering to
-# turn the vignette down on cloth.
-const MATERIAL_DEFAULTS = {
-	# L0 workbench. Fields only - L0 is a backdrop register, not a control
-	# register, and these materials have no plates (see tools/generate_ui_plates.py,
-	# which is a separate script from the L0 field PNGs that exist on disk).
-	# Brightness 0.85 lands each L0 final luminance in the 0.07-0.10 range -
-	# visible as a hobby desk, near the 0.42-brightness steel backdrop (which
-	# lands at 0.084), and well below the powdercoat panel body at ~0.110. The
-	# floor/surface/control stack stays strictly ascending.
-	"cutting_mat": {"wear": 0.10, "grime": 0.18, "scale": 1.2, "vignette": 0.18, "brightness": 0.85},
-	"cardboard":   {"wear": 0.12, "grime": 0.16, "scale": 1.0, "vignette": 0.20, "brightness": 0.85},
-	"kraft":       {"wear": 0.14, "grime": 0.18, "scale": 1.0, "vignette": 0.22, "brightness": 0.85},
-	"cork":        {"wear": 0.16, "grime": 0.14, "scale": 1.1, "vignette": 0.20, "brightness": 0.85},
-	"chipboard":   {"wear": 0.18, "grime": 0.16, "scale": 1.0, "vignette": 0.22, "brightness": 0.85},
-	# L1 equipment.
-	"powdercoat": {"wear": 0.25, "grime": 0.20, "scale": 1.0, "vignette": 0.30},
-	"steel":      {"wear": 0.35, "grime": 0.12, "scale": 1.0, "vignette": 0.22},
-	"moulded":    {"wear": 0.10, "grime": 0.18, "scale": 0.8, "vignette": 0.18},
-	# Cloth does not scuff to a bright edge and does not carry a corner
-	# falloff the way a curved metal plate does - it is matte and flat.
-	"canvas":     {"wear": 0.06, "grime": 0.30, "scale": 0.7, "vignette": 0.12},
-	"carbon":     {"wear": 0.04, "grime": 0.08, "scale": 0.6, "vignette": 0.20},
-	"fiberglass": {"wear": 0.15, "grime": 0.14, "scale": 1.0, "vignette": 0.24},
-	# The Design Lab parts dock, and nothing else. wear is LOW despite this
-	# being the most worn-looking surface in the game: the chips and scratches
-	# are baked into field_toolbox.png as actual bare metal, and stacking the
-	# shader's luminance scuff on top of them just washes the enamel out. grime
-	# runs high instead - a toolbox collects dirt in every recess.
-	"toolbox":    {"wear": 0.05, "grime": 0.34, "scale": 1.0, "vignette": 0.34},
-	# Commander's desk surface - warm bakelite plastic. Slightly worn, grimey.
-	"bakelite":   {"wear": 0.15, "grime": 0.25, "scale": 1.0, "vignette": 0.35, "brightness": 0.75},
-	# Paint bay / Armor station workbench - warm planed timber finish.
-	"wood":       {"wear": 0.08, "grime": 0.15, "scale": 1.0, "vignette": 0.22, "brightness": 0.52},
-}
-
 static var _field_cache: Dictionary = {}
 
 
 static func material_field(material: String) -> Texture2D:
-	if _field_cache.has(material):
-		return _field_cache[material]
-	var path := FIELD_DIR + "field_%s.png" % material
-	var tex: Texture2D = null
-	if ResourceLoader.exists(path):
-		tex = load(path) as Texture2D
-	else:
-		# Not an error worth crashing over - the shader falls back to a flat
-		# base_color - but it IS worth saying, because the symptom otherwise is
-		# a panel that looks merely a bit plain.
-		push_warning("UITheme: missing material field '%s'" % path)
-	_field_cache[material] = tex
-	return tex
+	return industrial_material_field(material)
 
 
 # Paints a named MATERIAL onto a node. The general entry point; prefer this
@@ -106,9 +172,11 @@ static func material_field(material: String) -> Texture2D:
 # at every other window size.
 static func apply_material(node: CanvasItem, material: String,
 		overrides: Dictionary = {}) -> void:
-	if material not in MATERIALS:
+	var material_spec := industrial_material_spec(material)
+	if material_spec.is_empty():
 		push_warning("UITheme: unknown material '%s'" % material)
 		material = "powdercoat"
+		material_spec = industrial_material_spec(material)
 
 	var mat := node.material as ShaderMaterial
 	if not mat or mat.shader != MATERIAL_SHADER:
@@ -120,7 +188,7 @@ static func apply_material(node: CanvasItem, material: String,
 	mat.set_shader_parameter("material_field", field)
 	mat.set_shader_parameter("has_field", field != null)
 
-	var d: Dictionary = MATERIAL_DEFAULTS.get(material, MATERIAL_DEFAULTS["powdercoat"])
+	var d: Dictionary = material_spec.get("wear", {})
 	mat.set_shader_parameter("wear_amount", overrides.get("wear", d["wear"]))
 	mat.set_shader_parameter("grime_amount", overrides.get("grime", d["grime"]))
 	mat.set_shader_parameter("field_scale", overrides.get("scale", d["scale"]))
@@ -129,7 +197,7 @@ static func apply_material(node: CanvasItem, material: String,
 	# materials carry 0.70 to keep the floor low), or 1.0 for materials that
 	# do not specify one (the L1 equipment, where panels and controls are at
 	# their authored luminance).
-	mat.set_shader_parameter("brightness", overrides.get("brightness", d.get("brightness", 1.0)))
+	mat.set_shader_parameter("brightness", overrides.get("brightness", d["brightness"]))
 	mat.set_shader_parameter("tint_strength", overrides.get("tint_strength", 0.0))
 	if overrides.has("tint"):
 		mat.set_shader_parameter("accent_tint", overrides["tint"])
@@ -289,6 +357,74 @@ static func flat_style(fill: Color = Tokens.BASE_800, edge: Color = Tokens.BASE_
 	sb.set_content_margin_all(margin)
 	Tokens.apply_elevation(sb, tier)
 	return sb
+
+
+# Shared panel/material roles. Material names describe the authored finish;
+# flat styles provide a legible fallback before a screen's asset pass.
+const PANEL_ROLES: Dictionary[String, Dictionary] = {
+	"surface": {"material": "powdercoat", "fill": Tokens.BASE_800, "tier": "raised"},
+	"inset": {"material": "moulded", "fill": Tokens.BASE_900, "tier": "flush"},
+	"header": {"material": "steel", "fill": Tokens.BASE_700, "tier": "raised"},
+	"navigation": {"material": "steel", "fill": Tokens.BASE_800, "tier": "flush"},
+	"floating": {"material": "canvas", "fill": Tokens.BASE_800, "tier": "floating"},
+	"modal": {"material": "powdercoat", "fill": Tokens.BASE_800, "tier": "modal"},
+}
+
+static func panel_style(role: String = "surface") -> StyleBoxFlat:
+	var spec: Dictionary = PANEL_ROLES.get(role, PANEL_ROLES["surface"])
+	return flat_style(spec["fill"], Tokens.BASE_500, Tokens.SPACE_MD, spec["tier"])
+
+static func panel_material(role: String = "surface") -> String:
+	return PANEL_ROLES.get(role, PANEL_ROLES["surface"])["material"]
+
+static func action_style(role: String = "secondary", state: String = "normal") -> StyleBoxFlat:
+	var colors := Tokens.role_colors(role, state)
+	var box := flat_style(colors["fill"], colors["edge"])
+	box.set_corner_radius_all(Tokens.RADIUS_CONTROL)
+	# Persistence is conveyed by geometry as well as hue. Disabled wins over it.
+	if state != "disabled" and role != "disabled":
+		if role == "selected":
+			box.border_width_left = Tokens.SELECTED_RULE_WIDTH
+		elif role == "active":
+			box.border_width_left = Tokens.ACTIVE_RULE_WIDTH
+	return box
+
+static func focus_style() -> StyleBoxFlat:
+	var box := flat_style(Color.TRANSPARENT, Tokens.ACCENT_INTERACTIVE, 0,
+		"flush", Tokens.BORDER_EMPHASIS)
+	box.draw_center = false
+	return box
+
+# A draw hook also covers TextureButton, LinkButton and Slider, which do not
+# all consume a native "focus" StyleBox. It adds no layout or input surface.
+static func ensure_focus(ctrl: Control) -> void:
+	if ctrl is SpinBox:
+		ensure_focus((ctrl as SpinBox).get_line_edit())
+		return
+	ctrl.focus_mode = Control.FOCUS_ALL
+	ctrl.add_theme_stylebox_override("focus", focus_style())
+	var redraw := ctrl.queue_redraw
+	if not ctrl.focus_entered.is_connected(redraw):
+		ctrl.focus_entered.connect(redraw)
+		ctrl.focus_exited.connect(redraw)
+	var draw_focus := _draw_focus.bind(ctrl)
+	if not ctrl.draw.is_connected(draw_focus):
+		ctrl.draw.connect(draw_focus)
+
+static func _draw_focus(ctrl: Control) -> void:
+	if ctrl.has_focus():
+		ctrl.get_theme_stylebox("focus").draw(ctrl.get_canvas_item(), Rect2(Vector2.ZERO, ctrl.size))
+
+static func apply_action(button: Button, role: String = "secondary") -> Button:
+	for state: String in Tokens.CONTROL_STATES:
+		button.add_theme_stylebox_override(state, action_style(role, state))
+	button.add_theme_stylebox_override("hover_pressed", action_style(role, "pressed"))
+	for state: String in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		var key := "font_color" if state == "normal" else "font_%s_color" % state
+		button.add_theme_color_override(key, Tokens.role_colors(role, state)["text"])
+	button.custom_minimum_size.y = maxf(button.custom_minimum_size.y, Tokens.HIT_TARGET_MIN)
+	ensure_focus(button)
+	return button
 
 
 # Authored screen chrome, monochrome white SVG tinted with `modulate` at the

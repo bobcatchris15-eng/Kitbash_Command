@@ -40,6 +40,9 @@ var _station_container: Control = null
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	focus_mode = Control.FOCUS_ALL
+	focus_entered.connect(queue_redraw)
+	focus_exited.connect(queue_redraw)
 	_station_container = Control.new()
 	_station_container.name = "StationContainer"
 	_station_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -99,6 +102,7 @@ func add_tweak_station(tweak_name: String, label: String, control: Control, p_ti
 		"tier": tier,
 	})
 	_station_container.add_child(control)
+	preload("res://scripts/ui_feedback.gd").wire_tree(control)
 	_update_station_positions()
 
 
@@ -118,17 +122,22 @@ func open_for_module(module: Node3D) -> void:
 	_update_screen_position()
 	_update_station_positions()
 	UIAnim.ring_pop(self)
+	grab_focus()
+	_step_action(1)
 
 
 func close() -> void:
 	if not _is_open:
 		return
 	_is_open = false
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	focus_mode = Control.FOCUS_NONE
+	_station_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dismissed.emit()
 	var tween := create_tween()
 	if tween:
-		tween.tween_property(self, "scale", Vector2(0.6, 0.6), 0.1)
-		tween.parallel().tween_property(self, "modulate:a", 0.0, 0.1)
+		tween.tween_property(self, "scale", Vector2(0.6, 0.6), Tokens.DURATION_FAST)
+		tween.parallel().tween_property(self, "modulate:a", 0.0, Tokens.DURATION_FAST)
 		tween.tween_callback(queue_free)
 	else:
 		queue_free()
@@ -207,6 +216,23 @@ func _has_point(point: Vector2) -> bool:
 func _gui_input(event: InputEvent) -> void:
 	if not _is_open:
 		return
+	if event.is_action_pressed("ui_right") or event.is_action_pressed("ui_down"):
+		_step_action(1)
+		accept_event()
+		return
+	if event.is_action_pressed("ui_left") or event.is_action_pressed("ui_up"):
+		_step_action(-1)
+		accept_event()
+		return
+	if event.is_action_pressed("ui_accept"):
+		if _hovered >= 0 and _actions[_hovered].get("enabled", true):
+			action_invoked.emit(_actions[_hovered]["id"])
+		accept_event()
+		return
+	if event.is_action_pressed("ui_cancel"):
+		accept_event()
+		close()
+		return
 
 	if event is InputEventMouseMotion:
 		var prev := _hovered
@@ -231,6 +257,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		close()
 
+func _step_action(direction: int) -> void:
+	if _actions.is_empty():
+		return
+	for i in range(_actions.size()):
+		_hovered = posmod(_hovered + direction, _actions.size())
+		if _actions[_hovered].get("enabled", true):
+			break
+	queue_redraw()
+
 
 func _draw() -> void:
 	var font := get_theme_font("font", "Label")
@@ -238,6 +273,8 @@ func _draw() -> void:
 		font = ThemeDB.fallback_font
 	
 	var center := size * 0.5
+	if has_focus():
+		draw_arc(center, outer_radius + 4.0, 0, TAU, 96, Tokens.TEXT_PRIMARY, 2.0, true)
 	
 	# Draw spoke connector lines to active tweak stations
 	for st in _tweak_stations:

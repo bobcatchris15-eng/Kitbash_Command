@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>blueprint_status</title>
+  <g fill="none" stroke="#ADA899" stroke-width="3" stroke-linejoin="round">
+    <path d="M14 10h28l8 8v36H14zM42 10v10h10"/><path d="M22 30h20M22 38h14M22 46h20"/>
+  </g><path d="M44 34v16M36 42h16" stroke="#E0AA2E" stroke-width="3" stroke-linecap="round"/>
+</svg>

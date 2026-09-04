@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>slot_module</title>
+  <g fill="none" stroke="#ADA899" stroke-width="3" stroke-linejoin="round">
+    <path d="M14 18h36v28H14z"/><path d="M22 18v-6h20v6M22 46v6h20v-6"/>
+    <path d="M26 26h12v12H26z"/>
+  </g><path d="M32 22v20M22 32h20" stroke="#607FA8" stroke-width="2" stroke-linecap="round"/>
+</svg>

@@ -365,11 +365,52 @@ func _build_library_column(entries: Array, category: String, heading_text: Strin
 	col.add_child(tray)
 
 	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_SM + 12)
+	scroll.custom_minimum_size = Vector2(0, CARD_SIZE.y + Tokens.SPACE_SM + 24)
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tray.add_child(scroll)
+
+	var hsb := scroll.get_h_scroll_bar()
+	hsb.custom_minimum_size = Vector2(0, 10)
+
+	var hsb_grabber := StyleBoxFlat.new()
+	hsb_grabber.bg_color = Tokens.BASE_400
+	hsb_grabber.corner_radius_top_left = 3
+	hsb_grabber.corner_radius_top_right = 3
+	hsb_grabber.corner_radius_bottom_left = 3
+	hsb_grabber.corner_radius_bottom_right = 3
+
+	var hsb_grabber_hl := StyleBoxFlat.new()
+	hsb_grabber_hl.bg_color = Tokens.SIGNAL_HAZARD
+	hsb_grabber_hl.corner_radius_top_left = 3
+	hsb_grabber_hl.corner_radius_top_right = 3
+	hsb_grabber_hl.corner_radius_bottom_left = 3
+	hsb_grabber_hl.corner_radius_bottom_right = 3
+
+	var hsb_grabber_pressed := StyleBoxFlat.new()
+	hsb_grabber_pressed.bg_color = Tokens.SIGNAL_HAZARD.lightened(0.15)
+	hsb_grabber_pressed.corner_radius_top_left = 3
+	hsb_grabber_pressed.corner_radius_top_right = 3
+	hsb_grabber_pressed.corner_radius_bottom_left = 3
+	hsb_grabber_pressed.corner_radius_bottom_right = 3
+
+	var hsb_track := StyleBoxFlat.new()
+	hsb_track.bg_color = Tokens.BASE_900
+	hsb_track.border_color = Tokens.BASE_600
+	hsb_track.set_border_width_all(1)
+	hsb_track.corner_radius_top_left = 3
+	hsb_track.corner_radius_top_right = 3
+	hsb_track.corner_radius_bottom_left = 3
+	hsb_track.corner_radius_bottom_right = 3
+	hsb_track.content_margin_top = 2
+	hsb_track.content_margin_bottom = 2
+
+	hsb.add_theme_stylebox_override("grabber", hsb_grabber)
+	hsb.add_theme_stylebox_override("grabber_highlight", hsb_grabber_hl)
+	hsb.add_theme_stylebox_override("grabber_pressed", hsb_grabber_pressed)
+	hsb.add_theme_stylebox_override("scroll", hsb_track)
+	hsb.add_theme_stylebox_override("scroll_focus", hsb_track)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", Tokens.SPACE_SM)

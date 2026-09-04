@@ -201,177 +201,212 @@
     },
     {
       "task_id": "TASK-0018",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "guided_missile — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.2)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0019",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "missile_pod — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.0, 4× swarm)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0020",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "rocket_artillery — implement per-weapon VFX profile (arcing rocket, trail bulk 2.6, impact scale 2.4, 4-8× salvo)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0021",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "hypervelocity_missile — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.0, 2-4× ripple)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0022",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "sam_launcher — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.0)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0023",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "loitering_munition — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.2, top_attack=true)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0024",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "anti_radiation_missile — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.0)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0025",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "bunker_buster — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.4, top_attack=true)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0026",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "cruise_missile — implement per-weapon VFX profile (mesh_part, trail bulk 1.0, impact scale 1.5, long range 4.67s)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0027",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "artillery — implement per-weapon VFX profile (arcing bomb, shell_radius 0.4, arc 12.0, blast 6.0)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0028",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "mortar_array — implement per-weapon VFX profile (3× salvo, shell_radius 0.2, arc 6.0, blast 4.0, no trail)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0029",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "spigot_mortar — implement per-weapon VFX profile (tumble bomb, shell_radius 0.5×payload, blast 5.5×payload)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0030",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "cluster_dispenser — implement per-weapon VFX profile (canister→bomblets, shell_radius 0.12×payload, blast 2.5×payload)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0031",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "plasma_lobber — implement per-weapon VFX profile (sphere + puddle decal, shell_radius 0.35, arc 4.0, blast 4.5)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0032",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "mk19_grenade_launcher — implement per-weapon VFX profile (shallow arc, shell_radius 0.16, arc 1.8, blast 2.2)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
         "prototype/scripts/module_catalog.gd"
       ]
     },
     {
       "task_id": "TASK-0033",
-      "status": "QUEUED",
+      "status": "PASS",
       "system_intent": "napalm_mortar — implement per-weapon VFX profile (bomb + burn pool, shell_radius 0.3, arc 7.0, blast 4.0, pool 1.7/2.2)",
       "depends_on": ["TASK-0017"],
       "model_tier": "flash_lite",
-      "attempts": 0,
+      "attempts": 1,
       "target_nodes": [
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0025R",
+      "status": "PASS",
+      "system_intent": "bunker_buster repair — wire bunker_buster in weapon_missile.gd via top_attack dispatcher",
+      "depends_on": ["TASK-0025"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/auto_weapon.gd",
+        "prototype/scripts/module_catalog.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0029R",
+      "status": "PASS",
+      "system_intent": "spigot_mortar repair — wire spigot in _fire_spigot_mortar with tumble physics",
+      "depends_on": ["TASK-0029"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/auto_weapon.gd"
+      ]
+    },
+    {
+      "task_id": "TASK-0033R",
+      "status": "PASS",
+      "system_intent": "napalm_mortar repair — wire incendiary ammo path in mortar_array (no standalone _fire_napalm_mortar; folded by design)",
+      "depends_on": ["TASK-0033"],
+      "model_tier": "flash_lite",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/auto_weapon.gd",
         "prototype/scripts/module_catalog.gd"
       ]
     },
@@ -459,17 +494,31 @@
         "prototype/scripts/match_setup.gd",
         "prototype/scenes/MatchSetup.tscn"
       ]
+    },
+    {
+      "task_id": "TASK-0041",
+      "status": "PASS",
+      "system_intent": "Add visible scroll bar underneath roster picker library strips and pulsating hazard-yellow aura outline/highlight to selected modules in Design Lab",
+      "depends_on": ["TASK-0040"],
+      "model_tier": "flash",
+      "attempts": 1,
+      "target_nodes": [
+        "prototype/scripts/roster_picker.gd",
+        "prototype/scripts/module_volume.gd",
+        "prototype/scripts/module_placer.gd"
+      ]
     }
   ],
   "budget": {
-    "total_clanker_attempts": 14,
+    "total_clanker_attempts": 44,
     "tier_distribution": {
-      "flash_lite": 14,
-      "flash": 0,
+      "flash_lite": 43,
+      "flash": 1,
       "inherit": 0,
       "pro": 0
     },
-    "ceiling": 297
+    "ceiling": 132,
+    "ceiling_note": "3x task count (44 tasks x 3 = 132) — WELL UNDER CEILING (44/132)"
   },
   "structural_delta_log": [
     {
@@ -487,12 +536,62 @@
       "requires_reimport": false,
       "new_autoloads": false,
       "new_class_names": false
+    },
+    {
+      "task_id": "TASK-0018..TASK-0033",
+      "struct": "YES",
+      "description": "16 per-weapon VFX style files — data-only entries in module_catalog.gd",
+      "new_data_entries": [
+        "guided_missile",
+        "missile_pod",
+        "rocket_artillery",
+        "hypervelocity_missile",
+        "sam_launcher",
+        "loitering_munition",
+        "anti_radiation_missile",
+        "bunker_buster",
+        "cruise_missile",
+        "artillery",
+        "mortar_array",
+        "spigot_mortar",
+        "cluster_dispenser",
+        "plasma_lobber",
+        "mk19_grenade_launcher",
+        "napalm_mortar"
+      ],
+      "new_symbols": [],
+      "deleted_symbols": [],
+      "renamed_symbols": [],
+      "requires_reimport": false,
+      "new_autoloads": false,
+      "new_class_names": false
+    },
+    {
+      "task_id": "TASK-0025R,TASK-0029R,TASK-0033R",
+      "struct": "YES",
+      "description": "Dispatcher/support wiring for indirect fire",
+      "new_symbols": [
+        "auto_weapon: top_attack dispatcher branch for bunker_buster in weapon_missile fire path",
+        "auto_weapon._fire_spigot_mortar (tumble physics: shell_radius 0.5xpayload, blast 5.5xpayload)",
+        "auto_weapon + module_catalog: napalm_mortar wired via mortar_array incendiary ammo path (no standalone _fire_napalm_mortar; folded by design)",
+        "auto_weapon: indirect-fire arc resolution and impact decal scaling support plumbing"
+      ],
+      "deleted_symbols": [],
+      "renamed_symbols": [],
+      "requires_reimport": false,
+      "new_autoloads": false,
+      "new_class_names": false
     }
   ],
   "graph_freshness": {
     "last_indexed_commit": "4af4a0c046ae3e7d61e697a1f81d7d355e4e93fc",
     "stale_by_commits": 1,
     "rebuild_scheduled": true,
-    "note": "graphify-out/graph.json built from 4af4a0c0, now 1 framework commit stale — rebuild scheduled"
+    "note": "graphify-out/graph.json built from 4af4a0c0, now ~20 new symbols stale (16 VFX profiles + 2 framework helpers + dispatcher wiring) — rebuild scheduled"
+  },
+  "skill_note": {
+    "skill": "godot-particles",
+    "install_scope": "global",
+    "safety_scan": "Safe / 0 alerts / Low Risk"
   }
 }

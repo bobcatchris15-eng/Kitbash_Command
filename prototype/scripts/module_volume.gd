@@ -46,7 +46,7 @@
 # happened to be selected measured its own gizmo handles into its click
 # collider (the handles sit out at the module's extents, so the box grew by
 # roughly the handle offset in every direction the moment you clicked it).
-const OVERLAY_PREFIXES := ["Gizmo3D", "ArcCone", "FiringArc", "BarrierShield", "DamageFX"]
+const OVERLAY_PREFIXES := ["Gizmo3D", "ArcCone", "FiringArc", "BarrierShield", "DamageFX", "SelectedHighlight"]
 # DamageFX is the runtime battle-damage overlay (module_damage_fx.gd: smoke
 # leak emitter plus cracked stencil cards). It draws ON the module but must not
 # measure AS the module - its sticker quads would otherwise fatten click

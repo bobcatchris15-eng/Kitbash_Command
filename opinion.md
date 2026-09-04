@@ -55,3 +55,12 @@
 > When commanders are planning an engagement, forcing them through linear back-and-forth wizard gates feels like filing tax forms. But completely trashing the staged flow would have alienated anyone wanting a deliberate, step-by-step onboarding walkthrough. The persistent console toggle `[MODE: WAR ROOM OPS-TABLE]` delivers the best of both doctrines.
 > 
 > Uniting Theatre Recon on the left (with crisp USGS topographic schematics and SITREP briefing), the 3D Squadron Apron turntable and Roster Tray in the center, and the Engagement Directives with real-time Echelon Manifest accounting on the right turns the match setup screen into an actual hardened command deck. What's especially satisfying is the seamless state preservation: reparenting `roster_picker` between the staged host and the ops deck means not a single vehicle card, filter query, or slot assignment is lost or duplicated across layout shifts. Dropping a tank into a well immediately recalculates deployment costs on the manifest and wheels out the chassis onto the turntable apron in real time. Clankers gonna clank."
+
+---
+
+### [2026-09-03 20:48] - Selection Highlights & Library Navigation Clanker (TASK-0041 Unit)
+> "Two major tactile feedback gaps closed in this cycle: library strip navigation in match setup and part focus awareness in the Design Lab.
+> 
+> Previously, the horizontal unit cards in the roster picker library strips relied on implicit scroll gestures, which felt frustratingly invisible when trying to survey a large lineup of armored designs. Forcing `scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS`, expanding the minimum container height by 24px, and applying dedicated `Tokens.BASE_900`/`Tokens.BASE_600` track and `Tokens.SIGNAL_HAZARD` grabber styling gives players an unmistakable, military-grade scroll channel underneath the unit trays.
+> 
+> In the Design Lab, selecting a module previously felt ambiguous in complex clusters. By introducing `_build_selected_highlight()`, selected components now immediately pop with a pulsating hazard-yellow gradient aura (`UITokens.SIGNAL_HAZARD`), complete with tactical bounding cage wires and corner brackets. Crucially, registering `SelectedHighlight` in `OVERLAY_PREFIXES` in `module_volume.gd` and filtering it out in `module_placer._find_meshes_recursive()` ensures this vibrant 3D selection aura never pollutes physics raycasts, volume bounding envelopes, or clipping checks. Clean visuals, zero mechanical interference. Clankers gonna clank."

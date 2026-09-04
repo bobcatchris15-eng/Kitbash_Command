@@ -567,6 +567,9 @@ func _select_module(module: Node3D):
 		var new_gizmo = Gizmo3D.instantiate()
 		new_gizmo.name = "Gizmo3D"
 		selected_module.add_child(new_gizmo)
+
+		if selected_module != hull:
+			selected_module.add_child(_build_selected_highlight(selected_module))
 		
 		# Show/hide handles based on module category
 		if selected_module.has_meta("module_data") or selected_module == hull:
@@ -1693,9 +1696,142 @@ func _deselect_module():
 		# it again, and the firing arc is permanently orphaned from
 		# cleanup (visible forever, even after later real deselects).
 		for child in selected_module.get_children():
-			if child.name == "ArcCone":
+			if child.name == "ArcCone" or child.name.begins_with("SelectedHighlight"):
 				selected_module.remove_child(child)
 				child.free()
+
+
+func _build_selected_highlight(module: Node3D) -> Node3D:
+	var highlight := Node3D.new()
+	highlight.name = "SelectedHighlight"
+	if not module or not is_instance_valid(module):
+		return highlight
+
+	var box_list: Array = ModuleVolumeScript.boxes(module)
+	if box_list.is_empty():
+		box_list = ModuleVolumeScript.clip_boxes(module)
+
+	if box_list.is_empty() and module.has_meta("module_data"):
+		var mdata = module.get_meta("module_data")
+		if mdata and "type_id" in mdata:
+			var cdata = ModuleCatalog.get_module_data(mdata.type_id)
+			var csize: Vector3 = cdata.get("size", Vector3(0.5, 0.5, 0.5))
+			var half: Vector3 = csize * 0.5
+			box_list = [{
+				"c": Vector3.ZERO,
+				"h0": Vector3(half.x, 0, 0),
+				"h1": Vector3(0, half.y, 0),
+				"h2": Vector3(0, 0, half.z),
+			}]
+
+	if box_list.is_empty():
+		box_list = [{
+			"c": Vector3.ZERO,
+			"h0": Vector3(0.25, 0, 0),
+			"h1": Vector3(0, 0.25, 0),
+			"h2": Vector3(0, 0, 0.25),
+		}]
+
+	var aura_mat := StandardMaterial3D.new()
+	aura_mat.albedo_color = Color(UITokens.SIGNAL_HAZARD.r, UITokens.SIGNAL_HAZARD.g, UITokens.SIGNAL_HAZARD.b, 0.4)
+	aura_mat.emission_enabled = true
+	aura_mat.emission = UITokens.SIGNAL_HAZARD
+	aura_mat.emission_energy_multiplier = 2.0
+	aura_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	aura_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	aura_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	aura_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+
+	var wire_mat := StandardMaterial3D.new()
+	wire_mat.albedo_color = UITokens.SIGNAL_HAZARD
+	wire_mat.emission_enabled = true
+	wire_mat.emission = UITokens.SIGNAL_HAZARD
+	wire_mat.emission_energy_multiplier = 2.5
+	wire_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wire_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	wire_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	wire_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+
+	for b in box_list:
+		var c: Vector3 = b.get("c", Vector3.ZERO)
+		var h0: Vector3 = b.get("h0", Vector3(0.2, 0, 0))
+		var h1: Vector3 = b.get("h1", Vector3(0, 0.2, 0))
+		var h2: Vector3 = b.get("h2", Vector3(0, 0, 0.2))
+
+		var len_x: float = maxf(0.04, h0.length())
+		var len_y: float = maxf(0.04, h1.length())
+		var len_z: float = maxf(0.04, h2.length())
+
+		var u: Vector3 = h0.normalized() if h0.length_squared() > 1e-6 else Vector3.RIGHT
+		var v: Vector3 = h1.normalized() if h1.length_squared() > 1e-6 else Vector3.UP
+		var w: Vector3 = h2.normalized() if h2.length_squared() > 1e-6 else Vector3.BACK
+		var basis := Basis(u, v, w)
+		var xf := Transform3D(basis, c)
+
+		var margin: float = 0.04
+		var hx: float = len_x + margin
+		var hy: float = len_y + margin
+		var hz: float = len_z + margin
+
+		# 1. Translucent aura BoxMesh
+		var glow_mi := MeshInstance3D.new()
+		var box_mesh := BoxMesh.new()
+		box_mesh.size = Vector3(hx * 2.0, hy * 2.0, hz * 2.0)
+		glow_mi.mesh = box_mesh
+		glow_mi.material_override = aura_mat
+		glow_mi.transform = xf
+		highlight.add_child(glow_mi)
+
+		# 2. Wireframe bounding cage & corner brackets
+		var line_pts: Array[Vector3] = []
+		# 12 cage edges
+		line_pts.append(Vector3(-hx, -hy, -hz)); line_pts.append(Vector3(hx, -hy, -hz))
+		line_pts.append(Vector3(-hx, -hy, hz)); line_pts.append(Vector3(hx, -hy, hz))
+		line_pts.append(Vector3(-hx, hy, -hz)); line_pts.append(Vector3(hx, hy, -hz))
+		line_pts.append(Vector3(-hx, hy, hz)); line_pts.append(Vector3(hx, hy, hz))
+
+		line_pts.append(Vector3(-hx, -hy, -hz)); line_pts.append(Vector3(-hx, hy, -hz))
+		line_pts.append(Vector3(hx, -hy, -hz)); line_pts.append(Vector3(hx, hy, -hz))
+		line_pts.append(Vector3(-hx, -hy, hz)); line_pts.append(Vector3(-hx, hy, hz))
+		line_pts.append(Vector3(hx, -hy, hz)); line_pts.append(Vector3(hx, hy, hz))
+
+		line_pts.append(Vector3(-hx, -hy, -hz)); line_pts.append(Vector3(-hx, -hy, hz))
+		line_pts.append(Vector3(hx, -hy, -hz)); line_pts.append(Vector3(hx, -hy, hz))
+		line_pts.append(Vector3(-hx, hy, -hz)); line_pts.append(Vector3(-hx, hy, hz))
+		line_pts.append(Vector3(hx, hy, -hz)); line_pts.append(Vector3(hx, hy, hz))
+
+		# Corner brackets
+		var arm: float = minf(0.12, minf(hx, minf(hy, hz)) * 0.45)
+		for sx in [-1.0, 1.0]:
+			for sy in [-1.0, 1.0]:
+				for sz in [-1.0, 1.0]:
+					var p := Vector3(sx * hx, sy * hy, sz * hz)
+					line_pts.append(p); line_pts.append(p - Vector3(sx * arm, 0, 0))
+					line_pts.append(p); line_pts.append(p - Vector3(0, sy * arm, 0))
+					line_pts.append(p); line_pts.append(p - Vector3(0, 0, sz * arm))
+
+		var cage_im := ImmediateMesh.new()
+		cage_im.surface_begin(Mesh.PRIMITIVE_LINES)
+		for pt in line_pts:
+			cage_im.surface_add_vertex(pt)
+		cage_im.surface_end()
+
+		var cage_mi := MeshInstance3D.new()
+		cage_mi.mesh = cage_im
+		cage_mi.material_override = wire_mat
+		cage_mi.transform = xf
+		highlight.add_child(cage_mi)
+
+	# Subtle pulsing loop on aura alpha when entered tree
+	highlight.tree_entered.connect(func():
+		if not is_instance_valid(highlight) or not highlight.is_inside_tree():
+			return
+		var tw := highlight.create_tween().set_loops()
+		tw.tween_property(aura_mat, "albedo_color:a", 0.15, 0.8).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(aura_mat, "albedo_color:a", 0.40, 0.8).set_trans(Tween.TRANS_SINE)
+	)
+
+	return highlight
 
 # Firing envelope preview.
 #
@@ -3001,7 +3137,7 @@ static func _clipping_material() -> StandardMaterial3D:
 	return _clipping_mat
 
 func _find_meshes_recursive(node: Node, result: Array):
-	if node.name == "ArcCone" or node.name.begins_with("Gizmo3D"):
+	if node.name == "ArcCone" or node.name.begins_with("Gizmo3D") or node.name.begins_with("SelectedHighlight"):
 		return
 	if node is MeshInstance3D:
 		result.append(node)

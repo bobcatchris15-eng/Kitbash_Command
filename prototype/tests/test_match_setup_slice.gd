@@ -1,4 +1,5 @@
 extends SceneTree
+const UITheme = preload("res://scripts/ui_theme.gd")
 
 # Task 5 screen-contract probe. Run with Godot headless; it exercises the
 # scene's presentation state without committing a match or loading Battle.
@@ -34,6 +35,9 @@ func _run() -> void:
 
 	_check(setup.find_child("MatchSetupReadiness", true, false) != null,
 		"readiness state is named for launch and assistive inspection")
+	var readiness_icon := setup.find_child("MatchSetupReadinessIcon", true, false) as TextureRect
+	_check(readiness_icon != null and readiness_icon.texture == UITheme.industrial_icon("state_selected"),
+		"active setup progression uses the authored selected state icon")
 	_check(setup.find_child("StageTheatre", true, false) != null,
 		"theatre stage has a stable semantic name")
 	_check(setup.find_child("StageRoster", true, false) != null,
@@ -54,6 +58,12 @@ func _run() -> void:
 	var readiness := setup.find_child("MatchSetupReadiness", true, false) as Label
 	_check(readiness != null and readiness.text != "",
 		"launch review exposes a non-empty readiness explanation")
+	_check(readiness_icon != null and (readiness_icon.texture == UITheme.industrial_icon("state_invalid") or
+		readiness_icon.texture == UITheme.industrial_icon("state_ready")),
+		"launch readiness keeps an authored state icon")
+	var spawn_marker := setup.find_child("IndustrialSpawnMarker", true, false) as TextureRect
+	_check(spawn_marker != null and spawn_marker.texture == UITheme.industrial_icon("map_spawn_marker"),
+		"theatre legend uses the authored deployment marker")
 
 	root.size = Vector2i(960, 720)
 	DisplayServer.window_set_size(Vector2i(960, 720))

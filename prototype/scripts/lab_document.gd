@@ -9,6 +9,7 @@ var _document_body: ScrollContainer
 var _document_tabs: HBoxContainer
 var _document_toggle: Button
 var _operation_label: Label
+var _operation_icon: TextureRect
 var _assembly_health_label: Label
 var _document_clusters: Dictionary = {}
 var tweak_callout_manager
@@ -1436,12 +1437,25 @@ func _build_operation_strip() -> void:
 	var column := VBoxContainer.new()
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(column)
+	var operation_row := HBoxContainer.new()
+	operation_row.add_theme_constant_override("separation", Tokens.SPACE_SM)
+	operation_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(operation_row)
+	_operation_icon = TextureRect.new()
+	_operation_icon.name = "OperationStateIcon"
+	_operation_icon.texture = SliceTheme.industrial_icon("drop_target")
+	_operation_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_operation_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_operation_icon.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+	_operation_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	operation_row.add_child(_operation_icon)
 	_operation_label = Label.new()
 	_operation_label.name = "OperationStatus"
 	_operation_label.text = "ASSEMBLE  /  Drag a part from the parts bin onto a hull face"
 	_operation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_operation_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(_operation_label)
+	_operation_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	operation_row.add_child(_operation_label)
 	_assembly_health_label = Label.new()
 	_assembly_health_label.name = "AssemblyHealthIndicator"
 	_assembly_health_label.theme_type_variation = "HintLabel"
@@ -1462,6 +1476,16 @@ func _build_operation_strip() -> void:
 func _show_placement_feedback(message: String, rejected: bool) -> void:
 	_operation_label.text = ("CANNOT FIT  /  " if rejected else "FITTED  /  ") + message
 	_operation_label.add_theme_color_override("font_color", Tokens.SIGNAL_ALERT if rejected else Tokens.TEXT_PRIMARY)
+	_set_operation_icon("state_invalid" if rejected else "state_ready", Tokens.SIGNAL_ALERT if rejected else Tokens.TEXT_PRIMARY)
+
+
+func _set_operation_icon(key: String, tint: Color) -> void:
+	if _operation_icon == null:
+		return
+	var texture := SliceTheme.industrial_icon(key)
+	if texture != null:
+		_operation_icon.texture = texture
+		_operation_icon.modulate = tint
 
 func update_stats_display(stats: Dictionary, hull: Node3D) -> void:
 	if stats.is_empty():
@@ -2049,9 +2073,11 @@ func on_module_selected(module: Node3D):
 	if is_instance_valid(module) and module.has_meta("module_data"):
 		var data = module.get_meta("module_data")
 		_operation_label.text = "TUNE  /  %s  ·  Drag to move  ·  Arrows + Enter: ring actions  ·  Esc: close" % data.type_id.replace("_", " ").capitalize()
+		_set_operation_icon("state_selected", Tokens.TEXT_PRIMARY)
 		_select_document_page("Selected")
 	else:
 		_operation_label.text = "ASSEMBLE  /  Drag a part from the parts bin onto a hull face"
+		_set_operation_icon("drop_target", Tokens.TEXT_PRIMARY)
 func _on_size_value_changed(value: float): tweak_callout_manager._on_size_value_changed(value)
 func _on_count_value_changed(value: float): tweak_callout_manager._on_count_value_changed(value)
 func _on_wheels_per_axle_changed(value: float): tweak_callout_manager._on_wheels_per_axle_changed(value)

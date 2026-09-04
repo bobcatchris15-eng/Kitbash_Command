@@ -686,6 +686,17 @@ func _build_top_ribbon(parent: Control) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", Tokens.SPACE_SM)
 	panel.add_child(row)
+	var menu_icon := UITheme.industrial_icon("nav_main_menu")
+	if menu_icon != null:
+		var icon_rect := TextureRect.new()
+		icon_rect.name = "MainMenuNavigationIcon"
+		icon_rect.texture = menu_icon
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_rect.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+		icon_rect.modulate = Tokens.TEXT_PRIMARY
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon_rect)
 	var title := Label.new()
 	title.text = TITLE
 	title.theme_type_variation = "TitleLabel"
@@ -744,6 +755,17 @@ func _add_destination(item: Dictionary, role: String = "secondary", node_name: S
 		button.name = node_name
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.tooltip_text = item["desc"]
+	var icon_key := ""
+	match str(item.get("scene", "")):
+		"res://scenes/MainLab.tscn": icon_key = "nav_design_lab"
+		"res://scenes/MatchSetup.tscn": icon_key = "nav_match_setup"
+	if not icon_key.is_empty():
+		var icon := UITheme.industrial_icon(icon_key)
+		if icon != null:
+			button.icon = icon
+			button.expand_icon = true
+			button.add_theme_constant_override("icon_max_width", Tokens.SPINE_ICON)
+			button.add_theme_constant_override("h_separation", Tokens.SPACE_SM)
 	button.set_meta("destination", item["scene"])
 	button.pressed.connect(func(): _activate_destination(item))
 	if role == "primary":

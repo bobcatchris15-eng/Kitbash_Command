@@ -4,6 +4,7 @@ extends RefCounted
 const UIStampScript = preload("res://scripts/ui_stamp.gd")
 const BlueprintNamerScript = preload("res://scripts/blueprint_namer.gd")
 const BlueprintManagerScript = preload("res://scripts/blueprint_manager.gd")
+const UITheme = preload("res://scripts/ui_theme.gd")
 const TestRangeLauncherScript = preload("res://scripts/test_range_launcher.gd")
 const MeshIconScript = preload("res://scripts/ui/mesh_icon.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
@@ -438,6 +439,15 @@ func _build_toolbar() -> void:
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar_scroll.add_child(row)
 	var mode_label := Label.new()
+	var lab_nav_icon := TextureRect.new()
+	lab_nav_icon.name = "DesignLabNavigationIcon"
+	lab_nav_icon.texture = UITheme.industrial_icon("nav_design_lab")
+	lab_nav_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	lab_nav_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	lab_nav_icon.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+	lab_nav_icon.modulate = Tokens.TEXT_PRIMARY
+	lab_nav_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(lab_nav_icon)
 	mode_label.text = "DESIGN LAB"
 	mode_label.theme_type_variation = "HeadingLabel"
 	row.add_child(mode_label)

@@ -40,6 +40,7 @@ signal part_unhovered()
 
 const ModuleCatalog = preload("res://scripts/module_catalog.gd")
 const ArmorPaint = preload("res://scripts/armor_paint.gd")
+const UITheme = preload("res://scripts/ui_theme.gd")
 const Tokens = preload("res://scripts/ui_tokens.gd")
 const UIAnim = preload("res://scripts/ui_anim.gd")
 const ToolboxPlateScript = preload("res://scripts/ui_toolbox_plate.gd")
@@ -654,6 +655,17 @@ func _build_part_card(type_id: String, data: Dictionary) -> Button:
 	icon_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	icon_rect.add_child(icon_tex)
 	btn.set_meta("thumbnail_rect", icon_tex)
+	var slot_icon := TextureRect.new()
+	slot_icon.name = "SlotModuleIcon"
+	slot_icon.texture = UITheme.industrial_icon("slot_module")
+	slot_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	slot_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	slot_icon.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+	slot_icon.size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+	slot_icon.position = Vector2(Tokens.SPACE_XS, Tokens.SPACE_XS)
+	slot_icon.modulate = Tokens.TEXT_SECONDARY
+	slot_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_rect.add_child(slot_icon)
 	
 	# The catalog accent as a painted stripe inside the icon area
 	var stripe = ColorRect.new()

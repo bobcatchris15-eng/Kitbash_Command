@@ -141,6 +141,7 @@ var _ops_table_page: Control = null
 var _ops_mode_btn: Button = null
 var _nav_bar: Control = null
 var _stage_roster_host: Control = null
+var _readiness_icon: TextureRect = null
 var _ops_roster_host: Control = null
 
 var _ops_map_select: OptionButton = null
@@ -484,6 +485,13 @@ func _build_nav() -> Control:
 	_readiness.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_readiness.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_readiness.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_readiness_icon = TextureRect.new()
+	_readiness_icon.name = "MatchSetupReadinessIcon"
+	_readiness_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_readiness_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_readiness_icon.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+	_readiness_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_readiness_icon)
 	row.add_child(_readiness)
 
 	UIFeedbackScript.wire(_back_btn)
@@ -525,6 +533,7 @@ func _refresh_readiness() -> void:
 	if _stage < STAGES.size() - 1:
 		_readiness.text = "STEP %d OF %d — %s" % [_stage + 1, STAGES.size(), str(STAGES[_stage]["caption"])]
 		_readiness.add_theme_color_override("font_color", Tokens.TEXT_SECONDARY)
+		_set_readiness_icon("state_selected", Tokens.TEXT_SECONDARY)
 		return
 	var manual_count := roster_picker.filled_unit_count() + roster_picker.filled_defence_count() if roster_picker else 0
 	var has_auto_draft: bool = bp_manager != null and not bp_manager.list_blueprints(true).is_empty()
@@ -533,12 +542,24 @@ func _refresh_readiness() -> void:
 	if manual_count > 0:
 		_readiness.text = "READY — %d DESIGN%s FIELD ASSIGNED" % [manual_count, "S" if manual_count != 1 else ""]
 		_readiness.add_theme_color_override("font_color", Tokens.SIGNAL_GO)
+		_set_readiness_icon("state_ready", Tokens.SIGNAL_GO)
 	elif has_auto_draft:
 		_readiness.text = "READY — AUTO-DRAFT WILL FIELD STANDARD RESERVES"
 		_readiness.add_theme_color_override("font_color", Tokens.SIGNAL_INFO)
+		_set_readiness_icon("state_ready", Tokens.SIGNAL_INFO)
 	else:
 		_readiness.text = "BLOCKED — SAVE A BLUEPRINT OR RETURN TO THE DESIGN LAB"
 		_readiness.add_theme_color_override("font_color", Tokens.SIGNAL_HAZARD)
+		_set_readiness_icon("state_invalid", Tokens.SIGNAL_HAZARD)
+
+
+func _set_readiness_icon(key: String, tint: Color) -> void:
+	if _readiness_icon == null:
+		return
+	var texture := UITheme.industrial_icon(key)
+	if texture != null:
+		_readiness_icon.texture = texture
+		_readiness_icon.modulate = tint
 
 
 func _on_viewport_size_changed() -> void:
@@ -695,7 +716,22 @@ func _build_legend() -> Control:
 		row.add_theme_constant_override("separation", Tokens.SPACE_SM)
 		var swatch: Control = null
 		if str(row_def[0]) != "":
-			swatch = UITheme.chrome_rect(str(row_def[0]), Tokens.SPINE_ICON, row_def[1])
+			var swatch_key := "map_spawn_marker" if str(row_def[0]) == "pin_spawn" else str(row_def[0])
+			if swatch_key == "map_spawn_marker":
+				var marker := UITheme.industrial_icon(swatch_key)
+				if marker != null:
+					var marker_rect := TextureRect.new()
+					marker_rect.texture = marker
+					marker_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					marker_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					marker_rect.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)
+					marker_rect.modulate = row_def[1]
+					marker_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					swatch = marker_rect
+			else:
+				swatch = UITheme.chrome_rect(swatch_key, Tokens.SPINE_ICON, row_def[1])
+			if swatch_key == "map_spawn_marker" and swatch != null and not box.has_node("IndustrialSpawnMarker"):
+				swatch.name = "IndustrialSpawnMarker"
 		if swatch == null:
 			var chip := Panel.new()
 			chip.custom_minimum_size = Vector2(Tokens.SPINE_ICON, Tokens.SPINE_ICON)

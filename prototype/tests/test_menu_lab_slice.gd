@@ -1,4 +1,5 @@
 extends SceneTree
+const UITheme = preload("res://scripts/ui_theme.gd")
 # Task 4 regression runner. Supported validation: run this script headless.
 # 2026-09-04: 46 checks passed, exit 0; headless editor/import also exited 0.
 # Dummy renderer logs null-material errors during hull teardown/undo/redo;
@@ -75,6 +76,12 @@ func _run() -> void:
 	root.add_child(menu)
 	await settle()
 	check(menu.find_child("DesignLabAction", true, false) != null, "Main Menu exposes Design Lab as primary destination")
+	var design_lab_action := menu.find_child("DesignLabAction", true, false) as Button
+	var match_setup_action := menu.find_child("MatchSetupAction", true, false) as Button
+	check(design_lab_action != null and design_lab_action.icon == UITheme.industrial_icon("nav_design_lab"),
+		"Main Menu uses the authored Design Lab navigation icon")
+	check(match_setup_action != null and match_setup_action.icon == UITheme.industrial_icon("nav_match_setup"),
+		"Main Menu uses the authored Match Setup navigation icon")
 	for node_name in ["DesignLabAction", "MatchSetupAction"]:
 		var button := menu.find_child(node_name, true, false) as Button
 		if button:
@@ -94,6 +101,15 @@ func _run() -> void:
 	var lab = load("res://scenes/MainLab.tscn").instantiate()
 	root.add_child(lab)
 	await settle()
+	var lab_nav_icon := lab.find_child("DesignLabNavigationIcon", true, false) as TextureRect
+	check(lab_nav_icon != null and lab_nav_icon.texture == UITheme.industrial_icon("nav_design_lab"),
+		"Design Lab toolbar uses its authored navigation icon")
+	var slot_icon := lab.find_child("SlotModuleIcon", true, false) as TextureRect
+	check(slot_icon != null and slot_icon.texture == UITheme.industrial_icon("slot_module"),
+		"Design Lab module cards expose the authored slot icon")
+	var operation_icon := lab.find_child("OperationStateIcon", true, false) as TextureRect
+	check(operation_icon != null and operation_icon.texture == UITheme.industrial_icon("drop_target"),
+		"Design Lab operation strip starts with the authored drop target icon")
 	for fixture_name: String in [
 		"LabFixtureConsoleFrame",
 		"LabFixtureDocumentClamp",
@@ -130,10 +146,14 @@ func _run() -> void:
 	lab._place_weapon_from_ui("basic_cannon", Vector3(0, 1, 0), Vector3.UP, true)
 	check(lab.undo_stack.size() == history and module_count(lab.hull) == before, "invalid placement preserves hull and history")
 	check(doc._operation_label.text.begins_with("CANNOT FIT"), "invalid placement explains recovery")
+	check(operation_icon != null and operation_icon.texture == UITheme.industrial_icon("state_invalid"),
+		"invalid placement switches the operation icon to the authored invalid state")
 	await capture("lab-invalid")
 	lab._place_weapon_from_ui("basic_cannon", Vector3(0, 1, 0), Vector3.UP)
 	await settle()
 	check(module_count(lab.hull) == before + 1 and lab.can_undo(), "placement adds one part and undo entry")
+	check(operation_icon != null and operation_icon.texture == UITheme.industrial_icon("state_ready"),
+		"fitted placement switches the operation icon to the authored ready state")
 	var part: Node3D
 	for child in lab.hull.get_children():
 		if child.has_meta("module_data"):
@@ -141,6 +161,8 @@ func _run() -> void:
 	lab._select_module(part)
 	await settle()
 	check(doc.current_selected_module == part and doc._document_page == "Selected", "selection updates document inspector")
+	check(operation_icon != null and operation_icon.texture == UITheme.industrial_icon("state_selected"),
+		"selected module switches the operation icon to the authored selected state")
 	var performance_tab: Button = null
 	for tab: Button in doc._document_tabs.get_children():
 		if tab.get_meta(&"destination_id", "") == "Performance":

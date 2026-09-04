@@ -75,11 +75,11 @@ const ROLES := {
 	# full-weight livery on this role would let a paint job repaint anything
 	# unclassified, so structure takes the body colour about halfway and keeps
 	# its own steel character for the rest.
-	"steel": {"metallic": 0.55, "roughness": 0.52, "tint": 0.85, "zone_tint": 0.55, "base": Color(0.30, 0.31, 0.33), "zone_value": 0.62, "wear": 0.55},
+	"steel": {"metallic": 0.55, "roughness": 0.68, "tint": 0.85, "zone_tint": 0.55, "base": Color(0.30, 0.31, 0.33), "zone_value": 0.62, "wear": 0.55},
 
 	# Painted sheet: housings, covers, ammo boxes. Holds its colour, and
 	# takes the most paint mottling of anything here.
-	"painted": {"metallic": 0.25, "roughness": 0.62, "tint": 1.0, "base": Color(0.35, 0.35, 0.35), "zone_pattern": true, "wear": 0.85},
+	"painted": {"metallic": 0.25, "roughness": 0.74, "tint": 1.0, "base": Color(0.35, 0.35, 0.35), "zone_pattern": true, "wear": 0.85},
 
 	# Bolt-on armor plates (slat, spaced composite, ablative, energy
 	# barrier). Treated as a SKIN of the hull rather than as a separate
@@ -90,7 +90,7 @@ const ROLES := {
 	# bleeds through in the deepest shadow. Wear is higher than steel's
 	# because armor takes hits - the eye expects a plate to look
 	# slightly more lived-in than the frame it bolts onto.
-	"armor": {"metallic": 0.45, "roughness": 0.58, "tint": 0.95, "zone_tint": 1.0, "base": Color(0.35, 0.35, 0.35), "zone_pattern": true, "wear": 0.70},
+	"armor": {"metallic": 0.45, "roughness": 0.72, "tint": 0.95, "zone_tint": 1.0, "base": Color(0.35, 0.35, 0.35), "zone_pattern": true, "wear": 0.70},
 
 	# Barrels, rails, tubes, bores. Dark, hard, and almost colour-immune to an
 	# INCIDENTAL tint - a barrel is gunmetal on a red gun and on a green gun
@@ -102,7 +102,7 @@ const ROLES := {
 	# should be resisted, whereas a colour the player deliberately chose for
 	# the barrel zone has to actually appear. Collapsing them into one number
 	# meant a red WEAPON turned its own barrel red even with no livery active.
-	"gunmetal": {"metallic": 0.80, "roughness": 0.34, "tint": 0.15, "zone_tint": 0.78, "base": Color(0.13, 0.135, 0.145), "wear": 0.30},
+	"gunmetal": {"metallic": 0.50, "roughness": 0.65, "tint": 0.15, "zone_tint": 0.78, "base": Color(0.13, 0.135, 0.145), "wear": 0.30},
 
 	# Receivers, breeches, bolts - the ACTION, as distinct from the barrel.
 	# Split out of gunmetal (identical PBR, so nothing changed visually on its
@@ -110,7 +110,7 @@ const ROLES := {
 	# which is what Chris's "two zones per weapon, action and barrel" needs.
 	# ROLE_HINTS already told them apart by part name; they just both landed
 	# on gunmetal before.
-	"action": {"metallic": 0.80, "roughness": 0.34, "tint": 0.15, "zone_tint": 0.78, "base": Color(0.13, 0.135, 0.145), "zone_value": 0.80, "zone_pattern": true, "wear": 0.30},
+	"action": {"metallic": 0.45, "roughness": 0.65, "tint": 0.15, "zone_tint": 0.78, "base": Color(0.13, 0.135, 0.145), "zone_value": 0.80, "zone_pattern": true, "wear": 0.30},
 
 	# The last few inches of a barrel and any muzzle device: heat-scorched,
 	# rougher and browner than the tube behind it. Reads as "this end is the
@@ -141,7 +141,7 @@ const ROLES := {
 	# Energy-weapon internals: coils, capacitors, emitters. Caller supplies
 	# the glow via the emission arguments; this just keeps the substrate dark
 	# so the emission has something to read against.
-	"energized": {"metallic": 0.45, "roughness": 0.30, "tint": 0.60, "base": Color(0.14, 0.15, 0.18), "wear": 0.20},
+	"energized": {"metallic": 0.45, "roughness": 0.60, "tint": 0.60, "base": Color(0.14, 0.15, 0.18), "wear": 0.20},
 
 	# Gravitic and field hardware: hover rings, anti-grav emitter plates.
 	# Chris: they "should both look like they're made out of real materials if
@@ -178,7 +178,7 @@ const ROLES := {
 	# player's livery accent colour (hull_stripe zone) while the rest of
 	# the module keeps its catalog colour.  Metallic painted finish so it
 	# reads as factory-applied paint on structural steel.
-	"accent": {"metallic": 0.45, "roughness": 0.50, "tint": 1.0, "zone_tint": 0.92, "base": Color(0.32, 0.33, 0.35), "zone_pattern": true, "wear": 0.60},
+	"accent": {"metallic": 0.45, "roughness": 0.65, "tint": 1.0, "zone_tint": 0.92, "base": Color(0.32, 0.33, 0.35), "zone_pattern": true, "wear": 0.60},
 }
 
 const DEFAULT_ROLE := "steel"
@@ -646,6 +646,11 @@ static func get_material(role: String, tint: Color, emission: Color = Color(0, 0
 	mat.albedo_color = Color(spec["base"]).lerp(effective_tint, tint_weight)
 	mat.metallic = metallic
 	mat.roughness = roughness
+	if role == "optics" or role == "fieldglass":
+		mat.metallic_specular = 0.5
+	else:
+		mat.metallic_specular = 0.2
+		mat.roughness = clampf(roughness, 0.50, 0.95)
 
 	# CULL_DISABLED preserved from the _mesh_inst() this replaces. Several
 	# authored parts are single-sided shells (wing membranes, skirts, the

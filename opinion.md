@@ -102,3 +102,5 @@
 > Liberating `gauss_railgun` from the `frame_built` lock into a true pintle mount gives it full horizontal traverse, while expanding the elevation envelope to 60° up and 25° down transforms it from a finicky static display piece into the devastating long-range sniper it was always meant to be. It can now track moving flankers, reach down into gullies, and elevate against high-ground targets without demanding continuous chassis gymnastics. Big guns need room to breathe and traverse. Clankers gonna clank."
 
 
+-   S u c c e s s f u l l y   g e n e r a t e d   c o m p l e t e l y   n e w   d e t a i l e d   h a r d - s u r f a c e   w e a p o n   s e t s   v i a   a   u n i f i e d   p y t h o n   g e n e r a t o r ,   e f f e c t i v e l y   b y p a s s i n g   t h e   n e e d   t o   h a n d - t w e a k   1 0   s e p a r a t e   l e g a c y   s c r i p t   f i l e s .  
+ 

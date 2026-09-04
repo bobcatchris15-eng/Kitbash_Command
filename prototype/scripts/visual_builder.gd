@@ -1000,7 +1000,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		var rail_mesh = _part("railgun_rails")
 		var rails: MeshInstance3D
 		if rail_mesh:
-			rails = _mesh_inst(rail_mesh, Color(0.15, 0.16, 0.18), Color.BLUE_VIOLET, 1.2)
+			rails = _mesh_inst(rail_mesh, Color(0.15, 0.16, 0.18), Color(0, 0, 0, 0), 0.0)
 			rails.scale = Vector3(caliber, caliber, length * caliber)
 			rails.position = Vector3(0, trunnion_y, 0.0)
 		else:
@@ -1010,9 +1010,8 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 			rails.mesh = r_box
 			var r_mat = StandardMaterial3D.new()
 			r_mat.albedo_color = Color(0.15, 0.16, 0.18)
-			r_mat.emission_enabled = true
-			r_mat.emission = Color.BLUE_VIOLET
-			r_mat.emission_energy_multiplier = 1.2
+			r_mat.roughness = 0.65
+			r_mat.metallic_specular = 0.2
 			rails.material_override = r_mat
 			rails.position = Vector3(0, trunnion_y, -(1.40 * length / 2.0))
 		parent_node.add_child(rails)
@@ -3033,7 +3032,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 				var arc_em_mesh = _part("arc_projector_emitter")
 				if arc_em_mesh:
 					var ae = _mesh_inst(arc_em_mesh, Color(0.30, 0.33, 0.36),
-						Color(0.35, 0.85, 1.0), 0.7)
+						Color(0, 0, 0, 0), 0.0)
 					ae.scale = Vector3(caliber * contain, caliber * contain, caliber * contain * arc_len)
 					ae.position = Vector3(0, arc_trunnion_y, ARC_BODY_FRONT_Z * caliber - 0.05 * (arc_len - 1.0))
 					parent_node.add_child(ae)

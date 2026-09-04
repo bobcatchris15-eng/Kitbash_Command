@@ -191,3 +191,4 @@ prototype/_probe_*.gd*
 prototype/_test_new_maps.gd*
 prototype/_test_spawns_tool.gd*
 prototype/_visual_review/
+.superpowers/

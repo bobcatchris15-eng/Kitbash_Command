@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "task_id": "weapons-mesh-fixes",
+  "outcome": "done",
+  "acceptance": [
+    {
+      "condition": "heavy_laser barrel connects flush to housing without a gap between action and barrel.",
+      "met": true,
+      "how_checked": "Inspected Blender bounds: heavy_laser_housing.glb Y extends [-0.700, +0.120] (front face at +0.100 with collar), heavy_laser_lens.glb Y starts at +0.080 and extends to +1.000. In visual_builder.gd, lens_z is anchored at -0.10 * (1.0 - barrel_len), meeting the housing front flush with zero gap."
+    },
+    {
+      "condition": "ion_cannon barrel connects flush to housing without a gap.",
+      "met": true,
+      "how_checked": "Inspected Blender bounds: ion_cannon_housing.glb Y extends [-0.500, +0.600], ion_cannon_lens.glb Y starts at 0.000 (front barrel interface) and extends to +0.360. In visual_builder.gd, lens_z is positioned at -0.60 * barrel_length, meeting the housing front flush with zero gap."
+    },
+    {
+      "condition": "guided_missile (tow_launch_tube) extends approximately equally behind and in front of the pintle mount axis (Z=0).",
+      "met": true,
+      "how_checked": "Inspected Blender bounds: tow_launch_tube.glb Y extents are [-0.600, +0.600], centered with exact 1:1 balance around the trunnion/pintle origin (Y=0 in Blender, Z=0 in Godot)."
+    },
+    {
+      "condition": "missile_pod rockets do not float above the housing and rear cone is properly oriented.",
+      "met": true,
+      "how_checked": "In build_task0046_detailed.py, missile_pod_housing rear cone orientation was fixed with radius_base=0.22 at -Y and radius_tip=0.28 at +Y, tapering backward properly. missile_pod_missile origin was set to front aperture with motor body extending backward [-0.420, +0.120]. In visual_builder.gd, grid_center_y was corrected to pod_body_y (removing the +0.19 offset) and grid_z set to -0.38*motor*warhead, embedding rockets flush in housing apertures."
+    },
+    {
+      "condition": "ciws is completely redesigned into an authentic recognizable Phalanx CIWS silhouette (pedestal, radome, 6-barrel rotary cluster).",
+      "met": true,
+      "how_checked": "Rebuilt ciws in build_task0046_detailed.py: ciws_mount.glb features circular base flange, equipment pedestal trunk, ammo drum, and twin trunnion riser arms; ciws_radar.glb features authentic white cylindrical radome with domed cap, forward tracking dish, and FLIR sensor pod; ciws_barrel.glb features 6 individual 20mm Vulcan barrels in 60-degree array, central spindle, 3 restraint clamp rings, and muzzle flash suppressors."
+    },
+    {
+      "condition": "Only the 5 specified weapons' models/scripts are modified. No other weapon models touched.",
+      "met": true,
+      "how_checked": "git status and git diff verify that only the 15 GLB files for heavy_laser, ion_cannon, tow (guided_missile), missile_pod, and ciws, plus build_task0046_detailed.py and visual_builder.gd (for these 5 weapons) were modified."
+    }
+  ],
+  "artifacts_changed": [
+    "prototype/tools/blender/build_task0046_detailed.py",
+    "prototype/scripts/visual_builder.gd",
+    "prototype/assets/models/parts/heavy_laser_mount.glb",
+    "prototype/assets/models/parts/heavy_laser_housing.glb",
+    "prototype/assets/models/parts/heavy_laser_lens.glb",
+    "prototype/assets/models/parts/ion_cannon_mount.glb",
+    "prototype/assets/models/parts/ion_cannon_housing.glb",
+    "prototype/assets/models/parts/ion_cannon_lens.glb",
+    "prototype/assets/models/parts/tow_pintle_mount.glb",
+    "prototype/assets/models/parts/tow_launch_tube.glb",
+    "prototype/assets/models/parts/tow_missile_warhead.glb",
+    "prototype/assets/models/parts/missile_pod_pintle_mount.glb",
+    "prototype/assets/models/parts/missile_pod_housing.glb",
+    "prototype/assets/models/parts/missile_pod_missile.glb",
+    "prototype/assets/models/parts/ciws_mount.glb",
+    "prototype/assets/models/parts/ciws_radar.glb",
+    "prototype/assets/models/parts/ciws_barrel.glb"
+  ],
+  "evidence": [
+    "Blender 5.2 execution output with code 0: glTF export succeeded for all 15 parts.",
+    "Blender GLB vertex bounding box measurement confirms exact meets: heavy_laser_housing Y [-0.700, +0.120] meets heavy_laser_lens Y [+0.080, +1.000]; ion_cannon_housing Y [-0.500, +0.600] meets ion_cannon_lens Y [-0.000, +0.360]; tow_launch_tube Y [-0.600, +0.600] is centered 1:1; missile_pod_housing rear cone tapers backward Y [-0.480, +0.380] and missile embeds Y [-0.420, +0.120]; ciws radome Z [0.000, +0.610] and 6-barrel cluster Y [-0.120, +0.945].",
+    "git status confirms exactly 15 GLB files and 2 script files modified."
+  ],
+  "findings": [
+    "build_task0046_detailed.py previously ran all 15 weapons unconditionally when invoked. Added --only filtering so specific weapon subsets can be regenerated without touching other weapon assets.",
+    "visual_builder.gd missile_pod grid_center_y had an erroneous +0.19*warhead offset from a legacy hull-mounting offset that caused the rocket grid to float above the pod housing roof. Removing this aligned the grid with the housing center."
+  ],
+  "blockers": [],
+  "assumptions_made": [
+    "Used 1.20 total tube length for tow_launch_tube centered at Y=0 (matching build_tow.py contract).",
+    "Authored CIWS radar and mount in Phalanx naval haze white/grey with dark gunmetal barrel cluster."
+  ]
+}

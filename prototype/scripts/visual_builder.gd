@@ -1250,13 +1250,13 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		# the face instead of from the deck.
 		var rocket_mesh = _part("missile_pod_missile")
 		var rows: int = maxi(int(round(float(grid) * 0.66)), 2)
-		var face_plate_w: float = 0.48 * 0.92 * warhead
-		var face_plate_h: float = 0.38 * 0.90 * warhead
-		var rocket_r: float = 0.066 * warhead
+		var face_plate_w: float = 0.44 * warhead
+		var face_plate_h: float = 0.34 * warhead
+		var rocket_r: float = 0.040 * warhead
 		var cell_w: float = (face_plate_w - 2.0 * rocket_r) / float(maxi(grid - 1, 1))
 		var cell_h: float = (face_plate_h - 2.0 * rocket_r) / float(maxi(rows - 1, 1))
-		var grid_center_y: float = pod_body_y + 0.19 * warhead
-		var grid_z: float = -0.42 * motor * warhead
+		var grid_center_y: float = pod_body_y
+		var grid_z: float = -0.38 * motor * warhead
 		for gx in range(grid):
 			for gy in range(rows):
 				var rx: float = (float(gx) - float(grid - 1) * 0.5) * cell_w
@@ -1683,7 +1683,7 @@ static func _build_visual_body(type_id: String, parent_node: Node3D, base_size: 
 		# 3. LENS TELESCOPE BARREL (heavy_laser_lens.glb)
 		var lens_mesh = _part("heavy_laser_lens")
 		var lens: MeshInstance3D
-		var lens_z = 0.0
+		var lens_z = -0.10 * (1.0 - barrel_len)
 		if lens_mesh:
 			lens = _mesh_inst(lens_mesh, Color(0.15, 0.18, 0.22))
 			lens.scale = Vector3(lens_aperture, lens_aperture, barrel_len)

@@ -1,0 +1,19 @@
+{
+  "operation": "clanker_protocol_migration",
+  "date": "2026-09-03",
+  "result": "success",
+  "installation_type": "fresh",
+  "protocol_source": "C:\\Users\\Chris\\.Codex\\AGENTS.md",
+  "target": "AGENTS.md",
+  "preserved_pre_migration_file": ".clanker/history/AGENTS.pre-clanker-migration.md",
+  "preserved_pre_migration_sha256": "8398FB30F49BC4264DD609B355040B113A426C7CD57A791F8AE79ECC049CEABF",
+  "backends": {
+    "agy": "1.1.10",
+    "opencode": "1.18.25"
+  },
+  "notes": [
+    "No previous repository Clanker protocol block or .clanker installation was present.",
+    "Unrelated repository guidance was retained beneath the project-doc separator.",
+    "Existing unrelated working-tree changes were left untouched."
+  ]
+}

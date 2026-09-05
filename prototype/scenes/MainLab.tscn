@@ -119,36 +119,33 @@ light_energy = 0.5
 
 [node name="LabEnvironment" parent="." instance=ExtResource("3_lab_env")]
 
-; A static, high-visibility gantry behind the floating hull proves the authored
-; fixture kit is live in the Design Lab without participating in placement.
+; The fixture kit pieces are static set dressing placed down on the desk
+; around the cutting mat floor (y = -12.0) so they don't float around the model.
 [node name="LabFixtureConsoleFrame" parent="." instance=ExtResource("11_fixture_console")]
-position = Vector3(0, 2, -3.4)
+position = Vector3(0, -12.0, -14.0)
 
-; The remaining fixture kit pieces are static set dressing. They stay low,
-; offset from the hull silhouette, and carry no collision or processing so the
-; active assembly and existing drag/camera interactions remain untouched.
 [node name="LabFixtureDocumentClamp" parent="." instance=ExtResource("12_fixture_document")]
-position = Vector3(-3.05, 1.92, 0.8)
-rotation_degrees = Vector3(0, -12, 0)
-scale = Vector3(0.65, 0.65, 0.65)
+position = Vector3(-8.0, -12.0, 6.0)
+rotation_degrees = Vector3(0, 25, 0)
+scale = Vector3(1.2, 1.2, 1.2)
 
 [node name="LabFixtureRail" parent="." instance=ExtResource("13_fixture_rail")]
-position = Vector3(0, 2.26, -3.02)
-scale = Vector3(0.75, 0.75, 0.75)
+position = Vector3(0, -12.0, -11.5)
+scale = Vector3(1.5, 1.5, 1.5)
 
 [node name="LabInspectionLamp" parent="." instance=ExtResource("14_fixture_lamp")]
-position = Vector3(-3.1, 1.92, -1.65)
-rotation_degrees = Vector3(0, 20, 0)
-scale = Vector3(0.7, 0.7, 0.7)
+position = Vector3(-10.0, -12.0, -4.0)
+rotation_degrees = Vector3(0, 45, 0)
+scale = Vector3(1.4, 1.4, 1.4)
 
 [node name="LabPartsTray" parent="." instance=ExtResource("15_fixture_tray")]
-position = Vector3(3.0, 1.92, 0.95)
-rotation_degrees = Vector3(0, -16, 0)
-scale = Vector3(0.65, 0.65, 0.65)
+position = Vector3(9.0, -12.0, 5.0)
+rotation_degrees = Vector3(0, -20, 0)
+scale = Vector3(1.2, 1.2, 1.2)
 
 [node name="LabServicePedestal" parent="." instance=ExtResource("16_fixture_pedestal")]
-position = Vector3(3.55, 0.05, -2.15)
-scale = Vector3(0.65, 0.65, 0.65)
+position = Vector3(10.0, -12.0, -6.0)
+scale = Vector3(1.3, 1.3, 1.3)
 
 [node name="PaintStationEnvironment" parent="." instance=ExtResource("9_paint_station")]
 visible = false

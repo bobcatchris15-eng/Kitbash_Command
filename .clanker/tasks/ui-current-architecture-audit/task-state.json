@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "task_id": "ui-current-architecture-audit",
+  "status": "complete",
+  "base_revision": "1263c9a5dccb78ed5df594b6059a656024389e9c",
+  "current_step": "Audit complete; receipt and evidence are written.",
+  "completed_steps": [
+    "Inventoried implemented player-facing scenes, runtime overlays, and entry/exit flows.",
+    "Mapped shared out-of-match UI infrastructure, forms, radial interaction families, and battle HUD boundary.",
+    "Recorded replacement seams, risks, stable contracts, and prioritized migration sequence in AUDIT.md.",
+    "Validated receipt JSON and confirmed no project-file diff."
+  ],
+  "next_step": "Dispatcher can consume receipt.json and AUDIT.md; no project changes were made.",
+  "touched_artifacts": [
+    ".clanker/tasks/ui-current-architecture-audit/"
+  ],
+  "validation": {
+    "passed": true,
+    "command": "Get-Content -Raw receipt.json | ConvertFrom-Json; git diff -- prototype (reported shared pre-existing changes); rg verification commands recorded in AUDIT.md",
+    "evidence_path": ".clanker/tasks/ui-current-architecture-audit/AUDIT.md"
+  },
+  "blockers": [],
+  "assumptions": [
+    "Included every MainMenu-exposed builder/sculpt tool as player-facing.",
+    "Used code and scenes as primary evidence; project prose only corroborated implementation."
+  ],
+  "receipt_path": ".clanker/tasks/ui-current-architecture-audit/receipt.json",
+  "resume_instructions": "Task is complete. Read AUDIT.md and receipt.json for architecture map and evidence; do not modify project files under this task authority.",
+  "updated": "2026-09-04T00:08:00-05:00"
+}

@@ -1,0 +1,66 @@
+{
+  "task_id": "ui-current-architecture-audit",
+  "outcome": "done",
+  "acceptance": [
+    {
+      "condition": "Inventory every player-facing out-of-match and in-match UI surface, with concrete scene/script ownership and entry/exit routes.",
+      "met": true,
+      "how_checked": "Inspected prototype/project.godot, all prototype/scenes roots, core/navigation.gd, main_menu.gd, setup/lab/library/livery scripts, match_director.gd, SystemLayer, and HUDRoot; map recorded in AUDIT.md."
+    },
+    {
+      "condition": "Map the shared UI infrastructure: theme/tokens, shell, docks/flyouts, controls, feedback/motion, radial interactions, and HUD boundaries.",
+      "met": true,
+      "how_checked": "Inspected ui_theme.gd, ui_tokens.gd, ui_shell.gd, ui_dock.gd, ui_flyout.gd, ui_feedback.gd, ui_anim.gd, radial scripts, and scripts/hud/hud_root.gd; ownership/seams recorded in AUDIT.md."
+    },
+    {
+      "condition": "Identify conventional button/dropdown/form patterns and their exact callers.",
+      "met": true,
+      "how_checked": "Ran rg for Button/OptionButton/SpinBox/LineEdit/CheckBox/MenuButton/ConfirmationDialog across scenes/scripts; exact owner fields and factory callers are recorded in AUDIT.md."
+    },
+    {
+      "condition": "Identify duplicated, contradictory, legacy, or replacement-ready systems, with evidence paths and confidence level.",
+      "met": true,
+      "how_checked": "Compared Navigation.ROUTES with MainMenu.GROUPS and direct scene transitions; traced Lab controls/radials and HUD construction. Six findings include high/medium evidence levels in AUDIT.md."
+    },
+    {
+      "condition": "State what must remain mechanically stable during a UI replacement: scene routing, MatchRuleSet flow, blueprint persistence, and the selected-module radial pattern.",
+      "met": true,
+      "how_checked": "Inspected core/navigation.gd, scene_router.gd, test_range_launcher.gd, MatchSetup/Operations setup scripts, Blueprint Library, BlueprintManager-referencing Lab scripts, and tweak_callout_manager.gd; stable contracts section in AUDIT.md."
+    },
+    {
+      "condition": "Write a receipt with a concise architecture map, risks, and a prioritized replacement sequence. Do not modify project files.",
+      "met": true,
+      "how_checked": "AUDIT.md contains the architecture map, six risks/findings, stable contracts, and six-step sequence. git diff -- prototype showed pre-existing/project-shared changes in CIWS/weapon assets, MainLab, match director, library, operations setup, visual builder, and a Blender tool; this audit used only read commands plus writes under its task directory."
+    }
+  ],
+  "artifacts_changed": [
+    ".clanker/tasks/ui-current-architecture-audit/AUDIT.md",
+    ".clanker/tasks/ui-current-architecture-audit/receipt.json",
+    ".clanker/tasks/ui-current-architecture-audit/task-state.json"
+  ],
+  "evidence": [
+    ".clanker/tasks/ui-current-architecture-audit/AUDIT.md",
+    "prototype/project.godot",
+    "prototype/scripts/core/navigation.gd",
+    "prototype/scripts/scene_router.gd",
+    "prototype/scripts/main_menu.gd",
+    "prototype/scripts/hud/hud_root.gd",
+    "prototype/scripts/ui/system_layer.gd"
+  ],
+  "findings": [
+    "Navigation.ROUTES is not authoritative in practice: it omits Livery, ModularHullBuilder, and TerrainSculpt while MainMenu exposes those destinations, and several surfaces direct-call change_scene_to_file.",
+    "The main Design Lab selected-module interaction is ModuleActionRing via TweakCalloutManager; UIRadialMenu is a separate ModularHullBuilder interaction. Do not remove or conflate them.",
+    "SystemLayer OBJECTIVES is not implemented; it issues a warning. Records is not exposed by the implemented Main Menu group map.",
+    "Battle HUD is intentionally separate from the out-of-match token/theme/3D chrome system and is already a consolidation boundary."
+  ],
+  "blockers": [],
+  "assumptions_made": [
+    "HullBuilder, ModularHullBuilder, and TerrainSculpt were included because MainMenu exposes them as player-selectable destinations, even though they may also serve authoring/development use.",
+    "Project documentation was treated only as corroborating evidence; concrete ownership/routes were derived from scripts and scenes."
+  ],
+  "cost": {
+    "tier": "high",
+    "wall_clock_s": 410,
+    "retries": 0
+  }
+}

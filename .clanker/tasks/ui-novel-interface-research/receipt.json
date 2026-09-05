@@ -1,0 +1,154 @@
+{
+  "task_id": "ui-novel-interface-research",
+  "outcome": "done",
+  "acceptance": [
+    {
+      "condition": "Identify at least six concrete interaction patterns relevant to a 3D RTS, vehicle-design lab, and campaign/menu shell; distinguish benefits, risks, and Godot implementation feasibility.",
+      "met": true,
+      "how_checked": "Inspected prototype/scripts/ui/module_action_ring.gd, prototype/scripts/ui/marking_menu.gd, prototype/scripts/ui_radial_menu.gd, prototype/scripts/hud/hud_root.gd, and the cited official PlayStation and Godot documentation. The interaction-pattern findings below name benefit, risk, and feasibility."
+    },
+    {
+      "condition": "Produce three named concepts that replace conventional forms rather than reskinning them. Each must cover navigation, selection, confirmation, and state/feedback.",
+      "met": true,
+      "how_checked": "The three concept records below each explicitly specify navigation, selection, confirmation, and feedback; none uses a tab/sidebar/card flow as its primary interaction."
+    },
+    {
+      "condition": "Preserve the selected-module radial interaction as a retained pattern, while proposing how its presentation can evolve.",
+      "met": true,
+      "how_checked": "The retained-pattern finding records the existing flick/hold radial behavior from marking_menu.gd and the module-local action ring from module_action_ring.gd; Concept 2 evolves it as the module's halo."
+    },
+    {
+      "condition": "Provide a detailed render prompt and a compact wireframe for every concept.",
+      "met": true,
+      "how_checked": "Each concept contains render_prompt and wireframe fields."
+    },
+    {
+      "condition": "Save a receipt with evidence-backed sources and explicit assumptions.",
+      "met": true,
+      "how_checked": "This receipt contains source URLs, project-file evidence, and assumptions_made."
+    }
+  ],
+  "artifacts_changed": [
+    ".clanker/tasks/ui-novel-interface-research/receipt.json",
+    ".clanker/tasks/ui-novel-interface-research/task-state.json"
+  ],
+  "evidence": [
+    "https://blog.playstation.com/archive/2017/03/03/extended-play-how-littlebigplanet-made-everyone-a-game-maker",
+    "https://blog.playstation.com/2009/10/09/littlebigplanet-sack-it-to-me-psp-goodness-part-1-edition/",
+    "https://blog.playstation.com/archive/2016/08/15/littlebigplanet-3-gets-major-ui-update-new-level-kit-and-mm-anniversary-pack",
+    "https://docs.godotengine.org/en/latest/tutorials/ui/custom_gui_controls.html",
+    "https://docs.godotengine.org/en/stable/classes/class_canvasitem.html",
+    "https://docs.godotengine.org/en/stable/classes/class_tween.html",
+    "prototype/scripts/ui/module_action_ring.gd (module-local radial action/tweak console)",
+    "prototype/scripts/ui/marking_menu.gd (fast flick commit; hold to reveal; hub cancellation)",
+    "prototype/scripts/ui_radial_menu.gd (module-tracking ring, equal-distance actions, drawn sectors)",
+    "prototype/scripts/hud/hud_root.gd (one HUD owner, world click-through outside panels, 20 Hz map and 5 Hz panel refresh)"
+  ],
+  "research_patterns": [
+    {
+      "pattern": "Embodied inventory / Popit",
+      "evidence": "PlayStation's LittleBigPlanet account describes the Popit as an above-character tool/object/material inventory; its create mode combines collected objects, a cursor, placement, and object tweaking.",
+      "benefit": "A large catalogue becomes a place the player enters and rummages through, rather than a nested inventory form.",
+      "risk": "Spatial metaphors can hide breadth and make keyboard search less discoverable; retain a text search and a last-used shelf.",
+      "godot_feasibility": "High. A custom Control can own hit-testing and focus via _gui_input; the relevant controls can be drawn instead of assembled from generic buttons."
+    },
+    {
+      "pattern": "Context-local marking menu",
+      "evidence": "prototype/scripts/ui/marking_menu.gd commits a fast directional stroke under 200 ms; a hold reveals a ring; releasing in the hub cancels. prototype/scripts/ui_radial_menu.gd establishes module-local, drawn sectors and equal cursor travel.",
+      "benefit": "Expert use is muscle memory while first use remains legible; local placement preserves visual attention on the subject.",
+      "risk": "Too many sectors become unlearnable and diagonal directions are error-prone. Keep first ring to 6-8 verbs, use a dead-zone cancel, and gate rare commands behind a second gesture.",
+      "godot_feasibility": "Already proven in this project; medium work only for presentation/state integration."
+    },
+    {
+      "pattern": "Direct manipulation with a persistent world subject",
+      "evidence": "The current module placer raycasts, selects a 3D module, starts drag after an 8 px threshold, reclassifies after drag, and invokes clipping checks. LittleBigPlanet's official Popit description similarly pairs a cursor with placement and object tweaking.",
+      "benefit": "The object itself is the primary control, eliminating a translate-then-click workflow.",
+      "risk": "Occlusion and precision failures can cause false actions. Preserve snap previews, invalid-placement ghosts, and an undo trail.",
+      "godot_feasibility": "High. Existing world picking and placement logic provide the hard 3D portion; a screen-space overlay only observes it."
+    },
+    {
+      "pattern": "Spatial hub navigation / morphing destination",
+      "evidence": "PlayStation says LittleBigPlanet 3 replaced a multi-planet structure with a single planet view that morphs into each destination while preserving destination functions behind selection.",
+      "benefit": "Navigation can communicate game-world hierarchy and continuity rather than presenting a page stack.",
+      "risk": "Motion can obscure location and prolong repeat access. Use a persistent compass, reduced-motion mode, and direct hotkeys.",
+      "godot_feasibility": "High. A 2D/3D hub can be composed with ordinary scenes; Tween supports dynamically selected property animation and bound-node cleanup."
+    },
+    {
+      "pattern": "Progressive disclosure through a context layer",
+      "evidence": "LittleBigPlanet's official UI update surfaces featured choices first, then opens the familiar deeper menu on selection; it also exposes filters as a separately invoked layer and retains filter state between sessions.",
+      "benefit": "The first view becomes a decision field, not a complete settings dump; detail appears only when needed.",
+      "risk": "Critical but uncommon actions may become invisible. Provide an always-visible command/search entry and keyboard route.",
+      "godot_feasibility": "High. Scene-local state plus existing retained UI architecture can drive surface/detail transitions."
+    },
+    {
+      "pattern": "State as geometry, motion, and signal rather than status prose",
+      "evidence": "Godot CanvasItem exposes _draw, arcs, circles, polygons, polylines, and text drawing; Tween supports chained/parallel property animation. HUDRoot already separates fast tactical and slower panel refreshes.",
+      "benefit": "Resource flow, contention, readiness, and danger can be perceived pre-attentively as pulse, path thickness, and occupancy.",
+      "risk": "Ambient animation can become visual noise or fail color-blind players. Pair each signal with shape, pattern, sound, and an inspectable text value.",
+      "godot_feasibility": "High for 2D overlays; use bounded update rates and queue_redraw only on state changes."
+    },
+    {
+      "pattern": "Commit by moving a physical token across a boundary",
+      "evidence": "This is an original synthesis built from the project's direct-drag interaction and Godot's custom Control input capture; it is not claimed as a copied game pattern.",
+      "benefit": "High-consequence confirmation is reversible until the token crosses a clearly legible threshold, avoiding modal yes/no dialogs.",
+      "risk": "Must never be the only confirmation method for keyboard/controller or accessibility users; offer hold-to-confirm and explicit cancel.",
+      "godot_feasibility": "High. A custom Control owns press-to-release input and can animate the token with Tween."
+    },
+    {
+      "retained_pattern": "Selected-module radial interaction",
+      "evidence": "module_action_ring.gd defines a fixed inner action ring with surrounding tweak stations; marking_menu.gd supports quick flick and held reveal; ui_radial_menu.gd tracks the selected module and makes its hub a generous cancellation zone.",
+      "directive_for_concepts": "Do not remove it. Preserve fast directional commitment, slow-hold explanation, local attachment, and dead-zone cancellation. Evolve its rendering and its relationship to world state, not its learned motor grammar."
+    }
+  ],
+  "concepts": [
+    {
+      "name": "Command Constellation",
+      "thesis": "Replace the main menu and mode-selection screens with a navigable command-room orrery: every major activity is a physical orbit around the player's active chassis and campaign clock.",
+      "navigation": "Mouse-wheel zoom travels between three scales: whole command room, orbit band, and destination station. Dragging the empty field rotates the orrery; keyboard directions step the compass. Stations are DESIGN, DEPLOY, OPERATIONS, PROVING GROUND, RECORDS, and SYSTEM, represented by apparatus rather than tabs.",
+      "selection": "Hovering a station projects a thin trajectory from the player chassis and unfolds only its immediate choices as attached instrument arms. Selecting a match/operation is placing its mission wafer on the central plotting table; that wafer previews map, roster pressure, and expected duration as physical layers.",
+      "confirmation": "Drag the selected wafer along a lit launch rail into the central aperture. Releasing before the aperture returns it to the table; keyboard/controller uses a deliberate hold on LAUNCH. Destructive actions use a red lock cover that must be lifted and held, never a generic dialog.",
+      "state_feedback": "Orbit speed conveys availability; a station's lamps encode unread/new/blocked; active work routes visible power cables to its station. Empty roster, invalid rule set, or unavailable map physically interrupts the launch rail and labels the exact blocker beside the break.",
+      "radial_evolution": "When returning from the lab, the active chassis is the constellation's center. Its existing radial module ring appears as a projected maintenance halo only after entering DESIGN, so the global shell never competes with module commands.",
+      "render_prompt": "Cinematic videogame UI concept art, 16:9. A darkened industrial command chamber viewed nearly orthographic, central olive-grey kitbashed armored vehicle model on a circular plotting table, six distinct mechanical orbit stations circling it on brass-black rails, no conventional buttons or panels. Fine cyan trajectory lines, restrained amber readiness lamps, one selected mission wafer being dragged along a luminous launch rail toward a recessed aperture. Dense but readable technical stencils, tactile machined metal, paper map layers, accurate RTS information hierarchy, practical lighting, high contrast, no logos, no text gibberish, no neon cyberpunk, no rounded mobile-app cards.",
+      "wireframe": "[SYSTEM]--(orbit)---[RECORDS]\n                 \\n [OPERATIONS] --- [ACTIVE CHASSIS / PLOTTING TABLE] --- [DESIGN]\n                 /          | launch rail\n       [DEPLOY]             v\n                         [APERTURE]\n                  [PROVING GROUND]",
+      "implementation_slice": "Build one custom ConstellationControl scene, feed it existing scene-router destinations and availability predicates, and retain conventional accessibility list/search as an alternate input layer. Use CanvasItem drawing for tracks and signals, Controls for accessible station focus, and Tween for zoom/arm motion."
+    },
+    {
+      "name": "Anatomy Bench",
+      "thesis": "Replace the Design Lab's parts browser and stat rail with an exploded, x-ray service bench: the chassis itself is the catalogue, constraint solver, and report.",
+      "navigation": "Camera orbit remains the navigation. Pressing a category key or sweeping from a hull facet opens a spatial parts drawer from that facet: weapon candidates hover over weapon hardpoints, locomotion candidates below the hull, armor plates along exposed facets. Scroll cycles only candidates compatible with the pointed attachment zone.",
+      "selection": "A part is selected by pulling its physical ghost toward a compatible socket; it magnetizes at legal mounts and becomes a red translucent clash volume at illegal ones. Selecting an installed part preserves the current radial behavior: quick flick invokes rotate/mirror/discard, held open reveals labels.",
+      "confirmation": "Installing is releasing into a socket. Parameter changes use the existing radial ring re-presented as a luminous HALO: inner verb wedges and outer instrument petals are tethered to the selected part with animated hairline leads. High-cost swaps require dragging a wrench cursor through a torque arc; it can be cancelled by returning to the hub.",
+      "state_feedback": "The vehicle becomes a living diagnostic: power is a colored current through conduits, mass is sag in a suspended balance frame, mobility is a floor contact trace, and firing arcs are projected volumes. Invalid constraints visibly pinch, spark, or stop a ghost rather than appearing as a toast. A small inspect lens can pin exact numbers on demand.",
+      "radial_evolution": "This is the retained selected-module radial interaction, not a replacement: retain module tracking, dead-zone cancellation, slow reveal, and flick selection. Change the appearance from detached machined UI to an attached diagnostic halo whose outer stations draw their data from the actual module and its linked systems.",
+      "render_prompt": "High-end game UX key art, 16:9, a 3D vehicle-design laboratory seen from a three-quarter top view. Center: a hand-built modular combat vehicle hovering above a physical service bench, half in x-ray diagnostic view. Compatible wheel, cannon, armor, sensor and generator ghosts emerge from the nearest hull facets like tools on articulated arms, no sidebar, no inventory grid. Selected cannon has a precise circular diagnostic halo attached around it: inner radial action sectors, outer small dial petals, tether lines into power and mass traces. Green legal socket glow, red translucent collision ghost, amber firing envelope projection, restrained military-industrial colors, sharp legible geometry, no UI cards, no generic buttons, no cyberpunk neon.",
+      "wireframe": "      compatible parts / facet drawers\n        [gun] [sensor] [armor]\n                 \\ | /\n      trace ---- [3D CHASSIS] ---- trace\n                 / | \\\n            [HALO: verbs + tweak petals]\n         mass sag / contact / power flow",
+      "implementation_slice": "Use existing module placement, clipping, firing-arc, telemetry, and action-ring data. Add a screen-space custom overlay that projects sockets/module centers; do not reimplement placement. Prototype with one weapon and one locomotion category, then measure occlusion and input conflict."
+    },
+    {
+      "name": "War Thread",
+      "thesis": "Replace campaign setup, roster lists, and after-action navigation with a tactile intelligence wall where operations are physical threads between locations, units, consequences, and pending decisions.",
+      "navigation": "The player pans a wall-sized regional map and zooms into clusters. A thread is not a menu item: it is a visible cord from an objective pin to its likely enemy doctrine, prior reports, and available blueprints. Pulling a cord forward opens its next decision; pulling sideways reveals alternatives; double-click centers the associated battlefield or design.",
+      "selection": "Select a mission by lifting its dossier tag from the wall. Select a roster by placing blueprint dog-tags onto staging pegs along that mission's thread. The system snaps compatible teams into squad groupings and leaves incompatible tags physically hanging loose with a plain-language reason.",
+      "confirmation": "Thread the final command cord through a metal dispatch slot; a short held pull cuts the perforated order strip and launches. Undo stays possible until the strip crosses the slot. For campaign-ending choices, the wall exposes the irreversible branch in full rather than hiding it behind a dialog.",
+      "state_feedback": "Information changes the literal topology: fresh intel lights a branch, casualties fray a thread, supply shortages narrow it, win streaks braid it, and completed missions leave stamped report layers. The active objective emits a slow pulse; urgency moves toward the player along the cord, so no alert stack is required.",
+      "radial_evolution": "Selecting a blueprint dog-tag can invoke the retained module radial only after opening its chassis preview. The radial reads as a compact field-service halo, while War Thread owns strategic choices; separate scopes prevent radial overload.",
+      "render_prompt": "Original RTS campaign interface concept art, 16:9. A large vertical intelligence planning wall made of matte charcoal map board, layered paper terrain contours, brass pins, tensioned black-red cords, blueprints clipped as dog-tags, stamped after-action reports, and a central metal dispatch slot. One player hand/cursor pulls a glowing mission thread through the slot; three roster tags snap onto staging pegs along the thread. Branches visibly braid, fray and brighten to communicate campaign state. Elegant military-industrial materiality, minimal color palette: bone paper, graphite, oxidized brass, cyan intel, amber readiness, restrained red risk. No panels, tabs, tables, dropdowns, or mobile cards; readable practical game UI.",
+      "wireframe": "[intel pin]---(branch)---[mission dossier]====[dispatch slot]\n                     |              |\\\n                 [enemy]       [roster pegs]\n                     |              |  [dog tags]\n              [prior reports]  [supply thread]",
+      "implementation_slice": "Represent campaign nodes/edges as a custom Control with a graph layout cache. Layer standard accessible focus targets over pin/dossier hit regions; use CanvasItem polylines/polygons for cords and Tween for state transitions. Keep a compact textual mission manifest in an inspect mode for screen readers and controller users."
+    }
+  ],
+  "assumptions_made": [
+    "The request seeks research and concept direction, not an implementation plan or art asset generation.",
+    "The project can retain a conventional accessible alternate path (keyboard/controller focus, search, and inspect text) without violating the request to challenge visible menu conventions.",
+    "The three directions are intentionally unconstrained by current UI styling, except for preserving the selected-module radial mechanics required by the brief.",
+    "The cited PlayStation sources are treated as primary publisher/developer descriptions of LittleBigPlanet interfaces; Godot documentation is treated as primary engine documentation."
+  ],
+  "blockers": [],
+  "cost": {
+    "tier": "high",
+    "tokens": 0,
+    "wall_clock_s": 0,
+    "retries": 0
+  }
+}

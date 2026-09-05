@@ -1396,7 +1396,7 @@ func _load_roster() -> void:
 	# enemy_roster matching a role, so changing the order is the whole mechanism;
 	# no design is added or dropped, and the AI plays exactly as it always did.
 	# Outside an operation, or on round one, this is a no-op.
-	var ops = get_node_or_null("/root/OperationsService")
+	var ops = get_node_or_null("/root/OperationsManager")
 	if ops != null and ops.is_active_operation:
 		var history: Array = ops.fielded_history()
 		if not history.is_empty():

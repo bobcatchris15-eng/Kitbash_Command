@@ -1,0 +1,31 @@
+{
+  "operation": "canonical_clanker_state_migration",
+  "date": "2026-09-04",
+  "outcome": "complete_with_host_constraint",
+  "preserved": [
+    ".clanker/history/AGENTS.pre-clanker-migration.md",
+    ".clanker/receipts/2026-09-03-clanker-migration.json",
+    ".clanker/tasks/weapons-mesh-fixes/brief.md",
+    ".clanker/tasks/weapons-mesh-fixes/receipt.json"
+  ],
+  "created": [
+    ".clanker/GENERAL_PROJECT_STATE.md",
+    ".clanker/current-work.md",
+    ".clanker/PENDING_ASKS.md",
+    ".clanker/tasks/weapons-mesh-fixes/task-state.json",
+    ".clanker/graph/baseline.json",
+    ".clanker/graph/baseline.digest",
+    ".clanker/graph/built-at-rev",
+    ".clanker/autoclank/HUMAN_HANDOFF.md"
+  ],
+  "graph": {
+    "source": "graphify-out/graph.json",
+    "digest": "d9aedbd28459b841",
+    "repository_revision": "1263c9a5dccb78ed5df594b6059a656024389e9c"
+  },
+  "backends": {
+    "agy": "installed 1.1.25; no agent-list command available",
+    "opencode": "installed 1.18.25; local role configuration discovered"
+  },
+  "constraint": "Bash enforcement wrappers are not runnable because the Windows host has no usable Linux shell. The limitation is recorded in PENDING_ASKS.md."
+}

@@ -67,6 +67,12 @@ def add_cone_forward(bm, pos, radius_base, radius_tip, height, segments=16):
     loc = mathutils.Vector(pos)
     for v in res['verts']: v.co = rot @ v.co + loc
 
+def add_cone_z(bm, pos, radius_base, radius_tip, height, segments=16):
+    """Creates a cone along Z. Base at -height/2, tip at +height/2."""
+    res = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=segments, radius1=radius_base, radius2=radius_tip, depth=height)
+    loc = mathutils.Vector(pos)
+    for v in res['verts']: v.co = v.co + loc
+
 def add_tube_between(bm, p0, p1, radius, segments=8):
     a = mathutils.Vector(p0)
     b = mathutils.Vector(p1)
@@ -170,21 +176,27 @@ def build_ion_cannon():
     bm = bmesh.new()
     add_box(bm, (0, -0.2, 0), (0.45, 0.6, 0.45), bevel=0.02)
     add_mechanical_greebles(bm, (0, -0.2, 0), (0.45, 0.6, 0.45))
-    add_cyl(bm, (0, 0.3, 0), 0.2, 0.4, 'Y', 24)
-    bolt_ring(bm, (0, 0.45, 0), 0.18, 12, 'Y')
+    # Accelerator barrel extending forward to Y = +0.60
+    add_cyl(bm, (0, 0.35, 0), 0.20, 0.50, 'Y', 24)
+    add_cyl(bm, (0, 0.25, 0), 0.23, 0.06, 'Y', 24)
+    add_cyl(bm, (0, 0.45, 0), 0.23, 0.06, 'Y', 24)
+    add_cyl(bm, (0, 0.58, 0), 0.22, 0.04, 'Y', 24)
+    bolt_ring(bm, (0, 0.58, 0), 0.20, 16, 'Y')
     fin_stack(bm, -0.2, 0.5, -0.25, -0.15, 0.15, 8, 0.01, 0.08)
     fin_stack(bm, -0.2, 0.5, 0.25, -0.15, 0.15, 8, 0.01, 0.08)
-    export_bmesh(bm, "ion_cannon_housing", "ion_cannon_housing.glb")
+    export_bmesh(bm, "ion_cannon_housing", "ion_cannon_housing.glb", color=(0.20, 0.24, 0.30, 1.0))
     bm = bmesh.new()
-    add_cyl(bm, (0, 0.6, 0), 0.18, 1.2, 'Y', 24)
-    for i in range(3):
-        y = 0.3 + i*0.4
-        add_cyl(bm, (0, y, 0), 0.24, 0.08, 'Y', 24)
-        bolt_ring(bm, (0, y, 0), 0.22, 16, 'Y')
-        add_tube_between(bm, (0, y, -0.24), (0, 0.0, -0.24), 0.02)
-        add_tube_between(bm, (0.24, y, 0), (0.24, 0.0, 0), 0.02)
-        add_tube_between(bm, (-0.24, y, 0), (-0.24, 0.0, 0), 0.02)
-    export_bmesh(bm, "ion_cannon_lens", "ion_cannon_lens.glb")
+    # Focusing lens origin at front barrel interface Y=0.0 connecting flush
+    add_cyl(bm, (0, 0.15, 0), 0.20, 0.30, 'Y', 24)
+    for angle in (0, 90, 180, 270):
+        rad = math.radians(angle)
+        cx = math.cos(rad) * 0.18
+        cz = math.sin(rad) * 0.18
+        add_box(bm, (cx, 0.15, cz), (0.05, 0.22, 0.05), bevel=0.005)
+        add_tube_between(bm, (cx, 0.04, cz), (cx, 0.26, cz), 0.015)
+    add_cone_forward(bm, (0, 0.33, 0), radius_base=0.18, radius_tip=0.22, height=0.06, segments=24)
+    add_cyl(bm, (0, 0.35, 0), 0.14, 0.02, 'Y', 24)
+    export_bmesh(bm, "ion_cannon_lens", "ion_cannon_lens.glb", color=(0.25, 0.60, 0.85, 1.0))
 
 def build_railgun():
     bm = bmesh.new()
@@ -224,57 +236,64 @@ def build_railgun():
 def build_guided_missile():
     bm = bmesh.new(); add_heavy_mount(bm, 0.6); export_bmesh(bm, "tow_pintle_mount", "tow_pintle_mount.glb")
     bm = bmesh.new()
-    add_cyl(bm, (0, 0.4, 0), 0.12, 0.9, 'Y', 16)
-    add_box(bm, (-0.2, 0.1, 0.0), (0.15, 0.35, 0.25), bevel=0.01)
-    add_cyl(bm, (-0.2, 0.28, 0.05), 0.05, 0.05, 'Y', 12)
-    bolt_ring(bm, (-0.2, 0.28, 0.05), 0.04, 8, 'Y')
-    for y in [0.0, 0.4, 0.8]:
-        add_cyl(bm, (0, y, 0), 0.13, 0.05, 'Y', 16)
-        bolt_ring(bm, (0, y, 0), 0.14, 8, 'Y', 0.006, 0.04)
-        add_tube_between(bm, (0, y, -0.13), (0, 0.8, -0.13), 0.01)
-    add_cyl(bm, (0, -0.05, 0), 0.15, 0.1, 'Y', 16)
-    export_bmesh(bm, "tow_launch_tube", "tow_launch_tube.glb")
+    # Centered at (0, 0, 0) so trunnion mounts at the midway point: Y from -0.60 to +0.60
+    add_cyl(bm, (0, 0.0, 0), 0.11, 1.20, 'Y', 20)
+    # Central trunnion mounting collar
+    add_box(bm, (0, 0.0, 0), (0.26, 0.12, 0.26), bevel=0.01)
+    bolt_ring(bm, (0, 0.0, 0.14), 0.08, 6, 'Z', 0.008, 0.02)
+    # Front and rear shock absorber collars
+    add_cyl(bm, (0, 0.55, 0), 0.13, 0.10, 'Y', 20)
+    bolt_ring(bm, (0, 0.55, 0), 0.135, 8, 'Y', 0.006, 0.02)
+    add_cyl(bm, (0, -0.55, 0), 0.13, 0.10, 'Y', 20)
+    bolt_ring(bm, (0, -0.55, 0), 0.135, 8, 'Y', 0.006, 0.02)
+    # Guidance optic sight on left side
+    add_box(bm, (-0.18, 0.0, 0.05), (0.12, 0.28, 0.20), bevel=0.01)
+    add_cyl(bm, (-0.18, 0.14, 0.09), 0.035, 0.03, 'Y', 12)
+    add_cyl(bm, (-0.18, 0.14, 0.01), 0.025, 0.03, 'Y', 12)
+    # Conduit line along bottom of tube
+    add_tube_between(bm, (0, -0.55, -0.12), (0, 0.55, -0.12), 0.012)
+    export_bmesh(bm, "tow_launch_tube", "tow_launch_tube.glb", color=(0.24, 0.26, 0.22, 1.0))
     bm = bmesh.new()
-    add_cyl(bm, (0, 0.4, 0), 0.08, 0.6, 'Y', 16)
-    add_cone_forward(bm, (0, 0.85, 0), radius_base=0.08, radius_tip=0.02, height=0.3, segments=16)
-    add_cyl(bm, (0, 1.05, 0), 0.01, 0.15, 'Y', 8)
+    # Missile warhead origin at front opening Y=0.0, extending forward
+    add_cyl(bm, (0, 0.08, 0), 0.075, 0.16, 'Y', 16)
+    add_cone_forward(bm, (0, 0.22, 0), radius_base=0.075, radius_tip=0.02, height=0.12, segments=16)
+    add_cyl(bm, (0, 0.33, 0), 0.01, 0.10, 'Y', 8)
     for i in range(4):
-        a = (i/4)*math.tau
-        add_box(bm, (math.cos(a)*0.10, 0.2, math.sin(a)*0.10), (0.01, 0.16, 0.08))
-    export_bmesh(bm, "tow_missile_warhead", "tow_missile_warhead.glb")
+        a = (i / 4.0) * math.tau
+        add_box(bm, (math.cos(a) * 0.09, 0.06, math.sin(a) * 0.09), (0.008, 0.12, 0.05))
+    export_bmesh(bm, "tow_missile_warhead", "tow_missile_warhead.glb", color=(0.85, 0.85, 0.85, 1.0))
 
 def build_missile_pod():
     bm = bmesh.new(); add_heavy_mount(bm, 0.8); export_bmesh(bm, "missile_pod_pintle_mount", "missile_pod_pintle_mount.glb")
     
     bm = bmesh.new()
+    # Main pod housing octagonal shell (centered at Z=0 trunnion axis, Y from -0.375 to +0.375)
     add_cyl(bm, (0, 0.0, 0), 0.28, 0.75, 'Y', 8)
-    add_cyl(bm, (0, -0.38, 0), 0.29, 0.06, 'Y', 8)
-    add_cone_forward(bm, (0, -0.42, 0), 0.29, 0.24, 0.08, 8)
+    # Side trunnion pivot lugs at Z=0
+    add_cyl(bm, (-0.28, 0.0, 0), 0.06, 0.10, 'X', 16)
+    add_cyl(bm, (0.28, 0.0, 0), 0.06, 0.10, 'X', 16)
+    # Rear exhaust boat-tail cone: attaches at Y=-0.375, tapers backward to Y=-0.46
+    # add_cone_forward: base (-Y) is 0.22, tip (+Y) is 0.28, so it points backward!
+    add_cone_forward(bm, (0, -0.42, 0), radius_base=0.22, radius_tip=0.28, height=0.09, segments=8)
+    add_cyl(bm, (0, -0.47, 0), 0.23, 0.02, 'Y', 8)
+    # Front face plate cowl & aperture ring at Y=+0.36
     add_cyl(bm, (0, 0.36, 0), 0.29, 0.04, 'Y', 8)
     bolt_ring(bm, (0, 0.37, 0), 0.26, 12, 'Y', 0.008, 0.02)
-    for q in range(7):
-        if q == 0: tx, tz = 0.0, 0.0
-        else:
-            ang = ((q - 1) / 6.0) * math.tau
-            tx, tz = math.cos(ang) * 0.15, math.sin(ang) * 0.15
-        add_cyl(bm, (tx, 0.37, tz), 0.048, 0.04, 'Y', 12)
-    add_box(bm, (0, -0.05, -0.22), (0.16, 0.25, 0.12), bevel=0.01)
-    add_cyl(bm, (-0.26, 0.0, 0), 0.06, 0.12, 'X', 16)
-    add_cyl(bm, (0.26, 0.0, 0), 0.06, 0.12, 'X', 16)
-    add_box(bm, (0, 0.0, 0.26), (0.12, 0.65, 0.04), bevel=0.005)
-    add_tube_between(bm, (0.08, -0.3, 0.24), (0.08, 0.3, 0.24), 0.012)
-    export_bmesh(bm, "missile_pod_housing", "missile_pod_housing.glb")
+    # Umbilical raceway on top (+Z)
+    add_box(bm, (0, 0.0, 0.28), (0.10, 0.65, 0.03), bevel=0.005)
+    export_bmesh(bm, "missile_pod_housing", "missile_pod_housing.glb", color=(0.28, 0.30, 0.26, 1.0))
     
     bm = bmesh.new()
-    add_cyl(bm, (0, 0.0, 0), 0.042, 0.40, 'Y', 16)
-    add_cone_forward(bm, (0, 0.26, 0), radius_base=0.042, radius_tip=0.005, height=0.14, segments=16)
-    add_cyl(bm, (0, 0.34, 0), 0.012, 0.03, 'Y', 8)
-    add_cyl(bm, (0, -0.21, 0), 0.038, 0.03, 'Y', 12)
+    # Individual rocket with origin at front tube aperture Y=0.0
+    # Rocket nose cone points forward (+Y) slightly out the front of the aperture
+    add_cone_forward(bm, (0, 0.05, 0), radius_base=0.040, radius_tip=0.005, height=0.10, segments=16)
+    add_cyl(bm, (0, 0.11, 0), 0.010, 0.02, 'Y', 8)
+    # Rocket motor body extends backward (-Y) inside the tube from 0.0 to -0.40
+    add_cyl(bm, (0, -0.20, 0), 0.040, 0.40, 'Y', 16)
+    add_cyl(bm, (0, -0.41, 0), 0.036, 0.02, 'Y', 12)
     for i in range(4):
         a = (i / 4.0) * math.tau
-        fx = math.cos(a) * 0.048
-        fz = math.sin(a) * 0.048
-        add_box(bm, (fx, -0.16, fz), (0.008, 0.08, 0.02))
+        add_box(bm, (math.cos(a) * 0.044, -0.36, math.sin(a) * 0.044), (0.006, 0.07, 0.015))
     export_bmesh(bm, "missile_pod_missile", "missile_pod_missile.glb", color=(0.42, 0.44, 0.40, 1.0))
 
 def build_sam_launcher():
@@ -434,8 +453,32 @@ def build_cruise_missile():
 
 def build_heavy_laser():
     bm = bmesh.new(); add_heavy_mount(bm, 1.2); export_bmesh(bm, "heavy_laser_mount", "heavy_laser_mount.glb")
-    bm = bmesh.new(); add_box(bm, (0, -0.3, 0), (0.4, 0.8, 0.35), bevel=0.02); add_mechanical_greebles(bm, (0, -0.3, 0), (0.4, 0.8, 0.35)); export_bmesh(bm, "heavy_laser_housing", "heavy_laser_housing.glb")
-    bm = bmesh.new(); add_box(bm, (0, 0.6, 0), (0.2, 0.8, 0.2), bevel=0.015); add_mechanical_greebles(bm, (0, 0.6, 0), (0.2, 0.8, 0.2)); export_bmesh(bm, "heavy_laser_lens", "heavy_laser_lens.glb")
+    bm = bmesh.new()
+    # Resonator housing body centered behind trunnion (Y from -0.70 to +0.10)
+    add_box(bm, (0, -0.30, 0), (0.40, 0.80, 0.35), bevel=0.02)
+    add_mechanical_greebles(bm, (0, -0.30, 0), (0.40, 0.80, 0.35))
+    # Front interface collar at Y = +0.10
+    add_cyl(bm, (0, 0.10, 0), 0.14, 0.04, 'Y', 20)
+    bolt_ring(bm, (0, 0.10, 0), 0.12, 8, 'Y', 0.008, 0.02)
+    fin_stack(bm, -0.30, 0.60, -0.22, -0.10, 0.10, 6, 0.012, 0.05)
+    fin_stack(bm, -0.30, 0.60, 0.22, -0.10, 0.10, 6, 0.012, 0.05)
+    export_bmesh(bm, "heavy_laser_housing", "heavy_laser_housing.glb", color=(0.24, 0.28, 0.32, 1.0))
+    
+    bm = bmesh.new()
+    # Lens telescope barrel: connects flush at Y = +0.10 (extending to +0.94)
+    # Starts inside collar at Y = +0.08 to Y = +0.92
+    add_box(bm, (0, 0.50, 0), (0.20, 0.84, 0.20), bevel=0.015)
+    # Focusing coil stations along the barrel
+    for i in range(3):
+        y = 0.30 + i * 0.25
+        add_cyl(bm, (0, y, 0), 0.14, 0.05, 'Y', 20)
+        bolt_ring(bm, (0, y, 0), 0.13, 8, 'Y', 0.006, 0.02)
+    add_tube_between(bm, (0.12, 0.10, 0), (0.12, 0.90, 0), 0.012)
+    add_tube_between(bm, (-0.12, 0.10, 0), (-0.12, 0.90, 0), 0.012)
+    # Aperture shroud / emitter lens at front
+    add_cyl(bm, (0, 0.95, 0), 0.15, 0.08, 'Y', 24)
+    add_cyl(bm, (0, 0.99, 0), 0.11, 0.02, 'Y', 24)
+    export_bmesh(bm, "heavy_laser_lens", "heavy_laser_lens.glb", color=(0.15, 0.18, 0.22, 1.0))
 
 def build_pd_laser():
     bm = bmesh.new(); add_heavy_mount(bm, 0.7); export_bmesh(bm, "pd_laser_mount", "pd_laser_mount.glb")
@@ -454,24 +497,113 @@ def build_cluster_dispenser():
     bm = bmesh.new(); add_box(bm, (0, 0.1, 0), (0.55, 0.5, 0.45), bevel=0.02); add_mechanical_greebles(bm, (0, 0.1, 0), (0.55, 0.5, 0.45)); export_bmesh(bm, "cluster_dispenser_housing", "cluster_dispenser_housing.glb")
 
 def build_ciws():
-    bm = bmesh.new(); add_heavy_mount(bm, 0.9); export_bmesh(bm, "ciws_mount", "ciws_mount.glb")
-    bm = bmesh.new(); add_cyl(bm, (0, -0.2, 0.4), 0.3, 0.25, 'Z', 24); add_mechanical_greebles(bm, (0, -0.2, 0.2), (0.4, 0.3, 0.2)); export_bmesh(bm, "ciws_radar", "ciws_radar.glb")
-    bm = bmesh.new(); add_cyl(bm, (0, 0.5, 0), 0.04, 1.0, 'Y', 12); add_mechanical_greebles(bm, (0, 0.5, 0), (0.1, 1.0, 0.1)); export_bmesh(bm, "ciws_barrel", "ciws_barrel.glb")
+    # 1. Authentic Phalanx Pedestal Mount (ciws_mount.glb)
+    bm = bmesh.new()
+    # Turret base flange at deck level Z=0.03
+    add_cyl(bm, (0, 0, 0.03), 0.32, 0.06, 'Z', 24)
+    bolt_ring(bm, (0, 0, 0.06), 0.29, 16, 'Z', 0.010, 0.02)
+    # Octagonal pedestal equipment trunk (Z from 0.06 to 0.22)
+    add_cyl(bm, (0, 0, 0.14), 0.25, 0.16, 'Z', 8)
+    # Rear equipment access hatch
+    add_box(bm, (0, -0.24, 0.14), (0.18, 0.03, 0.12), bevel=0.005)
+    bolt_ring(bm, (0, -0.25, 0.14), 0.08, 6, 'Y', 0.006, 0.015)
+    # Lower ammunition drum underneath the trunnions
+    add_cyl(bm, (0, 0.0, 0.16), 0.16, 0.26, 'X', 18)
+    # Twin vertical trunnion riser stanchions (Z from 0.18 to 0.36)
+    for side in (-1, 1):
+        x = side * 0.19
+        add_box(bm, (x, 0.0, 0.27), (0.06, 0.26, 0.18), bevel=0.01)
+        add_cyl(bm, (x + side * 0.03, 0.0, 0.32), 0.055, 0.06, 'X', 16)
+        bolt_ring(bm, (x + side * 0.06, 0.0, 0.32), 0.042, 6, 'X', 0.006, 0.015)
+    # Elevation drive servo on left stanchion
+    add_cyl(bm, (-0.24, -0.06, 0.25), 0.04, 0.08, 'X', 14)
+    add_tube_between(bm, (-0.24, -0.06, 0.21), (-0.16, -0.12, 0.12), 0.015)
+    export_bmesh(bm, "ciws_mount", "ciws_mount.glb", color=(0.85, 0.86, 0.88, 1.0))
+    
+    # 2. Distinctive White Radome & Tracking Housing (ciws_radar.glb)
+    bm = bmesh.new()
+    # Avionics carriage box sitting on trunnion (Z=0 to Z=0.18)
+    add_box(bm, (0, -0.05, 0.09), (0.22, 0.26, 0.18), bevel=0.01)
+    # Cooling exhaust louvers on aft face
+    for i in range(4):
+        add_box(bm, (0, -0.185, 0.05 + i * 0.03), (0.16, 0.01, 0.015))
+    # Iconic Phalanx White Radome cylinder (Z from 0.18 to 0.50)
+    add_cyl(bm, (0, -0.04, 0.34), 0.15, 0.32, 'Z', 24)
+    # Smooth hemispherical radome top dome
+    add_cyl(bm, (0, -0.04, 0.51), 0.145, 0.02, 'Z', 24)
+    add_cone_z(bm, (0, -0.04, 0.55), 0.14, 0.09, 0.06, 24)
+    add_cone_z(bm, (0, -0.04, 0.59), 0.09, 0.02, 0.04, 20)
+    # Forward tracking radar / optics dish on front face (+Y)
+    add_cyl(bm, (0, 0.09, 0.22), 0.08, 0.06, 'Y', 18)
+    add_cone_forward(bm, (0, 0.12, 0.22), radius_base=0.07, radius_tip=0.03, height=0.04, segments=16)
+    # Starboard FLIR sensor turret pod
+    add_cyl(bm, (0.14, 0.06, 0.18), 0.04, 0.10, 'Y', 14)
+    add_cyl(bm, (0.14, 0.11, 0.18), 0.025, 0.02, 'Y', 12)
+    export_bmesh(bm, "ciws_radar", "ciws_radar.glb", color=(0.92, 0.93, 0.95, 1.0), metallic=0.08, roughness=0.55)
+    
+    # 3. 20mm 6-Barrel M61A1 Vulcan Rotary Gatling Cannon Cluster (ciws_barrel.glb)
+    bm = bmesh.new()
+    # Rotor breech housing at trunnion
+    add_cyl(bm, (0, 0.08, 0), 0.09, 0.16, 'Y', 24)
+    add_box(bm, (0, -0.05, 0), (0.15, 0.14, 0.15), bevel=0.01)
+    # Central support drive shaft / spindle
+    add_cyl(bm, (0, 0.50, 0), 0.03, 0.76, 'Y', 16)
+    # 6 individual Vulcan barrels arranged in a circular array (60 deg spacing)
+    r_cluster = 0.060
+    r_barrel = 0.013
+    for i in range(6):
+        ang = i * (math.tau / 6.0)
+        bx = math.cos(ang) * r_cluster
+        bz = math.sin(ang) * r_cluster
+        # Barrel runs from Y=0.12 to Y=0.92 (length 0.80)
+        add_cyl(bm, (bx, 0.52, bz), r_barrel, 0.80, 'Y', 12)
+        # Muzzle flash suppressor / flared tip at Y=0.93
+        add_cyl(bm, (bx, 0.93, bz), r_barrel * 1.25, 0.03, 'Y', 10)
+    # 3 barrel restraint clamp rings holding the cluster rigid
+    add_cyl(bm, (0, 0.32, 0), 0.080, 0.035, 'Y', 24)
+    add_cyl(bm, (0, 0.62, 0), 0.080, 0.035, 'Y', 24)
+    add_cyl(bm, (0, 0.90, 0), 0.080, 0.025, 'Y', 24)
+    bolt_ring(bm, (0, 0.32, 0), 0.076, 6, 'Y', 0.005, 0.04)
+    export_bmesh(bm, "ciws_barrel", "ciws_barrel.glb", color=(0.18, 0.20, 0.22, 1.0), metallic=0.75, roughness=0.35)
 
 if __name__ == '__main__':
+    import sys
     clear_scene()
-    build_flamethrower()
-    build_arc_projector()
-    build_ion_cannon()
-    build_railgun()
-    build_guided_missile()
-    build_missile_pod()
-    build_sam_launcher()
-    build_cruise_missile()
-    build_heavy_laser()
-    build_pd_laser()
-    build_coilgun()
-    build_bunker_buster()
-    build_hypervelocity_missile()
-    build_cluster_dispenser()
-    build_ciws()
+    targets = None
+    if '--only' in sys.argv:
+        idx = sys.argv.index('--only')
+        if idx + 1 < len(sys.argv):
+            targets = [t.strip() for t in sys.argv[idx + 1].split(',')]
+    elif '--targets' in sys.argv:
+        idx = sys.argv.index('--targets')
+        if idx + 1 < len(sys.argv):
+            targets = [t.strip() for t in sys.argv[idx + 1].split(',')]
+
+    weapon_map = {
+        'flamethrower': build_flamethrower,
+        'arc_projector': build_arc_projector,
+        'ion_cannon': build_ion_cannon,
+        'railgun': build_railgun,
+        'guided_missile': build_guided_missile,
+        'missile_pod': build_missile_pod,
+        'sam_launcher': build_sam_launcher,
+        'cruise_missile': build_cruise_missile,
+        'heavy_laser': build_heavy_laser,
+        'pd_laser': build_pd_laser,
+        'coilgun': build_coilgun,
+        'bunker_buster': build_bunker_buster,
+        'hypervelocity_missile': build_hypervelocity_missile,
+        'cluster_dispenser': build_cluster_dispenser,
+        'ciws': build_ciws,
+    }
+
+    if targets:
+        for t in targets:
+            if t in weapon_map:
+                print(f"Building target: {t}")
+                weapon_map[t]()
+            else:
+                print(f"Unknown target: {t}")
+    else:
+        for name, fn in weapon_map.items():
+            fn()

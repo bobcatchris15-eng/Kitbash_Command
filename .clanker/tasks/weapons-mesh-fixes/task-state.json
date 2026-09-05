@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "task_id": "weapons-mesh-fixes",
+  "status": "complete",
+  "base_revision": "unknown (legacy receipt predates canonical task state)",
+  "current_step": "completed",
+  "completed_steps": [
+    "Regenerated the five scoped weapon-model groups.",
+    "Recorded geometry-bound evidence in the retained receipt."
+  ],
+  "next_step": "None; revalidate only if a later task modifies these assets.",
+  "touched_artifacts": [
+    "prototype/tools/blender/build_task0046_detailed.py",
+    "prototype/scripts/visual_builder.gd",
+    "prototype/assets/models/parts/heavy_laser_*.glb",
+    "prototype/assets/models/parts/ion_cannon_*.glb",
+    "prototype/assets/models/parts/tow_*.glb",
+    "prototype/assets/models/parts/missile_pod_*.glb",
+    "prototype/assets/models/parts/ciws_*.glb"
+  ],
+  "validation": {
+    "passed": true,
+    "command": "Blender export and bounds inspections recorded in the receipt.",
+    "evidence_path": ".clanker/tasks/weapons-mesh-fixes/receipt.json"
+  },
+  "blockers": [],
+  "assumptions": [
+    "Migrated from the retained 2026-09-03 receipt; no new implementation or validation was performed during this state migration."
+  ],
+  "receipt_path": ".clanker/tasks/weapons-mesh-fixes/receipt.json",
+  "resume_instructions": "Read the receipt before changing the five scoped weapon groups. Treat the current dirty worktree as user-owned and do not overwrite its changes.",
+  "updated": "2026-09-04T00:00:00-05:00"
+}

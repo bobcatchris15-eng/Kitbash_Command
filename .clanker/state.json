@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "protocol": {
+    "name": "Clanker Fleet Protocol — Self-Migration Directive",
+    "authority": "AGENTS.md#CLANKER_PROTOCOL_START..CLANKER_PROTOCOL_END",
+    "installation": "upgrade",
+    "activated_on": "2026-09-03",
+    "canonical_state_migrated_on": "2026-09-04"
+  },
+  "repository": {
+    "root": "E:\\Kitbash-Command",
+    "branch": "master"
+  },
+  "backends": {
+    "agy": {
+      "installed": true,
+      "version": "1.1.25",
+      "path": "C:\\Users\\Chris\\AppData\\Local\\agy\\bin\\agy.exe",
+      "configured_agents": [],
+      "status": "installed; the local CLI does not expose an agent-list command"
+    },
+    "opencode": {
+      "installed": true,
+      "version": "1.18.25",
+      "path": "C:\\Users\\Chris\\AppData\\Roaming\\npm\\opencode.cmd",
+      "configured_agents": [
+        "build",
+        "clanker",
+        "compaction",
+        "explore",
+        "general",
+        "orchestrator",
+        "plan",
+        "summary",
+        "title"
+      ],
+      "authenticated_providers": [
+        "OpenCode Go"
+      ]
+    }
+  },
+  "durable_state": {
+    "task_history": [
+      ".clanker/tasks/weapons-mesh-fixes/task-state.json"
+    ],
+    "graph_evidence": [
+      "graphify-out/graph.json",
+      "graphify-out/GRAPH_REPORT.md"
+    ],
+    "backend_success_statistics": {},
+    "decision_records": [],
+    "known_constraints": [
+      "Repository AGENTS.md was untracked before migration, so a preservation copy was created under .clanker/history/.",
+      "Unrelated working-tree changes under prototype/ predated this migration and were not modified.",
+      "AGY is installed but the local CLI does not expose an agent-list command.",
+      "The host's bash.exe cannot start a Linux shell, so the Bash enforcement scripts are not active; see .clanker/PENDING_ASKS.md.",
+      "Current structural baseline: .clanker/graph/baseline.json, digest d9aedbd28459b841."
+    ]
+  }
+}
